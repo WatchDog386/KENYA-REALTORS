@@ -1,33 +1,56 @@
-# Database Migrations - January 15, 2025
+# Database Migrations - January 30, 2026
 
 This folder contains all SQL migrations needed to set up the REALTORS-LEASERS database schema.
 
-## Migration Files
+## Essential Migrations (in order)
 
-### Core Schema
+1. **20260125_rls_hardening.sql** - Row Level Security hardening
+   - Secures database access with RLS policies
+   - Sets up role-based permissions
 
-- **20250115_simplified_schema.sql** - Main schema migration
-  - Creates `profiles` table with role-based access control
-  - Creates `properties`, `leases`, `payments`, `maintenance_requests` tables
-  - Sets up Row Level Security (RLS) policies
-  - Indexes for performance optimization
+2. **20260129_add_mock_data.sql** - Test/mock data
+   - Adds sample properties, users, and transactions
+   - Useful for development and testing
 
-### Helper Functions
+3. **20260129_tenant_portal_setup.sql** - Tenant portal tables
+   - Creates tenant-specific tables and views
+   - Sets up tenant dashboard functions
 
-- **20250115_helper_functions.sql** - Database functions and utilities
-  - User role and permission checking functions
-  - Dashboard stats functions for managers and tenants
-  - Audit logging functions
-  - Useful views for common queries
+4. **20260130_add_email_confirmation.sql** - Email verification
+   - Adds email confirmation workflow
+   - Authentication improvements
+
+5. **20260130_create_storage_buckets.sql** - Cloud storage
+   - Sets up Supabase storage buckets
+   - Document and image storage configuration
+
+6. **20260130_create_user_function.sql** - User creation function
+   - Database function for user provisioning
+   - Ensures data consistency
+
+7. **20260130_fix_profiles_rls.sql** - Profiles RLS fixes
+   - Fixes any RLS policy issues
+   - Ensures secure profile access
+
+8. **20260130_property_units_restructure.sql** - Property structure
+   - Restructures property/units relationship
+   - Final schema optimization
 
 ## How to Apply Migrations
 
-### Option 1: Using Supabase Dashboard
+### Option 1: Using Supabase Dashboard (Recommended)
 
 1. Go to your Supabase project
 2. Navigate to "SQL Editor"
 3. Click "New Query"
-4. Copy and paste the entire contents of each migration file (starting with `20250115_simplified_schema.sql`, then `20250115_helper_functions.sql`)
+4. Copy and paste the contents of each migration file in order
+5. Execute each migration and verify success
+
+### Option 2: Using Supabase CLI
+
+```bash
+supabase db push
+```
 5. Click "Run"
 6. Verify no errors appear
 
