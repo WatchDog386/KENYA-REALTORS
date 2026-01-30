@@ -527,33 +527,33 @@ const SuperAdminDashboard = () => {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen antialiased text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="bg-gradient-to-b from-slate-50 to-white min-h-screen antialiased text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Montserrat', sans-serif" }}>
       {/* HERO SECTION */}
-      <section className="bg-slate-50 overflow-hidden py-10 border-b border-gray-200/60">
+      <section className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 overflow-hidden py-10 shadow-lg">
         <div className="max-w-[1400px] mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-10">
             <div className="md:w-1/2">
               <div className="flex items-center gap-3 mb-4">
-                <span className="bg-[#00356B]/10 text-[#00356B] text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-[#00356B]/20">
+                <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/30">
                   System Admin
                 </span>
-                <span className="text-gray-500 text-[10px] font-semibold uppercase tracking-widest">
+                <span className="text-blue-100 text-[10px] font-semibold uppercase tracking-widest">
                   v4.2.0
                 </span>
               </div>
               
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-light text-[#00356B] mb-3 leading-[1.2] tracking-tight">
-                Welcome back, <span className="font-bold">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
+                Welcome back, <span className="text-blue-100">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
               </h1>
               
-              <p className="text-sm text-gray-500 leading-relaxed mb-8 max-w-lg font-medium">
+              <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
                 Here's your system overview. Monitor properties, users, revenue, and system health in real-time with our new polished dashboard.
               </p>
               
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleRefresh}
-                  className="group flex items-center gap-2 bg-[#00356B] text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-[#002a55] transition-all duration-300 rounded-lg shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/30 hover:-translate-y-0.5"
+                  className="group flex items-center gap-2 bg-white text-[#00356B] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-blue-50 transition-all duration-300 rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                   Refresh
@@ -561,7 +561,7 @@ const SuperAdminDashboard = () => {
                 
                 <button
                   onClick={() => navigate("/portal/super-admin/reports")}
-                  className="group flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:border-[#00356B] hover:text-[#00356B] transition-all duration-300 rounded-lg shadow-sm hover:shadow-md"
+                  className="group flex items-center gap-2 bg-white/20 border border-white/40 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/30 transition-all duration-300 rounded-lg shadow-sm hover:shadow-md"
                 >
                   <FileBarChart className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                   Reports
