@@ -434,8 +434,6 @@ export const useSuperAdmin = () => {
         return "property";
       case "profiles":
         return "user";
-      case "profiles":
-        return "user";
       case "refund_requests":
         return "refund";
       case "leases":
