@@ -44,6 +44,9 @@ TEMP_*.md
 .env
 .env.local
 .env.*.local
+src/.env
+src/.env.local
+src/.env.*.local
 
 # Optional npm cache
 .npm
