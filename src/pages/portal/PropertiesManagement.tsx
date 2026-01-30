@@ -266,15 +266,15 @@ const PropertiesManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-light text-[#00356B] tracking-tight">Properties <span className="font-bold">Management</span></h1>
-          <p className="text-gray-600 text-[13px] font-medium mt-2">Manage all properties in your portfolio</p>
+    <div className="space-y-8 bg-gradient-to-br from-gray-50 to-white min-h-screen p-6 rounded-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Properties <span className="font-semibold text-[#D85C2C]">Management</span></h1>
+          <p className="text-gray-500 font-medium">Manage all properties in your portfolio</p>
         </div>
         <Button
           onClick={() => setShowAddForm(true)}
-          className="bg-[#D85C2C] text-white px-6 py-3 text-[10px] font-black uppercase tracking-[1.5px] hover:bg-[#b84520] transition-colors rounded-md shadow-sm flex items-center gap-2"
+          className="bg-[#D85C2C] text-white px-6 py-3 font-semibold uppercase tracking-wide hover:bg-[#b84520] transition-all duration-200 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add Property
@@ -284,10 +284,10 @@ const PropertiesManagement: React.FC = () => {
       {/* Add Property Form Modal */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-light text-[#00356B] tracking-tight">Add <span className="font-bold">Property</span></h2>
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Add <span className="text-[#D85C2C]">Property</span></h2>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -300,10 +300,10 @@ const PropertiesManagement: React.FC = () => {
                 </Button>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {/* Property Basic Info */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Basic Information</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-3">Basic Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Property Name *</label>
@@ -319,7 +319,7 @@ const PropertiesManagement: React.FC = () => {
                       <select
                         value={newProperty.type}
                         onChange={(e) => setNewProperty({...newProperty, type: e.target.value as any})}
-                        className="w-full px-3 py-2 border rounded-md"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-gray-400 transition-colors"
                       >
                         <option value="apartment">Apartment Building</option>
                         <option value="house">Single Family House</option>
@@ -333,7 +333,7 @@ const PropertiesManagement: React.FC = () => {
 
                 {/* Address Section */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Address</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-3">Address</h3>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Street Address *</label>
                     <Input
@@ -384,7 +384,7 @@ const PropertiesManagement: React.FC = () => {
 
                 {/* Property Details */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Property Details</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-3">Property Details</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Total Units</label>
@@ -411,14 +411,14 @@ const PropertiesManagement: React.FC = () => {
                     <textarea
                       value={newProperty.description}
                       onChange={(e) => setNewProperty({...newProperty, description: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-md min-h-[100px]"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-gray-400 transition-colors min-h-[100px] resize-none"
                       placeholder="Describe the property features, amenities, etc."
                     />
                   </div>
                 </div>
 
                 {/* Form Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t">
+                <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -453,7 +453,7 @@ const PropertiesManagement: React.FC = () => {
       )}
 
       {/* Search and Filter */}
-      <Card>
+      <Card className="border-0 shadow-md bg-white">
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -462,10 +462,10 @@ const PropertiesManagement: React.FC = () => {
                 placeholder="Search properties by name, address, or city..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-white border-gray-200 hover:border-gray-300 transition-colors"
               />
             </div>
-            <Button variant="outline" className="flex items-center gap-2">
+            <Button variant="outline" className="flex items-center gap-2 hover:bg-gray-100 transition-colors">
               <Filter className="w-4 h-4" />
               Filter
             </Button>
@@ -474,47 +474,55 @@ const PropertiesManagement: React.FC = () => {
       </Card>
 
       {/* Property Statistics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Property Statistics</CardTitle>
-          <CardDescription>Overview of your property portfolio</CardDescription>
+      <Card className="border-0 shadow-md bg-white">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold text-gray-900">Property Statistics</CardTitle>
+          <CardDescription className="text-gray-600">Overview of your property portfolio</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Properties</p>
-                  <p className="text-2xl font-bold">{propertyStats.total}</p>
+                  <p className="text-sm font-medium text-gray-600">Total Properties</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{propertyStats.total}</p>
                 </div>
-                <Building className="w-8 h-8 text-blue-500" />
+                <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Building className="w-6 h-6 text-blue-600" />
+                </div>
               </div>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg">
+            <div className="bg-green-50 p-4 rounded-lg border border-green-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Occupied</p>
-                  <p className="text-2xl font-bold">{propertyStats.occupied}</p>
+                  <p className="text-sm font-medium text-gray-600">Occupied</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{propertyStats.occupied}</p>
                 </div>
-                <Home className="w-8 h-8 text-green-500" />
+                <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Home className="w-6 h-6 text-green-600" />
+                </div>
               </div>
             </div>
-            <div className="bg-yellow-50 p-4 rounded-lg">
+            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Available</p>
-                  <p className="text-2xl font-bold">{propertyStats.vacant}</p>
+                  <p className="text-sm font-medium text-gray-600">Available</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{propertyStats.vacant}</p>
                 </div>
-                <Home className="w-8 h-8 text-yellow-500" />
+                <div className="h-12 w-12 rounded-lg bg-yellow-100 flex items-center justify-center">
+                  <Home className="w-6 h-6 text-yellow-600" />
+                </div>
               </div>
             </div>
-            <div className="bg-orange-50 p-4 rounded-lg">
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Maintenance</p>
-                  <p className="text-2xl font-bold">{propertyStats.maintenance}</p>
+                  <p className="text-sm font-medium text-gray-600">Maintenance</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-1">{propertyStats.maintenance}</p>
                 </div>
-                <AlertCircle className="w-8 h-8 text-orange-500" />
+                <div className="h-12 w-12 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-orange-600" />
+                </div>
               </div>
             </div>
           </div>
@@ -528,17 +536,17 @@ const PropertiesManagement: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredProperties.map((property) => (
-              <Card key={property.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
+              <Card key={property.id} className="border-0 shadow-md hover:shadow-lg transition-all duration-300 bg-white">
+                <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         {getTypeIcon(property.type)}
-                        <CardTitle className="text-lg">{property.name}</CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-900">{property.name}</CardTitle>
                       </div>
-                      <CardDescription className="text-sm">
+                      <CardDescription className="text-sm text-gray-600">
                         {property.address}, {property.city}, {property.state} {property.zip_code}
                       </CardDescription>
                     </div>
@@ -546,7 +554,7 @@ const PropertiesManagement: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
                         onClick={() => {/* Add view functionality */}}
                       >
                         <Eye className="w-4 h-4" />
@@ -554,7 +562,7 @@ const PropertiesManagement: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
                         onClick={() => {/* Add edit functionality */}}
                       >
                         <Edit className="w-4 h-4" />
@@ -562,7 +570,7 @@ const PropertiesManagement: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                         onClick={() => handleDeleteProperty(property.id)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -571,26 +579,26 @@ const PropertiesManagement: React.FC = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Monthly Rent</span>
-                      <span className="font-semibold">{formatCurrency(property.monthly_rent)}</span>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                      <span className="text-sm text-gray-600 font-medium">Monthly Rent</span>
+                      <span className="font-semibold text-gray-900">{formatCurrency(property.monthly_rent)}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Units</span>
-                      <span className="font-medium">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                      <span className="text-sm text-gray-600 font-medium">Units</span>
+                      <span className="font-medium text-gray-900">
                         {property.occupied_units}/{property.total_units} occupied
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Status</span>
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                      <span className="text-sm text-gray-600 font-medium">Status</span>
                       {getStatusBadge(property.status)}
                     </div>
-                    <div className="pt-3 border-t">
+                    <div className="pt-3">
                       <select
                         value={property.status}
                         onChange={(e) => handleUpdateStatus(property.id, e.target.value as Property['status'])}
-                        className="w-full px-3 py-2 text-sm border rounded-md"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-gray-400 transition-colors"
                       >
                         <option value="available">Mark as Available</option>
                         <option value="occupied">Mark as Occupied</option>
@@ -610,11 +618,11 @@ const PropertiesManagement: React.FC = () => {
           </div>
 
           {filteredProperties.length === 0 && (
-            <Card>
+            <Card className="border-0 shadow-md bg-white md:col-span-2 lg:col-span-3">
               <CardContent className="py-12 text-center">
-                <Building className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No properties found</h3>
-                <p className="text-gray-500 mb-4">
+                <Building className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No properties found</h3>
+                <p className="text-gray-500 mb-6">
                   {searchQuery ? 'Try adjusting your search' : 'Get started by adding your first property'}
                 </p>
                 <Button onClick={() => setShowAddForm(true)}>
