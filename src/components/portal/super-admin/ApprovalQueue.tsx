@@ -213,15 +213,15 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
   const approvalStats = stats;
 
   return (
-    <div className="space-y-6 font-nunito">
+    <div className="space-y-8 font-nunito bg-gradient-to-br from-gray-50 to-white min-h-screen p-6 rounded-lg">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Approval Queue</h2>
-          <p className="text-gray-600">Review and approve pending requests</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900">Approval Queue</h2>
+          <p className="text-gray-500 font-medium">Review and approve pending requests</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="hover:bg-gray-100 transition-colors duration-200">
             <Download className="h-4 w-4 mr-2" />
             Export Queue
           </Button>
@@ -232,6 +232,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
               fetchApprovalRequests();
               fetchApprovalStats();
             }}
+            className="hover:bg-gray-100 transition-colors duration-200"
           >
             Refresh
           </Button>
@@ -239,49 +240,55 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700">
               Pending Approvals
             </CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
+            <div className="h-10 w-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+              <Clock className="h-5 w-5 text-yellow-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold text-gray-900">
               {approvalStats?.pending || 0}
             </div>
-            <p className="text-xs text-gray-500">Pending requests</p>
+            <p className="text-xs text-gray-600 font-medium mt-1">Pending requests</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+        <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700">
               Total Requests
             </CardTitle>
-            <Calendar className="h-4 w-4 text-blue-500" />
+            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Calendar className="h-5 w-5 text-blue-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold text-gray-900">
               {approvalStats?.total || 0}
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-600 font-medium mt-1">
               {approvalStats?.pending || 0} pending
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+        <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700">Approved</CardTitle>
+            <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold text-gray-900">
               {approvalStats?.approved || 0}
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-600 font-medium mt-1">
               {(
                 ((approvalStats?.approved || 0) /
                   Math.max(approvalStats?.total || 1, 1)) *
@@ -292,16 +299,18 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
+        <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700">Rejected</CardTitle>
+            <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
+              <XCircle className="h-5 w-5 text-red-600" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold text-gray-900">
               {approvalStats?.rejected || 0}
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-600 font-medium mt-1">
               {(
                 ((approvalStats?.rejected || 0) /
                   Math.max(approvalStats?.total || 1, 1)) *
@@ -314,7 +323,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
       </div>
 
       {/* Filters and Search */}
-      <Card>
+      <Card className="border-0 shadow-md bg-white">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
@@ -325,14 +334,14 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                  className="pl-10"
+                  className="pl-10 bg-white border-gray-200 hover:border-gray-300 transition-colors"
                 />
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[160px] bg-white border-gray-200 text-gray-700">
+                <SelectTrigger className="w-[160px] bg-white border-gray-200 text-gray-700 hover:border-gray-300 transition-colors">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -356,7 +365,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
               </Select>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-700">
+                <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-700 hover:border-gray-300 transition-colors">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -368,7 +377,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" onClick={handleSearch}>
+              <Button variant="outline" onClick={handleSearch} className="hover:bg-gray-100 transition-colors">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
@@ -378,10 +387,10 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
       </Card>
 
       {/* Approvals Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Approval Requests</CardTitle>
-          <CardDescription>
+      <Card className="border-0 shadow-md bg-white">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg font-semibold text-gray-900">Approval Requests</CardTitle>
+          <CardDescription className="text-gray-600">
             {filteredApprovals.length} requests found
           </CardDescription>
         </CardHeader>
@@ -397,7 +406,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
               <p className="text-gray-500">All requests have been processed</p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -578,10 +587,10 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
 
       {/* View Approval Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] rounded-lg">
           <DialogHeader>
-            <DialogTitle>Approval Request Details</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-bold">Approval Request Details</DialogTitle>
+            <DialogDescription className="text-gray-600">
               Review all details before making a decision
             </DialogDescription>
           </DialogHeader>
@@ -745,10 +754,10 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
 
       {/* Reject Dialog */}
       <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] rounded-lg">
           <DialogHeader>
-            <DialogTitle>Reject Approval Request</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-bold">Reject Approval Request</DialogTitle>
+            <DialogDescription className="text-gray-600">
               Please provide a reason for rejecting this request. The user will
               be notified.
             </DialogDescription>
@@ -761,6 +770,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Enter the reason for rejection..."
+                className="border-gray-200 focus:border-gray-400 resize-none"
                 rows={4}
               />
             </div>
