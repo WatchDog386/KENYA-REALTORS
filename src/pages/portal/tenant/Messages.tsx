@@ -156,8 +156,6 @@ const MessagesPage: React.FC = () => {
           </div>
         </div>
       </div>
-        </div>
-      </div>
 
       {messages.length === 0 ? (
         <Card>
