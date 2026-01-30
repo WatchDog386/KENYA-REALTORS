@@ -73,10 +73,6 @@ const ManagerTenants = () => {
       setLoading(false);
     }
   };
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredTenants = tenants.filter(tenant => 
     tenant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||

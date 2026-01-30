@@ -45,6 +45,14 @@ const ManagerPayments = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Get manager's properties first
+      const { data: propertyIds } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('property_manager_id', user.id);
+
+      const propIds = propertyIds?.map(p => p.id) || [];
+
       const { data, error } = await supabase
         .from('payments')
         .select(`
@@ -59,12 +67,7 @@ const ManagerPayments = () => {
             address
           )
         `)
-        .in('property_id', 
-          supabase
-            .from('properties')
-            .select('id')
-            .eq('property_manager_id', user.id)
-        )
+        .in('property_id', propIds)
         .order('payment_date', { ascending: false })
         .limit(50);
 

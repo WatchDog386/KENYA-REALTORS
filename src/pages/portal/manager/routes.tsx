@@ -1,6 +1,5 @@
 import { RouteObject } from 'react-router-dom';
 import ManagerLayout from '@/components/layout/ManagerLayout';
-import ManagerPortal from './index';
 import ManagerProperties from './Properties';
 import ManagerTenants from './Tenants';
 import ManagerPayments from './Payments';
@@ -8,19 +7,12 @@ import ManagerMaintenance from './Maintenance';
 import ManagerApprovalRequests from './ApprovalRequests';
 import ManagerVacationNotices from './VacationNotices';
 import ManagerReports from './Reports';
-import ManagerMessages from './Messages';
-import ManagerLeases from './Leases';
-import ManagerProfile from './Profile';
 
 export const managerRoutes: RouteObject[] = [
   {
     path: '/portal/manager',
-    element: <ManagerLayout />,
+    element: <ManagerLayout><div /></ManagerLayout>,
     children: [
-      {
-        index: true,
-        element: <ManagerPortal />,
-      },
       {
         path: 'properties',
         element: <ManagerProperties />,
@@ -48,18 +40,6 @@ export const managerRoutes: RouteObject[] = [
       {
         path: 'reports',
         element: <ManagerReports />,
-      },
-      {
-        path: 'messages',
-        element: <ManagerMessages />,
-      },
-      {
-        path: 'leases',
-        element: <ManagerLeases />,
-      },
-      {
-        path: 'profile',
-        element: <ManagerProfile />,
       },
     ],
   },

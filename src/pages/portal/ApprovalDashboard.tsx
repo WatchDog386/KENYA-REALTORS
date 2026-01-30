@@ -223,7 +223,7 @@ const ApprovalDashboard = () => {
                         <CardTitle>{request.title || `Approval #${request.id.slice(0, 8)}`}</CardTitle>
                         <CardDescription>
                           {getTypeLabel(request.type)} • 
-                          Submitted by: {request.submitted_by_user?.first_name || 'Unknown'}
+                          Submitted by: {request.submitted_by || 'Unknown'}
                         </CardDescription>
                       </div>
                     </div>
@@ -237,22 +237,9 @@ const ApprovalDashboard = () => {
                   <div className="space-y-4">
                     <p className="text-gray-700">{request.description || 'No additional details provided.'}</p>
                     
-                    {request.property && (
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Home className="w-4 h-4 text-gray-500" />
-                          <span className="font-medium">Related Property:</span>
-                          <span>{request.property.name}</span>
-                        </div>
-                      </div>
-                    )}
-                    
                     <div className="flex items-center justify-between text-sm text-gray-500">
                       <div>
                         <span>Requested: {formatDate(request.created_at)}</span>
-                        {request.days_pending !== undefined && (
-                          <span className="ml-4">Pending for {request.days_pending} days</span>
-                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button 
@@ -311,7 +298,7 @@ const ApprovalDashboard = () => {
                     </div>
                     <div className="text-sm text-gray-600">{request.description}</div>
                     <div className="text-xs text-gray-500">
-                      Approved on {request.reviewed_at ? formatDate(request.reviewed_at) : 'Unknown date'}
+                      Approved on {request.created_at ? formatDate(request.created_at) : 'Unknown date'}
                     </div>
                   </div>
                 </CardContent>
@@ -359,10 +346,7 @@ const ApprovalDashboard = () => {
                           {getStatusBadge(request.status)}
                         </td>
                         <td className="py-3 px-4">
-                          {request.submitted_by_user 
-                            ? `${request.submitted_by_user.first_name} ${request.submitted_by_user.last_name}`
-                            : 'Unknown'
-                          }
+                          {request.submitted_by || 'Unknown'}
                         </td>
                         <td className="py-3 px-4 text-gray-500">
                           {formatDate(request.created_at)}
@@ -407,13 +391,11 @@ const ApprovalDashboard = () => {
                     </div>
                     <div className="text-sm text-gray-600">{request.description}</div>
                     <div className="text-xs text-gray-500">
-                      Rejected on {request.reviewed_at ? formatDate(request.reviewed_at) : 'Unknown date'}
+                      Rejected on {formatDate(request.created_at)}
                     </div>
-                    {request.review_notes && (
-                      <div className="p-2 bg-red-50 border border-red-100 rounded text-sm text-red-700">
-                        <span className="font-medium">Rejection Reason:</span> {request.review_notes}
-                      </div>
-                    )}
+                    <div className="p-2 bg-red-50 border border-red-100 rounded text-sm text-red-700">
+                      <span className="font-medium">Status:</span> Rejected
+                    </div>
                   </div>
                 </CardContent>
               </Card>

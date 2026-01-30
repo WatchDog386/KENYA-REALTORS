@@ -18,15 +18,19 @@ import { useApprovalSystem } from '@/hooks/useApprovalSystem';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 const ManagerApprovalRequests = () => {
-  const { approvals, loading, processApproval } = useApprovalSystem();
+  const { requests, loading, approveRequest, rejectRequest } = useApprovalSystem();
   const [filter, setFilter] = useState('pending');
 
-  const filteredApprovals = approvals.filter(approval => 
+  const filteredApprovals = requests.filter(approval => 
     filter === 'all' || approval.status === filter
   );
 
   const handleProcess = async (approvalId: string, action: 'approve' | 'reject') => {
-    await processApproval(approvalId, action);
+    if (action === 'approve') {
+      await approveRequest(approvalId);
+    } else {
+      await rejectRequest(approvalId);
+    }
   };
 
   const getApprovalTypeIcon = (type: string) => {
@@ -72,14 +76,14 @@ const ManagerApprovalRequests = () => {
             size="sm"
             onClick={() => setFilter('pending')}
           >
-            Pending ({approvals.filter(a => a.status === 'pending').length})
+            Pending ({requests.filter(a => a.status === 'pending').length})
           </Button>
           <Button 
             variant={filter === 'all' ? 'default' : 'outline'} 
             size="sm"
             onClick={() => setFilter('all')}
           >
-            All ({approvals.length})
+            All ({requests.length})
           </Button>
         </div>
       </div>
@@ -109,27 +113,21 @@ const ManagerApprovalRequests = () => {
                 <TableRow key={approval.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {getApprovalTypeIcon(approval.approval_type)}
-                      <span className="capitalize">{approval.approval_type?.replace('_', ' ')}</span>
+                      {getApprovalTypeIcon(approval.request_type)}
+                      <span className="capitalize">{approval.request_type?.replace('_', ' ')}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-gray-400" />
-                      <span>{approval.user?.first_name} {approval.user?.last_name}</span>
+                      <span>{approval.requested_by_user?.first_name || approval.requested_by || 'Unknown'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    {approval.property?.name || 'N/A'}
+                    N/A
                   </TableCell>
                   <TableCell>
-                    {approval.details ? (
-                      <div className="text-sm text-gray-600">
-                        {JSON.stringify(approval.details)}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">No details</span>
-                    )}
+                    <span className="text-gray-400">No details</span>
                   </TableCell>
                   <TableCell>
                     {new Date(approval.created_at).toLocaleDateString()}
