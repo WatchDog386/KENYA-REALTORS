@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileContract } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 const LeasesManagement: React.FC = () => {
   return (
@@ -7,7 +7,7 @@ const LeasesManagement: React.FC = () => {
       <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="bg-white/20 p-3 rounded-lg">
-            <FileContract className="w-6 h-6 text-white" />
+            <FileText className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-white">Leases Management</h1>
