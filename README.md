@@ -52,7 +52,28 @@ npm run build
 
 ## 🔑 Environment Variables
 
-See `.env.example` in src directory for required environment variables.
+See `.env.example` in the root directory for required environment variables.
+
+### Local Development
+1. Copy the template: `cp .env.example .env.local`
+2. Fill in your actual API keys and credentials
+3. **IMPORTANT**: Never commit `.env` or `.env.local` to version control (`.gitignore` already excludes these)
+
+### Netlify Deployment
+1. Go to **Netlify Dashboard** → **Site settings** → **Build & deploy** → **Environment**
+2. Add environment variables for production:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_GEMINI_API_KEY`
+   - `VITE_PAYSTACK_PUBLIC_KEY`
+   - `VITE_PAYSTACK_SECRET_KEY`
+   - `VITE_PAYSTACK_PLAN_INTERMEDIATE`
+   - `VITE_PAYSTACK_PLAN_PROFESSIONAL`
+   - `VITE_APP_URL`
+
+3. Trigger a new deploy to apply the environment variables
+
+⚠️ **Security**: Never hardcode secrets in source code or commit `.env` files. All secrets should be configured in your deployment platform's environment variables.
 
 ## 📦 Technology Stack
 
