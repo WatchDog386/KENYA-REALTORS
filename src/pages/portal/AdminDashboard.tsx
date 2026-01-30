@@ -129,13 +129,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = () => {
   return (
     <div className="space-y-8">
       {/* Header with Brand Logic */}
-      <div className="flex items-center space-x-4 mb-8">
-        <div className="bg-blue-600 p-3 rounded-lg shadow-sm">
+      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center space-x-4">
+        <div className="bg-white/20 p-3 rounded-lg">
           <LayoutDashboard className="h-8 w-8 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here's what's happening today.</p>
+          <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+          <p className="text-blue-100 text-sm mt-1">Welcome back! Here's what's happening today.</p>
         </div>
       </div>
 

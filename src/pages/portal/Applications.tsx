@@ -75,10 +75,15 @@ const Applications = () => {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Applications</h1>
-        <p className="text-gray-600">Track and manage your rental applications</p>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center gap-4">
+        <div className="bg-white/20 p-3 rounded-lg">
+          <FileText className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-white">My Applications</h1>
+          <p className="text-blue-100 text-sm mt-1">Track and manage your rental applications</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

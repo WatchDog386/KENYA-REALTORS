@@ -1,11 +1,20 @@
 import React from 'react';
+import { FileContract } from 'lucide-react';
 
 const LeasesManagement: React.FC = () => {
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Leases Management</h1>
-        <button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark">
+      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/20 p-3 rounded-lg">
+            <FileContract className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Leases Management</h1>
+            <p className="text-blue-100 text-sm mt-1">Manage and track all property leases</p>
+          </div>
+        </div>
+        <button className="px-4 py-2 bg-white text-[#00356B] rounded-lg hover:bg-gray-100 font-medium">
           Create New Lease
         </button>
       </div>

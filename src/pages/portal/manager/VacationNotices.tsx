@@ -6,12 +6,17 @@ import { Button } from '@/components/ui/button';
 const ManagerVacationNotices = () => {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Vacation Notices</h1>
-          <p className="text-gray-600">Manage tenant vacation and absence reports</p>
+      <div className="bg-gradient-to-r from-[#D85C2C] to-[#D85C2C]/80 rounded-xl shadow-lg p-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/20 p-3 rounded-lg">
+            <Calendar className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Vacation Notices</h1>
+            <p className="text-orange-100 text-sm mt-1">Manage tenant vacation and absence reports</p>
+          </div>
         </div>
-        <Button>New Notice</Button>
+        <Button className="bg-white text-[#D85C2C] hover:bg-gray-100">New Notice</Button>
       </div>
 
       <Card>

@@ -185,13 +185,18 @@ const ManagerProperties = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-light text-[#00356B] tracking-tight">My <span className="font-bold">Properties</span></h1>
-          <p className="text-gray-600 text-[13px] font-medium">Manage your assigned properties and units</p>
+      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/20 p-3 rounded-lg">
+            <Building className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-white">My Properties</h1>
+            <p className="text-blue-100 text-sm mt-1">Manage your assigned properties and units</p>
+          </div>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" asChild className="border border-[#00356B] text-[#00356B] hover:bg-[#00356B] hover:text-white px-6 py-3 rounded-md">
+          <Button variant="outline" asChild className="border border-white text-white hover:bg-white/20 px-6 py-3 rounded-md">
             <Link to="/portal/manager/properties/units">
               <Home className="w-4 h-4 mr-2" />
               View Units

@@ -1,12 +1,18 @@
 // src/pages/portal/ProfileManagement.tsx
 import React from 'react';
+import { User } from 'lucide-react';
 
 const ProfileManagement: React.FC = () => {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-light text-[#00356B] tracking-tight">Profile <span className="font-bold">Management</span></h1>
-        <p className="text-gray-600 text-[13px] font-medium mt-2">Manage your personal information and account settings</p>
+      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center gap-4">
+        <div className="bg-white/20 p-3 rounded-lg">
+          <User className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-white">Profile Management</h1>
+          <p className="text-blue-100 text-sm mt-1">Manage your personal information and account settings</p>
+        </div>
       </div>
       
       <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">

@@ -155,18 +155,13 @@ const PropertyPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate("/portal/tenant")}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft size={20} className="text-gray-600" />
-        </button>
+      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center gap-4">
+        <div className="bg-white/20 p-3 rounded-lg">
+          <Home className="w-6 h-6 text-white" />
+        </div>
         <div>
-          <h1 className="text-3xl font-light text-[#00356B] tracking-tight">
-            Property Details
-          </h1>
-          <p className="text-sm text-gray-600">Information about your rental unit</p>
+          <h1 className="text-3xl font-bold text-white">Property Details</h1>
+          <p className="text-blue-100 text-sm mt-1">Information about your rental unit</p>
         </div>
       </div>
 

@@ -106,11 +106,11 @@ const RoleSelection = () => {
         </Button>
 
         {/* Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-8 text-center mb-10">
+          <h1 className="text-4xl font-bold text-white mb-4">
             Choose Your Role
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg text-blue-100 max-w-2xl mx-auto">
             Welcome, {user?.email}! Please select the role that best describes how you'll use this platform.
             You can request role changes from the super administrator later if needed.
           </p>
