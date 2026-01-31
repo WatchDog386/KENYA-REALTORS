@@ -17,8 +17,7 @@ const NotFound = () => {
       rotate: [0, 1, -1, 0],
       transition: {
         duration: 6,
-        repeat: Infinity,
-        ease: "easeInOut"
+        repeat: Infinity as any,
       }
     }
   };
@@ -30,8 +29,7 @@ const NotFound = () => {
       opacity: [0.3, 0.15, 0.3],
       transition: {
         duration: 6,
-        repeat: Infinity,
-        ease: "easeInOut"
+        repeat: Infinity as any,
       }
     }
   };
@@ -42,9 +40,8 @@ const NotFound = () => {
       scaleY: [1, 1, 0.1, 1],
       transition: {
         duration: 4,
-        repeat: Infinity,
+        repeat: Infinity as any,
         times: [0, 0.9, 0.95, 1], // Blink rarely
-        ease: "easeInOut"
       }
     }
   };
@@ -57,8 +54,7 @@ const NotFound = () => {
       opacity: [0.5, 1, 0.5],
       transition: {
         duration: 4,
-        repeat: Infinity,
-        ease: "easeInOut"
+        repeat: Infinity as any,
       }
     }
   };

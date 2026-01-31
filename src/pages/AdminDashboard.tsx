@@ -107,7 +107,7 @@ const AdminDashboard = () => {
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>;
 
   // Access Denied View
-  if (!profile?.is_admin && !loading && user) { // Keep lenient for demo, strictly check profile.is_admin in prod
+  if (profile?.role !== 'super_admin' && !loading && user) { // Keep lenient for demo, strictly check profile.role in prod
      // You can uncomment strict check below
      // return <div className="h-screen flex items-center justify-center font-sans text-lg font-medium text-red-600">Access Denied</div>;
   }

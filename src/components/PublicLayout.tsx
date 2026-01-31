@@ -29,7 +29,7 @@ export default function PublicLayout() {
     <div className="flex flex-col min-h-screen relative">
       {/* 1. Frontend Navbar for public pages - Only show on non-auth pages */}
       {!isAuthPage && (
-        <NavbarSection onOpenLeasing={() => setIsLeasingOpen(true)} />
+        <NavbarSection />
       )}
 
       {/* 2. Main Content 

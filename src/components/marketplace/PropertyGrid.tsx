@@ -1,26 +1,24 @@
 import { MapPin, Bed, Bath, Square } from 'lucide-react';
+import { Property } from '@/hooks/useProperties';
 
-// Define a basic interface for now
-interface Property {
-  id: string;
-  title: string;
-  price: number;
-  location: string;
-  beds: number;
-  baths: number;
-  sqft: number;
-  imageUrl: string;
+interface PropertyGridProps {
+  properties: Property[];
+  onPropertyClick?: (id: string) => void;
 }
 
-const PropertyGrid = ({ properties }: { properties: Property[] }) => {
+const PropertyGrid = ({ properties, onPropertyClick }: PropertyGridProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {properties.map((property) => (
-        <div key={property.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+        <div 
+          key={property.id} 
+          className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => onPropertyClick?.(property.id)}
+        >
           <div className="h-48 w-full bg-gray-200 relative">
             <img 
-              src={property.imageUrl} 
-              alt={property.title} 
+              src={property.images?.[0] || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00'} 
+              alt={property.title || property.name} 
               className="w-full h-full object-cover"
             />
             <span className="absolute top-3 right-3 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
@@ -29,23 +27,23 @@ const PropertyGrid = ({ properties }: { properties: Property[] }) => {
           </div>
           
           <div className="p-4">
-            <h3 className="text-lg font-bold text-gray-900 truncate">{property.title}</h3>
-            <p className="text-blue-600 font-bold text-xl mt-1">${property.price.toLocaleString()}<span className="text-sm text-gray-500 font-normal">/mo</span></p>
+            <h3 className="text-lg font-bold text-gray-900 truncate">{property.title || property.name}</h3>
+            <p className="text-blue-600 font-bold text-xl mt-1">${(property.price || property.monthly_rent || 0).toLocaleString()}<span className="text-sm text-gray-500 font-normal">/mo</span></p>
             
             <div className="flex items-center gap-1 text-gray-500 text-sm mt-2 mb-4">
               <MapPin size={16} />
-              <span className="truncate">{property.location}</span>
+              <span className="truncate">{property.address || property.city}</span>
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-3 text-sm text-gray-600">
               <div className="flex items-center gap-1">
-                <Bed size={16} /> <span>{property.beds} Beds</span>
+                <Bed size={16} /> <span>{property.bedrooms || 0} Beds</span>
               </div>
               <div className="flex items-center gap-1">
-                <Bath size={16} /> <span>{property.baths} Baths</span>
+                <Bath size={16} /> <span>{property.bathrooms || 0} Baths</span>
               </div>
               <div className="flex items-center gap-1">
-                <Square size={16} /> <span>{property.sqft} sqft</span>
+                <Square size={16} /> <span>{property.square_feet || 0} sqft</span>
               </div>
             </div>
           </div>

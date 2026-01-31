@@ -6,6 +6,20 @@ import {
   Share2, ThumbsUp, ArrowLeft, Bookmark, CheckCircle, MapPin
 } from "lucide-react";
 
+// --- GLOBAL STYLES ---
+const GlobalStyles = () => (
+    <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+        .font-nunito { font-family: 'Nunito', sans-serif; }
+        
+        /* Custom scrollbar for consistency */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #ccc; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #F96302; }
+    `}</style>
+);
+
 // --- 1. CONFIGURATION & TYPES ---
 
 const THEME = {
@@ -359,17 +373,6 @@ const RentalGuidesSection = () => {
   const [bookmarks, setBookmarks] = useState<number[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  // Global Styles injection (Quick fix for fonts)
-  const GlobalStyles = () => (
-    <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
-      .font-nunito { font-family: 'Nunito', sans-serif; }
-      .article-content h3 { font-size: 1.5rem; font-weight: 800; color: ${THEME.blue}; margin-top: 2rem; margin-bottom: 1rem; }
-      .article-content p { margin-bottom: 1.2rem; line-height: 1.8; color: ${THEME.text}; }
-      .article-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1.5rem; }
-    `}</style>
-  );
-
   // Handlers
   const toggleBookmark = (id: number) => {
     if (bookmarks.includes(id)) {
@@ -393,6 +396,7 @@ const RentalGuidesSection = () => {
   return (
     <>
       <GlobalStyles />
+      <div className="font-nunito w-full bg-[#f7f7f7] text-[#484848]">
       <AnimatePresence>
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       </AnimatePresence>
@@ -535,6 +539,7 @@ const RentalGuidesSection = () => {
           </motion.section>
         )}
       </AnimatePresence>
+      </div>
     </>
   );
 };

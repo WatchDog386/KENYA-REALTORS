@@ -3,12 +3,12 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Building, ArrowLeft, RefreshCw } from 'lucide-react';
-import PropertyManager from '@/components/portal/super-admin/PropertyManager';
+import PropertyManager from '@/components/portal/super-admin/PropertyManagementNew';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { Button } from '@/components/ui/button';
 
 const PropertiesManagement: React.FC = () => {
-  const { hasPermission, isLoading } = useSuperAdmin();
+  const { hasPermission, loading: isLoading } = useSuperAdmin();
   const navigate = useNavigate();
 
   // Check if user has permission to manage properties

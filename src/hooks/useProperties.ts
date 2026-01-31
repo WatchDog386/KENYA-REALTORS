@@ -24,6 +24,15 @@ export interface Property {
   zip_code?: string;
   country?: string;
   
+  // Marketplace/listing fields
+  title?: string;
+  price?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  square_feet?: number;
+  images?: string[];
+  amenities?: string[];
+  
   // Related data
   manager?: {
     id: string;

@@ -12,10 +12,15 @@ import {
 // ==========================================
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,700;0,900;1,900&family=Inter:wght@400;700;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
     
-    .font-condensed { font-family: 'Roboto Condensed', sans-serif; }
-    .font-pro { font-family: 'Inter', sans-serif; }
+    .font-nunito { font-family: 'Nunito', sans-serif; }
+    
+    /* Custom scrollbar for consistency */
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #ccc; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #F96302; }
     
     /* Hover Effect: Blue to Orange transition */
     .realtor-strip-hover:hover { background-color: #D85C2C !important; border-color: #D85C2C !important; }
@@ -44,13 +49,13 @@ export default function TenantCTABanner() {
   });
 
   useEffect(() => {
-    localStorage.setItem("realtor_unit_saved", isSaved);
+    localStorage.setItem("realtor_unit_saved", isSaved ? "true" : "false");
   }, [isSaved]);
 
   return (
     <>
     <GlobalStyles />
-    <section className="w-full bg-[#F4F4F4] py-4 px-4 font-pro">
+    <section className="w-full font-nunito bg-[#f7f7f7] py-4 px-4 text-[#484848]">
       <motion.div 
         initial={{ opacity: 0, y: 5 }}
         whileInView={{ opacity: 1, y: 0 }}

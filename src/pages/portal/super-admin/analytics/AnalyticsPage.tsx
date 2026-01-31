@@ -8,7 +8,7 @@ import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { Button } from '@/components/ui/button';
 
 const AnalyticsPage: React.FC = () => {
-  const { hasPermission, isLoading } = useSuperAdmin();
+  const { hasPermission, loading: isLoading } = useSuperAdmin();
   const navigate = useNavigate();
 
   // Check if user has permission to view analytics

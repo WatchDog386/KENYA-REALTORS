@@ -8,10 +8,23 @@ interface Approval {
   type: string;
   status: string;
   submitted_by: string;
+  submitted_by_user?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    avatar_url?: string;
+    role?: string;
+  };
   property_id?: string;
+  property?: {
+    name?: string;
+    address?: string;
+  };
   description: string;
   priority: string;
   attachments?: any[];
+  metadata?: Record<string, any>;
+  days_pending?: number;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +49,7 @@ interface ApprovalContextType {
   approveRequest: (approvalId: string, notes?: string) => Promise<void>;
   rejectRequest: (approvalId: string, reason: string) => Promise<void>;
   addComment: (approvalId: string, comment: string) => Promise<void>;
+  addApproval: (approval: Omit<Approval, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   getApproval: (approvalId: string) => Approval | undefined;
   
   // Filters
@@ -143,6 +157,24 @@ export const ApprovalProvider: React.FC<ApprovalProviderProps> = ({ children }) 
     return allApprovals.find(a => a.id === approvalId);
   };
 
+  // Add a new approval
+  const addApproval = async (approval: Omit<Approval, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const newApproval: Approval = {
+        ...approval,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      setPendingApprovals(prev => [...prev, newApproval]);
+      toast.success('Approval request submitted successfully');
+    } catch (error) {
+      toast.error('Failed to submit approval request');
+      throw error;
+    }
+  };
+
   // Filter approvals by type
   const filterByType = (type: string) => {
     const allApprovals = [...pendingApprovals, ...approvedApprovals, ...rejectedApprovals];
@@ -193,6 +225,7 @@ export const ApprovalProvider: React.FC<ApprovalProviderProps> = ({ children }) 
     approveRequest,
     rejectRequest,
     addComment,
+    addApproval,
     getApproval,
     
     // Filters

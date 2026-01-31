@@ -3,17 +3,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
     MapPin, BedDouble, Bath, X, Search, ShoppingCart, Menu,
     ChevronRight, CheckCircle2, Maximize, User, Phone, 
-    ArrowRight, PlayCircle, Home, Shield, Zap, Wifi
+    ArrowRight, PlayCircle, Home, Shield, Zap, Wifi, Clock, FileText
 } from "lucide-react";
 
 // --- 1. THEME & STYLES ---
 const THEME = {
-    orange: "#D85C2C",
-    blue: "#00356B",
-    text: "var(--dark-gray)",
-    heading: "var(--dark-gray)",
+    orange: "#F96302",
+    blue: "#154279",
+    text: "#484848",
+    heading: "#154279",
     bgLight: "#f7f7f7",
-    border: "#ebebeb"
+    border: "#e2e8f0"
 };
 
 const GlobalStyles = () => (
@@ -21,17 +21,19 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
     
     body { font-family: 'Nunito', sans-serif; color: ${THEME.text}; background-color: ${THEME.bgLight}; }
-    h1, h2, h3, h4, h5, h6 { color: ${THEME.heading}; }
+    .font-nunito { font-family: 'Nunito', sans-serif; }
     
-    .custom-scroll::-webkit-scrollbar { width: 8px; }
-    .custom-scroll::-webkit-scrollbar-track { background: #fff; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
-    .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--cta); }
+    h1, h2, h3, h4, h5, h6 { color: ${THEME.heading}; font-family: 'Nunito', sans-serif; }
+    
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #ccc; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: ${THEME.orange}; }
 
-    .hd-checkbox { accent-color: var(--cta); width: 18px; height: 18px; cursor: pointer; }
+    .hd-checkbox { accent-color: ${THEME.orange}; width: 18px; height: 18px; cursor: pointer; }
     
     .shadow-hover { transition: all 0.3s ease; }
-    .shadow-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .shadow-hover:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(21, 66, 121, 0.08); }
     
     /* Animation */
     .fade-in-up { animation: fadeInUp 0.8s ease-out forwards; opacity: 0; transform: translateY(20px); }
@@ -41,7 +43,7 @@ const GlobalStyles = () => (
     .gallery-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; height: 400px; }
     .gallery-main { grid-row: span 2; height: 100%; }
     .gallery-sub { display: flex; flex-direction: column; gap: 10px; height: 100%; }
-    .gallery-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; cursor: pointer; }
+    .gallery-img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; cursor: pointer; }
 
     @media (max-width: 768px) {
         .gallery-grid { display: flex; flex-direction: column; height: auto; }
@@ -308,31 +310,31 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
     };
 
     return (
-        <div className="bg-navy p-6 rounded-none shadow-sm border border-navy text-white">
-            <h3 className="font-bold text-lg mb-6 text-white flex items-center gap-2">
-                <Search size={18} className="text-cta" /> Find Your Unit
+        <div className="bg-[#154279] p-6 rounded-none shadow-xl shadow-slate-200/50 border border-[#154279] text-white font-nunito">
+            <h3 className="font-bold text-lg mb-6 text-white flex items-center gap-2 tracking-tight">
+                <Search size={18} className="text-[#F96302]" /> Find Your Unit
             </h3> 
             
             <div className="space-y-5">
                 <div>
-                    <label className="text-xs font-bold uppercase text-navy/50 mb-2 block">Search</label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Search</label>
                     <input 
                         type="text" 
                         name="keyword"
                         placeholder="Keyword (e.g. Balcony)" 
                         value={filters.keyword}
                         onChange={handleChange}
-                        className="w-full bg-white border-none p-3 rounded-none text-sm text-dark-gray focus:ring-1 focus:ring-cta outline-none"
+                        className="w-full bg-white/10 border border-white/10 p-3 rounded-none text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none backdrop-blur-sm"
                     />
                 </div>
 
                 <div>
-                    <label className="text-xs font-bold uppercase text-navy/50 mb-2 block">Apartment Type</label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Apartment Type</label>
                     <select 
                         name="type" 
                         value={filters.type}
                         onChange={handleChange}
-                        className="w-full bg-white border-none p-3 rounded-none text-sm text-dark-gray focus:ring-1 focus:ring-cta outline-none cursor-pointer"
+                        className="w-full bg-white/10 border border-white/10 p-3 rounded-none text-sm text-white focus:ring-1 focus:ring-[#F96302] outline-none cursor-pointer backdrop-blur-sm [&>option]:text-[#484848]"
                     >
                         <option value="All">All Types</option>
                         <option value="3 Bedroom">3 Bedrooms</option>
@@ -345,7 +347,7 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                 </div>
 
                 <div>
-                    <label className="text-xs font-bold uppercase text-navy/50 mb-2 block">Max Price: KES {Number(filters.maxPrice).toLocaleString()}</label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Max Price: KES {Number(filters.maxPrice).toLocaleString()}</label>
                     <input 
                         type="range" 
                         name="maxPrice"
@@ -354,26 +356,27 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                         step="5000"
                         value={filters.maxPrice}
                         onChange={handleChange}
-                        className="w-full h-1 bg-gray-400 rounded-lg appearance-none cursor-pointer accent-cta"
+                        className="w-full h-1 bg-white/20 rounded-none appearance-none cursor-pointer accent-[#F96302]"
                     />
-                    <div className="flex justify-between text-[10px] text-navy/50 mt-1 font-bold">
+                    <div className="flex justify-between text-[10px] text-white/50 mt-1 font-bold">
                         <span>10k</span>
                         <span>150k+</span>
                     </div>
                 </div>
 
                 <div className="pt-2">
-                    <label className="text-xs font-bold uppercase text-navy/50 mb-2 block">Tower Wing</label>
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Tower Wing</label>
                     <div className="space-y-2">
                         {["Wing A (Executive)", "Wing B (Standard)", "Wing C (Economy)"].map((wing, i) => (
-                            <label key={i} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-cta">
-                                <input type="checkbox" className="hd-checkbox rounded-sm" /> {wing}
+                            <label key={i} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#F96302] transition-colors group">
+                                <input type="checkbox" className="hd-checkbox border-white/20 bg-white/10" /> 
+                                <span className="font-medium group-hover:translate-x-1 transition-transform">{wing}</span>
                             </label>
                         ))}
                     </div>
                 </div>
 
-                <button className="btn-primary w-full">
+                <button className="w-full bg-[#F96302] hover:bg-[#d85502] text-white font-bold py-3 rounded-none uppercase tracking-widest text-xs transition-all shadow-lg shadow-orange-950/20">
                     Search Availability
                 </button>
             </div>
@@ -387,137 +390,166 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
     return (
         <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto custom-scroll"
+            className="fixed inset-0 z-50 bg-[#154279]/80 backdrop-blur-sm overflow-y-auto custom-scroll font-nunito"
         >
             {/* Header / Nav inside Modal */}
-            <div className="sticky top-0 bg-white shadow-md z-50 px-4 md:px-8 h-16 flex items-center justify-between">
-                <div className="font-bold text-xl text-navy">AYDEN<span className="text-cta">HOMES</span></div>
+            <div className="sticky top-0 bg-white shadow-xl shadow-slate-200/50 z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-slate-200">
+                <div className="font-bold text-xl text-[#154279] tracking-tighter uppercase">AYDEN<span className="text-[#F96302]">HOMES</span></div>
                 <button 
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-cta hover:text-white flex items-center justify-center transition-all"
+                    className="w-10 h-10 rounded-none bg-slate-100 hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all border border-slate-200"
                 >
-                    <X size={18} />
+                    <X size={20} />
                 </button>
             </div>
 
-            <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20">
+            <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20 shadow-2xl">
                 {/* 1. Title Header Section */}
-                <div className="p-6 md:p-10 pb-4 flex flex-col md:flex-row justify-between items-start border-b border-gray-100">
+                <div className="p-6 md:p-10 pb-6 flex flex-col md:flex-row justify-between items-start border-b border-slate-100 bg-slate-50/50">
                     <div>
-                        <div className="flex gap-2 mb-3">
-                            <span className="bg-[#F96302] text-white text-xs font-bold px-3 py-1 rounded uppercase">For Rent</span>
-                            {item.featured && <span className="badge-navy">Featured</span>} 
+                        <div className="flex gap-2 mb-4">
+                            <span className="bg-[#F96302] text-white text-[10px] font-bold px-3 py-1 rounded-none uppercase tracking-widest border border-[#F96302]/20">For Rent</span>
+                            {item.featured && <span className="bg-[#154279] text-white text-[10px] font-bold px-3 py-1 rounded-none uppercase tracking-widest border border-[#154279]/20">Featured</span>} 
                         </div>
-                        <h1 className="text-3xl md:text-4xl font-bold text-[#222] mb-2">{item.title}</h1>
-                        <p className="text-gray-500 flex items-center gap-2 text-sm md:text-base">
-                            <MapPin size={18} className="text-[#F96302]"/> {item.location} - {item.floor}
+                        <h1 className="text-3xl md:text-5xl font-extrabold text-[#154279] mb-3 tracking-tight leading-none">{item.title}</h1>
+                        <p className="text-slate-500 flex items-center gap-2 text-sm md:text-base font-bold">
+                            <MapPin size={18} className="text-[#F96302]"/> {item.location} <span className="text-slate-300">|</span> {item.floor}
                         </p>
                     </div>
-                    <div className="mt-4 md:mt-0 text-right">
-                        <div className="text-3xl font-extrabold text-[#F96302]">KES {item.price.toLocaleString()}</div>
-                        <p className="text-gray-400 font-bold text-sm">/ Month</p>
+                    <div className="mt-6 md:mt-0 text-left md:text-right bg-[#154279] p-6 rounded-none shadow-lg shadow-blue-900/10 border-b-4 border-[#F96302]">
+                        <div className="text-[10px] font-bold text-white/60 mb-1 uppercase tracking-widest">Monthly Rent</div>
+                        <div className="text-3xl md:text-4xl font-black text-white leading-none">KES {item.price.toLocaleString()}</div>
+                        <p className="text-[#F96302] font-black text-xs mt-1 uppercase tracking-widest">All Inclusive</p>
                     </div>
                 </div>
 
                 {/* 2. Gallery Section */}
-                <div className="p-6 md:p-10 pt-6">
+                <div className="p-6 md:p-10 pt-8">
                     <div className="gallery-grid">
-                        <div className="gallery-main relative group overflow-hidden">
-                            <img src={item.gallery[0]} alt="Main" className="gallery-img transition-transform duration-700 group-hover:scale-110" />
-                            <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded text-xs font-bold shadow flex items-center gap-2 cursor-pointer hover:bg-[#F96302] hover:text-white transition-colors">
-                                <Maximize size={14}/> View Photos
+                        <div className="gallery-main relative group overflow-hidden border border-slate-200">
+                            <img src={item.gallery[0]} alt="Main" className="gallery-img transition-transform duration-1000 group-hover:scale-105" />
+                            <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur px-4 py-2 rounded-none text-[10px] font-black uppercase tracking-widest shadow-xl border border-slate-200 flex items-center gap-2 cursor-pointer hover:bg-[#F96302] hover:text-white transition-all transform hover:-translate-y-1">
+                                <Maximize size={14}/> View Full Gallery
                             </div>
                         </div>
                         <div className="gallery-sub">
-                            <img src={item.gallery[1]} alt="Sub 1" className="gallery-img h-1/2" />
-                            <img src={item.gallery[2]} alt="Sub 2" className="gallery-img h-1/2" />
+                            <img src={item.gallery[1]} alt="Sub 1" className="gallery-img border border-slate-200" />
+                            <img src={item.gallery[2]} alt="Sub 2" className="gallery-img border border-slate-200" />
                         </div>
                     </div>
                 </div>
 
                 {/* 3. Main Content & Sidebar */}
-                <div className="p-6 md:p-10 pt-0 grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div className="p-6 md:p-10 pt-0 grid grid-cols-1 lg:grid-cols-3 gap-12">
                     
                     {/* LEFT COLUMN: Details */}
                     <div className="lg:col-span-2">
                         {/* Quick Overview Badges */}
-                        <div className="bg-[#f7f7f7] p-6 rounded-lg flex flex-wrap gap-6 md:gap-12 mb-8 border border-gray-100">
-                            <div className="flex items-center gap-3">
-                                <BedDouble size={24} className="text-[#F96302]"/>
+                        <div className="bg-slate-50 p-8 rounded-none flex flex-wrap gap-8 md:gap-16 mb-12 border border-slate-200 shadow-sm">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-[#154279]/5 p-3 rounded-none">
+                                    <BedDouble size={28} className="text-[#F96302]"/>
+                                </div>
                                 <div>
-                                    <span className="block font-bold text-lg text-[#222]">{item.beds}</span>
-                                    <span className="text-xs text-gray-500 font-bold uppercase">Bedrooms</span>
+                                    <span className="block font-black text-2xl text-[#154279] leading-none">{item.beds}</span>
+                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bedrooms</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <Bath size={24} className="text-[#F96302]"/>
+                            <div className="flex items-center gap-4">
+                                <div className="bg-[#154279]/5 p-3 rounded-none">
+                                    <Bath size={28} className="text-[#F96302]"/>
+                                </div>
                                 <div>
-                                    <span className="block font-bold text-lg text-[#222]">{item.baths}</span>
-                                    <span className="text-xs text-gray-500 font-bold uppercase">Bathrooms</span>
+                                    <span className="block font-black text-2xl text-[#154279] leading-none">{item.baths}</span>
+                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bathrooms</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <Maximize size={24} className="text-[#F96302]"/>
+                            <div className="flex items-center gap-4">
+                                <div className="bg-[#154279]/5 p-3 rounded-none">
+                                    <Maximize size={28} className="text-[#F96302]"/>
+                                </div>
                                 <div>
-                                    <span className="block font-bold text-lg text-[#222]">{item.sqft}</span>
-                                    <span className="text-xs text-gray-500 font-bold uppercase">Sq Ft</span>
+                                    <span className="block font-black text-2xl text-[#154279] leading-none">{item.sqft}</span>
+                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Sq Ft</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Description */}
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-[#222] mb-4 border-b pb-2">Description</h3>
-                            <p className="text-gray-600 leading-relaxed text-[15px]">
+                        <div className="mb-12">
+                            <h3 className="text-xl font-black text-[#154279] mb-6 border-b-2 border-slate-100 pb-2 uppercase tracking-tight flex items-center gap-3">
+                                <FileText size={20} className="text-[#F96302]" /> Description
+                            </h3>
+                            <p className="text-slate-600 leading-relaxed text-[15px] font-medium">
                                 {item.description}
                                 <br/><br/>
-                                Living at Ayden Home Towers offers a unique blend of community and privacy. 
+                                Living at <strong className="text-[#154279]">Ayden Home Towers</strong> offers a unique blend of community and privacy. 
                                 Enjoy dedicated maintenance teams, secure biometric access, and a community app for all your utility payments.
                             </p>
                         </div>
 
                         {/* Amenities */}
-                        <div className="mb-8">
-                            <h3 className="text-xl font-bold text-[#222] mb-4 border-b pb-2">Amenities</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="mb-12">
+                            <h3 className="text-xl font-black text-[#154279] mb-6 border-b-2 border-slate-100 pb-2 uppercase tracking-tight flex items-center gap-3">
+                                <Shield size={20} className="text-[#F96302]" /> Amenities
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
                                 {item.amenities.map((am:string, i:number) => (
-                                    <div key={i} className="flex items-center gap-2 text-gray-600 text-sm">
-                                        <CheckCircle2 size={16} className="text-[#F96302]"/> {am}
+                                    <div key={i} className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
+                                        <div className="w-5 h-5 bg-[#F96302]/10 flex items-center justify-center rounded-none">
+                                            <CheckCircle2 size={12} className="text-[#F96302]"/>
+                                        </div>
+                                        {am}
                                     </div>
                                 ))}
-                                <div className="flex items-center gap-2 text-gray-600 text-sm"><CheckCircle2 size={16} className="text-[#F96302]"/> CCTV Security</div>
-                                <div className="flex items-center gap-2 text-gray-600 text-sm"><CheckCircle2 size={16} className="text-[#F96302]"/> Borehole Water</div>
-                                <div className="flex items-center gap-2 text-gray-600 text-sm"><CheckCircle2 size={16} className="text-[#F96302]"/> Backup Generator</div>
+                                <div className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
+                                    <div className="w-5 h-5 bg-[#F96302]/10 flex items-center justify-center rounded-none">
+                                        <CheckCircle2 size={12} className="text-[#F96302]"/>
+                                    </div>
+                                    CCTV Security
+                                </div>
+                                <div className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
+                                    <div className="w-5 h-5 bg-[#F96302]/10 flex items-center justify-center rounded-none">
+                                        <CheckCircle2 size={12} className="text-[#F96302]"/>
+                                    </div>
+                                    Borehole Water
+                                </div>
+                                <div className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
+                                    <div className="w-5 h-5 bg-[#F96302]/10 flex items-center justify-center rounded-none">
+                                        <CheckCircle2 size={12} className="text-[#F96302]"/>
+                                    </div>
+                                    Backup Generator
+                                </div>
                             </div>
                         </div>
 
                         {/* Property Details Table */}
-                        <div className="bg-[#f9f9f9] p-6 rounded-lg mb-8">
-                            <h3 className="text-lg font-bold text-[#222] mb-4">Property Details</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
-                                <div className="flex justify-between border-b border-gray-200 pb-2">
-                                    <span className="font-bold text-[#555]">Property ID:</span>
-                                    <span className="text-gray-500">{item.id}</span>
+                        <div className="bg-slate-50 p-8 rounded-none border border-slate-200">
+                            <h3 className="text-lg font-black text-[#154279] mb-6 uppercase tracking-tight">Technical Specs</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 text-sm">
+                                <div className="flex justify-between border-b border-slate-200 pb-3">
+                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Unit ID</span>
+                                    <span className="font-black text-[#154279]">{item.id}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-2">
-                                    <span className="font-bold text-[#555]">Price:</span>
-                                    <span className="text-gray-500">KES {item.price.toLocaleString()}</span>
+                                <div className="flex justify-between border-b border-slate-200 pb-3">
+                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Monthly Fee</span>
+                                    <span className="font-black text-[#154279]">KES {item.price.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-2">
-                                    <span className="font-bold text-[#555]">Property Size:</span>
-                                    <span className="text-gray-500">{item.sqft} Sq Ft</span>
+                                <div className="flex justify-between border-b border-slate-200 pb-3">
+                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Floor Space</span>
+                                    <span className="font-black text-[#154279]">{item.sqft} Sq Ft</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-2">
-                                    <span className="font-bold text-[#555]">Bedrooms:</span>
-                                    <span className="text-gray-500">{item.beds}</span>
+                                <div className="flex justify-between border-b border-slate-200 pb-3">
+                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Unit Type</span>
+                                    <span className="font-black text-[#154279]">{item.type}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-2">
-                                    <span className="font-bold text-[#555]">Year Built:</span>
-                                    <span className="text-gray-500">2024</span>
+                                <div className="flex justify-between border-b border-slate-200 pb-3">
+                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Year Built</span>
+                                    <span className="font-black text-[#154279]">2024</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-200 pb-2">
-                                    <span className="font-bold text-[#555]">Property Type:</span>
-                                    <span className="text-gray-500">{item.type}</span>
+                                <div className="flex justify-between border-b border-slate-200 pb-3">
+                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Status</span>
+                                    <span className="bg-green-100 text-green-700 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest">Available</span>
                                 </div>
                             </div>
                         </div>
@@ -525,29 +557,39 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
 
                     {/* RIGHT COLUMN: Contact Form */}
                     <div className="lg:col-span-1">
-                        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg sticky top-24">
-                            <h4 className="text-lg font-bold text-navy mb-4">Schedule a Tour</h4>
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden">
-                                    <img src="https://i.pravatar.cc/150?u=ayden" alt="Agent" />
+                        <div className="bg-[#154279] border border-[#154279] rounded-none p-8 shadow-2xl sticky top-24 transform md:rotate-1">
+                            <h4 className="text-xl font-black text-white mb-6 uppercase tracking-tight flex items-center gap-3">
+                                <Clock size={20} className="text-[#F96302]" /> Schedule Visit
+                            </h4>
+                            <div className="flex items-center gap-4 mb-8 bg-white/5 p-4 rounded-none border border-white/10 backdrop-blur-sm">
+                                <div className="w-12 h-12 bg-white/10 rounded-none overflow-hidden border border-white/20 p-1">
+                                    <img src="https://i.pravatar.cc/150?u=ayden" alt="Agent" className="w-full h-full object-cover" />
                                 </div>
                                 <div>
-                                    <div className="font-bold text-[#333]">Ayden Office</div>
-                                    <div className="text-xs text-[#F96302] font-bold">Property Manager</div>
+                                    <div className="font-black text-white text-sm uppercase tracking-wide">Ayden Office</div>
+                                    <div className="text-[10px] text-[#F96302] font-black uppercase tracking-[0.2em]">Primary Manager</div>
                                 </div>
                             </div>
 
-                            <form className="space-y-3">
-                                <input type="text" placeholder="Your Name" className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none"/>
-                                <input type="email" placeholder="Your Email" className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none"/>
-                                <input type="tel" placeholder="Your Phone" className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none"/>
-                                <textarea rows={3} placeholder="I am interested in this property..." className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none"></textarea>
+                            <form className="space-y-4">
+                                <div>
+                                    <label className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1.5 block">Full Name</label>
+                                    <input type="text" placeholder="John Doe" className="w-full bg-white/10 border border-white/10 rounded-none px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#F96302] outline-none transition-all"/>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1.5 block">Email Address</label>
+                                    <input type="email" placeholder="john@example.com" className="w-full bg-white/10 border border-white/10 rounded-none px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#F96302] outline-none transition-all"/>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1.5 block">Message</label>
+                                    <textarea rows={3} placeholder="I want to see this unit..." className="w-full bg-white/10 border border-white/10 rounded-none px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#F96302] outline-none transition-all resize-none"></textarea>
+                                </div>
                                 
-                                <button className="w-full bg-[#F96302] hover:bg-[#d85502] text-white font-bold py-3 rounded transition-all">
-                                    Submit Request
+                                <button className="w-full bg-[#F96302] hover:bg-white hover:text-[#F96302] text-white font-black py-4 rounded-none transition-all uppercase tracking-widest text-xs shadow-xl shadow-orange-950/20">
+                                    Reserve My Tour
                                 </button>
-                                <button className="w-full border-2 border-navy text-navy font-bold py-3 rounded hover:bg-navy hover:text-white transition-all flex items-center justify-center gap-2">
-                                    <Phone size={18}/> Call Us
+                                <button className="w-full bg-transparent border-2 border-white/20 text-white font-black py-4 rounded-none hover:bg-white/5 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs">
+                                    <Phone size={18} className="text-[#F96302]"/> Direct Line
                                 </button>
                             </form>
                         </div>
@@ -601,7 +643,7 @@ export default function AydenTowersListing() {
                     
                     {/* Main Image (7 Cols) - Made more compact */}
                     <div className="lg:col-span-7 h-[320px] lg:h-[400px] w-full rounded-xl overflow-hidden shadow-md relative group">
-                        <div className="absolute top-4 left-4 z-20 bg-gradient-to-r from-[#F96302] to-[#ff7b2e] text-white text-xs font-bold px-4 py-2 rounded-lg uppercase tracking-wider shadow-lg">
+                        <div className="absolute top-6 left-6 z-20 bg-[#F96302] text-white text-[10px] font-black px-5 py-2 rounded-none uppercase tracking-[0.2em] shadow-xl border border-white/10">
                             Now Leasing
                         </div>
                         <img
@@ -609,65 +651,70 @@ export default function AydenTowersListing() {
                             alt="Ayden Home Towers Exterior"
                             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                         />
-                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/70 via-black/40 to-transparent h-2/3 pointer-events-none"></div>
-                        <div className="absolute bottom-6 left-6 text-white z-20">
-                            <div className="text-xs font-bold opacity-90 uppercase tracking-widest mb-1">Premium Living</div>
-                            <div className="text-2xl lg:text-3xl font-extrabold leading-tight">Ayden Home Towers</div>
-                            <div className="text-sm opacity-90 mt-1">Nairobi West</div>
+                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#154279] via-[#154279]/40 to-transparent h-1/2 pointer-events-none"></div>
+                        <div className="absolute bottom-8 left-8 text-white z-20">
+                            <div className="text-[10px] font-black opacity-80 uppercase tracking-[0.3em] mb-2 text-[#F96302]">Premium Inventory</div>
+                            <div className="text-3xl lg:text-5xl font-black leading-none tracking-tighter">AYDEN HOME TOWERS</div>
+                            <div className="text-sm font-bold opacity-70 mt-3 flex items-center gap-2">
+                                <MapPin size={14} className="text-[#F96302]" /> NAIROBI WEST, KENYA
+                            </div>
                         </div>
                     </div>
 
                     {/* Content Side (5 Cols) - Improved text hierarchy */}
                     <div className="lg:col-span-5 space-y-6">
                         <div className="fade-in-up">
-                            <div className="mb-4">
-                                <h2 className="text-sm font-bold text-[#F96302] uppercase tracking-widest mb-2">Welcome to</h2>
-                                <h1 className="text-3xl lg:text-4xl font-extrabold text-[#154279] leading-tight mb-4">
+                            <div className="mb-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="h-[2px] w-12 bg-[#F96302]"></div>
+                                    <h2 className="text-[10px] font-black text-[#F96302] uppercase tracking-[0.3em]">Signature Living</h2>
+                                </div>
+                                <h1 className="text-4xl lg:text-6xl font-black text-[#154279] leading-[0.9] tracking-tighter mb-6">
                                     Modern Living<br/>
                                     <span className="text-[#F96302]">Perfected.</span>
                                 </h1>
                             </div>
                             
-                            <p className="text-gray-600 text-sm lg:text-base leading-relaxed mb-6 font-normal tracking-tight">
-                                Discover <strong className="font-bold text-[#154279]">Ayden Home Towers</strong> — a sanctuary in the city featuring luxury 1, 2, and 3-bedroom apartments. 
+                            <p className="text-slate-500 text-sm lg:text-base leading-relaxed mb-8 font-medium max-w-md">
+                                Discover <strong className="font-black text-[#154279]">Ayden Home Towers</strong> — a sanctuary in the city featuring luxury 1, 2, and 3-bedroom apartments. 
                                 Secure, stylish, and built for community living.
                             </p>
                             
                             {/* Features Grid */}
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div className="flex items-center gap-2 text-sm">
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-10 pb-8 border-b border-slate-100">
+                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
                                     <Shield size={16} className="text-[#F96302]" />
-                                    <span className="font-medium">24/7 Security</span>
+                                    <span>24/7 Shield</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-sm">
+                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
                                     <Wifi size={16} className="text-[#F96302]" />
-                                    <span className="font-medium">Fiber Internet</span>
+                                    <span>Giga Fiber</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-sm">
+                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
                                     <Home size={16} className="text-[#F96302]" />
-                                    <span className="font-medium">Modern Design</span>
+                                    <span>Sleek Design</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-sm">
+                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
                                     <Zap size={16} className="text-[#F96302]" />
-                                    <span className="font-medium">Backup Power</span>
+                                    <span>Grid Backup</span>
                                 </div>
                             </div>
                             
-                            <div className="flex gap-3 mb-6">
-                                <button className="flex-1 bg-navy text-white py-3 px-4 rounded-lg font-bold text-sm shadow hover:shadow-md transition-all flex items-center justify-center gap-2">
-                                    View All Units <ArrowRight size={16} />
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <button className="flex-1 bg-[#154279] text-white py-4 px-8 rounded-none font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-900/20 hover:bg-[#0f2e54] transition-all flex items-center justify-center gap-3 active:scale-95">
+                                    Explore Units <ArrowRight size={16} className="text-[#F96302]" />
                                 </button>
-                                <button className="flex-1 border-2 border-[#154279] text-[#154279] py-3 px-4 rounded-lg font-bold text-sm hover:bg-[#154279] hover:text-white transition-all flex items-center justify-center gap-2">
-                                    <PlayCircle size={16} /> Virtual Tour
+                                <button className="flex-1 border-2 border-slate-200 text-[#154279] py-4 px-8 rounded-none font-black text-[10px] uppercase tracking-[0.2em] hover:border-[#154279] hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95">
+                                    <PlayCircle size={16} className="text-[#F96302]" /> Virtual Tour
                                 </button>
                             </div>
                         </div>
 
-                        {/* Thumbnails Row - Made smaller */}
+                        {/* Industrial Style Thumbnails */}
                         <div className="mt-4">
-                            <div className="flex justify-between items-end mb-2">
-                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Gallery</p>
-                                <p className="text-xs font-bold text-[#F96302] cursor-pointer hover:underline flex items-center gap-1">
+                            <div className="flex justify-between items-end mb-4">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gallery Preview</p>
+                                <p className="text-[10px] font-black text-[#F96302] cursor-pointer hover:underline flex items-center gap-1 uppercase tracking-widest">
                                     View All <ChevronRight size={12} />
                                 </p>
                             </div>
@@ -745,66 +792,72 @@ export default function AydenTowersListing() {
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {currentListings.map((item) => (
                                 <div 
                                     key={item.id} 
-                                    className="bg-white rounded-none overflow-hidden border border-gray-100 shadow-sm hover:shadow-md shadow-hover group flex flex-col transition-all duration-300"
+                                    className="bg-white rounded-none overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl group flex flex-col transition-all duration-500 hover:-translate-y-1"
                                 >
-                                    <div className="relative h-48 overflow-hidden cursor-pointer" onClick={() => setSelectedItem(item)}>
-                                        <img src={item.gallery[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                                        <div className="absolute top-4 left-4 bg-gradient-to-r from-[#154279] to-[#1a56b4] text-white text-[10px] font-bold px-3 py-1 rounded-none uppercase tracking-wide shadow">
+                                    <div className="relative h-56 overflow-hidden cursor-pointer" onClick={() => setSelectedItem(item)}>
+                                        <img src={item.gallery[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                                        
+                                        {/* Tag Overlay */}
+                                        <div className="absolute top-0 left-0 bg-[#154279] text-white text-[9px] font-black px-4 py-2 rounded-none uppercase tracking-[0.2em] shadow-lg z-10">
                                             {item.type}
                                         </div>
+
                                         {item.featured && (
-                                            <div className="absolute top-4 right-4 bg-gradient-to-r from-[#F96302] to-[#ff7b2e] text-white text-[10px] font-bold px-2 py-1 rounded-none uppercase">
-                                                FEATURED
+                                            <div className="absolute top-0 right-0 bg-[#F96302] text-white text-[9px] font-black px-4 py-2 rounded-none uppercase tracking-[0.2em] shadow-lg z-10">
+                                                Featured
                                             </div>
                                         )}
-                                        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-2 py-1 rounded-none text-xs font-bold flex items-center gap-1 shadow-sm">
-                                            <Maximize size={12}/> {item.gallery.length}
+                                        
+                                        {/* Bottom Info Gradient overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-[#154279]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        
+                                        <div className="absolute bottom-4 right-4 bg-white text-[#154279] px-3 py-1.5 rounded-none text-[10px] font-black flex items-center gap-2 shadow-xl uppercase tracking-widest z-10">
+                                            <Maximize size={12} className="text-[#F96302]"/> {item.gallery.length} Photos
                                         </div>
-                                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
-                                            <div className="text-white font-bold text-lg">KES {item.price.toLocaleString()}</div>
-                                            <div className="text-white/80 text-xs">{item.floor}</div>
+                                        
+                                        <div className="absolute bottom-5 left-5 z-10 transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                                            <div className="bg-[#F96302] text-white font-black text-sm px-4 py-2 shadow-xl inline-block">
+                                                KES {item.price.toLocaleString()}
+                                            </div>
                                         </div>
                                     </div>
                                     
-                                    <div className="p-4 flex-1 flex flex-col">
-                                        <h4 
-                                            className="font-bold text-base text-[#222] mb-2 cursor-pointer hover:text-[#F96302] transition-colors leading-tight line-clamp-1"
-                                            onClick={() => setSelectedItem(item)}
-                                        >
-                                            {item.title}
-                                        </h4>
-                                        <div className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                                            <MapPin size={12} className="text-gray-400"/> {item.location}
+                                    <div className="p-6 flex-1 flex flex-col">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <h4 
+                                                className="font-black text-lg text-[#154279] cursor-pointer hover:text-[#F96302] transition-colors leading-tight line-clamp-1 uppercase tracking-tight"
+                                                onClick={() => setSelectedItem(item)}
+                                            >
+                                                {item.title}
+                                            </h4>
                                         </div>
 
-                                        <div className="flex flex-wrap gap-1 mb-3">
-                                            {item.amenities.slice(0, 2).map((am:string, i:number) => (
-                                                <span key={i} className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-none">
+                                        <div className="text-[10px] font-bold text-slate-400 mb-5 flex items-center gap-2 uppercase tracking-widest">
+                                            <MapPin size={12} className="text-[#F96302]"/> {item.location}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2 mb-6">
+                                            {item.amenities.slice(0, 3).map((am:string, i:number) => (
+                                                <span key={i} className="bg-slate-50 text-slate-500 text-[9px] font-black px-2 py-1.5 rounded-none border border-slate-100 uppercase tracking-wider">
                                                     {am}
                                                 </span>
                                             ))}
-                                            {item.amenities.length > 2 && (
-                                                <span className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-none">
-                                                    +{item.amenities.length - 2}
-                                                </span>
-                                            )}
                                         </div>
 
-                                        <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-auto">
-                                            <div className="flex gap-4 text-xs font-medium text-gray-500">
-                                                <span className="flex items-center gap-1"><BedDouble size={13}/> {item.beds}</span>
-                                                <span className="flex items-center gap-1"><Bath size={13}/> {item.baths}</span>
-                                                <span className="flex items-center gap-1"><Maximize size={13}/> {item.sqft}</span>
+                                        <div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-auto">
+                                            <div className="flex gap-5 text-[10px] font-black text-[#154279] uppercase tracking-widest">
+                                                <span className="flex items-center gap-2"><BedDouble size={14} className="text-[#F96302]"/> {item.beds}</span>
+                                                <span className="flex items-center gap-1.2"><Maximize size={14} className="text-[#F96302]"/> {item.sqft}</span>
                                             </div>
                                             <button 
                                                 onClick={() => setSelectedItem(item)}
-                                                className="text-[#F96302] text-xs font-bold uppercase hover:text-[#d85502] transition-colors"
+                                                className="text-[#154279] hover:text-[#F96302] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group/btn"
                                             >
-                                                Details →
+                                                View Unit <ArrowRight size={14} className="transition-transform group-hover/btn:translate-x-1"/>
                                             </button>
                                         </div>
                                     </div>
@@ -815,25 +868,25 @@ export default function AydenTowersListing() {
                     
                     {/* Pagination */}
                     {filteredListings.length > 0 && (
-                        <div className="mt-10 flex justify-center gap-2">
+                        <div className="mt-16 flex justify-center gap-3">
                             <button 
                                 onClick={() => setCurrentPage(1)}
-                                className={`w-10 h-10 rounded-none font-bold ${currentPage === 1 ? 'bg-navy text-white hover:bg-[#0f325e]' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                className={`w-12 h-12 rounded-none font-black text-[10px] uppercase tracking-widest transition-all shadow-md ${currentPage === 1 ? 'bg-[#154279] text-white' : 'bg-white border border-slate-200 text-[#154279] hover:bg-slate-50'}`}
                             >
-                                1
+                                01
                             </button>
                             <button 
                                 onClick={() => setCurrentPage(2)}
-                                className={`w-10 h-10 rounded-none font-bold ${currentPage === 2 ? 'bg-[#154279] text-white hover:bg-[#0f325e]' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                className={`w-12 h-12 rounded-none font-black text-[10px] uppercase tracking-widest transition-all shadow-md ${currentPage === 2 ? 'bg-[#154279] text-white' : 'bg-white border border-slate-200 text-[#154279] hover:bg-slate-50'}`}
                             >
-                                2
+                                02
                             </button>
                             {totalPages > 2 && (
                                 <button 
                                     onClick={() => setCurrentPage(currentPage < totalPages ? currentPage + 1 : totalPages)}
-                                    className="w-10 h-10 rounded-none bg-white border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 flex items-center justify-center"
+                                    className="w-12 h-12 rounded-none bg-white border border-slate-200 text-[#154279] font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-md"
                                 >
-                                    <ChevronRight size={16}/>
+                                    Next
                                 </button>
                             )}
                         </div>

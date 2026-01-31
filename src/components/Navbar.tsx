@@ -16,53 +16,48 @@ const Navbar: React.FC = () => {
   ];
 
   return (
-    <nav className="who-section-bg fixed w-full z-50 shadow-sm border-b">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+    <nav className="fixed w-full z-[60] bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-100 font-nunito">
+      <div className="container mx-auto px-6">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <Home className="text-navy" size={24} />
-            <span className="text-xl font-bold text-dark-gray">Realtors & Leasers</span>
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="bg-[#154279] p-2 rounded-none group-hover:bg-[#F96302] transition-colors">
+              <Home className="text-white" size={20} />
+            </div>
+            <span className="text-xl font-black text-[#154279] uppercase tracking-tighter">REALTORS<span className="text-[#F96302]">.</span></span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className="text-gray-700 hover:text-primary transition-colors"
+                className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-[#154279] transition-all relative group/nav"
               >
                 {item.label}
+                <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#F96302] transition-all group-hover/nav:w-full"></span>
               </Link>
             ))}
           </div>
 
           {/* Auth Buttons */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-6">
             {user ? (
               <Link
-                to={user.role === 'admin' ? '/portal/admin' : '/portal/tenant'}
-                className="flex items-center gap-2 text-gray-700 hover:text-primary"
+                to={user.role === 'super_admin' ? '/portal/admin' : '/portal/tenant'}
+                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#154279] bg-slate-50 px-4 py-2 hover:bg-[#154279] hover:text-white transition-all border border-slate-200"
               >
-                <User size={20} />
-                <span>Dashboard</span>
+                <User size={16} />
+                <span>Portal</span>
               </Link>
             ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="text-gray-700 hover:text-primary transition-colors"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/register"
-                  className="btn-primary"
-                >
-                  Sign Up
-                </Link>
-              </>
+              <Link
+                to="/auth"
+                className="bg-[#154279] text-white px-6 py-2.5 rounded-none text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#F96302] transition-all shadow-lg shadow-blue-900/10"
+              >
+                Client Access
+              </Link>
             )}
           </div>
 
@@ -92,7 +87,7 @@ const Navbar: React.FC = () => {
               <div className="border-t pt-4 px-4">
                 {user ? (
                   <Link
-                    to={user.role === 'admin' ? '/portal/admin' : '/portal/tenant'}
+                    to={user.role === 'super_admin' ? '/portal/admin' : '/portal/tenant'}
                     className="block text-gray-700 hover:text-primary py-2"
                     onClick={() => setIsMenuOpen(false)}
                   >

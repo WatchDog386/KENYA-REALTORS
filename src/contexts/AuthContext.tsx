@@ -41,6 +41,7 @@ interface UserProfile {
 interface AuthContextType {
   session: Session | null;
   user: UserProfile | null;
+  profile: UserProfile | null; // Alias for user
   supabaseUser: SupabaseUser | null;
   isLoading: boolean;
   error: string | null;
@@ -59,6 +60,7 @@ interface AuthContextType {
   ) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<{ error?: string }>;
   updateUserRole: (role: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   resendVerificationEmail: (
@@ -640,11 +642,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Update password
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) return { error: error.message };
+      return {};
+    } catch (err: any) {
+      return { error: err.message || "Failed to update password" };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         session,
         user,
+        profile: user, // Alias for user
         supabaseUser,
         isLoading,
         error,
@@ -654,6 +671,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         signInWithProvider,
         signOut,
         updateProfile,
+        updatePassword,
         updateUserRole,
         refreshUser,
         resendVerificationEmail,

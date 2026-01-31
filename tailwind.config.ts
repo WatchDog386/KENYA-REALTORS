@@ -24,6 +24,12 @@ export default {
       },
     },
     extend: {
+      screens: {
+        "xs": "380px",
+      },
+      fontFamily: {
+        brand: ["Inter", "sans-serif"],
+      },
       colors: {
         /* Core CSS variable mappings kept for existing usage */
         border: "hsl(var(--border))",

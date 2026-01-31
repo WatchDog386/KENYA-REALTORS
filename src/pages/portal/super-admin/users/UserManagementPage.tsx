@@ -3,12 +3,12 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Users, ArrowLeft, RefreshCw } from 'lucide-react';
-import UserManagement from '@/components/portal/super-admin/UserManagement';
+import UserManagement from '@/components/portal/super-admin/UserManagementNew';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { Button } from '@/components/ui/button';
 
 const UserManagementPage: React.FC = () => {
-  const { hasPermission, isLoading } = useSuperAdmin();
+  const { hasPermission, loading: isLoading } = useSuperAdmin();
   const navigate = useNavigate();
 
   // Check if user has permission to manage users

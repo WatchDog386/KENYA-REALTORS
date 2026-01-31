@@ -172,7 +172,7 @@ const Dashboard = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold flex items-center">
             <LayoutDashboard className="mr-2" />
-            Welcome back, {profile?.name || "User"}
+            Welcome back, {profile?.first_name || "User"}
           </h1>
         </div>
 

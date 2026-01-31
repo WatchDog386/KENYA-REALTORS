@@ -1,44 +1,196 @@
--- Create refunds table
-CREATE TABLE IF NOT EXISTS refunds (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  payment_id UUID NOT NULL REFERENCES payments(id),
-  tenant_id UUID NOT NULL REFERENCES users(id),
-  property_id UUID NOT NULL REFERENCES properties(id),
-  amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'processed', 'failed')),
-  reason TEXT NOT NULL,
-  requested_by UUID NOT NULL REFERENCES users(id),
-  reviewed_by UUID REFERENCES users(id),
-  review_notes TEXT,
-  processed_at TIMESTAMP WITH TIME ZONE,
-  details JSONB DEFAULT '{}',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
--- Create indexes for refunds
-CREATE INDEX IF NOT EXISTS idx_refunds_payment ON refunds(payment_id);
-CREATE INDEX IF NOT EXISTS idx_refunds_tenant ON refunds(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_refunds_property ON refunds(property_id);
-CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);
-CREATE INDEX IF NOT EXISTS idx_refunds_created ON refunds(created_at DESC);
+export interface Refund {
+  id: string;
+  payment_id: string;
+  tenant_id: string;
+  property_id: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected' | 'processed' | 'failed';
+  reason: string;
+  requested_by: string;
+  reviewed_by?: string;
+  review_notes?: string;
+  processed_at?: string;
+  details?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  tenant?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  property?: {
+    name: string;
+    address: string;
+  };
+  payment?: {
+    amount: number;
+    payment_date: string;
+  };
+}
 
--- Enable RLS
-ALTER TABLE refunds ENABLE ROW LEVEL SECURITY;
+export const useRefundTracking = () => {
+  const [loading, setLoading] = useState(false);
+  const [refunds, setRefunds] = useState<Refund[]>([]);
 
--- RLS Policies
-CREATE POLICY "Super admins can do everything" ON refunds
-  FOR ALL USING (auth.uid() IN (SELECT id FROM users WHERE role = 'super_admin'));
+  const fetchRefunds = useCallback(async (filters?: {
+    status?: string;
+    property_id?: string;
+    tenant_id?: string;
+  }) => {
+    try {
+      setLoading(true);
 
-CREATE POLICY "Property managers can view property refunds" ON refunds
-  FOR SELECT USING (
-    property_id IN (
-      SELECT id FROM properties WHERE property_manager_id = auth.uid()
-    )
-  );
+      let query = supabase
+        .from('refunds')
+        .select(`
+          *,
+          tenant:users!refunds_tenant_id_fkey (
+            first_name,
+            last_name,
+            email
+          ),
+          property:properties!refunds_property_id_fkey (
+            name,
+            address
+          ),
+          payment:payments!refunds_payment_id_fkey (
+            amount,
+            payment_date
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-CREATE POLICY "Tenants can view their own refunds" ON refunds
-  FOR SELECT USING (tenant_id = auth.uid());
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters?.property_id) {
+        query = query.eq('property_id', filters.property_id);
+      }
+      if (filters?.tenant_id) {
+        query = query.eq('tenant_id', filters.tenant_id);
+      }
 
-CREATE POLICY "Tenants can create refunds" ON refunds
-  FOR INSERT WITH CHECK (tenant_id = auth.uid());
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setRefunds(data as Refund[] || []);
+      return data as Refund[];
+    } catch (error: any) {
+      toast.error('Failed to fetch refunds: ' + error.message);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const createRefundRequest = useCallback(async (refundData: {
+    payment_id: string;
+    tenant_id: string;
+    property_id: string;
+    amount: number;
+    reason: string;
+  }) => {
+    try {
+      setLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('refunds')
+        .insert({
+          ...refundData,
+          requested_by: user.id,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Refund request submitted successfully');
+      return data;
+    } catch (error: any) {
+      toast.error('Failed to create refund request: ' + error.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const reviewRefund = useCallback(async (
+    refundId: string,
+    status: 'approved' | 'rejected',
+    reviewNotes?: string
+  ) => {
+    try {
+      setLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('refunds')
+        .update({
+          status,
+          reviewed_by: user.id,
+          review_notes: reviewNotes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', refundId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success(`Refund ${status === 'approved' ? 'approved' : 'rejected'} successfully`);
+      return data;
+    } catch (error: any) {
+      toast.error('Failed to review refund: ' + error.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const processRefund = useCallback(async (refundId: string) => {
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('refunds')
+        .update({
+          status: 'processed',
+          processed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', refundId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Refund processed successfully');
+      return data;
+    } catch (error: any) {
+      toast.error('Failed to process refund: ' + error.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return {
+    loading,
+    refunds,
+    fetchRefunds,
+    createRefundRequest,
+    reviewRefund,
+    processRefund
+  };
+};

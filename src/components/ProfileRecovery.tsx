@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProfileRecovery: React.FC = () => {
-  const { user, supabaseUser, error, retryCreateProfile, clearError, isLoading } = useAuth();
+  const { user, supabaseUser, error, clearError, isLoading } = useAuth();
 
   if (user || !supabaseUser || !error?.includes('Account setup incomplete')) {
     return null;
@@ -29,11 +29,10 @@ const ProfileRecovery: React.FC = () => {
           <div className="mt-4">
             <button
               type="button"
-              onClick={retryCreateProfile}
               disabled={isLoading}
               className="inline-flex items-center px-3 py-2 text-sm font-medium text-yellow-800 bg-yellow-100 border border-transparent rounded-md hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
             >
-              {isLoading ? 'Creating Profile...' : 'Create Profile Now'}
+              {isLoading ? 'Loading...' : 'Profile Setup Required'}
             </button>
             <button
               type="button"

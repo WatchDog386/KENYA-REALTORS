@@ -11,6 +11,10 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "composite": true,
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
 
     /* Linting */
     "strict": true,
