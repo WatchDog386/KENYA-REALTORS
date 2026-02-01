@@ -638,11 +638,11 @@ export default function AydenTowersListing() {
         <div className="min-h-screen bg-[#f7f7f7] text-[#484848] font-sans">
             
             {/* --- IMPROVED HERO SECTION --- */}
-            <section className="bg-gradient-to-br from-white to-gray-50 pt-8 pb-12 lg:pt-10 lg:pb-16 border-b border-gray-200">
+            <section className="bg-white pt-8 pb-12 lg:pt-10 lg:pb-16 border-b border-slate-200 font-nunito">
                 <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
                     
                     {/* Main Image (7 Cols) - Made more compact */}
-                    <div className="lg:col-span-7 h-[320px] lg:h-[400px] w-full rounded-xl overflow-hidden shadow-md relative group">
+                    <div className="lg:col-span-7 h-[320px] lg:h-[400px] w-full rounded-none overflow-hidden shadow-md border border-slate-200 relative group">
                         <div className="absolute top-6 left-6 z-20 bg-[#F96302] text-white text-[10px] font-black px-5 py-2 rounded-none uppercase tracking-[0.2em] shadow-xl border border-white/10">
                             Now Leasing
                         </div>
@@ -663,45 +663,43 @@ export default function AydenTowersListing() {
 
                     {/* Content Side (5 Cols) - Improved text hierarchy */}
                     <div className="lg:col-span-5 space-y-6">
-                        <div className="fade-in-up">
-                            <div className="mb-6">
-                                <div className="flex items-center gap-3 mb-4">
+                        <div>
+                        <div className="flex items-center gap-3 mb-4">
                                     <div className="h-[2px] w-12 bg-[#F96302]"></div>
-                                    <h2 className="text-[10px] font-black text-[#F96302] uppercase tracking-[0.3em]">Signature Living</h2>
+                                    <h2 className="text-[9px] font-black text-[#F96302] uppercase tracking-[0.3em]">Signature Living</h2>
                                 </div>
-                                <h1 className="text-4xl lg:text-6xl font-black text-[#154279] leading-[0.9] tracking-tighter mb-6">
+                                <h1 className="text-4xl lg:text-5xl font-black text-[#154279] leading-[0.9] tracking-tight mb-6">
                                     Modern Living<br/>
                                     <span className="text-[#F96302]">Perfected.</span>
                                 </h1>
-                            </div>
                             
-                            <p className="text-slate-500 text-sm lg:text-base leading-relaxed mb-8 font-medium max-w-md">
+                            <p className="text-slate-600 text-sm lg:text-base leading-relaxed mb-8 font-medium max-w-md">
                                 Discover <strong className="font-black text-[#154279]">Ayden Home Towers</strong> — a sanctuary in the city featuring luxury 1, 2, and 3-bedroom apartments. 
                                 Secure, stylish, and built for community living.
                             </p>
                             
                             {/* Features Grid */}
-                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-10 pb-8 border-b border-slate-100">
-                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-10 pb-8 border-b border-slate-200">
+                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#154279]">
                                     <Shield size={16} className="text-[#F96302]" />
                                     <span>24/7 Shield</span>
                                 </div>
-                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
+                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#154279]">
                                     <Wifi size={16} className="text-[#F96302]" />
                                     <span>Giga Fiber</span>
                                 </div>
-                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
+                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#154279]">
                                     <Home size={16} className="text-[#F96302]" />
                                     <span>Sleek Design</span>
                                 </div>
-                                <div className="flex items-center gap-3 text-[11px] font-black uppercase tracking-widest text-[#154279]">
+                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#154279]">
                                     <Zap size={16} className="text-[#F96302]" />
                                     <span>Grid Backup</span>
                                 </div>
                             </div>
                             
                             <div className="flex flex-col sm:flex-row gap-4">
-                                <button className="flex-1 bg-[#154279] text-white py-4 px-8 rounded-none font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl shadow-blue-900/20 hover:bg-[#0f2e54] transition-all flex items-center justify-center gap-3 active:scale-95">
+                                <button className="flex-1 bg-[#154279] text-white py-4 px-8 rounded-none font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 hover:bg-[#0f2e54] transition-all flex items-center justify-center gap-3 active:scale-95">
                                     Explore Units <ArrowRight size={16} className="text-[#F96302]" />
                                 </button>
                                 <button className="flex-1 border-2 border-slate-200 text-[#154279] py-4 px-8 rounded-none font-black text-[10px] uppercase tracking-[0.2em] hover:border-[#154279] hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95">
@@ -713,25 +711,25 @@ export default function AydenTowersListing() {
                         {/* Industrial Style Thumbnails */}
                         <div className="mt-4">
                             <div className="flex justify-between items-end mb-4">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gallery Preview</p>
-                                <p className="text-[10px] font-black text-[#F96302] cursor-pointer hover:underline flex items-center gap-1 uppercase tracking-widest">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Gallery Preview</p>
+                                <p className="text-[9px] font-black text-[#F96302] cursor-pointer hover:underline flex items-center gap-1 uppercase tracking-[0.2em]">
                                     View All <ChevronRight size={12} />
                                 </p>
                             </div>
                             <div className="grid grid-cols-3 gap-2 h-20">
-                                <div className="relative rounded-lg overflow-hidden cursor-pointer group border border-gray-200">
+                                <div className="relative rounded-none overflow-hidden cursor-pointer group border border-slate-200">
                                     <img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?q=80&w-400" 
                                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
                                              alt="Lobby" />
                                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all"></div>
                                 </div>
-                                <div className="relative rounded-lg overflow-hidden cursor-pointer group border border-gray-200">
+                                <div className="relative rounded-none overflow-hidden cursor-pointer group border border-slate-200">
                                     <img src="https://images.unsplash.com/photo-1512918760383-eda2723ad6e1?q=80&w-400" 
                                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
                                              alt="Pool" />
                                     <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all"></div>
                                 </div>
-                                <div className="relative rounded-lg overflow-hidden cursor-pointer group border border-gray-200">
+                                <div className="relative rounded-none overflow-hidden cursor-pointer group border border-slate-200">
                                     <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w-400" 
                                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
                                              alt="Room" />

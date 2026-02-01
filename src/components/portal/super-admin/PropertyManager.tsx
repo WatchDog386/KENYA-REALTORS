@@ -996,7 +996,8 @@ const PropertyManager: React.FC<PropertyManagerProps> = ({
                     <TableHead>Location</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Units</TableHead>
+                    <TableHead>Unit Details</TableHead>
+                    <TableHead>Occupancy</TableHead>
                     <TableHead>Rent</TableHead>
                     <TableHead>Manager</TableHead>
                     <TableHead>Actions</TableHead>
@@ -1056,24 +1057,26 @@ const PropertyManager: React.FC<PropertyManagerProps> = ({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="text-center">
-                            <div className="font-medium">{property.occupied_units || 0}</div>
-                            <div className="text-xs text-gray-500">occupied</div>
+                        <div className="text-sm space-y-1">
+                          <div className="font-medium text-xs text-slate-600 dark:text-slate-400">Total: {property.total_units || 0} units</div>
+                          <div className="text-xs text-slate-500">
+                            <span className="text-green-600 font-medium">{property.occupied_units || 0} occupied</span>
+                            <span className="text-slate-400 mx-1">•</span>
+                            <span className="text-blue-600 font-medium">{(property.total_units || 0) - (property.occupied_units || 0)} vacant</span>
                           </div>
-                          <div className="text-gray-400">/</div>
-                          <div className="text-center">
-                            <div className="font-medium">{property.total_units || 0}</div>
-                            <div className="text-xs text-gray-500">total</div>
-                          </div>
-                          <div className="w-12 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div
-                              className="bg-green-500 h-2 rounded-full"
-                              style={{
-                                width: `${property.total_units ? ((property.occupied_units || 0) / property.total_units) * 100 : 0}%`,
-                              }}
-                            />
-                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className="bg-green-500 h-2 rounded-full"
+                            style={{
+                              width: `${property.total_units ? ((property.occupied_units || 0) / property.total_units) * 100 : 0}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {property.total_units ? Math.round(((property.occupied_units || 0) / property.total_units) * 100) : 0}% occupied
                         </div>
                       </TableCell>
                       <TableCell>

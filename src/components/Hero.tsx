@@ -201,30 +201,30 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto custom-scroll risa-font"
     >
       {/* Header / Nav inside Modal */}
-      <div className="sticky top-0 bg-white shadow-md z-50 px-4 md:px-8 h-16 flex items-center justify-between">
-        <div className="font-bold text-xl text-navy risa-heading">AYDEN<span className="text-cta">HOMES</span></div>
+      <div className="sticky top-0 bg-white shadow-lg shadow-slate-200/50 z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-slate-200 font-nunito">
+        <div className="font-bold text-xl text-[#154279] tracking-tighter uppercase">AYDEN<span className="text-[#F96302]">HOMES</span></div>
         <button
           onClick={onClose}
-          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-cta hover:text-white flex items-center justify-center transition-all"
+          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-[#D85C2C] hover:text-white flex items-center justify-center transition-all"
         >
           <X size={18} />
         </button>
       </div>
-      <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20">
+      <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20 shadow-2xl font-nunito">
         {/* 1. Title Header Section */}
-        <div className="p-6 md:p-10 pb-4 flex flex-col md:flex-row justify-between items-start border-b border-gray-100">
+        <div className="p-6 md:p-10 pb-4 flex flex-col md:flex-row justify-between items-start border-b border-slate-200 bg-slate-50/50">
           <div>
             <div className="flex gap-2 mb-3">
-              <span className="badge-navy">For Rent</span>
-              {item.badge && <span className="bg-[#154279] text-white text-xs font-bold px-3 py-1 rounded uppercase risa-uppercase risa-subheading">{item.badge}</span>}
+              <span className="bg-gradient-to-r from-[#00356B] to-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full risa-uppercase risa-subheading">For Rent</span>
+              {item.badge && <span className="bg-[#00356B] text-white text-xs font-bold px-3 py-1 rounded uppercase risa-uppercase risa-subheading">{item.badge}</span>}
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-[#222] mb-2 risa-heading">{item.title || item.subhead || item.headline}</h1>
+            <h1 className="text-3xl md:text-4xl font-black text-[#154279] mb-2">{item.title || item.subhead || item.headline}</h1>
             <p className="text-gray-500 flex items-center gap-2 text-sm risa-body">
-              <MapPin size={16} className="text-[#F96302]" /> {item.address || item.location} - {item.floor}
+              <MapPin size={16} className="text-[#D85C2C]" /> {item.address || item.location} - {item.floor}
             </p>
           </div>
           <div className="mt-4 md:mt-0 text-right">
-            <div className="text-3xl font-extrabold text-cta risa-heading">KES {parseInt(item.price.replace(',', '')).toLocaleString()}</div>
+            <div className="text-3xl font-extrabold text-[#D85C2C] risa-heading">KES {parseInt(item.price.replace(',', '')).toLocaleString()}</div>
             <p className="text-gray-400 font-bold text-sm risa-subheading">/ Month</p>
           </div>
         </div>
@@ -233,7 +233,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 h-[400px]">
             <div className="md:col-span-2 relative group overflow-hidden rounded-lg">
               <img src={item.gallery ? item.gallery[0] : item.img} alt="Main" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-              <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded text-xs font-bold shadow flex items-center gap-2 cursor-pointer hover:bg-[#F96302] hover:text-white transition-colors risa-subheading">
+              <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded text-xs font-bold shadow flex items-center gap-2 cursor-pointer hover:bg-[#D85C2C] hover:text-white transition-colors risa-subheading">
                 <Maximize size={14} /> View Photos
               </div>
             </div>
@@ -248,23 +248,23 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
           {/* LEFT COLUMN: Details */}
           <div className="lg:col-span-2">
             {/* Quick Overview Badges */}
-            <div className="bg-[#f7f7f7] p-6 rounded-lg flex flex-wrap gap-6 md:gap-12 mb-8 border border-gray-100">
+            <div className="bg-slate-50 p-6 rounded-none flex flex-wrap gap-6 md:gap-12 mb-8 border border-slate-200 shadow-sm">
               <div className="flex items-center gap-3">
-                <BedDouble size={22} className="text-[#F96302]" />
+                <BedDouble size={22} className="text-[#D85C2C]" />
                 <div>
                   <span className="block font-bold text-base text-[#222] risa-heading">{item.beds}</span>
                   <span className="text-xs text-gray-500 font-bold uppercase risa-uppercase risa-subheading">Bedrooms</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Bath size={22} className="text-[#F96302]" />
+                <Bath size={22} className="text-[#D85C2C]" />
                 <div>
                   <span className="block font-bold text-base text-[#222] risa-heading">{item.baths}</span>
                   <span className="text-xs text-gray-500 font-bold uppercase risa-uppercase risa-subheading">Bathrooms</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Maximize size={22} className="text-[#F96302]" />
+                <Maximize size={22} className="text-[#D85C2C]" />
                 <div>
                   <span className="block font-bold text-base text-[#222] risa-heading">{item.sqft}</span>
                   <span className="text-xs text-gray-500 font-bold uppercase risa-uppercase risa-subheading">Sq Ft</span>
@@ -273,7 +273,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
             </div>
             {/* Description */}
             <div className="mb-8">
-              <h3 className="text-lg font-bold text-[#222] mb-4 border-b pb-2 risa-heading">Description</h3>
+              <h3 className="text-lg font-black text-[#154279] mb-4 border-b border-slate-200 pb-2 uppercase tracking-tight">Description</h3>
               <p className="text-gray-600 leading-relaxed text-sm risa-body">
                 {item.description}
                 <br /><br />
@@ -283,71 +283,71 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
             </div>
             {/* Amenities */}
             <div className="mb-8">
-              <h3 className="text-lg font-bold text-[#222] mb-4 border-b pb-2 risa-heading">Amenities</h3>
+              <h3 className="text-lg font-black text-[#154279] mb-4 border-b border-slate-200 pb-2 uppercase tracking-tight">Amenities</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {item.amenities?.map((am: string, i: number) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-gray-600 risa-body">
+                  <div key={i} className="flex items-center gap-2 text-sm text-gray-600 font-medium">
                     <CheckCircle2 size={14} className="text-[#F96302]" /> {am}
                   </div>
                 ))}
-                <div className="flex items-center gap-2 text-sm text-gray-600 risa-body"><CheckCircle2 size={14} className="text-[#F96302]" /> CCTV Security</div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 risa-body"><CheckCircle2 size={14} className="text-[#F96302]" /> Borehole Water</div>
-                <div className="flex items-center gap-2 text-sm text-gray-600 risa-body"><CheckCircle2 size={14} className="text-[#F96302]" /> Backup Generator</div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 font-medium"><CheckCircle2 size={14} className="text-[#F96302]" /> CCTV Security</div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 font-medium"><CheckCircle2 size={14} className="text-[#F96302]" /> Borehole Water</div>
+                <div className="flex items-center gap-2 text-sm text-gray-600 font-medium"><CheckCircle2 size={14} className="text-[#F96302]" /> Backup Generator</div>
               </div>
             </div>
             {/* Property Details Table */}
-            <div className="bg-[#f9f9f9] p-6 rounded-lg mb-8">
-              <h3 className="text-base font-bold text-[#222] mb-4 risa-heading">Property Details</h3>
+            <div className="bg-slate-50 p-6 rounded-none mb-8 border border-slate-200 shadow-md">
+              <h3 className="text-base font-black text-[#154279] mb-4 uppercase tracking-tight">Property Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
                 <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="font-bold text-[#555] risa-subheading">Property ID:</span>
-                  <span className="text-gray-500 risa-body">{item.id}</span>
+                  <span className="font-bold text-[#555]">Property ID:</span>
+                  <span className="text-gray-500">{item.id}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="font-bold text-[#555] risa-subheading">Price:</span>
-                  <span className="text-gray-500 risa-body">KES {parseInt(item.price.replace(',', '')).toLocaleString()}</span>
+                  <span className="font-bold text-[#555]">Price:</span>
+                  <span className="text-gray-500">KES {parseInt(item.price.replace(',', '')).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="font-bold text-[#555] risa-subheading">Property Size:</span>
-                  <span className="text-gray-500 risa-body">{item.sqft} Sq Ft</span>
+                  <span className="font-bold text-[#555]">Property Size:</span>
+                  <span className="text-gray-500">{item.sqft} Sq Ft</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="font-bold text-[#555] risa-subheading">Bedrooms:</span>
-                  <span className="text-gray-500 risa-body">{item.beds}</span>
+                  <span className="font-bold text-[#555]">Bedrooms:</span>
+                  <span className="text-gray-500">{item.beds}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="font-bold text-[#555] risa-subheading">Year Built:</span>
-                  <span className="text-gray-500 risa-body">2024</span>
+                  <span className="font-bold text-[#555]">Year Built:</span>
+                  <span className="text-gray-500">2024</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2">
-                  <span className="font-bold text-[#555] risa-subheading">Property Type:</span>
-                  <span className="text-gray-500 risa-body">{item.beds === 0 ? 'Studio' : `${item.beds} Bedroom`}</span>
+                  <span className="font-bold text-[#555]">Property Type:</span>
+                  <span className="text-gray-500">{item.beds === 0 ? 'Studio' : `${item.beds} Bedroom`}</span>
                 </div>
               </div>
             </div>
           </div>
           {/* RIGHT COLUMN: Contact Form */}
           <div className="lg:col-span-1">
-            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-lg sticky top-24">
-              <h4 className="text-base font-bold text-[#154279] mb-4 risa-heading">Schedule a Tour</h4>
+            <div className="bg-[#154279] border border-[#154279] rounded-none p-6 shadow-lg sticky top-24">
+              <h4 className="text-base font-black text-white mb-4 uppercase tracking-tight">Schedule a Tour</h4>
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden">
                   <img src="https://i.pravatar.cc/150?u=property" alt="Agent" />
                 </div>
                 <div>
-                  <div className="font-bold text-[#333] risa-subheading">Property Manager</div>
-                  <div className="text-xs text-[#F96302] font-bold risa-uppercase risa-subheading">FindHouse Office</div>
+                  <div className="font-bold text-[#333] font-medium">Property Manager</div>
+                  <div className="text-xs text-[#F96302] font-bold uppercase">FindHouse Office</div>
                 </div>
               </div>
               <form className="space-y-3">
-                <input type="text" placeholder="Your Name" className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none risa-body" />
-                <input type="email" placeholder="Your Email" className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none risa-body" />
-                <input type="tel" placeholder="Your Phone" className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none risa-body" />
-                <textarea rows={3} placeholder="I am interested in this property..." className="w-full bg-[#f9f9f9] border border-gray-200 rounded px-3 py-3 text-sm focus:border-[#F96302] outline-none risa-body"></textarea>
+                <input type="text" placeholder="Your Name" className="w-full bg-white/10 border border-white/10 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none" />
+                <input type="email" placeholder="Your Email" className="w-full bg-white/10 border border-white/10 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none" />
+                <input type="tel" placeholder="Your Phone" className="w-full bg-white/10 border border-white/10 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none" />
+                <textarea rows={3} placeholder="I am interested in this property..." className="w-full bg-white border border-gray-200 rounded-none px-3 py-3 text-sm focus:border-[#F96302] outline-none"></textarea>
                 <button className="btn-primary">
                   Submit Request
                 </button>
-                <button className="w-full border-2 border-[#154279] text-[#154279] font-bold py-3 rounded hover:bg-[#154279] hover:text-white transition-all flex items-center justify-center gap-2 text-sm risa-subheading">
+                <button className="w-full border-2 border-[#154279] text-[#154279] font-bold py-3 rounded-none hover:bg-[#154279] hover:text-white transition-all flex items-center justify-center gap-2 text-sm">
                   <Phone size={16} /> Call Us
                 </button>
               </form>
@@ -418,27 +418,27 @@ const NeighborhoodMap = ({ activeSlideId }: { activeSlideId?: number }) => {
     },
   ];
   return (
-    <div className="w-full bg-white border border-gray-200 shadow-sm mt-8 flex flex-col rounded-sm overflow-hidden risa-font">
+    <div className="w-full bg-white border border-slate-200 shadow-md mt-8 flex flex-col rounded-none overflow-hidden font-nunito">
       {/* 1. Map Control Bar */}
-      <div className="p-4 border-b border-gray-200 bg-white flex flex-col md:flex-row justify-between items-center gap-4 z-10">
+      <div className="p-4 border-b border-slate-200 bg-white flex flex-col md:flex-row justify-between items-center gap-4 z-10">
         <div>
-          <h3 className="text-base font-bold text-[#333] flex items-center gap-2 uppercase tracking-tight risa-heading">
+          <h3 className="text-base font-bold text-[#333] flex items-center gap-2 uppercase tracking-tight">
             <MapPin className="text-[#F96302]" size={18} /> Featured Properties Map
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5 risa-body">
+          <p className="text-xs text-gray-500 mt-0.5 font-medium">
             Interactive map showing all 4 featured properties from the listings above.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-sm">
+          <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-none">
             <Search size={14} className="text-gray-400" />
-            <span className="text-xs font-medium text-gray-500 risa-body">Nairobi, KE</span>
+            <span className="text-xs font-medium text-gray-500">Nairobi, KE</span>
           </div>
           <div className="flex gap-1">
-            <button className="text-[10px] font-bold uppercase px-4 py-2 bg-[#1E3A5F] text-white rounded-sm hover:bg-[#152a45] transition-colors risa-uppercase risa-subheading">
+            <button className="text-[10px] font-bold uppercase px-4 py-2 bg-[#154279] text-white rounded-none hover:bg-[#0f2e54] transition-colors">
               Map
             </button>
-            <button className="text-[10px] font-bold uppercase px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-sm hover:bg-gray-50 transition-colors risa-uppercase risa-subheading">
+            <button className="text-[10px] font-bold uppercase px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-none hover:bg-gray-50 transition-colors">
               Satellite
             </button>
           </div>
@@ -461,26 +461,26 @@ const NeighborhoodMap = ({ activeSlideId }: { activeSlideId?: number }) => {
           ></iframe>
         </div>
         {/* Legend Overlay */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-sm shadow-md p-3 z-20 max-w-[200px] border border-gray-200">
-          <h4 className="text-xs font-bold text-[#333] mb-2 flex items-center gap-1 risa-subheading">
+        <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm rounded-none shadow-lg p-3 z-20 max-w-[200px] border border-slate-200">
+          <h4 className="text-xs font-bold text-[#333] mb-2 flex items-center gap-1">
             <Layers size={12} /> Property Areas
           </h4>
           <div className="space-y-1">
             {mapPins.map(pin => (
-              <div key={pin.id} className="flex items-center justify-between text-xs risa-body">
+              <div key={pin.id} className="flex items-center justify-between text-xs font-medium">
                 <div className="flex items-center gap-1">
-                  <div className={`w-2 h-2 rounded-full ${pin.active ? 'bg-[#F96302] animate-pulse' : 'bg-[#1E3A5F]'}`}></div>
-                  <span className={`font-medium ${pin.active ? 'text-[#F96302]' : 'text-gray-600'} ${pin.active ? 'risa-subheading' : ''}`}>
+                  <div className={`w-2 h-2 rounded-full ${pin.active ? 'bg-[#F96302] animate-pulse' : 'bg-[#154279]'}`}></div>
+                  <span className={`${pin.active ? 'text-[#F96302] font-bold' : 'text-gray-600'}`}>
                     {pin.area}
                   </span>
                 </div>
-                <span className="font-bold text-gray-700 risa-subheading">Ksh {pin.price}</span>
+                <span className="font-bold text-gray-700">Ksh {pin.price}</span>
               </div>
             ))}
           </div>
         </div>
         {/* Custom Map Controls Overlay */}
-        <div className="absolute right-4 bottom-20 flex flex-col shadow-lg rounded-sm overflow-hidden bg-white z-20 border border-gray-300">
+        <div className="absolute right-4 bottom-20 flex flex-col shadow-lg rounded-none overflow-hidden bg-white z-20 border border-slate-200">
           <button className="p-3 hover:bg-gray-50 text-gray-600 border-b border-gray-200">
             <Plus size={18} />
           </button>
@@ -498,54 +498,54 @@ const NeighborhoodMap = ({ activeSlideId }: { activeSlideId?: number }) => {
             <div className="relative flex flex-col items-center">
               {/* Enhanced Price Tag Pin */}
               <div className={`
-                ${pin.active ? 'bg-[#F96302] scale-110 shadow-lg' : 'bg-[#1E3A5F]'}
-                text-white text-xs font-bold px-3 py-1.5 rounded-sm shadow-md
+                ${pin.active ? 'bg-[#F96302] scale-110 shadow-xl ring-2 ring-white' : 'bg-[#154279]'}
+                text-white text-xs font-bold px-3 py-1.5 rounded-none shadow-md
                 border-2 border-white hover:scale-125 transition-all duration-300 flex items-center gap-1
-                group-hover/pin:bg-[#F96302] relative z-20 risa-subheading
+                group-hover/pin:bg-[#F96302] relative z-20
               `}>
                 <MapPin size={12} />
                 Ksh {pin.price}
               </div>
               {/* Triangle Arrow */}
               <div className={`w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]
-                ${pin.active ? 'border-t-[#F96302]' : 'border-t-[#1E3A5F]'}
+                ${pin.active ? 'border-t-[#F96302]' : 'border-t-[#154279]'}
                 group-hover/pin:border-t-[#F96302] -mt-[1px] transition-colors`}>
               </div>
               {/* Pulsing Ring Effect for Active Pins */}
               {pin.active && (
-                <div className="absolute w-16 h-16 border-2 border-[#F96302]/30 rounded-full -translate-x-1/2 -translate-y-1/2 animate-ping"></div>
+                <div className="absolute w-16 h-16 border-2 border-[#F96302]/40 rounded-full -translate-x-1/2 -translate-y-1/2 animate-ping shadow-md"></div>
               )}
               {/* Tooltip on Hover */}
               <div className="absolute bottom-[140%] mb-2 opacity-0 group-hover/pin:opacity-100 transition-all duration-200
-                bg-white shadow-xl rounded-sm overflow-hidden min-w-[180px] pointer-events-none transform translate-y-2
-                group-hover/pin:translate-y-0 z-50 border border-gray-200">
+                bg-white shadow-xl rounded-none overflow-hidden min-w-[180px] pointer-events-none transform translate-y-2
+                group-hover/pin:translate-y-0 z-50 border border-slate-200">
                 <div className="h-20 w-full bg-gray-100 overflow-hidden relative">
                   <img
                     src={pin.img}
                     className="w-full h-full object-cover"
                     alt={pin.area}
                   />
-                  <div className="absolute top-1 left-1 bg-[#F96302] text-white text-xs font-bold px-2 py-0.5 rounded-sm risa-uppercase risa-subheading">
+                  <div className="absolute top-1 left-1 bg-[#F96302] text-white text-xs font-bold px-2 py-0.5 rounded-none uppercase">
                     FOR RENT
                   </div>
                 </div>
                 <div className="p-3 border-t border-gray-100">
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="text-xs font-bold text-[#F96302] uppercase risa-uppercase risa-subheading">{pin.area}</div>
-                      <div className="text-sm font-black text-[#333] truncate risa-heading">{pin.title}</div>
+                      <div className="text-xs font-bold text-[#F96302] uppercase">{pin.area}</div>
+                      <div className="text-sm font-black text-[#333] truncate">{pin.title}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-base font-black text-[#1E3A5F] risa-heading">Ksh {pin.price}</div>
-                      <div className="text-xs text-gray-500 uppercase risa-uppercase risa-subheading">month</div>
+                      <div className="text-base font-black text-[#154279]">Ksh {pin.price}</div>
+                      <div className="text-xs text-gray-500 uppercase font-medium">month</div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-600 mt-2 line-clamp-2 risa-body">{pin.description}</p>
+                  <p className="text-xs text-gray-600 mt-2 line-clamp-2 font-medium">{pin.description}</p>
                   <div className="mt-2 flex gap-1">
                     {[1, 2, 3, 4, 5].map(i => (
-                      <Star key={i} size={12} className="fill-[#F9A100] text-[#F9A100]" />
+                      <Star key={i} size={12} className="fill-[#F96302] text-[#F96302]" />
                     ))}
-                    <span className="text-xs text-gray-500 ml-1 risa-body">({pin.count} listings)</span>
+                    <span className="text-xs text-gray-500 ml-1">({pin.count} listings)</span>
                   </div>
                 </div>
               </div>
@@ -554,15 +554,15 @@ const NeighborhoodMap = ({ activeSlideId }: { activeSlideId?: number }) => {
         ))}
       </div>
       {/* 3. Footer - Updated */}
-      <div className="bg-[#f9fafb] p-4 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 risa-body">
+      <div className="bg-slate-50 p-4 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
         <div className="mb-2 md:mb-0">
-          <div className="font-bold text-[#333] risa-subheading">Featured Properties Legend</div>
+          <div className="font-bold text-[#333]">Featured Properties Legend</div>
           <div className="flex items-center gap-3 mt-1">
-            <span className="flex items-center gap-1 text-xs risa-body"><div className="w-3 h-3 rounded-sm bg-[#F96302]"></div> Active/Highlighted</span>
-            <span className="flex items-center gap-1 text-xs risa-body"><div className="w-3 h-3 rounded-sm bg-[#1E3A5F]"></div> Available</span>
+            <span className="flex items-center gap-1 text-xs font-medium"><div className="w-3 h-3 rounded-none bg-[#F96302]"></div> Active/Highlighted</span>
+            <span className="flex items-center gap-1 text-xs font-medium"><div className="w-3 h-3 rounded-none bg-[#154279]"></div> Available</span>
           </div>
         </div>
-        <div className="text-xs risa-body">© 2026 FindHouse Map Data • All 4 listings shown on map</div>
+        <div className="text-xs font-medium">© 2026 FindHouse Map Data • All 4 listings shown on map</div>
       </div>
     </div>
   );
@@ -575,34 +575,34 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
   const [isSaved, setIsSaved] = useState(false);
   return (
     <div
-      className={`bg-white rounded-none overflow-hidden border ${isActive ? 'border-[#F96302]' : 'border-gray-100'} shadow-sm hover:shadow-md transition-all duration-300 group flex flex-col risa-font`}
+      className={`bg-white rounded-none overflow-hidden border ${isActive ? 'border-[#F96302] shadow-lg' : 'border-slate-200 shadow-md'} hover:shadow-xl transition-all duration-300 group flex flex-col font-nunito`}
     >
       <div className="relative h-48 overflow-hidden cursor-pointer" onClick={onClick}>
         <img src={data.img} alt={data.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-        <div className="absolute top-4 left-4 bg-gradient-to-r from-[#154279] to-[#1a56b4] text-white text-xs font-bold px-3 py-1 rounded-none uppercase tracking-wide shadow risa-uppercase risa-subheading">
+        <div className="absolute top-4 left-4 bg-[#154279] text-white text-xs font-bold px-3 py-1 rounded-none uppercase tracking-wide shadow-md">
           {data.beds === 0 ? "Studio" : `${data.beds} Bedroom`}
         </div>
         {data.badge && (
-          <div className="absolute top-4 right-4 bg-gradient-to-r from-[#F96302] to-[#ff7b2e] text-white text-xs font-bold px-2 py-1 rounded-none uppercase risa-uppercase risa-subheading">
+          <div className="absolute top-4 right-4 bg-[#F96302] text-white text-xs font-bold px-2 py-1 rounded-none uppercase tracking-wider shadow-md">
             {data.badge}
           </div>
         )}
-        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-2 py-1 rounded-none text-xs font-bold flex items-center gap-1 shadow-sm risa-subheading">
+        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-none text-xs font-bold flex items-center gap-1 shadow-md">
           <Maximize size={12} /> 3
         </div>
-        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
-          <div className="text-white font-bold text-base risa-heading">KES {data.price}</div>
-          <div className="text-white/80 text-xs risa-body">{data.floor}</div>
+        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent p-3 pt-8">
+          <div className="text-white font-black text-base">KES {data.price}</div>
+          <div className="text-white/80 text-xs font-medium">{data.floor}</div>
         </div>
       </div>
       <div className="p-4 flex-1 flex flex-col">
         <h4
-          className="font-bold text-sm text-[#222] mb-2 cursor-pointer hover:text-[#F96302] transition-colors leading-tight line-clamp-1 risa-heading"
+          className="font-bold text-sm text-[#222] mb-2 cursor-pointer hover:text-[#F96302] transition-colors leading-tight line-clamp-1"
           onClick={onClick}
         >
           {data.title}
         </h4>
-        <div className="text-xs text-gray-500 mb-3 flex items-center gap-1 risa-body">
+        <div className="text-xs text-gray-500 mb-3 flex items-center gap-1">
           <MapPin size={12} className="text-gray-400" /> {data.address}
         </div>
         <div className="flex items-center gap-2 mb-3">
@@ -617,29 +617,29 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
               />
             ))}
           </div>
-          <span className="text-xs text-gray-500 font-medium risa-body">({data.reviews} reviews)</span>
+          <span className="text-xs text-gray-500 font-medium">({data.reviews} reviews)</span>
         </div>
         <div className="flex flex-wrap gap-1 mb-3">
           {data.amenities?.slice(0, 2).map((am: string, i: number) => (
-            <span key={i} className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-none risa-body">
+            <span key={i} className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-none font-medium">
               {am}
             </span>
           ))}
           {data.amenities?.length > 2 && (
-            <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-none risa-body">
+            <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-none font-medium">
               +{data.amenities.length - 2}
             </span>
           )}
         </div>
         <div className="flex justify-between items-center border-t border-gray-100 pt-3 mt-auto">
-          <div className="flex gap-4 text-xs font-medium text-gray-500 risa-subheading">
+          <div className="flex gap-4 text-xs font-medium text-gray-500">
             <span className="flex items-center gap-1"><Bed size={13} /> {data.beds}</span>
             <span className="flex items-center gap-1"><Bath size={13} /> {data.baths}</span>
             <span className="flex items-center gap-1"><Maximize size={13} /> {data.sqft}</span>
           </div>
           <button
             onClick={onClick}
-            className="text-[#F96302] text-xs font-bold uppercase hover:text-[#d85502] transition-colors risa-uppercase risa-subheading"
+            className="text-[#F96302] text-xs font-bold uppercase hover:text-[#e55b20] transition-colors"
           >
             Details →
           </button>
@@ -678,7 +678,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
     exit: (dir: number) => ({ zIndex: 0, x: dir < 0 ? "100%" : "-100%", opacity: 1 })
   };
   return (
-    <div className="relative w-full h-[450px] bg-white border border-gray-200 overflow-hidden shadow-sm group risa-font">
+    <div className="relative w-full h-[450px] bg-white border border-slate-200 overflow-hidden shadow-md group font-nunito rounded-none">
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div
           key={page}
@@ -690,34 +690,31 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
           transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
           className="absolute inset-0 flex flex-col md:flex-row h-full w-full bg-white"
         >
-          <div className="w-full md:w-1/3 p-6 lg:p-10 flex flex-col justify-center relative z-10 bg-white border-r border-gray-100 h-full">
+          <div className="w-full md:w-1/3 p-6 lg:p-10 flex flex-col justify-center relative z-10 bg-white border-r border-slate-200 h-full">
             <div className="flex items-center gap-2 mb-4">
-              <span className="inline-block bg-[#F9A100] text-[#333] text-xs font-black uppercase px-2 py-1 tracking-wider risa-uppercase risa-heading">
+              <span className="inline-block bg-[#F96302] text-white text-xs font-black uppercase px-2 py-1 tracking-wider">
                 {currentSlide.tag}
               </span>
-              <span className="text-xs font-bold text-[#F96302] uppercase flex items-center gap-1 risa-uppercase risa-subheading">
+              <span className="text-xs font-bold text-[#F96302] uppercase flex items-center gap-1">
                 <Clock size={12} /> Auto-slides in 5s
               </span>
             </div>
-            <h1 className="text-2xl lg:text-3xl font-extrabold text-[#333] leading-none mb-2 uppercase tracking-tight whitespace-pre-line risa-heading">
+            <h1 className="text-2xl lg:text-3xl font-black text-[#154279] leading-none mb-2 uppercase tracking-tight whitespace-pre-line">
               {currentSlide.headline.split("\n")[0]} <br />{" "}
               <span className="text-[#F96302]">{currentSlide.headline.split("\n")[1]}</span>
             </h1>
-            <p className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wide border-b border-gray-100 pb-2 risa-uppercase risa-subheading">
+            <p className="text-sm font-bold text-[#154279] mb-3 uppercase tracking-[0.2em] border-b border-slate-200 pb-2">
               {currentSlide.subhead}
             </p>
             <div className="w-12 h-1 bg-[#F96302] mb-4"></div>
-            <p className="text-sm text-gray-700 font-medium mb-6 leading-relaxed risa-body">
+            <p className="text-sm text-gray-600 font-medium mb-6 leading-relaxed">
               {currentSlide.description}
             </p>
             <div className="flex flex-col gap-3">
-              <button
-                onClick={() => onCardClick(currentSlide)}
-                className="bg-[#F96302] text-white font-bold text-sm uppercase py-3 px-6 hover:bg-[#d15200] transition-colors shadow-sm flex items-center justify-center gap-2 rounded-sm border border-[#F96302] risa-uppercase risa-subheading"
-              >
+              <button className="bg-[#154279] text-white font-black py-3 px-6 hover:bg-[#0f2e54] transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 rounded-none border-none text-[10px] uppercase tracking-[0.2em]" onClick={() => onCardClick(currentSlide)}>
                 View This Listing <ChevronRight size={16} />
               </button>
-              <div className="flex items-center justify-center gap-4 text-xs font-bold text-gray-400 uppercase risa-uppercase risa-subheading">
+              <div className="flex items-center justify-center gap-4 text-xs font-bold text-gray-400 uppercase">
                 <span className="cursor-pointer hover:text-[#333]">Save to list</span>
                 <span className="w-px h-3 bg-gray-300"></span>
                 <span className="cursor-pointer hover:text-[#333]">Share</span>
@@ -728,25 +725,25 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
             <img src={currentSlide.img} alt="Property" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
             <div className="absolute bottom-4 right-4 bg-white border border-gray-300 shadow-sm p-2.5 flex flex-col items-end min-w-[140px] z-20">
-              <div className="bg-[#F9A100] text-[#333] text-xs font-black uppercase px-1.5 py-0.5 mb-1 leading-none risa-uppercase risa-heading">
+              <div className="bg-[#F96302] text-white text-xs font-black uppercase px-1.5 py-0.5 mb-1 leading-none">
                 {currentSlide.badge}
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-xs font-bold text-gray-500 risa-subheading">Ksh</span>
-                <span className="text-xl font-black text-[#333] leading-none tracking-tight risa-heading">
+                <span className="text-xs font-bold text-gray-500">Ksh</span>
+                <span className="text-xl font-black text-[#333] leading-none tracking-tight">
                   {currentSlide.price}
                 </span>
-                <span className="text-xs font-bold text-gray-400 risa-subheading">/mo</span>
+                <span className="text-xs font-bold text-gray-400">/mo</span>
               </div>
-              <div className="text-xs font-bold text-gray-700 mt-1 uppercase tracking-tight text-right risa-uppercase risa-subheading">
+              <div className="text-xs font-bold text-gray-700 mt-1 uppercase tracking-tight text-right">
                 {currentSlide.specs}
               </div>
-              <div className="text-xs text-gray-400 font-medium text-right truncate max-w-[150px] risa-body">
+              <div className="text-xs text-gray-400 font-medium text-right truncate max-w-[150px]">
                 {currentSlide.location}
               </div>
               {/* Show which map area this corresponds to */}
               <div className="mt-1 pt-1 border-t border-gray-200">
-                <div className="text-xs text-[#1E3A5F] font-bold uppercase risa-uppercase risa-subheading">
+                <div className="text-xs text-[#1E3A5F] font-bold uppercase">
                   Located in: {currentSlide.mapId === 101 ? 'CBD' : currentSlide.mapId === 102 ? 'Karen' : currentSlide.mapId === 103 ? 'Roysambu' : 'Westlands'}
                 </div>
               </div>
@@ -760,10 +757,10 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
           <button
             key={idx}
             onClick={() => goToSlide(idx)}
-            className={`h-2 rounded-full transition-all duration-300 shadow-sm ${
+            className={`h-2 rounded-none transition-all duration-300 shadow-sm ${
               slideIndex === idx
-                ? "bg-[#F96302] w-8"
-                : "bg-white/70 w-2 hover:w-4 hover:bg-gray-300"
+                ? "bg-[#F96302] w-8 shadow-md"
+                : "bg-white/80 w-2 hover:w-4 hover:bg-slate-300 hover:shadow-sm"
             }`}
           />
         ))}
@@ -799,21 +796,18 @@ const HomePage = () => {
     setActiveSlideId(mapPinId);
   };
 
-  // Add Inter font dynamically (matches navbar)
+  // Add Nunito font dynamically (matches FeaturesSection design)
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap';
+    link.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
     
-    // Add the CSS classes for font weights and styles
+    // Add the CSS classes for font weights and styles (matching FeaturesSection)
     const style = document.createElement('style');
     style.textContent = `
-      .risa-font { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
-      .risa-heading { font-weight: 800; letter-spacing: -0.03em; }
-      .risa-subheading { font-weight: 600; letter-spacing: -0.01em; }
-      .risa-body { font-weight: 400; letter-spacing: -0.01em; }
-      .risa-uppercase { font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+      body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      .font-nunito { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     `;
     document.head.appendChild(style);
     
@@ -824,18 +818,18 @@ const HomePage = () => {
   }, []);
 
   return (
-    <div className="antialiased min-h-screen bg-white risa-font">
+    <div className="antialiased min-h-screen bg-white text-[#484848] font-sans">
       <NavbarSection />
 
       {/* FIXED: Reduced top padding to eliminate large gap */}
       <main className="max-w-[1440px] mx-auto px-4 lg:px-8 py-4 pt-20">
         {/* Breadcrumb */}
-        <div className="text-xs text-gray-500 mb-4 flex items-center gap-1 font-medium risa-subheading">
+        <div className="text-xs text-gray-600 mb-4 flex items-center gap-1 font-bold">
           <span className="hover:underline cursor-pointer">Realtor</span>
           <ChevronRight size={12} />
           <span className="hover:underline cursor-pointer">Rentals</span>
           <ChevronRight size={12} />
-          <span className="font-bold text-[#F96302] risa-subheading">Current Listings</span>
+          <span className="font-bold text-[#F96302]">Current Listings</span>
         </div>
         <div className="flex-1">
           {/* Carousel */}
@@ -847,12 +841,12 @@ const HomePage = () => {
           </div>
           {/* Trending Rentals */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-bold text-[#333] flex items-center gap-2 uppercase tracking-tight risa-heading">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-2">
+              <h2 className="text-base font-black text-[#154279] flex items-center gap-2 uppercase tracking-tight">
                 <MapPin className="text-[#F96302]" size={18} />
                 Trending Rentals (Mapped Below)
               </h2>
-              <span className="text-xs font-bold text-[#F96302] cursor-pointer hover:underline risa-subheading">
+              <span className="text-xs font-bold text-[#F96302] cursor-pointer hover:underline">
                 See All 124 Results &gt;
               </span>
             </div>
@@ -868,9 +862,9 @@ const HomePage = () => {
               ))}
             </div>
             {/* Info Box */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-sm">
-              <div className="flex items-center gap-2 text-blue-800 text-sm font-medium risa-subheading">
-                <Navigation size={14} />
+            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-none">
+              <div className="flex items-center gap-2 text-slate-700 text-sm font-medium">
+                <Navigation size={14} className="text-[#F96302]" />
                 Click any property card to see its location highlighted on the map below
               </div>
             </div>

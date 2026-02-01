@@ -309,8 +309,13 @@ ALTER TABLE public.property_income_projections ENABLE ROW LEVEL SECURITY;
 -- Drop existing policies if they exist (to avoid conflicts on re-run)
 DROP POLICY IF EXISTS "Super admins can view all unit specifications" ON public.unit_specifications;
 DROP POLICY IF EXISTS "Super admins can manage unit specifications" ON public.unit_specifications;
+DROP POLICY IF EXISTS "Anyone can view active unit specifications" ON public.unit_specifications;
+DROP POLICY IF EXISTS "Property managers can view unit specifications for their properties" ON public.unit_specifications;
 DROP POLICY IF EXISTS "Super admins can view all detailed units" ON public.units_detailed;
 DROP POLICY IF EXISTS "Super admins can manage detailed units" ON public.units_detailed;
+DROP POLICY IF EXISTS "Anyone can view vacant units" ON public.units_detailed;
+DROP POLICY IF EXISTS "Property managers can view units in their properties" ON public.units_detailed;
+DROP POLICY IF EXISTS "Tenants can view their assigned unit" ON public.units_detailed;
 DROP POLICY IF EXISTS "Super admins can view income projections" ON public.property_income_projections;
 DROP POLICY IF EXISTS "Super admins can manage income projections" ON public.property_income_projections;
 
@@ -339,6 +344,22 @@ WITH CHECK (
     )
 );
 
+-- Allow all users (including unauthenticated) to view active unit specifications
+CREATE POLICY "Anyone can view active unit specifications"
+ON public.unit_specifications FOR SELECT
+USING (is_active = true);
+
+-- Property managers can manage unit specifications for their properties
+CREATE POLICY "Property managers can view unit specifications for their properties"
+ON public.unit_specifications FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.properties p
+        WHERE p.id = unit_specifications.property_id
+        AND p.property_manager_id = auth.uid()
+    )
+);
+
 CREATE POLICY "Super admins can view all detailed units" 
 ON public.units_detailed FOR SELECT
 USING (
@@ -362,6 +383,27 @@ WITH CHECK (
         WHERE id = auth.uid() AND role = 'super_admin'
     )
 );
+
+-- Allow all users (including unauthenticated) to view vacant units for registration
+CREATE POLICY "Anyone can view vacant units" 
+ON public.units_detailed FOR SELECT
+USING (status = 'vacant');
+
+-- Property managers can view all units in their properties
+CREATE POLICY "Property managers can view units in their properties"
+ON public.units_detailed FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.properties p
+        WHERE p.id = units_detailed.property_id
+        AND p.property_manager_id = auth.uid()
+    )
+);
+
+-- Tenants can view their own unit
+CREATE POLICY "Tenants can view their assigned unit"
+ON public.units_detailed FOR SELECT
+USING (occupant_id = auth.uid());
 
 CREATE POLICY "Super admins can view income projections" 
 ON public.property_income_projections FOR SELECT

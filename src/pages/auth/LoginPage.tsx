@@ -1,450 +1,364 @@
 // src/pages/auth/LoginPage.tsx
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client"; // Direct import for login action
-import { useAuth } from "@/contexts/AuthContext"; // Context for session monitoring
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Battery, Wifi, Signal, 
-  Eye, EyeOff, Mail, Lock, ArrowRight, UserCheck 
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Loader2, CheckCircle, User, ArrowLeft } from "lucide-react";
 
-// --- 1. UI COMPONENT: The Brand Logo ---
-const BrandLogo = ({ width = "120", height = "120" }: { width?: string | number, height?: string | number }) => (
-  <svg width={width} height={height} viewBox="0 0 200 200" className="drop-shadow-md">
-    <defs>
-      <linearGradient id="grad-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#D4AF37" />
-        <stop offset="100%" stopColor="#B59325" />
-      </linearGradient>
-    </defs>
-    <path fill="url(#grad-gold)" d="M110 90 V170 L160 150 V70 L110 90 Z" />
-    <path fill="#1F2937" d="M160 70 L180 80 V160 L160 150 Z" />
-    <path fill="url(#grad-gold)" d="M30 150 V50 L80 20 V120 L30 150 Z" />
-    <path fill="#8A7D55" d="M80 20 L130 40 V140 L80 120 Z" />
-    <g fill="#FFFFFF">
-      <path d="M85 50 L100 56 V86 L85 80 Z" />
-      <path d="M85 90 L100 96 V126 L85 120 Z" />
-      <path d="M45 60 L55 54 V124 L45 130 Z" />
-      <path d="M120 130 L140 122 V152 L120 160 Z" />
-    </g>
-  </svg>
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+    .font-technical { font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  `}</style>
 );
 
-// --- 2. UI COMPONENT: Portal Loader ---
-const PortalLoader = ({ message = "Loading Workspace" }: { message?: string }) => {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer);
-          return 100;
-        }
-        return prev + Math.floor(Math.random() * 15) + 5;
-      });
-    }, 200);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-      className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white rounded-[45px] md:rounded-[24px]"
-    >
-      <div className="w-64 flex flex-col items-center">
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.6 }}
-          className="mb-8"
-        >
-          <BrandLogo width={60} height={60} />
-        </motion.div>
-        <div className="w-full h-[2px] bg-slate-100 rounded-full overflow-hidden">
-          <motion.div 
-            className="h-full bg-slate-900"
-            initial={{ width: "0%" }}
-            animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={{ ease: "easeInOut" }}
-          />
-        </div>
-        <div className="mt-3 text-[10px] font-medium tracking-[0.2em] text-slate-400 uppercase font-brand">
-          {message}
-        </div>
-      </div>
-    </motion.div>
-  );
+// Brand Colors
+const BRAND = {
+  PRIMARY: "#00356B",
+  ACCENT: "#D85C2C",
+  SUCCESS: "#86bc25",
 };
 
-// --- MAIN PAGE COMPONENT ---
 const LoginPage: React.FC = () => {
-  // --- LOGIC SETUP (From File 1) ---
   const navigate = useNavigate();
   const location = useLocation();
   const { user, supabaseUser, isLoading: authLoading, getUserRole } = useAuth();
   
-  // --- UI STATE (From File 2) ---
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false); // Controls the PortalLoader animation
-  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  // --- CORE LOGIC: Handle Redirects & Roles (Preserved from File 1) ---
   useEffect(() => {
-    // Only proceed if not loading auth context and we have a supabase user
-    if (!authLoading && supabaseUser) {
-      console.log("🔑 LoginPage: User authenticated, checking profile...");
-      setIsSuccess(true); // Trigger the PortalLoader UI
+    const searchParams = new URLSearchParams(location.search);
+    const mode = searchParams.get("mode");
+    if (mode === "signup") setIsSignUp(true);
+    else if (mode === "signin") setIsSignUp(false);
+  }, [location.search]);
 
-      if (user) {
-        // User has a profile - redirect to appropriate dashboard
-        console.log("✅ LoginPage: User has profile, redirecting...");
-        setRedirecting(true);
-
-        setTimeout(() => {
-          const searchParams = new URLSearchParams(location.search);
-          const redirect = searchParams.get("redirect");
-
-          if (redirect) {
-            navigate(redirect, { replace: true });
-          } else {
-            // Determine redirect based on user role (Logic from File 1)
-            const userRole = getUserRole();
-            console.log(`🚀 LoginPage: User role determined: ${userRole}`);
-
-            let targetPath = "/profile"; 
-
-            switch (userRole) {
-              case "super_admin": targetPath = "/portal/super-admin"; break;
-              case "property_manager": targetPath = "/portal/manager"; break;
-              case "tenant": targetPath = "/portal/tenant"; break;
-              case "owner": targetPath = "/portal/owner"; break;
-              default: targetPath = "/profile";
-            }
-
-            console.log(`🚀 LoginPage: Redirecting to ${targetPath}`);
-            navigate(targetPath, { replace: true });
+  useEffect(() => {
+    if (!authLoading && supabaseUser && isSuccess) {
+      setTimeout(() => {
+        const searchParams = new URLSearchParams(location.search);
+        const redirect = searchParams.get("redirect");
+        if (redirect) {
+          navigate(redirect, { replace: true });
+        } else {
+          const userRole = getUserRole();
+          let targetPath = "/profile"; 
+          switch (userRole) {
+            case "super_admin": targetPath = "/portal/super-admin"; break;
+            case "property_manager": targetPath = "/portal/manager"; break;
+            case "tenant": targetPath = "/portal/tenant"; break;
+            case "owner": targetPath = "/portal/owner"; break;
+            default: targetPath = "/profile";
           }
-        }, 800); // Slight delay to let the animation play
-      } else {
-        // User authenticated but no profile - Logic from File 1 (redirects to complete-profile)
-        console.log("⚠️ LoginPage: User authenticated but no profile");
-        // We will handle the UI for this inside the render, but we can also auto-redirect
-        // depending on preference. File 1 auto-redirected after timeout.
-        setTimeout(() => {
-            navigate("/complete-profile", { replace: true });
-        }, 800);
-      }
+          navigate(targetPath, { replace: true });
+        }
+      }, 2000);
     }
-  }, [user, supabaseUser, authLoading, navigate, location.search, getUserRole]);
+  }, [user, supabaseUser, authLoading, navigate, location.search, getUserRole, isSuccess]);
 
-  // --- HANDLER: Login Submission ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
-    const trimmedEmail = email.trim().toLowerCase();
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      toast.error("Please enter a valid email address");
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Password validation
-    if (!password || password.length < 6) {
-      toast.error("Please enter your password");
-      setIsSubmitting(false);
-      return;
-    }
-
+    setError("");
     setIsSubmitting(true);
-
     try {
-      // Attempt login
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password: password,
-      });
-
-      if (loginError) {
-        // Handle specific auth errors
-        if (loginError.message.includes("Invalid login credentials")) {
-          throw new Error("Invalid email or password. Please try again.");
-        }
-        if (loginError.message.includes("Email not confirmed")) {
-          throw new Error("Please confirm your email before logging in. Check your inbox for a confirmation link.");
-        }
-        throw new Error(loginError.message || "Login failed");
-      }
-
-      if (!loginData.user) {
-        throw new Error("Login failed. Please try again.");
-      }
-
-      // Check if user profile exists and is confirmed
-      const { data: profileCheck, error: profileCheckError } = await supabase.rpc(
-        "check_email_confirmed",
-        { p_user_id: loginData.user.id }
-      );
-
-      if (profileCheckError) {
-        console.error("Profile check error:", profileCheckError);
-        throw new Error("Failed to verify user profile. Please contact support.");
-      }
-
+      if (!email || !password) throw new Error("Credentials required.");
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
       toast.success("Login successful!");
       setIsSuccess(true);
-      // We don't manually navigate here. 
-      // The `useEffect` above detects the auth state change and handles the routing.
     } catch (error: any) {
-      console.error("Login error:", error);
-      const errorMessage = error.message || "Login failed. Please try again.";
-      toast.error(errorMessage);
       setIsSubmitting(false);
+      setError(error.message || "Invalid credentials.");
+      toast.error(error.message || "Login failed");
     }
   };
 
-  // --- RENDER HELPERS ---
-  const isProfilePending = supabaseUser && !user && !authLoading;
-
   return (
-    <div className="fixed inset-0 z-[9999] w-full h-[100dvh] bg-white flex items-center justify-center overflow-hidden font-brand">
-      
-      {/* Styles */}
-      <style>
-        {`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
-          .font-brand { font-family: 'Inter', sans-serif; }
-          .no-scrollbar::-webkit-scrollbar { display: none; }
-          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        `}
-      </style>
-
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-50 via-white to-gray-100 opacity-80 pointer-events-none" />
-
-      {/* DEVICE CONTAINER */}
-      <motion.div 
-        key="device"
-        initial={{ opacity: 0, scale: 0.95 }} 
-        animate={{ opacity: 1, scale: 1 }} 
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex items-center justify-center p-4 w-full h-full"
+    <>
+      <GlobalStyles />
+      <div
+        className="min-h-screen w-full flex items-center justify-center p-4 font-technical relative"
+        style={{
+          backgroundImage: `url('https://t4.ftcdn.net/jpg/03/57/34/39/360_F_357343965_u58BFcRrziBVMqgt6liwPHJKcIjHsPnc.jpg')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }}
       >
-        <div 
-          className="relative mx-auto bg-[#1a1a1a] transition-all duration-700 ease-in-out
-            /* MOBILE (iPhone): Narrow, Taller, Rounder corners */
-            w-[360px] xs:w-[380px] h-[780px] rounded-[55px]
-            /* DESKTOP (Fold): Wide, Square-ish corners */
-            md:w-[700px] md:h-[800px] md:rounded-[30px]
-          "
-          style={{
-            boxShadow: `
-              0 0 0 1px #333,
-              0 0 0 4px #444,
-              0 20px 50px -10px rgba(0,0,0,0.4),
-              0 40px 80px -20px rgba(0,0,0,0.3)
-            `
-          }}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+
+        {/* Back to Home Button */}
+        <button
+          onClick={() => navigate("/")}
+          className="absolute top-6 left-6 z-20 flex items-center gap-2 text-white hover:text-gray-200 transition-colors group"
+          aria-label="Back to home"
         >
+          <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm font-medium">Back Home</span>
+        </button>
+
+        <div className="relative bg-white rounded-xl shadow-xl overflow-hidden w-full max-w-[850px] min-h-[600px] md:min-h-[520px] z-10">
           
-          {/* --- PHYSICAL BUTTONS (Decorations) --- */}
-          <div className="md:hidden">
-            <div className="absolute -left-[3px] top-28 w-[3px] h-7 bg-gray-500 rounded-l-md" /> 
-            <div className="absolute -left-[3px] top-44 w-[3px] h-14 bg-gray-500 rounded-l-md" /> 
-            <div className="absolute -left-[3px] top-60 w-[3px] h-14 bg-gray-500 rounded-l-md" /> 
-            <div className="absolute -right-[3px] top-40 w-[3px] h-20 bg-gray-500 rounded-r-md" /> 
-          </div>
-          <div className="hidden md:block">
-            <div className="absolute -right-[3px] top-32 w-[3px] h-10 bg-gray-500 rounded-r-md" />
-            <div className="absolute -right-[3px] top-48 w-[3px] h-14 bg-gray-500 rounded-r-md" />
-          </div>
+          {/* SIGN UP FORM */}
+          <div
+            className={`absolute top-0 h-full transition-all duration-700 ease-in-out left-0 w-full md:w-1/2 z-[1] 
+              ${isSignUp ? "opacity-100 z-[5] md:translate-x-full" : "opacity-0 z-[1] md:opacity-100 md:translate-x-0"}
+            `}
+          >
+            <div
+              className="bg-white flex flex-col items-center justify-center h-full px-6 sm:px-10 text-center"
+            >
+              <h1 className="font-bold text-2xl md:text-3xl mb-4" style={{ color: BRAND.PRIMARY }}>
+                Create Account
+              </h1>
+              <span className="text-xs text-gray-500 mb-6 font-medium">
+                Complete your registration
+              </span>
 
-          {/* --- SCREEN CONTAINER --- */}
-          <div className="relative w-full h-full bg-black overflow-hidden flex flex-col transition-all duration-700
-                          rounded-[50px] border-[8px] border-[#1a1a1a] 
-                          md:rounded-[26px] md:border-[6px]">
-            
-            {/* Dynamic Island / Punch Hole */}
-            <div className="md:hidden absolute top-0 w-full h-14 z-50 flex justify-center items-start pt-3 pointer-events-none">
-               <div className="w-[120px] h-[35px] bg-black rounded-full flex items-center justify-end pr-4">
-                 <div className="w-3 h-3 rounded-full bg-[#1a1a1a] shadow-[inset_0_0_4px_rgba(255,255,255,0.1)]" />
-               </div>
-            </div>
-            <div className="hidden md:block absolute top-4 left-1/2 translate-x-[150px] w-3 h-3 bg-black rounded-full z-50 pointer-events-none opacity-90" />
+              <button
+                type="button"
+                onClick={() => navigate("/register")}
+                className="mt-6 text-white text-xs font-black py-3 px-12 rounded-md uppercase tracking-wider hover:brightness-110 transition-all shadow-sm"
+                style={{ backgroundColor: BRAND.ACCENT }}
+              >
+                Go to Register Page
+              </button>
 
-            {/* --- STATUS BAR --- */}
-            <div className="w-full px-6 pt-3 pb-2 flex justify-between items-center z-40 select-none bg-white transition-all">
-              <span className="text-black text-[14px] font-semibold">{time}</span>
-              <div className="flex items-center gap-2 text-black">
-                <Signal size={14} fill="currentColor" />
-                <Wifi size={14} strokeWidth={2.5}/>
-                <Battery size={18} className="ml-1"/>
+              <div className="flex items-center gap-4 w-full my-6">
+                <div className="h-px bg-gray-200 w-full"></div>
+                <span className="text-xs font-bold text-gray-400">OR</span>
+                <div className="h-px bg-gray-200 w-full"></div>
+              </div>
+
+              <div className="mt-6 md:hidden">
+                <p className="text-xs text-gray-500">Already have an account?</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setError("");
+                  }}
+                  className="text-xs font-bold uppercase mt-2 hover:underline"
+                  style={{ color: BRAND.ACCENT }}
+                >
+                  Sign In
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* --- CONTENT AREA --- */}
-            <div className="flex-1 bg-white relative w-full h-full flex flex-col justify-center px-6 md:px-16 overflow-y-auto no-scrollbar">
-              
-              <AnimatePresence mode="wait">
-                
-                {/* STATE 1: LOADING / REDIRECTING / SUCCESS */}
-                {(authLoading || redirecting || isSuccess) ? (
-                  <PortalLoader key="loader" message={redirecting ? "Redirecting..." : "Verifying Credentials"} />
-                ) : 
-                
-                /* STATE 2: AUTHENTICATED BUT NO PROFILE (Almost There) */
-                isProfilePending ? (
-                  <motion.div 
-                    key="no-profile"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="w-full max-w-sm mx-auto text-center"
-                  >
-                     <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <UserCheck className="w-10 h-10 text-green-600" />
-                     </div>
-                     <h2 className="text-2xl font-brand font-bold text-gray-900 mb-2">Almost There!</h2>
-                     <p className="text-gray-500 mb-6 text-sm">
-                       Signed in as <span className="font-semibold text-gray-900">{supabaseUser.email}</span>
-                     </p>
-                     <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 mb-6">
-                      <p className="text-yellow-800 text-xs font-medium">
-                        Your account needs a profile to continue. Redirecting you to setup...
-                      </p>
-                    </div>
-                    <Button 
-                      onClick={() => navigate("/complete-profile")}
-                      className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl"
-                    >
-                      Complete Profile Now
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="mt-4 text-xs text-gray-500 hover:text-gray-900"
-                      onClick={async () => {
-                         await supabase.auth.signOut();
-                         window.location.reload();
-                      }}
-                    >
-                      Sign Out
-                    </Button>
-                  </motion.div>
-                ) : 
-                
-                /* STATE 3: LOGIN FORM (Default) */
-                (
-                  <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                    {/* Header */}
-                    <div className="text-center mb-8">
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center">
-                            <BrandLogo width={30} height={30} />
-                        </div>
-                      </div>
-                      <h2 className="text-2xl md:text-3xl font-brand font-semibold text-slate-900 tracking-tight">
-                        Welcome Back
-                      </h2>
-                      <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
-                        Enter your credentials to access your account
-                      </p>
-                    </div>
+          {/* SIGN IN FORM */}
+          <div
+            className={`absolute top-0 h-full transition-all duration-700 ease-in-out left-0 w-full md:w-1/2 z-[2]
+               ${isSignUp ? "opacity-0 z-[1] md:opacity-100 md:translate-x-full" : "opacity-100 z-[5] md:translate-x-0"}
+            `}
+          >
+            <form
+              className="bg-white flex flex-col items-center justify-center h-full px-6 sm:px-10 text-center"
+              onSubmit={handleLogin}
+            >
+              <h1 className="font-bold text-2xl md:text-3xl mb-6" style={{ color: BRAND.PRIMARY }}>
+                Sign In
+              </h1>
 
-                    {/* Form - Centered stack */}
-                    <div className="w-full max-w-sm mx-auto">
-                      <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="space-y-1.5">
-                          <Label htmlFor="email" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">Email</Label>
-                          <div className="relative group">
-                            <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                              <Mail className="h-4 w-4" />
-                            </div>
-                            <Input
-                              id="email"
-                              type="email"
-                              placeholder="john@example.com"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="pl-10 h-11 bg-white border-2 border-slate-300 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl font-medium text-black placeholder:text-slate-400 transition-all"
-                              required
-                            />
-                          </div>
-                        </div>
+              <div className="w-full space-y-4">
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                  className="bg-gray-50 border border-[#d1d5db] px-4 py-3 text-sm w-full outline-none rounded-lg focus:ring-1 focus:ring-[#00356B] focus:border-[#00356B] transition-all"
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
+                  className="bg-gray-50 border border-[#d1d5db] px-4 py-3 text-sm w-full outline-none rounded-lg focus:ring-1 focus:ring-[#00356B] focus:border-[#00356B] transition-all"
+                />
+              </div>
 
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between ml-1">
-                            <Label htmlFor="password" className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Password</Label>
-                            <Link to="/reset-password" className="text-[10px] font-bold text-[#D4AF37] hover:underline">Forgot?</Link>
-                          </div>
-                          <div className="relative group">
-                            <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                              <Lock className="h-4 w-4" />
-                            </div>
-                            <Input
-                              id="password"
-                              type={showPassword ? "text" : "password"}
-                              placeholder="••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              className="pl-10 pr-10 h-11 !bg-white !text-black border-2 border-slate-300 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl font-medium placeholder:text-slate-400 transition-all dark:!bg-white dark:!text-black"
-                              required
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </div>
+              <Link
+                to="/reset-password"
+                className="text-xs mt-3 hover:underline font-medium transition-colors"
+                style={{ color: BRAND.PRIMARY }}
+              >
+                Forgot Password?
+              </Link>
 
-                        <Button 
-                          type="submit" 
-                          className="w-full h-12 bg-navy hover:bg-[#002855] text-white rounded-xl font-medium text-sm shadow-lg shadow-navy/20 mt-2 transition-all active:scale-[0.98]" 
-                          disabled={isSubmitting}
-                        >
-                          {isSubmitting ? "Signing in..." : <span className="flex items-center gap-2 justify-center">Sign In <ArrowRight className="w-4 h-4"/></span>}
-                        </Button>
-                      </form>
+              {error && !isSignUp && (
+                <p className="text-red-500 text-xs mt-2 font-bold">{error}</p>
+              )}
 
-                      <div className="mt-8 text-center space-y-4">
-                        <p className="text-xs text-slate-500">
-                          Don't have an account? <Link to="/register" className="text-slate-900 font-bold hover:underline">Sign up</Link>
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <button
+                type="submit"
+                className="mt-6 text-white text-xs font-black py-3 px-16 rounded-md uppercase tracking-wider hover:brightness-110 transition-all shadow-sm"
+                disabled={isSubmitting}
+                style={{ backgroundColor: BRAND.ACCENT }}
+              >
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Login"}
+              </button>
+
+              <div className="flex items-center gap-4 w-full my-6">
+                <div className="h-px bg-gray-200 w-full"></div>
+                <span className="text-xs font-bold text-gray-400">OR</span>
+                <div className="h-px bg-gray-200 w-full"></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsSubmitting(true);
+                    setError("");
+                    const { error } = await supabase.auth.signInWithOAuth({
+                      provider: "google",
+                      options: {
+                        redirectTo: `${window.location.origin}/auth/callback`,
+                        queryParams: {
+                          access_type: "offline",
+                          prompt: "consent",
+                        },
+                      },
+                    });
+                    if (error) throw error;
+                  } catch (error: any) {
+                    setError(error.message || "Google login failed");
+                    setIsSubmitting(false);
+                    toast.error(error.message || "Google login failed");
+                  }
+                }}
+                disabled={isSubmitting}
+                className="w-full text-gray-700 text-xs font-black py-3 px-12 rounded-md uppercase tracking-wider hover:brightness-95 transition-all shadow-sm border border-gray-300 bg-white flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    fill="#EA4335"
+                  />
+                </svg>
+                Continue with Google
+              </button>
+
+              <div className="mt-6 md:hidden">
+                <p className="text-xs text-gray-500">Don't have an account?</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setError("");
+                  }}
+                  className="text-xs font-bold uppercase mt-2 hover:underline"
+                  style={{ color: BRAND.ACCENT }}
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* OVERLAY PANEL (Desktop Only) */}
+          <div
+            className={`hidden md:block absolute top-0 left-1/2 w-1/2 h-full overflow-hidden transition-transform duration-700 ease-in-out z-[100]
+              ${isSignUp ? "-translate-x-full rounded-tr-[100px]" : "translate-x-0 rounded-tl-[100px]"}
+            `}
+          >
+            <div
+              className={`bg-[#00356B] text-white relative -left-full h-full w-[200%] transition-transform duration-700 ease-in-out
+                ${isSignUp ? "translate-x-1/2" : "translate-x-0"}
+              `}
+            >
+              <div
+                className={`absolute flex flex-col items-center justify-center h-full w-1/2 px-8 text-center top-0 transition-transform duration-700 ease-in-out
+                  ${isSignUp ? "translate-x-0" : "-translate-x-[20%]"}
+                `}
+              >
+                <div className="mb-6 h-20 w-20 rounded-full bg-white flex items-center justify-center shadow-lg border-2" style={{ borderColor: BRAND.SUCCESS }}>
+                  <User className="w-8 h-8" style={{ color: BRAND.PRIMARY }} strokeWidth={1.8} />
+                </div>
+                <h1 className="font-bold text-2xl md:text-3xl mb-3" style={{ color: BRAND.SUCCESS }}>Welcome Back!</h1>
+                <p className="text-sm text-white/90 mb-6 max-w-[260px]">
+                  Enter your details to access your dashboard.
+                </p>
+                <button
+                  type="button"
+                  className="text-xs font-black py-2.5 px-8 rounded-md uppercase tracking-wider hover:bg-white/10 transition-colors"
+                  style={{ backgroundColor: 'white', color: BRAND.PRIMARY }}
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setError("");
+                  }}
+                >
+                  Sign In
+                </button>
+              </div>
+
+              <div
+                className={`absolute right-0 flex flex-col items-center justify-center h-full w-1/2 px-8 text-center top-0 transition-transform duration-700 ease-in-out
+                  ${isSignUp ? "translate-x-[20%]" : "translate-x-0"}
+                `}
+              >
+                <div className="mb-6 h-20 w-20 rounded-full bg-white flex items-center justify-center shadow-lg border-2" style={{ borderColor: BRAND.SUCCESS }}>
+                  <User className="w-8 h-8" style={{ color: BRAND.PRIMARY }} strokeWidth={1.8} />
+                </div>
+                <h1 className="font-bold text-2xl md:text-3xl mb-3" style={{ color: BRAND.SUCCESS }}>Join REALTORS</h1>
+                <p className="text-sm text-white/90 mb-6 max-w-[260px]">
+                  Register to unlock all features and start managing properties.
+                </p>
+                <button
+                  type="button"
+                  className="text-xs font-black py-2.5 px-8 rounded-md uppercase tracking-wider hover:bg-white/10 transition-colors"
+                  style={{ backgroundColor: 'white', color: BRAND.PRIMARY }}
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setError("");
+                  }}
+                >
+                  Sign Up
+                </button>
+              </div>
             </div>
+          </div>
 
-            {/* Home Indicator */}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-36 md:w-48 h-[5px] md:h-[4px] bg-black/20 backdrop-blur-sm rounded-full z-50 transition-all" />
-          </div>
-          
-          {/* Screen Reflection Overlay */}
-          <div className="absolute inset-0 rounded-[55px] md:rounded-[30px] pointer-events-none z-[60] shadow-[inset_0_0_40px_rgba(255,255,255,0.05)] opacity-50 transition-all duration-700">
-            <div className="absolute inset-y-0 left-1/2 w-8 -translate-x-1/2 bg-gradient-to-r from-transparent via-black/5 to-transparent mix-blend-multiply" />
-          </div>
+          {/* SUCCESS MESSAGE */}
+          {isSuccess && (
+            <div className="absolute inset-0 z-[200] bg-white/95 backdrop-blur-sm flex items-center justify-center rounded-xl">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${BRAND.SUCCESS}20` }}>
+                  <CheckCircle className="w-8 h-8" style={{ color: BRAND.SUCCESS }} strokeWidth={2} />
+                </div>
+                <h2 className="text-xl font-bold" style={{ color: BRAND.PRIMARY }}>Success!</h2>
+                <p className="text-gray-600 text-sm">Redirecting to dashboard...</p>
+              </div>
+            </div>
+          )}
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </>
   );
 };
 

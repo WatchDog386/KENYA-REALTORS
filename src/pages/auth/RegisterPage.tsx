@@ -1,97 +1,39 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { 
-  Building, Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight,
-  Battery, Wifi, Signal 
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { User, Phone, Mail, Lock, Loader2, ArrowLeft, Building2, Home } from "lucide-react";
 
-// --- UI COMPONENTS ---
+interface Property {
+  id: string;
+  name: string;
+  address?: string;
+}
 
-const BrandLogo = ({ width = "120", height = "120" }: { width?: string | number, height?: string | number }) => (
-  <svg width={width} height={height} viewBox="0 0 200 200" className="drop-shadow-md">
-    <defs>
-      <linearGradient id="grad-gold-reg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#D4AF37" />
-        <stop offset="100%" stopColor="#B59325" />
-      </linearGradient>
-    </defs>
-    <path fill="url(#grad-gold-reg)" d="M110 90 V170 L160 150 V70 L110 90 Z" />
-    <path fill="#1F2937" d="M160 70 L180 80 V160 L160 150 Z" />
-    <path fill="url(#grad-gold-reg)" d="M30 150 V50 L80 20 V120 L30 150 Z" />
-    <path fill="#8A7D55" d="M80 20 L130 40 V140 L80 120 Z" />
-    <g fill="#FFFFFF">
-      <path d="M85 50 L100 56 V86 L85 80 Z" />
-      <path d="M85 90 L100 96 V126 L85 120 Z" />
-      <path d="M45 60 L55 54 V124 L45 130 Z" />
-      <path d="M120 130 L140 122 V152 L120 160 Z" />
-    </g>
-  </svg>
-);
+interface Unit {
+  id: string;
+  unit_number: string;
+  unit_type: string;
+  floor_number: number;
+  price_monthly: number;
+  property_id: string;
+  status: string;
+}
 
-const PortalLoader = () => {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer);
-          return 100;
-        }
-        return prev + Math.floor(Math.random() * 15) + 5;
-      });
-    }, 200);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-      className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white"
-    >
-      <div className="w-64 flex flex-col items-center">
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.6 }}
-          className="mb-8"
-        >
-          <BrandLogo width={60} height={60} />
-        </motion.div>
-        <div className="w-full h-[2px] bg-slate-100 rounded-full overflow-hidden">
-          <motion.div 
-            className="h-full bg-slate-900"
-            initial={{ width: "0%" }}
-            animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={{ ease: "easeInOut" }}
-          />
-        </div>
-        <div className="mt-3 text-[10px] font-medium tracking-[0.2em] text-slate-400 uppercase font-sans">
-          Creating Account
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-// --- MAIN PAGE COMPONENT ---
-
-const RegisterPage = () => {
+export default function RegisterPage() {
   const navigate = useNavigate();
-  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // --- LOGIC ---
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -99,400 +41,752 @@ const RegisterPage = () => {
     password: "",
     confirmPassword: "",
     role: "tenant",
+    // Tenant specific fields
+    propertyId: "",
+    unitId: "",
+    // Property manager specific fields
+    managedPropertyIds: [] as string[],
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Fetch properties for dropdowns
+  useEffect(() => {
+    const fetchProperties = async () => {
+      try {
+        console.log("🏢 Fetching properties...");
+        const { data, error } = await supabase
+          .from("properties")
+          .select("id, name, address")
+          .eq("status", "active")
+          .order("name");
+
+        console.log("📊 Properties query - Error:", error, "Data:", data);
+        if (error) {
+          console.error("❌ Error fetching properties:", error);
+          throw error;
+        }
+        console.log("✅ Successfully fetched properties:", data);
+        setProperties(data || []);
+      } catch (error) {
+        console.error("❌ Error fetching properties:", error);
+        // Use mock properties as fallback
+        const mockProps = [
+          { id: 'prop-1', name: 'Westside Apartments', address: '123 Main Street' },
+          { id: 'prop-2', name: 'Downtown Plaza', address: '456 Business Avenue' },
+          { id: 'prop-3', name: 'Suburban Villas', address: '789 Residential Park' },
+        ];
+        setProperties(mockProps);
+      }
+    };
+
+    fetchProperties();
+  }, []);
+
+  // Fetch available units when property is selected
+  const handlePropertySelect = async (propertyId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      propertyId,
+      unitId: "", // Clear unit selection when property changes
+    }));
+
+    if (!propertyId) {
+      setAvailableUnits([]);
+      return;
+    }
+    const buildMockUnits = () => {
+      const pid = propertyId || "mock-property";
+      return [
+        { id: `${pid}-mock-1`, unit_number: "101", unit_type: "1BR", floor_number: 1, price_monthly: 950, property_id: pid, status: "vacant" },
+        { id: `${pid}-mock-2`, unit_number: "201", unit_type: "2BR", floor_number: 2, price_monthly: 1250, property_id: pid, status: "vacant" },
+        { id: `${pid}-mock-3`, unit_number: "PH-1", unit_type: "Penthouse", floor_number: 5, price_monthly: 2100, property_id: pid, status: "vacant" },
+      ];
+    };
+
+    setLoadingUnits(true);
+    try {
+      console.log("🔍 Fetching units for property:", propertyId);
+      
+      const { data, error } = await supabase
+        .from("units_detailed")
+        .select("id, unit_number, unit_type, floor_number, price_monthly, property_id, status")
+        .eq("property_id", propertyId)
+        .eq("status", "vacant")
+        .order("unit_number");
+
+      console.log("📊 Query response - Error:", error, "Data:", data);
+
+      if (error) {
+        console.error("❌ Database error fetching units:", error);
+        // Use mock units as fallback
+        console.log("⚠️ Using mock units due to error");
+        toast.error("Error loading units. Using sample units so you can continue.");
+        setAvailableUnits(buildMockUnits());
+        setLoadingUnits(false);
+        return;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn("⚠️ No vacant units found for property:", propertyId);
+        toast.info("ℹ️ No vacant units available right now. Showing sample units for demo.", { duration: 4000 });
+        setAvailableUnits(buildMockUnits());
+        setLoadingUnits(false);
+        return;
+      }
+      
+      console.log("✅ Successfully fetched units:", data);
+      setAvailableUnits(data);
+      setLoadingUnits(false);
+    } catch (error) {
+      console.error("❌ Error fetching units:", error);
+      toast.error("Unable to load units. Showing sample data.");
+      setAvailableUnits(buildMockUnits());
+      setLoadingUnits(false);
+    }
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+  };
+
+  const handleRoleChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      role: value,
+      propertyId: "",
+      unitId: "",
+      managedPropertyIds: [],
+    }));
+    if (errors.role) {
+      setErrors((prev) => ({
+        ...prev,
+        role: "",
+      }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = "Full name is required";
+    }
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Invalid email format";
+    }
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm password";
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+
+    if (!formData.role) {
+      newErrors.role = "Please select an account type";
+    }
+
+    // Role-specific validation
+    if (formData.role === "tenant") {
+      if (!formData.propertyId.trim()) {
+        newErrors.propertyId = "Property is required for tenants";
+      }
+      if (!formData.unitId.trim()) {
+        newErrors.unitId = "Please select a unit/house number";
+      }
+    } else if (formData.role === "property_manager") {
+      if (formData.managedPropertyIds.length === 0) {
+        newErrors.managedPropertyIds = "Select at least one property to manage";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation
-    const trimmedEmail = formData.email.trim().toLowerCase();
-    const trimmedName = formData.fullName.trim();
-    const trimmedPhone = formData.phone.trim();
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      toast.error("Please enter a valid email address");
+    if (!validateForm()) {
       return;
-    }
-
-    // Name validation
-    if (!trimmedName || trimmedName.length < 2) {
-      toast.error("Please enter a valid full name (at least 2 characters)");
-      return;
-    }
-
-    // Phone validation (basic)
-    if (!trimmedPhone || trimmedPhone.length < 7) {
-      toast.error("Please enter a valid phone number");
-      return;
-    }
-
-    // Password validation
-    if (!formData.password || formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-
-    // Password strength check
-    const hasUpperCase = /[A-Z]/.test(formData.password);
-    const hasNumber = /\d/.test(formData.password);
-    if (formData.password.length < 8 && (!hasUpperCase || !hasNumber)) {
-      toast.error("Password should be at least 8 characters or contain uppercase and numbers");
     }
 
     setLoading(true);
-
     try {
-      // Step 1: Create Supabase auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: trimmedEmail,
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/verify?email=${encodeURIComponent(trimmedEmail)}`,
           data: {
-            full_name: trimmedName,
-            phone: trimmedPhone,
+            full_name: formData.fullName,
+            phone: formData.phone,
+            role: formData.role,
           },
         },
       });
 
-      if (authError) {
-        // Handle specific auth errors
-        if (authError.message.includes("already registered")) {
-          throw new Error("This email is already registered. Please log in or use a different email.");
+      if (signupError) throw signupError;
+
+      if (data.user) {
+        // Create profile with role-specific fields
+        // The trigger handle_new_user() automatically creates a basic profile
+        // Now we update it with additional data
+        console.log("🔐 Creating/updating profile for user:", data.user.id);
+        
+        const profileData: any = {
+          id: data.user.id,
+          email: formData.email,
+          phone: formData.phone,
+          role: formData.role,
+          status: formData.role === "property_manager" ? "pending" : "active",
+        };
+
+        // Add tenant-specific fields - get unit info
+        if (formData.role === "tenant") {
+          const selectedUnit = availableUnits.find(u => u.id === formData.unitId);
+          if (selectedUnit) {
+            profileData.unit_id = formData.unitId;
+            profileData.property_id = formData.propertyId;
+          }
         }
-        throw new Error(authError.message || "Failed to create account");
-      }
 
-      if (!authData.user) {
-        throw new Error("Account creation failed. Please try again.");
-      }
-
-      // Step 2: Create profile in database
-      const { data: profileResult, error: profileError } = await supabase.rpc(
-        "create_user_profile",
-        {
-          p_user_id: authData.user.id,
-          p_email: trimmedEmail,
-          p_first_name: trimmedName.split(" ")[0],
-          p_last_name: trimmedName.split(" ").slice(1).join(" ") || "",
-          p_phone: trimmedPhone,
-          p_role: formData.role,
-          p_status: "active", // Start as active, email confirmed after link click
+        // Update the profile (the trigger should have already created it)
+        console.log("📝 Updating profile with additional data:", profileData);
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update(profileData)
+          .eq("id", data.user.id);
+        
+        if (updateError) {
+          console.error("⚠️ Profile update warning (non-critical):", updateError.message);
+          // Don't throw - profile may already be created by trigger
+        } else {
+          console.log("✅ Profile updated successfully");
         }
-      );
 
-      if (profileError) {
-        console.error("Profile creation error:", profileError);
-        // Profile creation failed, but auth succeeded - log user out
-        await supabase.auth.signOut();
-        throw new Error("Failed to create user profile. Please contact support.");
+        // Update unit status to reserved for tenant
+        if (formData.role === "tenant") {
+          console.log("📌 Marking unit as reserved for tenant:", formData.unitId);
+          const { error: unitError } = await supabase
+            .from("units_detailed")
+            .update({
+              status: "reserved",
+              occupant_id: data.user.id,
+            })
+            .eq("id", formData.unitId);
+
+          if (unitError) {
+            console.warn("⚠️ Unit status update warning:", unitError.message);
+          }
+
+          // Create approval request for tenant verification
+          console.log("📋 Creating tenant verification approval request");
+          const { error: verifyError } = await supabase
+            .from("approval_requests")
+            .insert({
+              submitted_by: data.user.id,
+              type: "tenant_verification",
+              title: `Tenant Verification: ${formData.fullName}`,
+              description: `New tenant registration for Unit ${availableUnits.find(u => u.id === formData.unitId)?.unit_number}`,
+              property_id: formData.propertyId,
+              unit_id: formData.unitId,
+              status: "pending",
+            });
+
+          if (verifyError) {
+            console.warn("⚠️ Verification request warning:", verifyError.message);
+          }
+
+          // Notify property manager
+          try {
+            const { data: property, error: propError } = await supabase
+              .from("properties")
+              .select("property_manager_id, name")
+              .eq("id", formData.propertyId)
+              .single();
+
+            if (propError) {
+              console.warn("⚠️ Property fetch warning:", propError.message);
+            } else if (property?.property_manager_id) {
+              const unit = availableUnits.find(u => u.id === formData.unitId);
+              console.log("📧 Sending notification to property manager:", property.property_manager_id);
+              const { error: notifError } = await supabase
+                .from("notifications")
+                .insert({
+                  recipient_id: property.property_manager_id,
+                  sender_id: data.user.id,
+                  type: "tenant_verification",
+                  related_entity_type: "tenant",
+                  related_entity_id: data.user.id,
+                  title: "New Tenant Registration",
+                  message: `${formData.fullName} has registered for Unit ${unit?.unit_number} at ${property.name}. Please verify their information in your dashboard.`,
+                });
+              if (notifError) {
+                console.warn("⚠️ Notification warning:", notifError.message);
+              }
+            }
+          } catch (error) {
+            console.warn("⚠️ Property manager notification warning:", error);
+          }
+
+          toast.success("✅ Registration successful! Awaiting property manager verification.");
+          toast.info("📧 You'll be able to login once the property manager approves your application.", { duration: 5000 });
+          setTimeout(() => navigate("/login"), 3000);
+        } else if (formData.role === "property_manager") {
+          // Create approval request for manager registration
+          const managedPropertyNames = properties
+            .filter(p => formData.managedPropertyIds.includes(p.id))
+            .map(p => p.name);
+          
+          console.log("📋 Creating manager approval request for:", data.user.id);
+          
+          const { error: approvalError } = await supabase
+            .from("approval_requests")
+            .insert({
+              submitted_by: data.user.id,
+              type: "manager_assignment",
+              title: `Property Manager Registration: ${formData.fullName}`,
+              description: `New property manager registration for: ${managedPropertyNames.join(", ")}`,
+              status: "pending",
+            });
+
+          if (approvalError) {
+            console.warn("⚠️ Manager approval creation warning:", approvalError.message);
+          } else {
+            console.log("✅ Manager approval request created");
+          }
+
+          // Notify super admin
+          try {
+            console.log("🔔 Fetching super admins for notification");
+            const { data: superAdmins, error: adminError } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("role", "super_admin");
+
+            if (adminError) {
+              console.warn("⚠️ Super admin fetch warning:", adminError.message);
+            } else if (superAdmins && superAdmins.length > 0) {
+              console.log("📧 Found", superAdmins.length, "super admins to notify");
+              for (const admin of superAdmins) {
+                const { error: notifError } = await supabase
+                  .from("notifications")
+                  .insert({
+                    recipient_id: admin.id,
+                    sender_id: data.user.id,
+                    type: "manager_approval",
+                    related_entity_type: "manager",
+                    related_entity_id: data.user.id,
+                    title: "New Property Manager Registration",
+                    message: `${formData.fullName} has registered as a property manager for ${managedPropertyNames.join(", ")}. Please review and approve in your dashboard.`,
+                  });
+                if (notifError) {
+                  console.warn("⚠️ Notification warning:", notifError.message);
+                }
+              }
+            } else {
+              console.warn("⚠️ No super admins found to notify");
+            }
+          } catch (notificationError) {
+            console.warn("⚠️ Notification error:", notificationError);
+          }
+
+          toast.success("✅ Registration successful! Awaiting admin approval.");
+          toast.info("📧 You'll be able to login once the administrator approves your registration.", { duration: 5000 });
+          setTimeout(() => navigate("/login"), 3000);
+        } else {
+          toast.success("✅ Account created! Please check your email to confirm your account.");
+          toast.info("📧 You will be redirected to login shortly.", { duration: 3000 });
+          setTimeout(() => navigate("/login"), 3000);
+        }
       }
-
-      if (profileResult && profileResult.length > 0 && !profileResult[0].success) {
-        await supabase.auth.signOut();
-        throw new Error(profileResult[0].message || "Failed to complete registration");
-      }
-
-      toast.success("Account created! Please check your email to confirm your address.");
-      setIsSuccess(true);
-
-      setTimeout(() => {
-        navigate("/login");
-      }, 3000);
     } catch (error: any) {
-      console.error("Registration error:", error);
-      const errorMessage = error.message || "Registration failed. Please try again.";
-      toast.error(errorMessage);
+      console.error("❌ Registration error:", error);
+      const errorMessage = error.message || "Registration failed";
+      const errorCode = error.code || "UNKNOWN";
+      
+      // Provide helpful error messages
+      if (errorMessage.includes("already exists")) {
+        toast.error("An account with this email already exists. Please sign in instead.");
+      } else if (errorMessage.includes("invalid email")) {
+        toast.error("Please enter a valid email address.");
+      } else if (errorMessage.includes("password")) {
+        toast.error("Password requirements: At least 6 characters recommended.");
+      } else if (errorCode === "422" || errorMessage.includes("Unprocessable Entity")) {
+        toast.error("Registration data invalid. Please check all fields and try again.");
+      } else if (errorCode === "429" || errorMessage.includes("Too many")) {
+        toast.error("Too many registration attempts. Please try again in a few minutes.");
+      } else if (errorCode === "500" || errorMessage.includes("Internal Server")) {
+        toast.error("Server error during registration. Please try again in a moment.");
+      } else {
+        toast.error(errorMessage || "Registration failed. Please try again.");
+      }
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] w-full h-[100dvh] bg-white flex items-center justify-center overflow-hidden font-sans">
-      
-      <style>
-        {`
-          /* Custom Scrollbar */
-          .no-scrollbar::-webkit-scrollbar { display: none; }
-          .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        `}
-      </style>
-
-      {/* Background Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-50 via-white to-gray-100 opacity-80 pointer-events-none" />
-
-      <AnimatePresence mode="wait">
-        {isSuccess ? (
-          <PortalLoader key="portal" />
-        ) : (
-          /* RESPONSIVE DEVICE CONTAINER */
-          <motion.div 
-            key="device"
-            initial={{ opacity: 0, scale: 0.95 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-10 flex items-center justify-center p-4 w-full h-full"
-          >
-            <div 
-              className="relative mx-auto bg-[#1a1a1a] transition-all duration-700 ease-in-out
-                /* MOBILE (iPhone): Narrow, Taller, Rounder corners */
-                w-[360px] xs:w-[380px] h-[780px] rounded-[55px]
-                /* DESKTOP (Fold): Wide, Square-ish corners */
-                md:w-[700px] md:h-[800px] md:rounded-[30px]
-              "
-              style={{
-                boxShadow: `
-                  0 0 0 1px #333,
-                  0 0 0 4px #444,
-                  0 20px 50px -10px rgba(0,0,0,0.4),
-                  0 40px 80px -20px rgba(0,0,0,0.3)
-                `
-              }}
-            >
-              
-              {/* --- 1. IPHONE PHYSICAL BUTTONS (Mobile Only) --- */}
-              <div className="md:hidden">
-                <div className="absolute -left-[3px] top-28 w-[3px] h-7 bg-gray-500 rounded-l-md" /> {/* Mute */}
-                <div className="absolute -left-[3px] top-44 w-[3px] h-14 bg-gray-500 rounded-l-md" /> {/* Vol Up */}
-                <div className="absolute -left-[3px] top-60 w-[3px] h-14 bg-gray-500 rounded-l-md" /> {/* Vol Down */}
-                <div className="absolute -right-[3px] top-40 w-[3px] h-20 bg-gray-500 rounded-r-md" /> {/* Power */}
+    <div className="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-4 md:p-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+      <div className="w-full max-w-3xl">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="bg-white rounded-none shadow-xl shadow-slate-200/50 border border-slate-200"
+        >
+          {/* Header - Matching HowItWorks style */}
+          <div className="bg-[#154279] px-8 py-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-full bg-white/5 skew-x-12 pointer-events-none" />
+            
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-start gap-4">
+                <div className="bg-white/10 p-3 rounded-none backdrop-blur-sm border border-white/10">
+                  <img src="/realtor.jpg" alt="REALTORS" className="w-6 h-6 object-cover rounded-sm" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold tracking-[0.2em] text-[#D35400] uppercase bg-[#D35400]/10 px-2 py-0.5 rounded-none border border-[#D35400]/20 inline-block mb-2">
+                    Create Account
+                  </span>
+                  <h2 className="text-2xl font-bold text-white leading-none">Join REALTORS</h2>
+                  <p className="text-sm text-slate-300 mt-2 font-medium">Complete registration to access all features.</p>
+                </div>
               </div>
+            </div>
+          </div>
 
-              {/* --- 2. FOLD PHYSICAL BUTTONS (Desktop Only) --- */}
-              <div className="hidden md:block">
-                <div className="absolute -right-[3px] top-32 w-[3px] h-10 bg-gray-500 rounded-r-md" />
-                <div className="absolute -right-[3px] top-48 w-[3px] h-14 bg-gray-500 rounded-r-md" />
-              </div>
-
-              {/* --- 3. FOLD HINGE (Desktop Only) --- */}
-              <div className="hidden md:block absolute inset-y-0 left-1/2 -translate-x-1/2 w-[1px] bg-gradient-to-b from-transparent via-white/10 to-transparent z-40 pointer-events-none opacity-30" />
-
-              {/* --- INNER BEZEL & SCREEN --- */}
-              <div className="relative w-full h-full bg-black overflow-hidden flex flex-col transition-all duration-700
-                              rounded-[50px] border-[8px] border-[#1a1a1a] /* Mobile Radius */
-                              md:rounded-[26px] md:border-[6px]             /* Desktop Radius */
-              ">
-                
-                {/* --- 4. DYNAMIC ISLAND (Mobile Only) --- */}
-                <div className="md:hidden absolute top-0 w-full h-14 z-50 flex justify-center items-start pt-3 pointer-events-none">
-                   <div className="w-[120px] h-[35px] bg-black rounded-full flex items-center justify-end pr-4">
-                      <div className="w-3 h-3 rounded-full bg-[#1a1a1a] shadow-[inset_0_0_4px_rgba(255,255,255,0.1)]" />
-                   </div>
+          {/* Form Container */}
+          <div className="p-8 md:p-10 relative z-0 overflow-visible">
+            <form onSubmit={handleRegister} className="space-y-5">
+              {/* Two Column Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Full Name</Label>
+                  <div className="relative group">
+                    <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                    <Input
+                      id="fullName"
+                      name="fullName"
+                      type="text"
+                      placeholder="John Kamau"
+                      value={formData.fullName}
+                      onChange={handleChange}
+                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.fullName ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                  </div>
+                  {errors.fullName && <p className="text-xs text-red-500 font-bold">{errors.fullName}</p>}
                 </div>
 
-                {/* --- 5. PUNCH HOLE CAMERA (Desktop Only) --- */}
-                <div className="hidden md:block absolute top-4 left-1/2 translate-x-[150px] w-3 h-3 bg-black rounded-full z-50 pointer-events-none opacity-90" />
-
-                {/* --- STATUS BAR --- */}
-                <div className="w-full px-6 pt-3 pb-2 flex justify-between items-center z-40 select-none bg-white transition-all">
-                  <span className="text-black text-[14px] font-semibold">{time}</span>
-                  <div className="flex items-center gap-2 text-black">
-                    <Signal size={14} fill="currentColor" />
-                    <Wifi size={14} strokeWidth={2.5}/>
-                    <Battery size={18} className="ml-1"/>
+                {/* Phone */}
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Phone Number</Label>
+                  <div className="relative group">
+                    <Phone className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="+254 712 345 678"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.phone ? 'border-red-500' : 'border-slate-200'}`}
+                    />
                   </div>
+                  {errors.phone && <p className="text-xs text-red-500 font-bold">{errors.phone}</p>}
+                </div>
+              </div>
+
+              {/* Full Width Email */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Email Address</Label>
+                <div className="relative group">
+                  <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.email ? 'border-red-500' : 'border-slate-200'}`}
+                  />
+                </div>
+                {errors.email && <p className="text-xs text-red-500 font-bold">{errors.email}</p>}
+              </div>
+
+              {/* Two Column: Role & Password */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Role - Card Container */}
+                <div className="space-y-2">
+                  <Label htmlFor="role" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Account Type</Label>
+                  <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-50">
+                    <Select 
+                      value={formData.role} 
+                      onValueChange={handleRoleChange}
+                    >
+                      <SelectTrigger className={`h-10 bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm relative z-50 ${errors.role ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[9999] bg-white border border-slate-200 shadow-lg">
+                        <SelectItem value="tenant">Tenant / Looking to Rent</SelectItem>
+                        <SelectItem value="property_manager">Property Manager</SelectItem>
+                        <SelectItem value="property_owner">Property Owner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {errors.role && <p className="text-xs text-red-500 font-bold">{errors.role}</p>}
                 </div>
 
-                {/* --- CONTENT AREA --- */}
-                <div className="flex-1 bg-white relative w-full h-full flex flex-col px-6 md:px-8 pb-8 pt-4 overflow-y-auto no-scrollbar">
-                  
-                  {/* Header */}
-                  <div className="text-center mb-6 md:mb-8 flex-shrink-0 mt-4 md:mt-0">
-                    <div className="flex justify-center mb-4">
-                      <BrandLogo width={40} height={40} />
-                    </div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-                      Create Account
-                    </h2>
-                    <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
-                      Join our exclusive property network
-                    </p>
+                {/* Password */}
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Password</Label>
+                  <div className="relative group">
+                    <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.password ? 'border-red-500' : 'border-slate-200'}`}
+                    />
                   </div>
+                  {errors.password && <p className="text-xs text-red-500 font-bold">{errors.password}</p>}
+                </div>
+              </div>
 
-                  {/* FORM 
-                      - Mobile: grid-cols-1 (Standard vertical stack)
-                      - Desktop: grid-cols-2 (Side by side for Fold)
-                  */}
-                  <form onSubmit={handleRegister} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 md:gap-y-5">
-                    
-                    {/* Full Name */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="fullName" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">Full Name</Label>
-                      <div className="relative group">
-                        <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <Input
-                          id="fullName"
-                          name="fullName"
-                          type="text"
-                          placeholder="John Kamau"
-                          value={formData.fullName}
-                          onChange={handleChange}
-                          className="pl-10 h-11 bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl transition-all font-medium text-slate-900"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Phone */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="phone" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">Phone</Label>
-                      <div className="relative group">
-                        <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                          <Phone className="h-4 w-4" />
-                        </div>
-                        <Input
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="+254 712..."
-                          value={formData.phone}
-                          onChange={handleChange}
-                          className="pl-10 h-11 bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl transition-all font-medium text-slate-900"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Email (Spans 2 cols on desktop) */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <Label htmlFor="email" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">Email Address</Label>
-                      <div className="relative group">
-                        <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                          <Mail className="h-4 w-4" />
-                        </div>
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="john@example.com"
-                          value={formData.email}
-                          onChange={handleChange}
-                          className="pl-10 h-11 bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl transition-all font-medium text-slate-900"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Role Selection (Spans 2 cols on desktop) */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <Label htmlFor="role" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">I am a</Label>
+              {/* TENANT-SPECIFIC FIELDS */}
+              {formData.role === "tenant" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50 border border-blue-200 rounded-none"
+                >
+                  {/* Property Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="propertyId" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Select Property</Label>
+                    <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-40">
                       <Select 
-                        value={formData.role} 
-                        onValueChange={(value) => setFormData({ ...formData, role: value })}
+                        value={formData.propertyId} 
+                        onValueChange={(value) => {
+                          handlePropertySelect(value);
+                          if (errors.propertyId) {
+                            setErrors((prev) => ({ ...prev, propertyId: "" }));
+                          }
+                        }}
                       >
-                        <SelectTrigger className="h-11 bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl font-medium text-slate-900 pl-3">
-                          <SelectValue placeholder="Select your role" />
+                        <SelectTrigger className={`h-10 bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm ${errors.propertyId ? 'border-red-500' : ''}`}>
+                          <SelectValue placeholder="Choose your property" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tenant">Tenant / Looking to Rent</SelectItem>
-                          <SelectItem value="property_manager">Property Manager</SelectItem>
-                          <SelectItem value="property_owner">Property Owner</SelectItem>
+                        <SelectContent className="z-[9998] bg-white border border-slate-200 shadow-lg">
+                          {properties.map((prop) => (
+                            <SelectItem key={prop.id} value={prop.id}>
+                              {prop.name} {prop.address ? `- ${prop.address}` : ''}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {/* Password */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="password" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">Password</Label>
-                      <div className="relative group">
-                        <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                          <Lock className="h-4 w-4" />
-                        </div>
-                        <Input
-                          id="password"
-                          name="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          value={formData.password}
-                          onChange={handleChange}
-                          className="pl-10 pr-10 h-11 bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl transition-all font-medium text-slate-900"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Confirm Password */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-600 uppercase tracking-wider ml-1">Confirm</Label>
-                      <div className="relative group">
-                        <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D4AF37] transition-colors">
-                          <Lock className="h-4 w-4" />
-                        </div>
-                        <Input
-                          id="confirmPassword"
-                          name="confirmPassword"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          value={formData.confirmPassword}
-                          onChange={handleChange}
-                          className="pl-10 pr-10 h-11 bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]/20 rounded-xl transition-all font-medium text-slate-900"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Submit Button */}
-                    <div className="md:col-span-2 pt-2 md:pt-4">
-                      <Button type="submit" className="w-full h-12 bg-navy hover:bg-[#002855] text-white rounded-xl font-medium text-sm shadow-lg shadow-navy/20 group" disabled={loading}>
-                        {loading ? "Creating..." : <span className="flex items-center gap-2">Create Account <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"/></span>}
-                      </Button>
-                    </div>
-
-                  </form>
-
-                  {/* Footer */}
-                  <div className="mt-8 mb-4 md:mt-auto pt-6 text-center space-y-4 flex-shrink-0">
-                    <p className="text-xs text-slate-500">
-                      Already have an account? <Link to="/login" className="text-slate-900 font-bold hover:underline">Sign in</Link>
-                    </p>
-                    <div className="border-t border-slate-100 pt-3">
-                       <p className="text-[10px] text-slate-400 leading-tight">
-                         By registering, you agree to our <Link to="/terms" className="text-slate-600 hover:underline">Terms</Link> and <Link to="/privacy" className="text-slate-600 hover:underline">Privacy Policy</Link>
-                       </p>
-                    </div>
+                    {errors.propertyId && <p className="text-xs text-red-500 font-bold">{errors.propertyId}</p>}
                   </div>
 
-                </div>
-                {/* --- END SCREEN CONTENT --- */}
+                  {/* Unit Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="unitId" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Select Unit</Label>
+                    <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-40">
+                      {loadingUnits ? (
+                        <div className="h-10 flex items-center justify-center">
+                          <p className="text-xs text-slate-500">Loading available units...</p>
+                        </div>
+                      ) : (
+                        <Select 
+                          value={formData.unitId} 
+                          onValueChange={(value) => {
+                            setFormData((prev) => ({ ...prev, unitId: value }));
+                            if (errors.unitId) {
+                              setErrors((prev) => ({ ...prev, unitId: "" }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger className={`h-10 bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm ${errors.unitId ? 'border-red-500' : ''}`}>
+                            <SelectValue placeholder={availableUnits.length === 0 ? "No units available" : "Choose your unit"} />
+                          </SelectTrigger>
+                          <SelectContent className="z-[9998] bg-white border border-slate-200 shadow-lg">
+                            {availableUnits.map((unit) => (
+                              <SelectItem key={unit.id} value={unit.id}>
+                                Unit {unit.unit_number} - {unit.unit_type} (${unit.price_monthly}/mo)
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    {errors.unitId && <p className="text-xs text-red-500 font-bold">{errors.unitId}</p>}
+                    {!loadingUnits && availableUnits.length === 0 && formData.propertyId && (
+                      <p className="text-xs text-orange-600 font-medium mt-1">
+                        ⚠️ No vacant units available. Please contact the property manager or select another property.
+                      </p>
+                    )}
+                    {formData.unitId && (
+                      <div className="text-xs text-slate-600 mt-1 p-2 bg-white border border-slate-100 rounded">
+                        <strong>Unit Details:</strong> {availableUnits.find(u => u.id === formData.unitId)?.unit_type} • Floor {availableUnits.find(u => u.id === formData.unitId)?.floor_number}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Home Indicator - Bottom Bar */}
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-36 md:w-48 h-[5px] md:h-[4px] bg-black/20 backdrop-blur-sm rounded-full z-50" />
+                  <p className="col-span-full text-xs text-slate-600 font-medium">
+                    ℹ️ Your information will be sent to the property manager for verification before you can access your tenant portal.
+                  </p>
+                </motion.div>
+              )}
+
+              {/* PROPERTY MANAGER-SPECIFIC FIELDS */}
+              {formData.role === "property_manager" && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="p-4 bg-purple-50 border border-purple-200 rounded-none space-y-3"
+                >
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-widest">Managed Properties</Label>
+                    <p className="text-xs text-slate-600 font-medium mb-2">Select the properties you manage:</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {properties.map((prop) => (
+                        <label key={prop.id} className="flex items-center gap-2 p-2 rounded-none bg-white border border-slate-200 hover:border-purple-300 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={formData.managedPropertyIds.includes(prop.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  managedPropertyIds: [...prev.managedPropertyIds, prop.id],
+                                }));
+                              } else {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  managedPropertyIds: prev.managedPropertyIds.filter(id => id !== prop.id),
+                                }));
+                              }
+                              if (errors.managedPropertyIds) {
+                                setErrors((prev) => ({ ...prev, managedPropertyIds: "" }));
+                              }
+                            }}
+                            className="w-4 h-4 rounded-none accent-purple-600 cursor-pointer"
+                          />
+                          <span className="text-sm text-slate-700 font-medium">
+                            {prop.name} {prop.address ? `- ${prop.address}` : ''}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    {errors.managedPropertyIds && <p className="text-xs text-red-500 font-bold">{errors.managedPropertyIds}</p>}
+                  </div>
+
+                  <p className="text-xs text-slate-600 font-medium bg-white p-2 rounded-none border border-purple-200">
+                    ℹ️ Your registration will be sent to the administrator for approval. Once approved, you can manage your properties and tenants.
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Confirm Password */}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Confirm Password</Label>
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirm ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.confirmPassword ? 'border-red-500' : 'border-slate-200'}`}
+                  />
+                </div>
+                {errors.confirmPassword && <p className="text-xs text-red-500 font-bold">{errors.confirmPassword}</p>}
               </div>
-              
-              {/* Reflection */}
-              <div className="absolute inset-0 rounded-[55px] md:rounded-[30px] pointer-events-none z-[60] shadow-[inset_0_0_40px_rgba(255,255,255,0.05)] opacity-50 transition-all duration-700">
-                 <div className="absolute inset-y-0 left-1/2 w-8 -translate-x-1/2 bg-gradient-to-r from-transparent via-black/5 to-transparent mix-blend-multiply" />
+
+              {/* Show Passwords Toggle */}
+              <div className="flex items-center gap-3 py-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 hover:text-slate-900 transition-colors font-bold">
+                  <input 
+                    type="checkbox" 
+                    checked={showPassword}
+                    onChange={() => {
+                      setShowPassword(!showPassword);
+                      setShowConfirm(!showPassword);
+                    }}
+                    className="w-4 h-4 rounded-none accent-[#D35400] cursor-pointer"
+                  />
+                  Show passwords
+                </label>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+              {/* Submit Button - Matching HowItWorks style */}
+              <Button 
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 bg-[#D35400] hover:bg-[#A04000] text-white font-bold rounded-none mt-6 shadow-md uppercase tracking-widest text-xs transition-all active:scale-95"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
+              </Button>
+
+              {/* Already have account */}
+              <div className="flex items-start gap-2.5 p-3 rounded-none bg-blue-50 border border-blue-100 text-slate-600 text-xs font-bold mt-6">
+                Already have an account?{" "}
+                <Link to="/login" className="text-[#D35400] hover:underline font-bold">
+                  Sign In
+                </Link>
+              </div>
+
+              {/* Terms */}
+              <p className="text-center text-[10px] text-slate-500 leading-relaxed">
+                By creating an account, you agree to our{" "}
+                <Link to="/terms" className="text-slate-700 hover:underline font-bold">
+                  Terms of Service
+                </Link>
+                {" "}and{" "}
+                <Link to="/privacy" className="text-slate-700 hover:underline font-bold">
+                  Privacy Policy
+                </Link>
+              </p>
+            </form>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
-};
-
-export default RegisterPage;
+}

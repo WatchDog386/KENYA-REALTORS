@@ -103,10 +103,11 @@ const ManagerLayout = ({ children }: { children: ReactNode }) => {
 
     try {
       setLoadingNotifications(true);
+      // Fetch notifications targeted at the current user (recipient)
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('recipient_id', user.id)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -261,13 +262,14 @@ const ManagerLayout = ({ children }: { children: ReactNode }) => {
     // Set up real-time subscription for notifications
     const subscription = supabase
       .channel('manager-notifications')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user?.id}`
-        }, 
+          filter: `recipient_id=eq.${user?.id}`,
+        },
         () => {
           fetchNotifications();
         }
@@ -568,10 +570,10 @@ const ManagerLayout = ({ children }: { children: ReactNode }) => {
         {/* Navigation */}
         <nav className="flex-1 px-4 overflow-y-auto sidebar-scroll pb-4 mt-6">
           <div className="mb-6">
-            <p className="px-2 mb-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="px-2 mb-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <span>Management</span>
-              <div className="h-px flex-1 bg-slate-200"></div>
-            </p>
+              <span className="h-px flex-1 bg-slate-200" aria-hidden />
+            </div>
             <div className="space-y-1">
               {navItems.map(item => renderNavItem(item))}
             </div>

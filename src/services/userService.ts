@@ -33,54 +33,26 @@ export const userService = {
 
       const userId = authData.user.id;
 
-      // 2. Create profile based on role
-      if (input.role === "tenant") {
-        // Create in OLD table
-        const { error: profileError } = await supabase
-          .from("profiles_old")
-          .insert({
-            id: userId,
-            uuid: userId,
-            email: input.email,
-            full_name: input.full_name,
-            phone: input.phone || null,
-            tenant: input.role,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
+      // 2. Create profile in unified profiles table
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: userId,
+        email: input.email,
+        first_name: input.full_name?.split(" ")[0] || "",
+        last_name: input.full_name?.split(" ").slice(1).join(" ") || "",
+        full_name: input.full_name,
+        phone: input.phone || null,
+        role: input.role,
+        user_type: input.role,
+        status: "active",
+        is_active: true,
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
 
-        if (profileError) {
-          console.error("Tenant profile error:", profileError);
-          return { success: false, error: profileError.message };
-        }
-      } else {
-        // Create in NEW table for property managers/admins
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: userId,
-          user_id: userId,
-          user_type: input.role,
-          full_name: input.full_name,
-          email: input.email,
-          phone: input.phone || null,
-          date_of_birth: input.date_of_birth || null,
-          nationality: input.nationality || null,
-          preferred_language: input.preferred_language || "en",
-          emergency_contact_name: input.emergency_contact_name || null,
-          emergency_contact_phone: input.emergency_contact_phone || null,
-          emergency_contact_relationship:
-            input.emergency_contact_relationship || null,
-          id_document_type: input.id_document_type || null,
-          id_document_number: input.id_document_number || null,
-          id_document_expiry: input.id_document_expiry || null,
-          tax_id: input.tax_id || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-
-        if (profileError) {
-          console.error("Manager profile error:", profileError);
-          return { success: false, error: profileError.message };
-        }
+      if (profileError) {
+        console.error("Profile creation error:", profileError);
+        return { success: false, error: profileError.message };
       }
 
       console.log(`✅ ${input.role} user created successfully`);

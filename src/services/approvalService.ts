@@ -829,3 +829,272 @@ class ApprovalService {
 }
 
 export const approvalService = new ApprovalService();
+// ============================================================================
+// TENANT VERIFICATION AND MANAGER APPROVAL FUNCTIONS
+// ============================================================================
+
+export interface TenantVerification {
+  id: string;
+  tenant_id: string;
+  property_id: string;
+  house_number: string;
+  unit_id?: string;
+  status: "pending" | "verified" | "rejected" | "processing";
+  verified_by?: string;
+  verified_at?: string;
+  verification_notes?: string;
+  rejection_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ManagerApproval {
+  id: string;
+  manager_id: string;
+  property_id?: string;
+  managed_properties: string[];
+  status: "pending" | "approved" | "rejected" | "processing";
+  approved_by?: string;
+  approved_at?: string;
+  approval_notes?: string;
+  rejection_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  sender_id?: string;
+  type: "tenant_verification" | "manager_approval" | "verification_approved" | "verification_rejected" | "approval_approved" | "approval_rejected";
+  related_entity_type?: string;
+  related_entity_id?: string;
+  title: string;
+  message?: string;
+  is_read: boolean;
+  read_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Get all pending tenant verifications for a property manager
+export const getTenantVerificationsForManager = async (managerId: string): Promise<TenantVerification[]> => {
+  try {
+    // First get all properties managed by this manager
+    const { data: properties, error: propError } = await supabase
+      .from("properties")
+      .select("id")
+      .eq("property_manager_id", managerId);
+
+    if (propError) throw propError;
+
+    const propertyIds = properties?.map(p => p.id) || [];
+
+    if (propertyIds.length === 0) {
+      return [];
+    }
+
+    // Get verifications for these properties
+    const { data, error } = await supabase
+      .from("tenant_verifications")
+      .select("*")
+      .in("property_id", propertyIds)
+      .eq("status", "pending");
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching tenant verifications:", error);
+    throw error;
+  }
+};
+
+// Verify a tenant
+export const verifyTenant = async (
+  verificationId: string,
+  managerId: string,
+  approved: boolean,
+  notes?: string
+): Promise<void> => {
+  try {
+    const status = approved ? "verified" : "rejected";
+
+    const { error: updateError } = await supabase
+      .from("tenant_verifications")
+      .update({
+        status,
+        verified_by: managerId,
+        verified_at: new Date().toISOString(),
+        verification_notes: approved ? notes : undefined,
+        rejection_reason: !approved ? notes : undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", verificationId);
+
+    if (updateError) throw updateError;
+
+    // Get verification details to send notification
+    const { data: verification } = await supabase
+      .from("tenant_verifications")
+      .select("tenant_id")
+      .eq("id", verificationId)
+      .single();
+
+    if (verification?.tenant_id) {
+      // Create notification for tenant
+      await supabase.from("notifications").insert({
+        recipient_id: verification.tenant_id,
+        sender_id: managerId,
+        type: approved ? "verification_approved" : "verification_rejected",
+        related_entity_type: "tenant",
+        related_entity_id: verification.tenant_id,
+        title: approved ? "Verification Approved" : "Verification Rejected",
+        message: approved
+          ? `Your tenant registration has been approved. You can now access your tenant portal.`
+          : `Your tenant registration was rejected. Reason: ${notes || "See property manager for details"}`,
+      });
+    }
+
+    toast.success(approved ? "Tenant verified successfully" : "Tenant verification rejected");
+  } catch (error) {
+    console.error("Error verifying tenant:", error);
+    throw error;
+  }
+};
+
+// Get all pending manager approvals (for super admin)
+export const getManagerApprovalsForAdmin = async (): Promise<ManagerApproval[]> => {
+  try {
+    const { data, error } = await supabase
+      .from("manager_approvals")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching manager approvals:", error);
+    throw error;
+  }
+};
+
+// Approve or reject a property manager
+export const approvePropertyManager = async (
+  approvalId: string,
+  adminId: string,
+  approved: boolean,
+  notes?: string
+): Promise<void> => {
+  try {
+    const status = approved ? "approved" : "rejected";
+
+    // Get the manager ID from the approval
+    const { data: approval } = await supabase
+      .from("manager_approvals")
+      .select("manager_id")
+      .eq("id", approvalId)
+      .single();
+
+    if (!approval) throw new Error("Approval not found");
+
+    // Update approval status
+    const { error: updateApprovalError } = await supabase
+      .from("manager_approvals")
+      .update({
+        status,
+        approved_by: adminId,
+        approved_at: new Date().toISOString(),
+        approval_notes: approved ? notes : undefined,
+        rejection_reason: !approved ? notes : undefined,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", approvalId);
+
+    if (updateApprovalError) throw updateApprovalError;
+
+    // If approved, update the manager's role in profiles
+    if (approved) {
+      const { error: updateProfileError } = await supabase
+        .from("profiles")
+        .update({
+          role: "property_manager",
+          status: "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", approval.manager_id);
+
+      if (updateProfileError) throw updateProfileError;
+    }
+
+    // Create notification for manager
+    await supabase.from("notifications").insert({
+      recipient_id: approval.manager_id,
+      sender_id: adminId,
+      type: approved ? "approval_approved" : "approval_rejected",
+      related_entity_type: "manager",
+      related_entity_id: approval.manager_id,
+      title: approved ? "Registration Approved" : "Registration Rejected",
+      message: approved
+        ? `Your property manager registration has been approved. You can now access your property management portal.`
+        : `Your property manager registration was rejected. Reason: ${notes || "See administrator for details"}`,
+    });
+
+    toast.success(approved ? "Manager approved successfully" : "Manager approval rejected");
+  } catch (error) {
+    console.error("Error approving manager:", error);
+    throw error;
+  }
+};
+
+// Get notifications for current user
+export const getUserNotifications = async (userId: string): Promise<Notification[]> => {
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("recipient_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    throw error;
+  }
+};
+
+// Mark notification as read
+export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from("notifications")
+      .update({
+        is_read: true,
+        read_at: new Date().toISOString(),
+      })
+      .eq("id", notificationId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    throw error;
+  }
+};
+
+// Get unread notification count
+export const getUnreadNotificationCount = async (userId: string): Promise<number> => {
+  try {
+    const { count, error } = await supabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("recipient_id", userId)
+      .eq("is_read", false);
+
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error("Error getting notification count:", error);
+    return 0;
+  }
+};

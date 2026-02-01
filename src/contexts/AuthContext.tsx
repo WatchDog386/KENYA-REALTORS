@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Get available roles
   const getAvailableRoles = () => AVAILABLE_ROLES;
 
-  // Fetch user profile from users table
+  // Fetch user profile from unified profiles table
   const fetchUserProfileFromDB = async (
     userId: string
   ): Promise<UserProfile | null> => {
@@ -114,12 +114,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (fetchError) {
         console.error("❌ Error fetching profile:", fetchError);
+        return null;
       }
 
       if (data) {
-        console.log("✅ Profile found:", data.email);
-        return data as UserProfile;
+        console.log("✅ Profile found:", data.email, "Role:", data.role);
+        // Ensure role defaults to tenant if not set
+        const profile = {
+          ...data,
+          role: data.role || "tenant",
+          is_active: data.is_active !== false,
+        } as UserProfile;
+        return profile;
       }
+
+      console.log("⚠️ No profile found for user:", userId);
+      return null;
     } catch (err) {
       console.error("❌ Error in fetchUserProfileFromDB:", err);
       return null;
