@@ -546,10 +546,10 @@ export default function RegisterPage() {
                       value={formData.role} 
                       onValueChange={handleRoleChange}
                     >
-                      <SelectTrigger className={`h-10 bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm relative z-50 ${errors.role ? 'border-red-500' : ''}`}>
+                      <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm relative z-50 text-slate-800 dark:text-slate-800 ${errors.role ? 'border-red-500' : ''}`}>
                         <SelectValue placeholder="Select your role" />
                       </SelectTrigger>
-                      <SelectContent className="z-[9999] bg-white border border-slate-200 shadow-lg">
+                      <SelectContent className="z-[9999] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
                         <SelectItem value="tenant">Tenant / Looking to Rent</SelectItem>
                         <SelectItem value="property_manager">Property Manager</SelectItem>
                         <SelectItem value="property_owner">Property Owner</SelectItem>
@@ -599,10 +599,10 @@ export default function RegisterPage() {
                           }
                         }}
                       >
-                        <SelectTrigger className={`h-10 bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm ${errors.propertyId ? 'border-red-500' : ''}`}>
+                        <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm text-slate-800 dark:text-slate-800 ${errors.propertyId ? 'border-red-500' : ''}`}>
                           <SelectValue placeholder="Choose your property" />
                         </SelectTrigger>
-                        <SelectContent className="z-[9998] bg-white border border-slate-200 shadow-lg">
+                        <SelectContent className="z-[9998] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
                           {properties.map((prop) => (
                             <SelectItem key={prop.id} value={prop.id}>
                               {prop.name} {prop.address ? `- ${prop.address}` : ''}
@@ -632,10 +632,10 @@ export default function RegisterPage() {
                             }
                           }}
                         >
-                          <SelectTrigger className={`h-10 bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm ${errors.unitId ? 'border-red-500' : ''}`}>
+                          <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm text-slate-800 dark:text-slate-800 ${errors.unitId ? 'border-red-500' : ''}`}>
                             <SelectValue placeholder={availableUnits.length === 0 ? "No units available" : "Choose your unit"} />
                           </SelectTrigger>
-                          <SelectContent className="z-[9998] bg-white border border-slate-200 shadow-lg">
+                          <SelectContent className="z-[9998] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
                             {availableUnits.map((unit) => (
                               <SelectItem key={unit.id} value={unit.id}>
                                 Unit {unit.unit_number} - {unit.unit_type} (${unit.price_monthly}/mo)
