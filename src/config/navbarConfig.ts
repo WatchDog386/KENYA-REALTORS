@@ -45,15 +45,7 @@ export const NAVIGATION_SECTIONS = [
     highlight: false,
   },
   {
-    name: "DIY Rental guides",
-    id: "how-it-works",
-    icon: FaTools,
-    iconSize: 16,
-    iconColor: COLORS.secondary,
-    highlight: false,
-  },
-  {
-    name: "Apartments features",
+    name: "Ayden Homes",
     id: "features",
     icon: FaList,
     iconSize: 16,
@@ -69,11 +61,11 @@ export const NAVIGATION_SECTIONS = [
     highlight: true,
   },
   {
-    name: "Blog",
-    id: "payment-options",
-    icon: FaCreditCard,
-    iconSize: 18,
-    iconColor: COLORS.primary,
+    name: "DIY Rental Guides",
+    id: "how-it-works",
+    icon: FaTools,
+    iconSize: 16,
+    iconColor: COLORS.secondary,
     highlight: false,
   },
   {

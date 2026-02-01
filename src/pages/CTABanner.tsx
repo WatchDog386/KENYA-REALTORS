@@ -12,10 +12,6 @@ import {
 // ==========================================
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
-    
-    .font-nunito { font-family: 'Nunito', sans-serif; }
-    
     /* Custom scrollbar for consistency */
     .custom-scroll::-webkit-scrollbar { width: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -23,9 +19,8 @@ const GlobalStyles = () => (
     .custom-scroll::-webkit-scrollbar-thumb:hover { background: #F96302; }
     
     /* Hover Effect: Blue to Orange transition */
-    .realtor-strip-hover:hover { background-color: #D85C2C !important; border-color: #D85C2C !important; }
-    .realtor-strip-hover:hover .text-dynamic { color: white !important; }
-    .realtor-strip-hover:hover .bg-dynamic { background-color: white !important; color: #F96302 !important; }
+    .realtor-strip-hover { background-color: #154279 !important; border-color: #154279 !important; }
+    .realtor-strip-hover:hover { background-color: #F96302 !important; border-color: #F96302 !important; }
 
     /* Subtle Texture */
     .bg-texture-stripes {
@@ -55,7 +50,7 @@ export default function TenantCTABanner() {
   return (
     <>
     <GlobalStyles />
-    <section className="w-full font-nunito bg-[#f7f7f7] py-4 px-4 text-[#484848]">
+    <section className="w-full bg-[#f7f7f7] py-4 px-4 text-[#484848]">
       <motion.div 
         initial={{ opacity: 0, y: 5 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -64,7 +59,7 @@ export default function TenantCTABanner() {
       >
         
         {/* COMPACT STRIP CONTAINER */}
-        <div className="bg-[#0056b3] realtor-strip-hover transition-colors duration-300 flex flex-col md:flex-row h-auto md:h-40 relative overflow-hidden border-b-4 border-black/20">
+        <div className="bg-[#154279] realtor-strip-hover transition-colors duration-300 flex flex-col md:flex-row h-auto md:h-40 relative overflow-hidden border-b-4 border-black/20">
           
           {/* Background Texture */}
           <div className="absolute inset-0 bg-texture-stripes opacity-20 pointer-events-none"></div>
@@ -90,15 +85,15 @@ export default function TenantCTABanner() {
           <div className="flex-1 p-4 md:p-5 flex flex-col justify-center relative z-10">
              
              <div className="flex items-center gap-2 mb-1">
-               <span className="bg-dynamic bg-black text-white transition-colors text-[9px] font-black uppercase px-1.5 py-0.5 tracking-widest">
+               <span className="bg-[#154279] text-white transition-colors text-[9px] font-black uppercase px-1.5 py-0.5 tracking-widest group-hover:bg-white group-hover:text-[#F96302]">
                  New Listing
                </span>
-               <span className="text-[9px] font-bold text-white/80 uppercase tracking-wide">
+               <span className="text-[9px] font-bold text-white/80 uppercase tracking-wide group-hover:text-white transition-colors">
                  Ref: #404-KE
                </span>
              </div>
 
-             <h2 className="font-condensed font-black text-2xl md:text-3xl text-white uppercase italic leading-none mb-2 drop-shadow-sm">
+             <h2 className="font-condensed font-black text-2xl md:text-3xl text-white uppercase leading-none mb-2 drop-shadow-sm">
                 Modern <span className="text-white/50">Living Spaces</span>
              </h2>
              
@@ -126,7 +121,7 @@ export default function TenantCTABanner() {
              </div>
 
              <div className="grid grid-cols-2 gap-2">
-               <button className="bg-white text-black hover:bg-[#111] hover:text-white transition-colors h-8 text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm">
+               <button className="bg-white text-[#154279] hover:bg-[#F96302] hover:text-white transition-colors h-8 text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm">
                   <Search className="w-3 h-3" /> View
                </button>
                
@@ -134,10 +129,10 @@ export default function TenantCTABanner() {
                  onClick={() => setIsSaved(!isSaved)}
                  className={`h-8 border text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all
                  ${isSaved 
-                    ? 'bg-[#FCD200] border-[#FCD200] text-black' 
-                    : 'border-white/30 text-white hover:bg-white/10'}`}
+                    ? 'bg-[#F96302] border-[#F96302] text-white' 
+                    : 'border-white/30 text-white hover:bg-[#154279]'}`}
                >
-                  <Heart className={`w-3 h-3 ${isSaved ? 'fill-black' : ''}`} />
+                  <Heart className={`w-3 h-3 ${isSaved ? 'fill-white' : ''}`} />
                   {isSaved ? 'Saved' : 'Save'}
                </button>
              </div>

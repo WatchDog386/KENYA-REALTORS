@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 import {
   FaBars,
   FaUser,
@@ -11,6 +12,9 @@ import {
   FaUserPlus,
   FaCity,
   FaKey,
+  FaMapPin,
+  FaBed,
+  FaBath
 } from "react-icons/fa";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
@@ -28,17 +32,84 @@ import {
   LOGOUT_BUTTON,
 } from "@/config/navbarConfig";
 
+// Unified Data for Search
+const SEARCH_DATA = [
+  // --- HERO LISTINGS ---
+  { id: 101, title: "Modern Downtown Loft", area: "CBD", price: "85,000", type: "Loft", img: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=200" },
+  { id: 102, title: "Suburban Family Home", area: "Karen", price: "150,000", type: "House", img: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=200" },
+  { id: 103, title: "Cozy Studio Apartment", area: "Roysambu", price: "25,000", type: "Studio", img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=200" },
+  { id: 104, title: "Luxury Condo w/ View", area: "Westlands", price: "210,000", type: "Condo", img: "https://images.unsplash.com/photo-1515263487990-61b07816b324?q=80&w=200" },
+
+  // --- FEATURES LISTINGS (Page 1) ---
+  { id: "AHT-304", title: "Luxury 3-Bedroom Panorama Suite", area: "Ayden Home Towers, Wing A", price: 85000, type: "3 Bedroom", img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=200" },
+  { id: "AHT-202", title: "Modern 2-Bedroom Executive", area: "Ayden Home Towers, Wing B", price: 55000, type: "2 Bedroom", img: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=200" },
+  { id: "AHT-105", title: "Spacious 1-Bedroom Apartment", area: "Ayden Home Towers, Wing B", price: 35000, type: "1 Bedroom", img: "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?q=80&w=200" },
+  { id: "AHT-001", title: "Standard Single Room / Bedsitter", area: "Ayden Home Towers, Wing C", price: 18000, type: "Bedsitter", img: "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?q=80&w=200" },
+  { id: "AHT-205", title: "Premium 2-Bedroom with Balcony", area: "Ayden Home Towers, Wing A", price: 60000, type: "2 Bedroom", img: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?q=80&w=200" },
+  { id: "AHT-108", title: "Economy 1-Bedroom", area: "Ayden Home Towers, Wing C", price: 28000, type: "1 Bedroom", img: "https://images.unsplash.com/photo-1554995207-c18c203602cb?q=80&w=200" },
+
+  // --- FEATURES LISTINGS (Page 2) ---
+  { id: "AHT-406", title: "Penthouse 4-Bedroom Executive Suite", area: "Ayden Home Towers, Wing A", price: 125000, type: "4 Bedroom", img: "https://images.unsplash.com/photo-1613977257363-707ba9348227?q=80&w=200" },
+  { id: "AHT-309", title: "Executive 3-Bedroom Family Unit", area: "Ayden Home Towers, Wing A", price: 92000, type: "3 Bedroom", img: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=200" },
+  { id: "AHT-212", title: "Modern 2-Bedroom Corner Unit", area: "Ayden Home Towers, Wing B", price: 62000, type: "2 Bedroom", img: "https://images.unsplash.com/photo-1567767292278-a4f21aa2d36e?q=80&w=200" },
+  { id: "AHT-115", title: "Premium 1-Bedroom Studio", area: "Ayden Home Towers, Wing B", price: 42000, type: "1 Bedroom", img: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=200" },
+  { id: "AHT-003", title: "Deluxe Bedsitter with Balcony", area: "Ayden Home Towers, Wing C", price: 22000, type: "Bedsitter", img: "https://images.unsplash.com/photo-1558036117-15e82a2c9a9a?q=80&w=200" },
+  { id: "AHT-110", title: "Budget-Friendly Studio Apartment", area: "Ayden Home Towers, Wing C", price: 25000, type: "Studio", img: "https://images.unsplash.com/photo-1554995207-c18c203602cb?q=80&w=200" }
+];
+
+// Extract unique locations with vacancy info
+const LOCATION_AREAS = [
+  { name: "Ayden Home Towers, Wing A", vacancies: 5, rentals: 12 },
+  { name: "Ayden Home Towers, Wing B", vacancies: 3, rentals: 8 },
+  { name: "Ayden Home Towers, Wing C", vacancies: 2, rentals: 6 },
+  { name: "CBD", vacancies: 7, rentals: 15 },
+  { name: "Karen", vacancies: 4, rentals: 10 },
+  { name: "Roysambu", vacancies: 6, rentals: 14 },
+  { name: "Westlands", vacancies: 3, rentals: 9 }
+];
+
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const [showLocations, setShowLocations] = useState(false);
+  const [filteredResults, setFilteredResults] = useState<typeof SEARCH_DATA>([]);
 
   // Cart logic
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem("realtor_cart");
     return saved ? JSON.parse(saved) : { count: 0, total: 0 };
   });
+
+  // Search Logic
+  useEffect(() => {
+    const lowerQuery = searchQuery.toLowerCase().trim();
+    if (lowerQuery === "") {
+      // Show all results if search is empty (or limit to top 5-10 if list is huge)
+      setFilteredResults(SEARCH_DATA);
+      return;
+    }
+    const results = SEARCH_DATA.filter(item => 
+      item.title.toLowerCase().includes(lowerQuery) || 
+      item.area.toLowerCase().includes(lowerQuery) ||
+      item.type.toLowerCase().includes(lowerQuery)
+    );
+    setFilteredResults(results);
+  }, [searchQuery]);
+
+  const addToCart = (item: typeof SEARCH_DATA[0]) => {
+    const newCart = {
+      count: cart.count + 1,
+      total: cart.total + (typeof item.price === 'string' ? parseFloat(item.price.replace(/,/g, '')) : item.price)
+    };
+    setCart(newCart);
+    setSearchQuery("");
+    setShowResults(false);
+    // Optional: Flash a toast or something
+  };
 
   // Fonts
   useEffect(() => {
@@ -55,6 +126,38 @@ const Navbar = () => {
       :root {
         --navbar-height-mobile: ${NAVBAR_HEIGHTS.mobile};
         --navbar-height-desktop: ${NAVBAR_HEIGHTS.desktop};
+      }
+
+      /* Sleek & Polished 3D Effect */
+      @keyframes polishedLift {
+        0%, 100% {
+          filter: drop-shadow(-6px 10px 18px rgba(0, 0, 0, 0.15));
+          transform: translateY(0px);
+        }
+        50% {
+          filter: drop-shadow(-8px 14px 24px rgba(0, 0, 0, 0.22));
+          transform: translateY(-3px);
+        }
+      }
+
+      .brand-animate {
+        animation: polishedLift 4s ease-in-out infinite;
+      }
+
+      .logo-svg {
+        filter: drop-shadow(-5px 8px 16px rgba(0, 0, 0, 0.12));
+        transition: all 0.3s ease;
+        will-change: filter, transform;
+      }
+
+      .logo-svg:hover {
+        filter: drop-shadow(-7px 12px 22px rgba(0, 0, 0, 0.2));
+        transform: translateY(-3px);
+      }
+
+      .brand-text-3d {
+        filter: drop-shadow(-5px 8px 16px rgba(0, 0, 0, 0.12));
+        animation: polishedLift 4s ease-in-out infinite;
       }
     `;
     document.head.appendChild(style);
@@ -88,7 +191,7 @@ const Navbar = () => {
 
   return (
     <div 
-      className={`fixed top-0 w-full z-50 bg-white transition-all duration-300 border-b border-slate-200 ${isScrolled ? "shadow-md" : ""}`}
+      className={`fixed top-0 w-full z-50 bg-white transition-all duration-300 ${isScrolled ? "shadow-md border-b border-slate-200" : ""}`}
       style={{
         '--navbar-height-mobile': NAVBAR_HEIGHTS.mobile,
         '--navbar-height-desktop': NAVBAR_HEIGHTS.desktop
@@ -126,7 +229,7 @@ const Navbar = () => {
       </div>
 
       {/* Main Nav Bar */}
-      <div className="bg-white border-b border-slate-200 py-4 relative z-20">
+      <div className={`bg-white py-4 relative z-20 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"}`}>
         <div className="max-w-[1440px] mx-auto px-4 lg:px-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-8">
             
@@ -146,7 +249,7 @@ const Navbar = () => {
                   className="shrink-0 cursor-pointer flex items-center gap-3 group"
                 >
                   {/* SVG: Gold/Metallic Colors */}
-                  <svg viewBox="0 0 200 200" className="h-12 md:h-14 w-auto drop-shadow-sm group-hover:scale-105 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox="0 0 200 200" className="h-12 md:h-14 w-auto drop-shadow-sm group-hover:scale-105 transition-transform duration-300 logo-svg" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <linearGradient id="grad-front-nav" x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor="#F9F1DC" />
@@ -160,34 +263,50 @@ const Navbar = () => {
                         <stop offset="0%" stopColor="#998A5E" />
                         <stop offset="100%" stopColor="#5C5035" />
                       </linearGradient>
+                      <filter id="glow-nav">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
                     </defs>
 
-                    {/* Structure */}
-                    <path d="M110 90 V170 L160 150 V70 L110 90 Z" fill="url(#grad-front-nav)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round"/>
-                    <path d="M160 70 L180 80 V160 L160 150 Z" fill="url(#grad-dark-nav)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round"/>
-                    <path d="M30 150 V50 L80 20 V120 L30 150 Z" fill="url(#grad-front-nav)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round"/>
-                    <path d="M80 20 L130 40 V140 L80 120 Z" fill="url(#grad-side-nav)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round"/>
+                    {/* Enhanced Structure with Golden Accents */}
+                    <path d="M110 90 V170 L160 150 V70 L110 90 Z" fill="url(#grad-front-nav)" stroke="#D4AF37" strokeWidth="2.5" strokeLinejoin="round" filter="url(#glow-nav)"/>
+                    <path d="M160 70 L180 80 V160 L160 150 Z" fill="url(#grad-dark-nav)" stroke="#D4AF37" strokeWidth="2.5" strokeLinejoin="round" filter="url(#glow-nav)"/>
+                    <path d="M30 150 V50 L80 20 V120 L30 150 Z" fill="url(#grad-front-nav)" stroke="#D4AF37" strokeWidth="2.5" strokeLinejoin="round" filter="url(#glow-nav)"/>
+                    <path d="M80 20 L130 40 V140 L80 120 Z" fill="url(#grad-side-nav)" stroke="#D4AF37" strokeWidth="2.5" strokeLinejoin="round" filter="url(#glow-nav)"/>
                     
-                    {/* Windows */}
-                    <g fill="#1a232e"> 
+                    {/* Enhanced Windows with Gradient */}
+                    <defs>
+                      <linearGradient id="window-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#154279" />
+                        <stop offset="100%" stopColor="#0F2847" />
+                      </linearGradient>
+                    </defs>
+                    <g fill="url(#window-grad)" opacity="0.9">
                       <path d="M85 50 L100 56 V86 L85 80 Z" />
                       <path d="M85 90 L100 96 V126 L85 120 Z" />
                       <path d="M45 60 L55 54 V124 L45 130 Z" />
                       <path d="M120 130 L140 122 V152 L120 160 Z" />
                     </g>
+
+                    {/* Accent Highlight */}
+                    <circle cx="120" cy="60" r="8" fill="#F96302" opacity="0.7" filter="url(#glow-nav)"/>
                   </svg>
 
                   {/* BRAND TEXT: Blue Dominant */}
                   <div className="flex flex-col justify-center select-none ml-1">
-                    <span className={`${BRAND.countryLabelSize} font-bold text-slate-400 leading-none ml-0.5 brand-lowercase tracking-[0.2em] uppercase`}>
+                    <span className={`${BRAND.countryLabelSize} font-bold text-black leading-none ml-0.5 brand-lowercase tracking-[0.2em] uppercase text-xs md:text-sm`}>
                         {BRAND.countryLabel}
                     </span>
                     <div className="flex items-baseline -mt-1 relative">
-                        <span className={`${BRAND.brandNameSize} font-extrabold tracking-tight text-[${BRAND.primaryColor}] brand-lowercase`}>
+                        <span className={`font-semibold text-2xl md:text-4xl font-extrabold tracking-tight text-[${BRAND.primaryColor}] brand-lowercase`}>
                         {BRAND.brandName}
                         </span>
                         {/* Dot is Bright Orange */}
-                        <div className={`h-1.5 w-1.5 md:h-2 md:w-2 bg-[${BRAND.dotColor}] rounded-none ml-1 mb-1.5 shadow-sm animate-pulse`}></div>
+                        <div className={`h-1.5 w-1.5 md:h-2 md:w-2 bg-[${BRAND.dotColor}] rounded-none ml-1 mb-1.5 shadow-sm`}></div>
                     </div>
                   </div>
                 </div>
@@ -209,23 +328,59 @@ const Navbar = () => {
               </div>
             </div>
 
-            {/* SEARCH BAR: Bright Orange Button */}
+            {/* CHECK VISIBILITY: Sleek Rounded Design */}
             <div className="flex-1 w-full relative group z-30 ml-4 lg:ml-8">
-              <div className={`w-full flex items-center bg-slate-50 border border-slate-200 rounded-none pl-1 pr-1 py-1 transition-all duration-300 shadow-sm group-hover:shadow-md focus-within:border-[${COLORS.secondary}] focus-within:shadow-[0_4px_15px_rgba(249,99,2,0.2)] focus-within:ring-1 focus-within:ring-[${COLORS.secondary}]/30`}>
+                <div className={`w-full flex items-center bg-slate-50 border border-slate-200 rounded-full pl-1 pr-1 py-1 transition-all duration-300 shadow-sm group-hover:shadow-md focus-within:border-[${COLORS.secondary}] focus-within:shadow-[0_4px_15px_rgba(249,99,2,0.2)] focus-within:ring-1 focus-within:ring-[${COLORS.secondary}]/30`}>
                 <div className="relative flex-1">
                   <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[${COLORS.secondary}] transition-colors pointer-events-none`}>
                     <FaSearch size={16} />
                   </div>
                   <input 
-                    type="text" 
-                    placeholder={SEARCH_BAR.placeholder}
+                    type="text"
+                    placeholder="Search by location..."
+                    onFocus={() => setShowLocations(true)}
+                    onBlur={() => setTimeout(() => setShowLocations(false), 200)}
                     className="w-full h-10 pl-11 pr-4 border-none outline-none text-[15px] placeholder:text-slate-500 font-medium bg-transparent text-slate-900"
                   />
                 </div>
-                <button className={`bg-[${COLORS.primary}] hover:bg-[${COLORS.secondary}] text-white px-6 h-10 font-bold uppercase text-xs tracking-wider transition-all duration-300 rounded-none shadow-md hover:shadow-lg flex items-center gap-2 transform hover:-translate-y-0.5`}>
-                  <span className="hidden md:block">{SEARCH_BAR.buttonText}</span>
+                <button className={`bg-[${COLORS.secondary}] hover:bg-[${COLORS.primary}] text-white px-6 h-10 font-bold text-[16px] transition-all duration-300 rounded-full shadow-md hover:shadow-lg flex items-center gap-2 transform hover:-translate-y-0.5`}>
+                  <span className="hidden md:block">SEARCH</span>
                   <FaSearch size={12} className="md:hidden" />
                 </button>
+
+                {/* LOCATION DROPDOWN */}
+                {showLocations && (
+                  <div className="absolute top-full left-0 w-full bg-white shadow-xl border border-gray-100 mt-2 max-h-[350px] overflow-y-auto rounded-lg z-50">
+                    <div className="px-4 py-2 bg-slate-50 text-[10px] uppercase font-bold text-gray-500 tracking-wider sticky top-0 border-b border-gray-100">
+                      Available Areas
+                    </div>
+                    {LOCATION_AREAS.map((location, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setShowLocations(false);
+                          navigate("/features");
+                        }}
+                        className="w-full px-4 py-3 hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-0 text-left group/loc"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-bold text-[#154279] group-hover/loc:text-[#F96302] transition-colors">{location.name}</h4>
+                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                                {location.vacancies} Vacant
+                              </span>
+                              <span>•</span>
+                              <span>{location.rentals} Total</span>
+                            </div>
+                          </div>
+                          <ChevronRight size={16} className="text-[#F96302] opacity-0 group-hover/loc:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -236,7 +391,7 @@ const Navbar = () => {
               <div className="relative group h-full py-2">
                 <button className="flex flex-col items-start outline-none">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">Account</span>
+                    <span className="text-[10px] text-black font-bold uppercase tracking-wider">Account</span>
                     <FaChevronDown size={8} className={`text-[${COLORS.secondary}] group-hover:rotate-180 transition-transform duration-300`} />
                   </div>
                   <span className={`text-[14px] text-[${COLORS.primary}] font-bold group-hover:text-[${COLORS.secondary}] transition-colors`}>
@@ -273,7 +428,7 @@ const Navbar = () => {
               {/* Cart Button */}
               <button className={`flex items-center gap-3 group relative pl-6 border-l border-slate-200`}>
                 <div className="relative">
-                  <FaShoppingCart size={24} className={`text-slate-600 group-hover:text-[${COLORS.secondary}] transition-colors duration-300`} />
+                  <FaShoppingCart size={24} className={`text-[${COLORS.secondary}] group-hover:text-[${COLORS.primary}] transition-colors duration-300`} />
                   {cart.count > 0 && (
                     <span className={`absolute -top-2 -right-2 bg-[${COLORS.secondary}] text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-none border-2 border-white shadow-md scale-100 group-hover:scale-110 transition-transform`}>
                       {cart.count}
@@ -281,7 +436,7 @@ const Navbar = () => {
                   )}
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="text-[10px] text-slate-600 font-bold uppercase tracking-wider">My Cart</span>
+                  <span className="text-[10px] text-black font-bold uppercase tracking-wider">My Cart</span>
                   <span className={`text-[13px] text-[${COLORS.primary}] font-bold leading-tight group-hover:text-[${COLORS.secondary}] transition-colors`}>
                     {cart.count} Items
                   </span>
@@ -293,33 +448,23 @@ const Navbar = () => {
       </div>
 
       {/* Sub-Nav (Desktop) */}
-      <div className="hidden lg:block bg-white border-b border-slate-200 h-14">
-        <div className="max-w-[1440px] mx-auto px-6 flex items-center h-full">
-          <div className="flex items-center gap-10 text-[13px] font-bold text-slate-700">
+      <div className={`hidden lg:block bg-white h-14 ${isScrolled ? "border-b border-slate-200" : ""}`}>
+        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-center h-full">
+          <div className="flex items-center gap-10">
             {NAVIGATION_SECTIONS.map((item) => {
               const IconComponent = item.icon;
               return (
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`flex items-center gap-2.5 relative group h-full transition-all duration-200 ${
-                    (location.pathname === `/${item.id}` || (item.id === "" && location.pathname === "/"))
-                      ? `text-[${COLORS.primary}]` 
-                      : `text-slate-700 hover:text-[${COLORS.secondary}]`
-                  }`}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-none transition-all duration-200`}
                 >
-                  <span className="group-hover:scale-110 transition-transform duration-300 opacity-80 group-hover:opacity-100">
-                    <IconComponent size={item.iconSize} className={`text-[${item.iconColor}]`} />
+                  <span className={`text-[${COLORS.secondary}]`}>
+                    <IconComponent size={item.iconSize} />
                   </span>
-                  <span className={item.highlight ? `text-[${COLORS.secondary}] font-bold uppercase tracking-wide` : ''}>
+                  <span className={`font-semibold text-sm text-[${COLORS.primary}]`}>
                     {item.name}
                   </span>
-                  {/* Active Indicator Line - Bright Orange */}
-                  <span className={`absolute bottom-0 left-0 h-[3px] transition-all duration-300 ${
-                    (location.pathname === `/${item.id}` || (item.id === "" && location.pathname === "/") || item.highlight)
-                      ? `bg-[${COLORS.secondary}] w-full` 
-                      : `bg-[${COLORS.secondary}] w-0 group-hover:w-full`
-                  }`}></span>
                 </button>
               );
             })}
@@ -331,52 +476,45 @@ const Navbar = () => {
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
         <SheetContent side="left" className="w-[85vw] max-w-[340px] p-0 border-r-0 z-[60] bg-slate-50 flex flex-col h-full">
           
-          {/* Mobile Header: Deep Blue background, Bright Orange accents */}
+          {/* Mobile Header: Pure Blue background matching navbar */}
           <div className={`bg-[${COLORS.primary}] p-6 text-white relative overflow-hidden`}>
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-[${COLORS.secondary}] rounded-none blur-[30px] opacity-40 -translate-y-1/2 translate-x-1/2`}></div>
-            <div className="relative z-10 flex items-center gap-4 mb-6">
-              <div className="bg-white/15 p-3 rounded-none shadow-md border border-white/20">
+            <div className="relative z-10 mb-6">
+              <div className="flex items-center gap-3 mb-6">
                 <FaUser className={`text-[${COLORS.secondary}] text-xl`} />
+                <div>
+                  <h2 className="font-bold text-xl">{MOBILE_HEADER.title}</h2>
+                  <p className="text-xs text-white/85 font-medium">{MOBILE_HEADER.subtitle}</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-bold text-xl">{MOBILE_HEADER.title}</h2>
-                <p className="text-xs text-white/85 font-medium">{MOBILE_HEADER.subtitle}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {MOBILE_HEADER.buttons.map((btn, idx) => (
-                <button 
-                  key={idx}
-                  onClick={() => { setMenuOpen(false); navigate(`/${btn.action}`); }} 
-                  className={`${btn.bgColor} ${btn.textColor} ${btn.borderColor ? btn.borderColor + ' border-2' : ''} py-3 px-4 rounded-none font-bold text-xs uppercase tracking-wide hover:bg-[${COLORS.secondary}] hover:text-white transition shadow-md flex justify-center items-center gap-2`}
-                >
-                  {btn.label}
+
+              {/* Search Bar - Mobile Version */}
+              <div className={`w-full flex items-center bg-white/15 border border-white/20 rounded-full pl-1 pr-1 py-1 transition-all duration-300 focus-within:border-white focus-within:ring-1 focus-within:ring-white/50`}>
+                <div className="relative flex-1">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60">
+                    <FaSearch size={14} />
+                  </div>
+                  <input 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowResults(true);
+                    }}
+                    onFocus={() => setShowResults(true)}
+                    onBlur={() => setTimeout(() => setShowResults(false), 200)}
+                    placeholder="Find properties..."
+                    className="w-full h-9 pl-10 pr-3 border-none outline-none text-[13px] placeholder:text-white/50 font-medium bg-transparent text-white"
+                  />
+                </div>
+                <button className={`bg-[${COLORS.secondary}] hover:bg-[${COLORS.primary}] text-white px-4 h-9 font-bold text-xs tracking-wider transition-all rounded-full shadow-md flex items-center`}>
+                  <FaSearch size={12} />
                 </button>
-              ))}
+              </div>
             </div>
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {/* Quick Actions */}
-            <div className="grid grid-cols-3 gap-3 p-4 border-b border-slate-200 bg-white">
-              {QUICK_ACTIONS.map((action, idx) => {
-                const ActionIcon = action.icon;
-                return (
-                  <button 
-                    key={idx}
-                    onClick={() => handleNavClick(action.id)} 
-                    className={`flex flex-col items-center gap-2 p-3 rounded-none bg-slate-50 hover:bg-orange-50 transition border border-slate-200 hover:border-orange-200 group`}
-                  >
-                    <div className={`bg-white p-2.5 rounded-none text-[${action.iconColor}] shadow-sm group-hover:scale-110 transition-transform`}>
-                      <ActionIcon />
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">{action.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Mobile Menu Links */}
+            {/* Menu Links */}
             <div className="py-4 bg-white">
               <div className="px-6 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Menu</div>
               {NAVIGATION_SECTIONS.map((item) => {

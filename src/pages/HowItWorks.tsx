@@ -140,15 +140,15 @@ export default function PolishedLeasingModule() {
                             <div className="flex items-end gap-4 min-w-[200px]">
                                 <div className="flex-1">
                                     <div className="flex justify-between text-[10px] font-bold text-slate-300 uppercase mb-2 tracking-wider">
-                                        <span>Readiness</span>
-                                        <span className="text-white">{progress}%</span>
+                                        <span>Readiness Score</span>
+                                        <span className="text-white text-[#F96302]">{progress}%</span>
                                     </div>
-                                    <div className="h-2 w-full bg-[#0f325e] rounded-none overflow-hidden border border-white/5">
+                                    <div className="h-3 w-full bg-[#0f325e] rounded-none overflow-hidden border border-white/10">
                                         <motion.div 
                                             initial={{ width: 0 }}
                                             animate={{ width: `${progress}%` }}
                                             transition={{ duration: 1, ease: "easeOut" }}
-                                            className="h-full bg-gradient-to-r from-[#d85502] to-[#F96302]" 
+                                            className="h-full bg-gradient-to-r from-[#F96302] to-[#d85502]" 
                                         />
                                     </div>
                                 </div>

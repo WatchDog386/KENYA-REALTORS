@@ -5,7 +5,7 @@ import React from "react";
 ====================== */
 import Hero from "@/components/Hero"; 
 import HowItWorks from "@/pages/HowItWorks";          // Matches id="how-it-works"
-import FeaturesSection from "@/pages/FeaturesSection"; // Matches id="features"
+// Matches id="features"
 import PricingSection from "@/pages/PricingSection";   // Matches id="pricing"
 import PaymentOptionsSection from "@/pages/PaymentOptionsSection"; // Matches id="payment-options"
 import TestimonialsSection from "@/pages/TestimonialsSection"; // Matches id="testimonials"
@@ -27,9 +27,8 @@ const HomePage = () => {
        
 
         {/* Apartments Features */}
-        <div id="features">
-          <FeaturesSection />
-        </div>
+       
+        
 
         
        

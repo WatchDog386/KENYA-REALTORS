@@ -59,7 +59,7 @@ export default function RegisterPage() {
           .from("properties")
           .select("id, name, address")
           .eq("status", "active")
-          .order("name");
+          .order("name", { ascending: true });
 
         console.log("📊 Properties query - Error:", error, "Data:", data);
         if (error) {
