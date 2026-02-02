@@ -89,7 +89,7 @@ const Footer = () => {
           <div className="space-y-6">
             <div className="flex items-center gap-3 cursor-pointer select-none">
               <Logo />
-              <div className="flex flex-col justify-center">
+              <div className="flex flex-col justify-center font-brand">
                 <div className="flex items-baseline gap-1">
                   <span className={`text-[${COLORS.primary}] font-bold text-xl md:text-2xl tracking-tight leading-none`}>
                     Kenya
@@ -113,7 +113,7 @@ const Footer = () => {
 
           {/* 2. DISCOVER */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-widest mb-6 pb-2 border-b-2 text-black" style={{ borderBottomColor: COLORS.primary }}>
+            <h3 className="text-xs font-black uppercase tracking-widest mb-6 pb-2 text-black">
               Discover
             </h3>
             <ul className="space-y-4">
@@ -130,7 +130,7 @@ const Footer = () => {
 
           {/* 3. RESOURCES */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-widest mb-6 pb-2 border-b-2 text-black" style={{ borderBottomColor: COLORS.primary }}>
+            <h3 className="text-xs font-black uppercase tracking-widest mb-6 pb-2 text-black">
               Resources
             </h3>
             <ul className="space-y-4">
@@ -147,10 +147,10 @@ const Footer = () => {
 
           {/* 4. CONTACT BADGES */}
           <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-black uppercase tracking-widest mb-3 pb-2 border-b-2 text-black" style={{ borderBottomColor: COLORS.primary }}>
+            <h3 className="text-xs font-black uppercase tracking-widest mb-3 pb-2 text-black">
               Contact Us
             </h3>
-            <div className="p-4 bg-slate-50 border-l-4 rounded-none flex items-center gap-3" style={{ borderLeftColor: COLORS.primary }}>
+            <div className="p-4 bg-slate-50 rounded-none flex items-center gap-3">
               <MapPin className="w-5 h-5" style={{ color: COLORS.secondary }} />
               <span className="text-[10px] font-bold uppercase leading-tight text-slate-700">
                 Westlands, Nairobi<br/>Realtor Plaza, 4th Flr
@@ -158,8 +158,7 @@ const Footer = () => {
             </div>
             <a 
               href="tel:+254706927062" 
-              className="p-4 bg-slate-50 border-l-4 rounded-none flex items-center gap-3 group transition-all duration-300"
-              style={{ borderLeftColor: COLORS.secondary }}
+              className="p-4 bg-slate-50 rounded-none flex items-center gap-3 group transition-all duration-300"
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = COLORS.primary;
                 e.currentTarget.style.color = "white";

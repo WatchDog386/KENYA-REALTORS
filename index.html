@@ -34,9 +34,8 @@
       /* --- MAIN CONTENT WRAPPER --- */
       #main-content {
         opacity: 0;
-        /* No zoom, just a subtle lift */
-        transform: translateY(20px); 
-        transition: opacity 1s ease, transform 1s var(--ease-elegant);
+        transform: translateY(20px);
+        transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         will-change: opacity, transform;
       }
       
@@ -55,13 +54,32 @@
         align-items: center;
         width: 100%;
         height: 100dvh;
-        /* darker, richer background for contrast */
-        background: radial-gradient(circle at 50% 50%, #232d38 0%, #0b0f14 100%);
-        will-change: opacity;
-        transition: opacity 0.8s ease, visibility 0.8s ease;
+        background: #1a232e;
+        will-change: opacity, transform, filter;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+        overflow: hidden;
       }
 
-      /* The Simple Fade Exit (No Zoom) */
+      /* Sweep Overlay */
+      .app-loader::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent 0%, #f7f7f7 50%, transparent 100%);
+        transform: translateX(120%);
+        will-change: transform;
+      }
+
+      .app-loader.fade-exit::before {
+        animation: sweepLeft 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+
+      @keyframes sweepLeft {
+        0% { transform: translateX(120%); }
+        100% { transform: translateX(-120%); }
+      }
+
+      /* Fast & Sleek Exit */
       .app-loader.fade-exit {
         opacity: 0;
         visibility: hidden;
@@ -75,6 +93,11 @@
         flex-direction: column;
         align-items: center;
         width: 100%;
+        transition: opacity 0.4s ease;
+      }
+
+      .loader-content.exit {
+        opacity: 0;
       }
 
       /* --- HOUSE ICON --- */
@@ -86,6 +109,11 @@
         margin-bottom: 35px;
         /* Subtle float animation */
         animation: floatIcon 6s ease-in-out infinite;
+        transition: opacity 0.4s ease;
+      }
+
+      .icon-wrapper.exit {
+        opacity: 0;
       }
 
       @keyframes floatIcon {
@@ -142,6 +170,11 @@
         justify-content: center;
         align-items: center;
         perspective: 1000px;
+        transition: opacity 0.4s ease;
+      }
+
+      .text-container.exit {
+        opacity: 0;
       }
 
       .text-group {
@@ -255,20 +288,21 @@
         const text1 = document.getElementById('text1');
         const text2 = document.getElementById('text2');
         const loader = document.getElementById('loader');
+        const loaderContent = document.querySelector('.loader-content');
+        const iconWrapper = document.querySelector('.icon-wrapper');
+        const textContainer = document.querySelector('.text-container');
         const content = document.getElementById('main-content');
         
         // Timer Helper
         const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
         /* 1. START DRAWING (0s) */
-        // We draw the main structure first, slightly staggered
         let delay = 0;
         paths.forEach(p => {
           setTimeout(() => { p.style.animation = `drawLine 1.0s var(--ease-draw) forwards`; }, delay);
-          delay += 150; // Slower stagger for more drama
+          delay += 150;
         });
         
-        // Windows draw quickly after structure starts
         setTimeout(() => {
            windows.forEach(w => w.style.animation = `drawLine 0.8s var(--ease-draw) forwards`);
         }, 500);
@@ -279,31 +313,31 @@
         text1.classList.add('visible');
 
         /* 3. SWAP TEXT (2.5s) */
-        // We hold the first logo state longer as requested
         await wait(1600); 
         
         text1.classList.remove('visible');
         text1.classList.add('exit');
         
-        await wait(500); // Clean pause between texts
+        await wait(500);
         text2.classList.add('visible');
 
-        /* 4. HOLD & REVEAL (5.0s) */
-        // "Make it stay there for a while"
+        /* 4. HOLD & PREPARE FOR TRANSITION (5.0s) */
         await wait(2200); 
         
-        // 5. SIMPLE FADE OUT (No Zoom)
+        /* 5. ADVANCED TRANSITION OUT - Blur and Scale */
+        loaderContent.classList.add('exit');
+        iconWrapper.classList.add('exit');
+        textContainer.classList.add('exit');
         loader.classList.add('fade-exit');
         
-        // 6. REVEAL WEBSITE
-        // Slight delay to ensure smooth cross-dissolve
+        /* 6. REVEAL WEBSITE WITH SMOOTH UNBLUR */
         setTimeout(() => {
            content.classList.add('visible');
-           document.body.style.overflow = 'auto'; // Enable scrolling
+           document.body.style.overflow = 'auto';
         }, 100);
 
-        // Remove Loader from DOM entirely after fade completes
-        setTimeout(() => { loader.style.display = 'none'; }, 1000);
+        /* 7. CLEANUP */
+        setTimeout(() => { loader.style.display = 'none'; }, 1300);
 
       })();
     </script>
