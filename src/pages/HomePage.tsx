@@ -24,7 +24,8 @@ const HomePage = () => {
       {/* 2. Content Sections - Stacked Vertically */}
       <div className="w-full flex flex-col space-y-0">
         
-       
+        {/* Testimonials Section */}
+        <TestimonialsSection />
 
         {/* Apartments Features */}
        

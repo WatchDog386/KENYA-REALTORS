@@ -3,19 +3,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail,
   Phone,
+  MessageSquare,
   MapPin,
   Clock,
-  Send,
-  CheckCircle,
-  AlertCircle,
-  MessageSquare,
-  Linkedin,
-  Twitter,
-  Facebook,
   Globe,
-  Plus,
+  Facebook,
+  Twitter,
+  Linkedin,
   X,
-  ChevronDown
+  ChevronDown,
+  Send,
+  AlertCircle,
+  CheckCircle,
+  Loader
 } from "lucide-react";
 
 // --- GLOBAL STYLES ---
@@ -198,7 +198,7 @@ export default function Contact() {
   return (
     <>
       <GlobalStyles />
-      <div className="font-nunito w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 min-h-screen pt-12 pb-12">
+      <div className="font-nunito w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 min-h-screen pt-32 pb-12">
         
         {/* HEADER SECTION */}
         <motion.div
@@ -270,17 +270,15 @@ export default function Contact() {
                   <AnimatePresence>
                     {submitted && (
                       <motion.div
-                        className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200 text-green-800"
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3 }}
+                        className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3"
                       >
                         <CheckCircle size={20} className="text-green-600" />
-                        <div>
-                          <p className="font-semibold">Thank you for your message!</p>
-                          <p className="text-sm">We've received your inquiry and will respond within 2 hours.</p>
-                        </div>
+                        <span className="text-sm font-semibold text-green-800">
+                          Thank you! We've received your message and will respond within 2 hours.
+                        </span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -289,14 +287,13 @@ export default function Contact() {
                   <AnimatePresence>
                     {error && (
                       <motion.div
-                        className="flex items-center gap-3 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800"
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3 }}
+                        className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3"
                       >
                         <AlertCircle size={20} className="text-red-600" />
-                        <p className="font-semibold">{error}</p>
+                        <span className="text-sm font-semibold text-red-800">{error}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -317,7 +314,7 @@ export default function Contact() {
                   {/* Email & Phone */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Email Address *</label>
+                      <label className="block text-sm font-semibold text-slate-800 mb-2">Email *</label>
                       <input
                         type="email"
                         name="email"
@@ -328,7 +325,7 @@ export default function Contact() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Phone (Optional)</label>
+                      <label className="block text-sm font-semibold text-slate-800 mb-2">Phone</label>
                       <input
                         type="tel"
                         name="phone"
@@ -343,15 +340,17 @@ export default function Contact() {
                   {/* Category & Subject */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Category *</label>
+                      <label className="block text-sm font-semibold text-slate-800 mb-2">Category</label>
                       <select
                         name="category"
                         value={formData.category}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all appearance-none bg-white"
+                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
                       >
-                        {categories.map(cat => (
-                          <option key={cat.value} value={cat.value}>{cat.label}</option>
+                        {categories.map((cat) => (
+                          <option key={cat.value} value={cat.value}>
+                            {cat.label}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -390,12 +389,13 @@ export default function Contact() {
                   >
                     {loading ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                        <Loader size={16} className="animate-spin" />
                         Sending...
                       </>
                     ) : (
                       <>
-                        <Send size={18} /> Send Message
+                        <Send size={16} />
+                        Send Message
                       </>
                     )}
                   </button>
@@ -421,15 +421,15 @@ export default function Contact() {
                 <ul className="space-y-2 text-sm text-slate-700">
                   <li className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[#F96302]" />
-                    <span><strong>Email:</strong> 2 hours</span>
+                    <span>Email: 2 hours</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[#F96302]" />
-                    <span><strong>Phone:</strong> Immediate</span>
+                    <span>Phone: Immediate</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[#F96302]" />
-                    <span><strong>Chat:</strong> Instant</span>
+                    <span>Chat: Instant</span>
                   </li>
                 </ul>
               </div>
@@ -458,14 +458,13 @@ export default function Contact() {
                   ].map((social, idx) => {
                     const Icon = social.icon;
                     return (
-                      <motion.button
+                      <a
                         key={idx}
-                        className={`w-10 h-10 rounded-lg bg-gradient-to-br ${social.color} text-white flex items-center justify-center transition-transform`}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
+                        href="#"
+                        className={`w-10 h-10 rounded-lg bg-gradient-to-br ${social.color} text-white flex items-center justify-center hover:scale-110 transition-transform`}
                       >
-                        <Icon size={18} />
-                      </motion.button>
+                        <Icon size={16} />
+                      </a>
                     );
                   })}
                 </div>
@@ -501,13 +500,13 @@ export default function Contact() {
                     </div>
                     <div className="flex items-center gap-3">
                       <Phone size={16} className="text-[#F96302] shrink-0" />
-                      <a href={`tel:${office.phone}`} className="text-sm text-[#154279] hover:underline">{office.phone}</a>
+                      <p className="text-sm text-slate-700">{office.phone}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <Mail size={16} className="text-[#F96302] shrink-0" />
-                      <a href={`mailto:${office.email}`} className="text-sm text-[#154279] hover:underline">{office.email}</a>
+                      <p className="text-sm text-slate-700">{office.email}</p>
                     </div>
-                    <div className="flex items-start gap-3 pt-2 border-t border-slate-200">
+                    <div className="flex items-start gap-3 pt-3 border-t border-slate-100">
                       <Clock size={16} className="text-[#F96302] mt-0.5 shrink-0" />
                       <p className="text-xs text-slate-600 whitespace-pre-line">{office.hours}</p>
                     </div>
@@ -539,24 +538,28 @@ export default function Contact() {
                     onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
                     className="w-full text-left px-8 py-5 hover:bg-slate-50 transition-colors flex justify-between items-center"
                   >
-                    <span className="font-semibold text-slate-800">{faq.question}</span>
-                    <motion.span
-                      animate={{ rotate: expandedFaq === faq.id ? 180 : 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <ChevronDown size={20} className="text-[#F96302]" />
-                    </motion.span>
+                    <div>
+                      <h3 className="font-semibold text-slate-800">{faq.question}</h3>
+                    </div>
+                    <ChevronDown
+                      size={20}
+                      className={`text-slate-600 transition-transform ${
+                        expandedFaq === faq.id ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
                   <AnimatePresence>
                     {expandedFaq === faq.id && (
                       <motion.div
-                        className="px-8 py-4 bg-slate-50 text-slate-700 text-sm leading-relaxed"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
                       >
-                        {faq.answer}
+                        <div className="px-8 py-5 bg-slate-50 text-slate-700 text-sm">
+                          {faq.answer}
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>

@@ -194,8 +194,7 @@ const Rating = ({ rating, count }) => (
 // ==========================================
 // COMPONENT: PRODUCT CARD
 // ==========================================
-const ProductCard = ({ product }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const ProductCard = ({ product, onViewPlans }) => {
   const [selectedVariantId, setSelectedVariantId] = useState(product.variants[0].id);
 
   const currentVariant = product.variants.find(v => v.id === selectedVariantId) || product.variants[0];
@@ -207,41 +206,19 @@ const ProductCard = ({ product }) => {
       viewport={{ once: true }}
       className={cn(
         "group relative border-2 rounded-2xl transition-all duration-300 flex flex-col h-full overflow-hidden",
-        "bg-gradient-to-br from-white via-[#154279]/5 to-slate-50 border-[#154279]",
+        "bg-gradient-to-br from-white via-[#154279]/5 to-slate-50 border-slate-300",
         "hover:border-[#F96302] hover:shadow-2xl hover:shadow-[#F96302]/30 hover:scale-[1.02]",
-        "shadow-lg shadow-[#154279]/20"
+        "shadow-lg shadow-slate-300/30"
       )}
     >
       
       {/* --- DECORATIVE CORNER ACCENT --- */}
       <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 bg-gradient-to-br from-[#154279] group-hover:from-[#F96302] transition-all duration-300" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
       
-      {/* --- TOP: BRAND & HEADER --- */}
-      <div className="relative z-10 p-6 flex justify-between items-start bg-gradient-to-br from-[#154279] via-[#154279] to-[#154279] text-white border-b-3 border-[#F96302] group-hover:border-[#F96302] transition-all duration-300"
-      >
-        {/* Decorative bg element */}
-        <div className="absolute top-0 right-0 w-40 h-full opacity-10 pointer-events-none">
-          {product.icon}
-        </div>
-        
-        <div className="relative z-20">
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] block mb-2 px-2 py-0.5 rounded-lg bg-[#F96302]/30 text-white border border-[#F96302]/50">
-            {product.brand}
-          </span>
-          <span className="text-[10px] text-white font-bold tracking-tight">
-            {product.baseModel}-{currentVariant.name.substring(0,3).toUpperCase()}
-          </span>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.2, rotate: 20 }}
-          className="relative z-20 text-white/70 hover:text-white transition-colors"
-        >
-          <Heart size={18} />
-        </motion.button>
-      </div>
+
 
       {/* --- MIDDLE: MAIN CONTENT --- */}
-      <div className="flex-grow relative p-8 flex flex-col items-center justify-center border-b-2 border-slate-100">
+      <div className="flex-grow relative p-8 flex flex-col items-center justify-center">
         {/* Gradient background layer */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#154279] to-transparent opacity-10 pointer-events-none group-hover:from-[#F96302] transition-all duration-300" />
         
@@ -249,12 +226,12 @@ const ProductCard = ({ product }) => {
           whileHover={{ scale: 1.15, rotate: 5 }}
           className="relative z-10"
         >
-          <span style={{ color: "#F96302", filter: "drop-shadow(0 2px 8px rgba(249, 99, 2, 0.3))" }} className="transition-transform duration-300">
+          <span style={{ color: "#F96302", filter: "drop-shadow(0 2px 8px rgba(249, 99, 2, 0.3))" }} className="transition-transform duration-300 text-9xl">
             {product.icon}
           </span>
         </motion.div>
         
-        {product.hasVariants && !isOpen && (
+        {product.hasVariants && (
           <motion.div 
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
@@ -274,93 +251,7 @@ const ProductCard = ({ product }) => {
         </div>
       </div>
 
-      {/* --- OVERLAY: CONFIGURATION VIEW --- */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div 
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className={cn(
-              "absolute inset-0 z-20 flex flex-col",
-              "bg-gradient-to-br from-white via-[#154279]/3 to-slate-50"
-            )}
-          >
-            <div className="bg-gradient-to-r from-[#154279] to-[#154279] text-white p-4 flex items-center justify-between shadow-lg rounded-t-2xl">
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Select Plan</span>
-              <motion.button 
-                whileHover={{ rotate: 90, scale: 1.15 }}
-                onClick={() => setIsOpen(false)} 
-                className="hover:bg-white/20 p-1 rounded-lg transition-all"
-              >
-                <X size={16} />
-              </motion.button>
-            </div>
 
-            <div className="overflow-y-auto flex-grow p-0 custom-scroll">
-              <table className="w-full text-left border-collapse">
-                <thead className="text-[9px] uppercase font-bold sticky top-0 border-b-2 tracking-[0.15em] bg-gradient-to-r from-[#e8ecf1] to-[#f0f4f8] text-[#154279] border-[#154279]">
-                  <tr>
-                    <th className="p-3 pl-4">Plan</th>
-                    <th className="p-3">Details</th>
-                    <th className="p-3 text-right pr-4">Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {product.variants.map((variant) => {
-                    const isActive = selectedVariantId === variant.id;
-                    return (
-                      <motion.tr 
-                        key={variant.id}
-                        onClick={() => setSelectedVariantId(variant.id)}
-                        whileHover={{ scale: 1.01 }}
-                        className={cn(
-                          "cursor-pointer text-xs border-b border-slate-100 transition-all",
-                          isActive 
-                            ? "bg-gradient-to-r from-[#e8ecf1]/60 to-[#f0f4f8]/40 shadow-md" 
-                            : "bg-white hover:bg-slate-50"
-                        )}
-                      >
-                        <td className="p-3 pl-4">
-                          <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "w-3.5 h-3.5 rounded-sm border-2 flex items-center justify-center transition-all",
-                              isActive ? "border-[#154279] bg-[#154279]" : "border-slate-300"
-                            )}>
-                              {isActive && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
-                            </div>
-                            <span className={cn("font-bold transition-colors", isActive ? "text-[#154279]" : "text-slate-700")}>
-                              {variant.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="p-3 text-[9px] font-bold text-[#154279]">
-                          {variant.diff}
-                        </td>
-                        <td className="p-3 pr-4 text-right font-bold text-[#154279]">
-                          {variant.price.toLocaleString()}
-                        </td>
-                      </motion.tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <div className="p-4 text-[9px] space-y-2 border-t-2 bg-gradient-to-br from-[#f0f4f8] to-[#e8ecf1] text-slate-700 border-[#154279]">
-                <p className="font-bold mb-2 flex items-center gap-1.5 uppercase tracking-widest text-[#154279]">
-                  <Check size={14} /> Features:
-                </p>
-                {product.features.map((f, i) => (
-                  <div key={i} className="flex gap-2 items-start">
-                    <Check size={12} className="text-[#154279]" style={{ flexShrink: 0, marginTop: "2px" }} /> 
-                    <span>{f}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* --- BOTTOM: PRICE & ACTIONS --- */}
       <div className="relative z-30 p-6 border-t-3 shadow-lg transition-all bg-gradient-to-r from-[#f0f4f8] via-white to-[#e8ecf1] border-[#154279] group-hover:border-[#F96302]">
@@ -386,10 +277,10 @@ const ProductCard = ({ product }) => {
 
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={onViewPlans}
             className="px-4 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.15em] transition-all flex items-center gap-2 bg-[#154279] hover:bg-[#F96302] text-white shadow-lg hover:shadow-xl"
           >
-            {isOpen ? "Close" : "View Plans"} <ChevronRight size={14} />
+            View Plans <ChevronRight size={14} />
           </motion.button>
         </div>
       </div>
@@ -417,18 +308,18 @@ const ComparisonMatrix = () => {
         </div>
       </div>
 
-      <div className="overflow-x-auto bg-gradient-to-br from-white via-slate-50 to-blue-50/30">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/30">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-gradient-to-r from-[#e8ecf1] to-[#f0f4f8] border-b-2 border-[#154279]">
-              <th className="p-4 min-w-[220px] text-[10px] uppercase text-[#154279] font-bold tracking-[0.2em]">Unit Type</th>
-              <th className="p-4 min-w-[160px] bg-gradient-to-b from-[#e8ecf1]/50 to-[#f0f4f8]/50 text-[10px] uppercase text-[#154279] font-bold border-l-2 border-r-2 border-[#154279] text-center tracking-[0.2em]">
+              <th className="p-4 text-[10px] uppercase text-[#154279] font-bold tracking-[0.2em]">Unit Type</th>
+              <th className="p-4 bg-gradient-to-b from-[#e8ecf1]/50 to-[#f0f4f8]/50 text-[10px] uppercase text-[#154279] font-bold border-l-2 border-r-2 border-[#154279] text-center tracking-[0.2em]">
                 Option 1
               </th>
-              <th className="p-4 min-w-[160px] bg-slate-100/50 text-[10px] uppercase text-slate-700 font-bold border-r-2 border-slate-300 text-center tracking-[0.2em]">
+              <th className="p-4 bg-slate-100/50 text-[10px] uppercase text-slate-700 font-bold border-r-2 border-[#154279] text-center tracking-[0.2em]">
                 Option 2
               </th>
-              <th className="p-4 min-w-[160px] bg-gradient-to-b from-orange-200/50 to-orange-100/50 text-[10px] uppercase text-[#F96302] font-bold text-center tracking-[0.2em]">
+              <th className="p-4 bg-gradient-to-b from-orange-200/50 to-orange-100/50 text-[10px] uppercase text-[#F96302] font-bold text-center tracking-[0.2em]">
                 Option 3
               </th>
             </tr>
@@ -460,7 +351,7 @@ const ComparisonMatrix = () => {
                     <div className="font-bold text-[#154279] text-[11px] uppercase tracking-tight">KES {v1.price.toLocaleString()}</div>
                     <div className="text-[9px] text-slate-600 mt-1 font-bold uppercase tracking-widest">{v1.name}</div>
                   </td>
-                  <td className="p-4 text-center border-r-2 border-slate-300 bg-slate-50/30">
+                  <td className="p-4 text-center border-r-2 border-[#154279] bg-slate-50/30">
                     {v2 ? (
                       <>
                         <div className="font-bold text-[#154279] text-[11px] uppercase tracking-tight">KES {v2.price.toLocaleString()}</div>
@@ -468,7 +359,7 @@ const ComparisonMatrix = () => {
                       </>
                     ) : <span className="text-slate-400 text-[10px] italic font-semibold">N/A</span>}
                   </td>
-                  <td className="p-4 text-center border-l-2 border-[#154279] bg-[#f0f4f8]/5">
+                  <td className="p-4 text-center bg-[#f0f4f8]/5">
                     {v3 ? (
                       <>
                         <div className="font-bold text-[#F96302] text-[11px] uppercase tracking-tight">KES {v3.price.toLocaleString()}</div>
@@ -610,10 +501,16 @@ const PaymentMethodsSection = () => {
 // MAIN PAGE COMPONENT
 // ==========================================
 export default function PricingPage() {
+  const comparisonRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToComparison = () => {
+    comparisonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <>
     <GlobalStyles />
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 font-nunito text-slate-900 pb-32">
+    <div className="min-h-screen bg-slate-50 font-nunito text-slate-900 pb-32">
       
       {/* Fixed navbar offset - prevents content cutoff */}
       <div className="pt-8 md:pt-10 lg:pt-12"></div>
@@ -631,7 +528,7 @@ export default function PricingPage() {
             <h2 className="text-[9px] font-bold text-[#F96302] uppercase tracking-[0.3em]">Ayden Homes</h2>
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#154279] leading-tight tracking-tight">
-            Available Units
+            Available Unit Prices
           </h1>
           <p className="text-slate-600 mt-3 text-[11px] sm:text-xs font-bold uppercase tracking-widest">
             Explore our diverse range of residential and commercial units
@@ -649,12 +546,15 @@ export default function PricingPage() {
             <ProductCard 
               key={product.id} 
               product={product}
+              onViewPlans={scrollToComparison}
             />
           ))}
         </motion.div>
 
         {/* --- COMPARISON TABLE --- */}
-        <ComparisonMatrix />
+        <div ref={comparisonRef}>
+          <ComparisonMatrix />
+        </div>
 
         {/* --- PAYMENT SECTION --- */}
         <PaymentMethodsSection />

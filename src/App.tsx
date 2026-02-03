@@ -23,6 +23,7 @@ import HowItWorks from "@/pages/HowItWorks";
 import Testimonials from "@/pages/TestimonialsSection";
 import PaymentOptions from "@/pages/PaymentOptionsSection";
 import Faq from "@/pages/FaqSection";
+import Contact from "@/pages/Contact";
 
 /* ======================
    AUTH PAGES
@@ -31,6 +32,8 @@ import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import ResetPassword from "@/pages/ResetPassword";
 import RoleSelection from "@/pages/auth/RoleSelection";
+import PendingApproval from "@/pages/auth/PendingApproval";
+import AuthCallback from "@/pages/AuthCallback";
 
 /* ======================
    USER CREATION PAGES
@@ -161,7 +164,7 @@ const mapLegacyRole = (
    DEV BYPASS GUARD
 ====================== */
 const DevBypassGuard = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, supabaseUser, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -172,6 +175,9 @@ const DevBypassGuard = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
+    if (supabaseUser) {
+      return <Navigate to="/profile" replace />;
+    }
     return <Navigate to="/login" replace />;
   }
 
@@ -182,7 +188,7 @@ const DevBypassGuard = ({ children }: { children: React.ReactNode }) => {
    PORTAL REDIRECT BASED ON ROLE
 ====================== */
 const PortalRedirect = () => {
-  const { user, isLoading, getUserRole } = useAuth();
+  const { user, supabaseUser, isLoading, getUserRole } = useAuth();
 
   if (isLoading) {
     return (
@@ -193,26 +199,34 @@ const PortalRedirect = () => {
   }
 
   if (!user) {
+    if (supabaseUser) {
+      return <Navigate to="/profile" replace />;
+    }
     return <Navigate to="/login" replace />;
   }
 
   // Get user role from AuthContext
   const userRole = getUserRole();
 
-  console.log("PortalRedirect - User:", user.email, "User Role:", userRole);
+  console.log("PortalRedirect - User:", user.email, "User Role:", userRole, "All user data:", user);
 
   // Redirect based on role
   switch (userRole) {
     case "super_admin":
+      console.log("Redirecting to super admin dashboard");
       return <Navigate to="/portal/super-admin/dashboard" replace />;
     case "property_manager":
+      console.log("Redirecting to manager portal");
       return <Navigate to="/portal/manager" replace />;
     case "tenant":
+      console.log("Redirecting to tenant portal");
       return <Navigate to="/portal/tenant" replace />;
     case "owner":
+      console.log("Redirecting to owner portal");
       return <Navigate to="/portal/owner" replace />;
     default:
-      return <Navigate to="/profile" replace />;
+      console.log("No role match, redirecting to role selection");
+      return <Navigate to="/auth/role-selection" replace />;
   }
 };
 
@@ -226,7 +240,7 @@ const RoleBasedRoute = ({
   children: React.ReactNode;
   allowedRoles: ("super_admin" | "property_manager" | "tenant" | "owner")[];
 }) => {
-  const { user, isLoading, getUserRole } = useAuth();
+  const { user, supabaseUser, isLoading, getUserRole, isApproved } = useAuth();
 
   if (isLoading) {
     return (
@@ -237,7 +251,15 @@ const RoleBasedRoute = ({
   }
 
   if (!user) {
+    if (supabaseUser) {
+      return <Navigate to="/profile" replace />;
+    }
     return <Navigate to="/login" replace />;
+  }
+
+  // Check approval
+  if (!isApproved()) {
+    return <Navigate to="/pending-approval" replace />;
   }
 
   // Get user role
@@ -256,7 +278,7 @@ const RoleBasedRoute = ({
       case "owner":
         return <Navigate to="/portal/owner" replace />;
       default:
-        return <Navigate to="/profile" replace />;
+        return <Navigate to="/auth/role-selection" replace />;
     }
   }
 
@@ -264,15 +286,15 @@ const RoleBasedRoute = ({
   const getLayout = () => {
     switch (userRole) {
       case "super_admin":
-        return <SuperAdminLayout><div>{children}</div></SuperAdminLayout>;
+        return <SuperAdminLayout>{children}</SuperAdminLayout>;
       case "property_manager":
-        return <ManagerLayout><div>{children}</div></ManagerLayout>;
+        return <ManagerLayout>{children}</ManagerLayout>;
       case "tenant":
-        return <TenantPortalLayout><div>{children}</div></TenantPortalLayout>;
+        return <TenantPortalLayout>{children}</TenantPortalLayout>;
       case "owner":
-        return <MainLayout><div>{children}</div></MainLayout>;
+        return <MainLayout>{children}</MainLayout>;
       default:
-        return <MainLayout><div>{children}</div></MainLayout>;
+        return <MainLayout>{children}</MainLayout>;
     }
   };
 
@@ -283,23 +305,28 @@ const RoleBasedRoute = ({
    SUPER ADMIN PORTAL WRAPPER
 ====================== */
 const SuperAdminPortalWrapper = () => {
-  const { getUserRole, isAdmin } = useAuth();
+  const { getUserRole, isAdmin, user } = useAuth();
 
   // Get user role
   const userRole = getUserRole();
 
+  console.log("SuperAdminPortalWrapper - userRole:", userRole, "isAdmin:", isAdmin());
+
   if (userRole !== "super_admin" && !isAdmin()) {
-    return <Navigate to="/portal" replace />;
+    // Redirect to appropriate dashboard, NOT back to /portal to avoid loop
+    if (userRole === "property_manager") {
+      return <Navigate to="/portal/manager" replace />;
+    } else if (userRole === "tenant") {
+      return <Navigate to="/portal/tenant" replace />;
+    } else {
+      return <Navigate to="/login" replace />;
+    }
   }
 
   return (
     <DevBypassGuard>
       <SuperAdminProvider>
-        <SuperAdminLayout>
-          <div>
-            <Outlet />
-          </div>
-        </SuperAdminLayout>
+        <SuperAdminLayout />
       </SuperAdminProvider>
     </DevBypassGuard>
   );
@@ -313,8 +340,17 @@ const ManagerPortalWrapper = () => {
 
   const userRole = getUserRole();
 
+  console.log("ManagerPortalWrapper - userRole:", userRole);
+
   if (userRole !== "property_manager") {
-    return <Navigate to="/portal" replace />;
+    // Redirect to appropriate dashboard, NOT back to /portal to avoid loop
+    if (userRole === "super_admin") {
+      return <Navigate to="/portal/super-admin/dashboard" replace />;
+    } else if (userRole === "tenant") {
+      return <Navigate to="/portal/tenant" replace />;
+    } else {
+      return <Navigate to="/login" replace />;
+    }
   }
 
   return (
@@ -334,8 +370,17 @@ const TenantPortalWrapper = () => {
 
   const userRole = getUserRole();
 
+  console.log("TenantPortalWrapper - userRole:", userRole);
+
   if (userRole !== "tenant") {
-    return <Navigate to="/portal" replace />;
+    // Redirect to appropriate dashboard, NOT back to /portal to avoid loop
+    if (userRole === "super_admin") {
+      return <Navigate to="/portal/super-admin/dashboard" replace />;
+    } else if (userRole === "property_manager") {
+      return <Navigate to="/portal/manager" replace />;
+    } else {
+      return <Navigate to="/login" replace />;
+    }
   }
 
   return (
@@ -380,9 +425,7 @@ const UserCreationWrapper = () => {
 
   return (
     <DevBypassGuard>
-      <MainLayout>
-        <Outlet />
-      </MainLayout>
+      <MainLayout />
     </DevBypassGuard>
   );
 };
@@ -491,13 +534,12 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
-          <ApprovalProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
+        <ApprovalProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
 
-              <Routes>
+            <Routes>
                 {/* ======================
                     PUBLIC ROUTES
                 ====================== */}
@@ -509,6 +551,7 @@ const App = () => {
                   <Route path="/testimonials" element={<Testimonials />} />
                   <Route path="/payment-options" element={<PaymentOptions />} />
                   <Route path="/faq" element={<Faq />} />
+                  <Route path="/contact" element={<Contact />} />
                   <Route path="/marketplace" element={<ListingsPage />} />
                   <Route path="/complete-profile" element={<Profile />} />
                   <Route path="/profile" element={<Profile />} />
@@ -533,6 +576,10 @@ const App = () => {
                   element={<RoleSelection />}
                 />
                 <Route
+                  path="/pending-approval"
+                  element={<PendingApproval />}
+                />
+                <Route
                   path="/auth/verify"
                   element={
                     <div className="min-h-screen flex items-center justify-center">
@@ -551,19 +598,7 @@ const App = () => {
 
                 <Route
                   path="/auth/callback"
-                  element={
-                    <div className="min-h-screen flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <h1 className="text-2xl font-bold mb-2">
-                          Verifying your email...
-                        </h1>
-                        <p className="text-gray-600">
-                          Please wait while we confirm your email address.
-                        </p>
-                      </div>
-                    </div>
-                  }
+                  element={<AuthCallback />}
                 />
 
                 {/* ======================
@@ -916,11 +951,9 @@ const App = () => {
                   path="/portal/components-demo"
                   element={
                     <DevBypassGuard>
-                      <MainLayout>
-                        <div>
-                          <ComponentsDemoPage />
-                        </div>
-                      </MainLayout>
+                      <div className="p-8">
+                        <ComponentsDemoPage />
+                      </div>
                     </DevBypassGuard>
                   }
                 />
@@ -991,7 +1024,6 @@ const App = () => {
               </Routes>
             </TooltipProvider>
           </ApprovalProvider>
-        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

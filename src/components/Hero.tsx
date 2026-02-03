@@ -28,7 +28,18 @@ import {
   Menu,
   PlayCircle,
   ArrowRight,
-  AlertCircle
+  AlertCircle,
+  Waves,
+  Dumbbell,
+  Smartphone,
+  Mountain,
+  Flower2,
+  Cable,
+  Car,
+  ShieldCheck,
+  Shirt,
+  Sofa,
+  ChefHat
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -509,13 +520,13 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
                 </div>
                 <div>
                   <div className="font-bold text-white font-medium">Property Manager</div>
-                  <div className="text-xs text-[#F96302] font-bold uppercase">FindHouse Office</div>
+                  <div className="text-xs text-gray-200 font-bold uppercase">AYDEN HOMES</div>
                 </div>
               </div>
               <form className="space-y-3">
-                <input type="text" placeholder="Your Name" className="w-full bg-white/10 border border-white/10 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none font-medium" />
-                <input type="email" placeholder="Your Email" className="w-full bg-white/10 border border-white/10 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none font-medium" />
-                <input type="tel" placeholder="Your Phone" className="w-full bg-white/10 border border-white/10 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#F96302] outline-none font-medium" />
+                <input type="text" placeholder="Your Name" className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium" />
+                <input type="email" placeholder="Your Email" className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium" />
+                <input type="tel" placeholder="Your Phone" className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium" />
                 <textarea rows={3} placeholder="I am interested in this property..." className="w-full bg-white border border-gray-200 rounded-none px-3 py-3 text-sm focus:border-[#F96302] outline-none font-medium"></textarea>
                 <button className="w-full bg-[#F96302] text-white font-bold py-3 rounded-none hover:bg-[#d85502] transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
                   Submit Request
@@ -553,11 +564,7 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
         <div className="absolute top-4 left-4 bg-[#154279] text-white text-xs font-bold px-3 py-1 rounded-none uppercase tracking-wider shadow-md">
           {data.beds === 0 ? "Studio" : `${data.beds} Bedroom`}
         </div>
-        {data.badge && (
-          <div className="absolute top-4 right-4 bg-[#F96302] text-white text-xs font-bold px-2 py-1 rounded-none uppercase tracking-wider shadow-md">
-            {data.badge}
-          </div>
-        )}
+
         <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-none text-xs font-bold flex items-center gap-1 shadow-md">
           <Maximize size={12} /> 3
         </div>
@@ -642,7 +649,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
   };
   
   return (
-    <div className="relative w-full h-[450px] bg-white border border-slate-200 overflow-hidden shadow-md group font-nunito rounded-none">
+    <div className="relative w-full h-[500px] lg:h-[600px] font-nunito overflow-hidden">
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div
           key={page}
@@ -652,86 +659,45 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
           animate="center"
           exit="exit"
           transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
-          className="absolute inset-0 flex flex-col md:flex-row h-full w-full bg-white"
+          className="absolute inset-0 h-full w-full"
         >
-          <div className="w-full md:w-1/3 p-6 lg:p-10 flex flex-col justify-center relative z-10 bg-gradient-to-br from-[#154279] via-[#0f325e] to-[#F96302]/5 border-r border-slate-200 h-full overflow-hidden">
-            {/* Decorative gradient overlay */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-[#F96302]/20 to-transparent rounded-full -mr-32 -mt-32 pointer-events-none"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-white/10 to-transparent rounded-full -ml-24 -mb-24 pointer-events-none"></div>
-            
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-bold text-[#F96302] uppercase flex items-center gap-1 bg-[#F96302]/10 backdrop-blur px-2 py-1 rounded-none border border-[#F96302]/20 tracking-wider">
-                  <Clock size={12} /> Auto-slides in 5s
-                </span>
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold text-white leading-none mb-2 uppercase tracking-tight whitespace-pre-line drop-shadow-lg">
-                {currentSlide.headline.split("\n")[0]} <br />{" "}
-                <span className="text-white drop-shadow-lg font-extrabold">{currentSlide.headline.split("\n")[1]}</span>
-              </h1>
-              <p className="text-sm font-extrabold text-white mb-3 uppercase tracking-[0.2em] border-b border-white/20 pb-2">
-                {currentSlide.subhead}
-              </p>
-              <div className="w-12 h-1 bg-white mb-4 rounded-none"></div>
-              <p className="text-sm text-white/95 font-medium mb-6 leading-relaxed">
-                {currentSlide.description}
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 relative z-10">
-              <button className="bg-[#F96302] text-white font-bold py-3 px-6 hover:bg-[#d85502] transition-all shadow-lg shadow-orange-900/20 flex items-center justify-center gap-2 rounded-none border-none text-[10px] uppercase tracking-[0.2em]" onClick={() => onCardClick(currentSlide)}>
-                View This Listing <ChevronRight size={16} />
-              </button>
-              <div className="flex items-center justify-center gap-4 text-xs font-bold text-white/70 uppercase tracking-wider">
-                <span className="cursor-pointer hover:text-white transition-colors">Save to list</span>
-                <span className="w-px h-3 bg-white/30"></span>
-                <span className="cursor-pointer hover:text-white transition-colors">Share</span>
-              </div>
-            </div>
-          </div>
-          <div className="w-full md:w-2/3 h-full relative overflow-hidden bg-gray-100">
+          {/* Full-width Image */}
+          <div className="w-full h-full relative overflow-hidden">
             <img src={currentSlide.img} alt="Property" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
-            <div className="absolute bottom-4 right-4 bg-white border border-slate-200 shadow-md p-3 flex flex-col items-end min-w-[160px] z-20 rounded-none">
-              <div className="bg-[#F96302] text-white text-xs font-bold uppercase px-2 py-1 mb-2 leading-none tracking-wider rounded-none">
-                {currentSlide.badge}
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xs font-bold text-gray-600">Ksh</span>
-                <span className="text-2xl font-bold text-[#154279] leading-none tracking-tight">
-                  {currentSlide.price}
-                </span>
-                <span className="text-xs font-bold text-gray-500">/mo</span>
-              </div>
-              <div className="text-xs font-bold text-[#154279] mt-2 uppercase tracking-tight text-right">
-                {currentSlide.specs}
-              </div>
-              <div className="text-xs text-gray-600 font-bold text-right truncate max-w-[150px] mt-1">
-                {currentSlide.location}
-              </div>
-              {/* Show which map area this corresponds to */}
-              <div className="mt-2 pt-2 border-t border-slate-200">
-                <div className="text-xs text-[#F96302] font-bold uppercase">
-                  Located in: {currentSlide.mapId === 101 ? 'CBD' : currentSlide.mapId === 102 ? 'Karen' : currentSlide.mapId === 103 ? 'Roysambu' : 'Westlands'}
-                </div>
+            
+            {/* Gradient overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
+            
+            {/* Text overlay - positioned at bottom left */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 lg:p-16">
+              <div className="max-w-[700px]">
+                <h1 className="text-2xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-white leading-none mb-3 uppercase tracking-tight">
+                  {currentSlide.headline.split("\n")[0]}{" "}
+                  <span className="text-[#F96302]">{currentSlide.headline.split("\n")[1]}</span>
+                </h1>
+                
+                <p className="text-xs md:text-sm font-bold text-white/90 mb-4 uppercase tracking-[0.15em]">
+                  {currentSlide.subhead}
+                </p>
+                
+                <div className="w-12 h-1 bg-[#F96302] mb-4"></div>
+                
+                <p className="text-xs md:text-sm text-white/80 font-medium mb-6 leading-relaxed max-w-[550px] hidden md:block line-clamp-1">
+                  {currentSlide.description.substring(0, 80)}...
+                </p>
+                
+                <button 
+                  className="bg-[#F96302] text-white font-bold py-3 px-8 hover:bg-[#d85502] transition-all shadow-lg flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em]" 
+                  onClick={() => onCardClick(currentSlide)}
+                >
+                  View This Listing <ChevronRight size={16} />
+                </button>
               </div>
             </div>
           </div>
         </motion.div>
       </AnimatePresence>
-      {/* Enhanced Indicators */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-30">
-        {VACANCY_SLIDES.map((slide, idx) => (
-          <button
-            key={idx}
-            onClick={() => goToSlide(idx)}
-            className={`h-2 rounded-none transition-all duration-300 shadow-sm ${
-              slideIndex === idx
-                ? "bg-[#F96302] w-8 shadow-md"
-                : "bg-white/80 w-2 hover:w-4 hover:bg-slate-300 hover:shadow-sm"
-            }`}
-          />
-        ))}
-      </div>
     </div>
   );
 };
@@ -747,6 +713,21 @@ const HomePage = () => {
   const [selectedBedroom, setSelectedBedroom] = useState<string>("");
   const [selectedPrice, setSelectedPrice] = useState<string>("");
   const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const locations = ["Pangani", "CBD", "Westlands", "Kilimani", "Karen", "Roysambu", "Upper Hill", "Spring Valley", "Muthaiga", "Riverside"];
+
+  useEffect(() => {
+    let dir = 1;
+    let current = 0;
+    const interval = setInterval(() => {
+      if (current >= locations.length - 1) dir = -1;
+      if (current <= 0) dir = 1;
+      current += dir;
+      setHighlightedIndex(current);
+    }, 600);
+    return () => clearInterval(interval);
+  }, []);
 
   const amenitiesList = [
     "Swimming Pool", "Gym Access", "High-Speed Wifi", "Smart Home", 
@@ -754,7 +735,22 @@ const HomePage = () => {
     "Parking", "Security", "Laundry", "Furnished", "Balcony", "Modern Kitchen"
   ];
 
-  const locations = ["CBD", "Westlands", "Kilimani", "Karen", "Roysambu", "Upper Hill", "Spring Valley", "Muthaiga", "Riverside"];
+  const amenityIcons: Record<string, any> = {
+    "Swimming Pool": Waves,
+    "Gym Access": Dumbbell,
+    "High-Speed Wifi": Wifi,
+    "Smart Home": Smartphone,
+    "Panoramic View": Mountain,
+    "Garden Access": Flower2,
+    "Fiber Ready": Cable,
+    "Backup Generator": Zap,
+    "Parking": Car,
+    "Security": ShieldCheck,
+    "Laundry": Shirt,
+    "Furnished": Sofa,
+    "Balcony": Mountain,
+    "Modern Kitchen": ChefHat
+  };
 
   const toggleAmenity = (amenity: string) => {
     setSelectedAmenities(prev =>
@@ -802,25 +798,34 @@ const HomePage = () => {
     return amenityMatch && bedroomMatch && priceMatch && locationMatch;
   });
 
+  // Auto-open details when only one listing matches
+  useEffect(() => {
+    if (filteredListings.length === 1) {
+      openPreview(filteredListings[0]);
+    } else {
+      closePreview();
+    }
+  }, [filteredListings]);
+
   return (
     <>
       <GlobalStyles />
       <div className="antialiased min-h-screen bg-[#f7f7f7] text-[#484848] font-nunito">
         <NavbarSection />
 
-        <main className="max-w-[1440px] mx-auto px-4 lg:px-8 py-4 pt-12 lg:pt-16 font-nunito">
-          {/* Carousel */}
-          <div className="mb-6">
-            <VacancyCarousel
-              onCardClick={openPreview}
-              onSlideChange={handleSlideChange}
-            />
-          </div>
+        {/* Hero Carousel - Full width edge to edge */}
+        <div className="w-full">
+          <VacancyCarousel
+            onCardClick={openPreview}
+            onSlideChange={handleSlideChange}
+          />
+        </div>
 
+        <main className="max-w-[1440px] mx-auto px-4 lg:px-8 py-6 font-nunito">
           {/* Quick Search Section - HowItWorks Inspired Design */}
-          <div className="mb-8 bg-white border border-slate-200 rounded-none shadow-lg shadow-slate-200/50 overflow-hidden">
+          <div className="mb-8">
             {/* Header with Gradient Background */}
-            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-6 md:px-8 py-6 relative overflow-hidden">
+            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-6 md:px-8 py-5 relative overflow-hidden rounded-t-lg">
               <div className="absolute top-0 right-0 w-48 h-full bg-white/5 skew-x-12 pointer-events-none" />
               <div className="flex items-center gap-3 relative z-10">
                 <div className="bg-white/10 p-2.5 rounded-none backdrop-blur-sm border border-white/10">
@@ -834,39 +839,18 @@ const HomePage = () => {
             </div>
 
             {/* Filter Content */}
-            <div className="p-6 md:p-8 bg-white">
-              {/* Location Filter */}
-              <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#154279]">📍 Select Location</h4>
-                  {selectedLocation && <span className="text-[10px] font-bold bg-[#F96302] text-white px-2 py-0.5 rounded-none">1 Selected</span>}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                  {locations.map(loc => (
-                    <button
-                      key={loc}
-                      onClick={() => setSelectedLocation(selectedLocation === loc ? "" : loc)}
-                      className={`px-3 py-2.5 rounded-none border-2 font-bold text-xs transition-all tracking-wide uppercase group transform hover:scale-105 ${
-                        selectedLocation === loc
-                          ? 'bg-gradient-to-br from-[#154279] to-[#0f325e] text-white border-[#154279] shadow-md shadow-blue-900/20'
-                          : 'bg-white text-[#154279] border-slate-200 hover:border-[#154279] hover:bg-slate-50'
-                      }`}
-                    >
-                      {loc}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
+            <div className="p-6 md:p-8 bg-[#f7f7f7]">
               {/* Amenities Checkboxes */}
-              <div className="mb-8 pb-8 border-b border-slate-100">
-                <div className="flex items-center gap-2 mb-4">
+              <div className="mb-8 pb-8 border-b border-slate-200/40">
+                <div className="flex items-center gap-2 mb-5">
                   <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#154279]">✨ Select Amenities</h4>
                   {selectedAmenities.length > 0 && <span className="text-[10px] font-bold bg-[#F96302] text-white px-2 py-0.5 rounded-none">{selectedAmenities.length} Selected</span>}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {amenitiesList.map((amenity, idx) => (
-                    <label key={idx} className="flex items-center gap-2 cursor-pointer group p-2 rounded-none hover:bg-slate-50 transition-all">
+                  {amenitiesList.map((amenity, idx) => {
+                    const Icon = amenityIcons[amenity] || Star;
+                    return (
+                    <label key={idx} className="flex items-center gap-2 cursor-pointer group p-2.5 rounded-lg hover:bg-white/50 transition-all duration-200">
                       <div className={`
                         w-5 h-5 rounded-none border-2 flex items-center justify-center transition-all flex-shrink-0
                         ${selectedAmenities.includes(amenity) 
@@ -884,22 +868,54 @@ const HomePage = () => {
                         onChange={() => toggleAmenity(amenity)}
                         className="hidden"
                       />
-                      <span className={`text-xs font-bold transition-colors ${selectedAmenities.includes(amenity) ? 'text-[#154279]' : 'text-slate-600'}`}>
-                        {amenity}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Icon size={20} className="text-[#F96302] stroke-[2.5]" />
+                        <span className="text-sm font-extrabold text-[#154279]">
+                          {amenity}
+                        </span>
+                      </div>
                     </label>
+                  )})}
+                </div>
+              </div>
+
+              {/* Location Filter */}
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-5">
+                  <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-[#154279]">📍 Select Location</h4>
+                  {selectedLocation && <span className="text-[10px] font-bold bg-[#F96302] text-white px-2 py-0.5 rounded-none">1 Selected</span>}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                  {locations.map((loc, idx) => (
+                    <button
+                      key={loc}
+                      onClick={() => {
+                        if (loc === "Pangani") {
+                          window.location.href = "/features";
+                        } else {
+                          setSelectedLocation(selectedLocation === loc ? "" : loc);
+                        }
+                      }}
+                      className={`px-3 py-2.5 rounded-none border-2 font-bold text-xs transition-all duration-300 ease-out tracking-wide uppercase group transform hover:-translate-y-1 hover:shadow-lg active:scale-95 ${
+                        selectedLocation === loc || highlightedIndex === idx
+                          ? 'bg-[#154279] text-white border-[#154279] shadow-md shadow-blue-900/20'
+                          : 'bg-[#F96302] text-white border-[#F96302] hover:bg-[#154279] hover:border-[#154279]'
+                      }`}
+                    >
+                      {loc}
+                    </button>
                   ))}
                 </div>
               </div>
 
               {/* Other Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-7">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-[0.2em] text-[#154279] mb-3 block">🛏️ Bedrooms</label>
                   <select 
                     value={selectedBedroom}
                     onChange={(e) => setSelectedBedroom(e.target.value)}
-                    className="w-full border-2 border-slate-200 p-3 rounded-none text-sm text-[#484848] focus:ring-1 focus:ring-[#F96302] focus:border-[#F96302] outline-none cursor-pointer bg-white hover:border-[#154279] transition-all font-bold"
+                    className="w-full border-2 border-slate-300 p-3 rounded-lg text-sm text-[#484848] focus:ring-2 focus:ring-[#F96302] focus:border-[#F96302] outline-none cursor-pointer bg-white/80 hover:bg-white hover:border-[#154279] transition-all font-bold"
                   >
                     <option value="">All Types</option>
                     <option value="0">Studio</option>
@@ -914,7 +930,7 @@ const HomePage = () => {
                   <select 
                     value={selectedPrice}
                     onChange={(e) => setSelectedPrice(e.target.value)}
-                    className="w-full border-2 border-slate-200 p-3 rounded-none text-sm text-[#484848] focus:ring-1 focus:ring-[#F96302] focus:border-[#F96302] outline-none cursor-pointer bg-white hover:border-[#154279] transition-all font-bold"
+                    className="w-full border-2 border-slate-300 p-3 rounded-lg text-sm text-[#484848] focus:ring-2 focus:ring-[#F96302] focus:border-[#F96302] outline-none cursor-pointer bg-white/80 hover:bg-white hover:border-[#154279] transition-all font-bold"
                   >
                     <option value="">All Prices</option>
                     <option value="budget">Under 35,000</option>
@@ -928,26 +944,26 @@ const HomePage = () => {
 
               {/* Active Filters Display */}
               {(selectedAmenities.length > 0 || selectedBedroom || selectedPrice || selectedLocation) && (
-                <div className="pt-6 border-t-2 border-slate-200">
+                <div className="pt-6 border-t-2 border-slate-200/40">
                   <div className="flex flex-wrap gap-2 items-center">
                     <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Active Filters:</span>
                     {selectedLocation && (
-                      <span className="bg-gradient-to-r from-[#F96302] to-[#d85502] text-white text-xs px-3 py-1.5 rounded-none font-bold shadow-sm">
+                      <span className="bg-gradient-to-r from-[#F96302] to-[#d85502] text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm">
                         📍 {selectedLocation}
                       </span>
                     )}
                     {selectedAmenities.map(am => (
-                      <span key={am} className="bg-gradient-to-r from-[#154279] to-[#0f325e] text-white text-xs px-3 py-1.5 rounded-none font-bold shadow-sm">
+                      <span key={am} className="bg-gradient-to-r from-[#154279] to-[#0f325e] text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-sm">
                         ✓ {am}
                       </span>
                     ))}
                     {selectedBedroom && (
-                      <span className="bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-none font-bold">
+                      <span className="bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-full font-bold">
                         🛏️ {selectedBedroom === "0" ? "Studio" : `${selectedBedroom} Bed`}
                       </span>
                     )}
                     {selectedPrice && (
-                      <span className="bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-none font-bold">
+                      <span className="bg-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-full font-bold">
                         💰 {selectedPrice}
                       </span>
                     )}
@@ -958,7 +974,7 @@ const HomePage = () => {
                         setSelectedPrice("");
                         setSelectedLocation("");
                       }}
-                      className="ml-auto text-xs font-bold text-white bg-[#154279] hover:bg-[#0f2e54] px-4 py-1.5 rounded-none uppercase tracking-wider transition-all hover:shadow-md"
+                      className="ml-auto text-xs font-bold text-white bg-[#154279] hover:bg-[#0f2e54] px-4 py-1.5 rounded-full uppercase tracking-wider transition-all hover:shadow-md"
                     >
                       ✕ Clear All
                     </button>
@@ -1027,7 +1043,7 @@ const HomePage = () => {
           ) : (
             <div className="mb-6 text-center py-12 bg-white border border-slate-200 rounded-none shadow-md">
               <div className="flex flex-col items-center gap-4">
-                <MapPin size={40} className="text-slate-300" />
+                <MapPin size={40} className="text-red-500" />
                 <div>
                   <h3 className="text-lg font-bold text-[#154279] mb-2 uppercase tracking-widest">Apply Filters to Search</h3>
                   <p className="text-sm text-slate-600 font-bold">Use the filters above to find properties by location, amenities, bedrooms, and price</p>

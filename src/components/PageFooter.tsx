@@ -79,7 +79,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer id="contact" className="text-slate-900 border-t border-slate-200 bg-white">
+    <footer id="contact" className="text-slate-900 bg-slate-50">
       
       {/* MAIN CONTENT AREA */}
       <div className="pt-20 pb-12 px-6">

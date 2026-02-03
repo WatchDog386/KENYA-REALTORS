@@ -68,8 +68,36 @@ const LoginPage: React.FC = () => {
     setIsSubmitting(true);
     try {
       if (!email || !password) throw new Error("Credentials required.");
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      
+      // Sign in
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
+      
+      // Check if user is approved before allowing login
+      if (signInData.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role, status")
+          .eq("id", signInData.user.id)
+          .single();
+        
+        if (profileError) {
+          console.warn("Profile fetch warning:", profileError);
+        }
+        
+        // If pending (property manager or tenant), show approval message
+        if (profile && profile.status === "pending") {
+          console.log("⏳ User pending approval:", signInData.user.id);
+          // Sign out user who isn't approved yet
+          await supabase.auth.signOut();
+          setIsSubmitting(false);
+          const roleText = profile.role === "property_manager" ? "Property Manager" : "Tenant";
+          setError(`Your ${roleText} account is pending approval. You'll be able to login once the administrator approves your registration.`);
+          toast.error(`⏳ Approval Pending - Your ${roleText} account is being reviewed.`, { duration: 7000 });
+          return;
+        }
+      }
+      
       toast.success("Login successful!");
       setIsSuccess(true);
     } catch (error: any) {
@@ -85,13 +113,9 @@ const LoginPage: React.FC = () => {
       <div
         className="min-h-screen w-full flex items-center justify-center p-4 font-technical relative"
         style={{
-          backgroundImage: `url('https://t4.ftcdn.net/jpg/03/57/34/39/360_F_357343965_u58BFcRrziBVMqgt6liwPHJKcIjHsPnc.jpg')`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
+          backgroundColor: "#1a232e",
         }}
       >
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
 
         {/* Back to Home Button */}
         <button

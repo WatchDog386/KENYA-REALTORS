@@ -48,7 +48,7 @@ interface Notification {
   created_at: string;
 }
 
-const ManagerLayout = ({ children }: { children: ReactNode }) => {
+const ManagerLayout = ({ children }: { children?: ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);

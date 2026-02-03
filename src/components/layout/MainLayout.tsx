@@ -1,7 +1,7 @@
 // © 2025 Jeff. All rights reserved.
 // Unauthorized copying, distribution, or modification of this file is strictly prohibited.
 
-import React, { useState } from "react";
+import React, { useState, ReactNode } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
 // ✅ Correct Frontend Navbar Import for public pages
@@ -16,7 +16,7 @@ import PolishedLeasingModule from "@/components/PolishedLeasingModule";
 // ✅ CTA Banner Import
 import CTABanner from "@/pages/CTABanner";
 
-const MainLayout: React.FC = () => {
+const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
   // State to manage the visibility of the Leasing Modal
   const [isLeasingOpen, setIsLeasingOpen] = useState(false);
   const location = useLocation();

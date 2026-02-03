@@ -5,49 +5,43 @@ import {
     ChevronRight, CheckCircle2, Maximize, User, Phone, 
     ArrowRight, PlayCircle, Home, Shield, Zap, Wifi, Clock, FileText
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-// --- 1. THEME & STYLES ---
+// --- 1. THEME & STYLES (Matching DIY Rental Guide) ---
 const THEME = {
-    orange: "#D85C2C",
-    blue: "#00356B",
-    text: "#1a1a1a",
-    heading: "#00356B",
-    bgLight: "#f8f9fa",
-    border: "#e2e8f0"
+    primary: "#154279",
+    secondary: "#F96302",
+    white: "#ffffff",
+    bgLight: "#f8fafc",
+    slate50: "#f8fafc",
+    slate100: "#e2e8f0",
+    slate200: "#cbd5e1",
+    slate500: "#64748b",
+    slate600: "#475569",
+    slate700: "#334155",
+    slate900: "#0f172a",
+    textDark: "#484848",
+    textMid: "#666666"
 };
 
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    body { font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif; color: ${THEME.text}; background-color: ${THEME.bgLight}; }
-    .font-nunito { font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif; }
+    .font-inter { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     
-    h1, h2, h3, h4, h5, h6 { color: ${THEME.heading}; font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif; }
-    
-    .custom-scroll::-webkit-scrollbar { width: 6px; }
-    .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #ccc; }
-    .custom-scroll::-webkit-scrollbar-thumb:hover { background: ${THEME.orange}; }
-
-    .hd-checkbox { accent-color: ${THEME.orange}; width: 18px; height: 18px; cursor: pointer; }
-    
-    .shadow-hover { transition: all 0.3s ease; }
-    .shadow-hover:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(0, 53, 107, 0.08); }
-    
-    /* Animation */
-    .fade-in-up { animation: fadeInUp 0.8s ease-out forwards; opacity: 0; transform: translateY(20px); }
-    @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 
     /* Mosaic Grid for Detail Page */
-    .gallery-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; height: 400px; }
+    .gallery-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; height: 400px; border-radius: 12px; overflow: hidden; }
     .gallery-main { grid-row: span 2; height: 100%; }
     .gallery-sub { display: flex; flex-direction: column; gap: 10px; height: 100%; }
-    .gallery-img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; cursor: pointer; }
+    .gallery-img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
 
     @media (max-width: 768px) {
-        .gallery-grid { display: flex; flex-direction: column; height: auto; }
+        .gallery-grid { display: flex; flex-direction: column; height: auto; border-radius: 12px; }
         .gallery-main { height: 250px; }
         .gallery-sub { display: none; }
     }
@@ -341,19 +335,22 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
     };
 
     return (
-        <div className="bg-[#00356B] p-6 rounded-lg shadow-lg border border-[#00356B] text-white font-nunito">
-            <h3 className="font-bold text-lg mb-6 text-white flex items-center gap-2 tracking-tight">
-                <Search size={18} className="text-[#D85C2C]" /> Find Your Unit
-            </h3> 
+        <div className="bg-gradient-to-br from-[#f0f4f8] via-white to-[#e8ecf1] p-6 rounded-none shadow-2xl border-2 border-slate-300 font-inter overflow-hidden">
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b-2 border-[#154279]">
+                <Zap size={18} className="text-[#F96302]" />
+                <h3 className="font-bold text-lg text-[#154279] tracking-tight uppercase">
+                    Find Your Unit
+                </h3>
+            </div>
             
             <div className="space-y-5">
                 <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Popular Searches</label>
+                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Popular Searches</label>
                     <select 
                         name="keyword"
                         value={filters.keyword}
                         onChange={handleChange}
-                        className="w-full bg-white/10 border border-white/10 p-3 rounded-lg text-sm text-white focus:ring-1 focus:ring-[#D85C2C] outline-none cursor-pointer backdrop-blur-sm [&>option]:text-[#484848]"
+                        className="w-full bg-white border-2 border-slate-300 p-3 rounded-none text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
                     >
                         {SEARCH_PRESETS.map((preset, idx) => (
                             <option key={idx} value={preset.value}>
@@ -364,7 +361,7 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                 </div>
 
                 <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Or Search Keyword</label>
+                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Or Search Keyword</label>
                     <input 
                         type="text" 
                         name="keywordCustom"
@@ -374,17 +371,17 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                                 setFilters((prev: any) => ({ ...prev, keyword: e.target.value }));
                             }
                         }}
-                        className="w-full bg-white/10 border border-white/10 p-3 rounded-lg text-sm text-white placeholder:text-white/40 focus:ring-1 focus:ring-[#D85C2C] outline-none backdrop-blur-sm"
+                        className="w-full bg-white border-2 border-slate-300 p-3 rounded-none text-sm text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none"
                     />
                 </div>
 
                 <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Apartment Type</label>
+                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Apartment Type</label>
                     <select 
                         name="type" 
                         value={filters.type}
                         onChange={handleChange}
-                        className="w-full bg-white/10 border border-white/10 p-3 rounded-lg text-sm text-white focus:ring-1 focus:ring-[#D85C2C] outline-none cursor-pointer backdrop-blur-sm [&>option]:text-[#484848]"
+                        className="w-full bg-white border-2 border-slate-300 p-3 rounded-none text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
                     >
                         <option value="All">All Types</option>
                         <option value="3 Bedroom">3 Bedrooms</option>
@@ -397,7 +394,7 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                 </div>
 
                 <div>
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Max Price: KES {Number(filters.maxPrice).toLocaleString()}</label>
+                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Max Price: KES {Number(filters.maxPrice).toLocaleString()}</label>
                     <input 
                         type="range" 
                         name="maxPrice"
@@ -406,27 +403,27 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                         step="5000"
                         value={filters.maxPrice}
                         onChange={handleChange}
-                        className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-[#D85C2C]"
+                        className="w-full h-2 bg-slate-300 rounded-none appearance-none cursor-pointer accent-[#F96302]"
                     />
-                    <div className="flex justify-between text-[10px] text-white/50 mt-1 font-bold">
+                    <div className="flex justify-between text-[10px] text-[#154279] mt-2 font-bold">
                         <span>10k</span>
                         <span>150k+</span>
                     </div>
                 </div>
 
                 <div className="pt-2">
-                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 mb-2 block">Tower Wing</label>
+                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-3 block">Tower Wing</label>
                     <div className="space-y-2">
                         {["Wing A (Executive)", "Wing B (Standard)", "Wing C (Economy)"].map((wing, i) => (
-                            <label key={i} className="flex items-center gap-2 text-sm text-white cursor-pointer hover:text-[#D85C2C] transition-colors group">
-                                <input type="checkbox" className="hd-checkbox border-white/20 bg-white/10" /> 
-                                <span className="font-medium group-hover:translate-x-1 transition-transform">{wing}</span>
+                            <label key={i} className="flex items-center gap-3 text-sm text-[#154279] cursor-pointer hover:text-[#F96302] transition-colors group p-2 rounded-none hover:bg-white/50">
+                                <input type="checkbox" className="w-4 h-4 accent-[#F96302]" /> 
+                                <span className="font-semibold">{wing}</span>
                             </label>
                         ))}
                     </div>
                 </div>
 
-                <button className="w-full bg-[#D85C2C] hover:bg-[#d85502] text-white font-bold py-3 rounded-lg uppercase tracking-widest text-xs transition-all shadow-lg shadow-orange-950/20">
+                <button className="w-full bg-[#154279] hover:bg-[#F96302] text-white font-bold py-3 rounded-none text-[10px] uppercase tracking-[0.15em] transition-all shadow-lg">
                     Search Availability
                 </button>
             </div>
@@ -440,51 +437,51 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
     return (
         <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-[#00356B]/80 backdrop-blur-sm overflow-y-auto custom-scroll font-nunito"
+            className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm overflow-y-auto custom-scroll font-inter"
         >
             {/* Header / Nav inside Modal */}
-            <div className="sticky top-0 bg-white shadow-lg z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-slate-200">
-                <div className="font-bold text-xl text-[#00356B] tracking-tighter uppercase">AYDEN<span className="text-[#D85C2C]">HOMES</span></div>
+            <div className="sticky top-0 bg-white shadow-sm z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-slate-200/60">
+                <div className="font-semibold text-xl text-[#154279] tracking-tight">AYDEN<span className="text-[#F96302]">HOMES</span></div>
                 <button 
                     onClick={onClose}
-                    className="w-10 h-10 rounded-lg bg-slate-100 hover:bg-[#D85C2C] hover:text-white flex items-center justify-center transition-all border border-slate-200"
+                    className="w-10 h-10 rounded-lg bg-slate-100 hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all"
                 >
                     <X size={20} />
                 </button>
             </div>
 
-            <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20 shadow-2xl">
+            <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20 shadow-lg rounded-b-xl">
                 {/* 1. Title Header Section */}
-                <div className="p-6 md:p-10 pb-6 flex flex-col md:flex-row justify-between items-start border-b border-slate-100 bg-slate-50/50">
+                <div className="p-6 md:p-10 pb-6 flex flex-col md:flex-row justify-between items-start border-b border-slate-200/60 bg-slate-50/50 rounded-t-xl">
                     <div>
                         <div className="flex gap-2 mb-4">
-                            <span className="bg-[#D85C2C] text-white text-[10px] font-bold px-3 py-1 rounded-lg uppercase tracking-widest border border-[#D85C2C]/20">For Rent</span>
-                            {item.featured && <span className="bg-[#00356B] text-white text-[10px] font-bold px-3 py-1 rounded-lg uppercase tracking-widest border border-[#00356B]/20">Featured</span>} 
+                            <span className="bg-[#F96302] text-white text-xs font-medium px-3 py-1.5 rounded-full">For Rent</span>
+                            {item.featured && <span className="bg-[#154279] text-white text-xs font-medium px-3 py-1.5 rounded-full">Featured</span>} 
                         </div>
-                        <h1 className="text-3xl md:text-5xl font-extrabold text-[#00356B] mb-3 tracking-tight leading-none">{item.title}</h1>
-                        <p className="text-slate-500 flex items-center gap-2 text-sm md:text-base font-bold">
-                            <MapPin size={18} className="text-[#D85C2C]"/> {item.location} <span className="text-slate-300">|</span> {item.floor}
+                        <h1 className="text-2xl md:text-4xl font-semibold text-[#154279] mb-3 tracking-tight leading-tight">{item.title}</h1>
+                        <p className="text-slate-500 flex items-center gap-2 text-sm font-normal">
+                            <MapPin size={16} className="text-[#F96302]"/> {item.location} <span className="text-slate-300">|</span> {item.floor}
                         </p>
                     </div>
-                    <div className="mt-6 md:mt-0 text-left md:text-right bg-[#00356B] p-6 rounded-lg shadow-lg shadow-blue-900/10 border-b-4 border-[#D85C2C]">
-                        <div className="text-[10px] font-bold text-white/60 mb-1 uppercase tracking-widest">Monthly Rent</div>
-                        <div className="text-3xl md:text-4xl font-black text-white leading-none">KES {item.price.toLocaleString()}</div>
-                        <p className="text-[#D85C2C] font-black text-xs mt-1 uppercase tracking-widest">All Inclusive</p>
+                    <div className="mt-6 md:mt-0 text-left md:text-right bg-[#154279] p-6 rounded-xl shadow-sm">
+                        <div className="text-xs font-medium text-white/70 mb-1">Monthly Rent</div>
+                        <div className="text-2xl md:text-3xl font-bold text-white leading-none">KES {item.price.toLocaleString()}</div>
+                        <p className="text-[#F96302] font-medium text-sm mt-1">All Inclusive</p>
                     </div>
                 </div>
 
                 {/* 2. Gallery Section */}
                 <div className="p-6 md:p-10 pt-8">
-                    <div className="gallery-grid">
-                        <div className="gallery-main relative group overflow-hidden border border-slate-200">
+                    <div className="gallery-grid rounded-xl overflow-hidden">
+                        <div className="gallery-main relative group overflow-hidden">
                             <img src={item.gallery[0]} alt="Main" className="gallery-img transition-transform duration-1000 group-hover:scale-105" />
-                            <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-xl border border-slate-200 flex items-center gap-2 cursor-pointer hover:bg-[#D85C2C] hover:text-white transition-all transform hover:-translate-y-1">
+                            <div className="absolute bottom-6 right-6 bg-white/95 backdrop-blur px-4 py-2 rounded-lg text-xs font-medium shadow-lg flex items-center gap-2 cursor-pointer hover:bg-[#F96302] hover:text-white transition-all">
                                 <Maximize size={14}/> View Full Gallery
                             </div>
                         </div>
                         <div className="gallery-sub">
-                            <img src={item.gallery[1]} alt="Sub 1" className="gallery-img border border-slate-200" />
-                            <img src={item.gallery[2]} alt="Sub 2" className="gallery-img border border-slate-200" />
+                            <img src={item.gallery[1]} alt="Sub 1" className="gallery-img rounded-tr-xl" />
+                            <img src={item.gallery[2]} alt="Sub 2" className="gallery-img rounded-br-xl" />
                         </div>
                     </div>
                 </div>
@@ -495,111 +492,108 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                     {/* LEFT COLUMN: Details */}
                     <div className="lg:col-span-2">
                         {/* Quick Overview Badges */}
-                        <div className="bg-slate-50 p-8 rounded-lg flex flex-wrap gap-8 md:gap-16 mb-12 border border-slate-200 shadow-sm">
+                        <div className="bg-slate-50 p-6 rounded-xl flex flex-wrap gap-8 md:gap-12 mb-10 border border-slate-200/60">
                             <div className="flex items-center gap-4">
-                                <div className="bg-[#00356B]/5 p-3 rounded-lg">
-                                    <BedDouble size={28} className="text-[#D85C2C]"/>
+                                <div className="bg-[#154279]/5 p-3 rounded-lg">
+                                    <BedDouble size={24} className="text-[#F96302]"/>
                                 </div>
                                 <div>
-                                    <span className="block font-black text-2xl text-[#00356B] leading-none">{item.beds}</span>
-                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bedrooms</span>
+                                    <span className="block font-bold text-2xl text-[#154279] leading-none">{item.beds}</span>
+                                    <span className="text-xs text-slate-500 font-medium">Bedrooms</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="bg-[#00356B]/5 p-3 rounded-lg">
-                                    <Bath size={28} className="text-[#D85C2C]"/>
+                                <div className="bg-[#154279]/5 p-3 rounded-lg">
+                                    <Bath size={24} className="text-[#F96302]"/>
                                 </div>
                                 <div>
-                                    <span className="block font-black text-2xl text-[#00356B] leading-none">{item.baths}</span>
-                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bathrooms</span>
+                                    <span className="block font-bold text-2xl text-[#154279] leading-none">{item.baths}</span>
+                                    <span className="text-xs text-slate-500 font-medium">Bathrooms</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="bg-[#00356B]/5 p-3 rounded-lg">
-                                    <Maximize size={28} className="text-[#D85C2C]"/>
+                                <div className="bg-[#154279]/5 p-3 rounded-lg">
+                                    <Maximize size={24} className="text-[#F96302]"/>
                                 </div>
                                 <div>
-                                    <span className="block font-black text-2xl text-[#00356B] leading-none">{item.sqft}</span>
-                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Sq Ft</span>
+                                    <span className="block font-bold text-2xl text-[#154279] leading-none">{item.sqft}</span>
+                                    <span className="text-xs text-slate-500 font-medium">Sq Ft</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Description */}
-                        <div className="mb-12">
-                            <h3 className="text-xl font-black text-[#00356B] mb-6 border-b-2 border-slate-100 pb-2 uppercase tracking-tight flex items-center gap-3">
-                                <FileText size={20} className="text-[#D85C2C]" /> Description
-                            </h3>
-                            <p className="text-slate-600 leading-relaxed text-[15px] font-medium">
+                        <div className="mb-10">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-px w-8 bg-[#F96302]"></div>
+                                <h3 className="text-lg font-semibold text-[#154279]">Description</h3>
+                            </div>
+                            <p className="text-slate-600 leading-relaxed text-sm font-normal">
                                 {item.description}
                                 <br/><br/>
-                                Living at <strong className="text-[#00356B]">Ayden Home Towers</strong> offers a unique blend of community and privacy. 
+                                Living at <strong className="text-[#154279]">Ayden Home Towers</strong> offers a unique blend of community and privacy. 
                                 Enjoy dedicated maintenance teams, secure biometric access, and a community app for all your utility payments.
                             </p>
                         </div>
 
                         {/* Amenities */}
-                        <div className="mb-12">
-                            <h3 className="text-xl font-black text-[#00356B] mb-6 border-b-2 border-slate-100 pb-2 uppercase tracking-tight flex items-center gap-3">
-                                <Shield size={20} className="text-[#D85C2C]" /> Amenities
-                            </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
+                        <div className="mb-10">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-px w-8 bg-[#F96302]"></div>
+                                <h3 className="text-lg font-semibold text-[#154279]">Amenities</h3>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 {item.amenities.map((am:string, i:number) => (
-                                    <div key={i} className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
-                                        <div className="w-5 h-5 bg-[#D85C2C]/10 flex items-center justify-center rounded-lg">
-                                            <CheckCircle2 size={12} className="text-[#D85C2C]"/>
-                                        </div>
+                                    <div key={i} className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-3">
+                                        <CheckCircle2 size={16} className="text-[#F96302]"/>
                                         {am}
                                     </div>
                                 ))}
-                                <div className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
-                                    <div className="w-5 h-5 bg-[#D85C2C]/10 flex items-center justify-center rounded-lg">
-                                        <CheckCircle2 size={12} className="text-[#D85C2C]"/>
-                                    </div>
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-3">
+                                    <CheckCircle2 size={16} className="text-[#F96302]"/>
                                     CCTV Security
                                 </div>
-                                <div className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
-                                    <div className="w-5 h-5 bg-[#D85C2C]/10 flex items-center justify-center rounded-lg">
-                                        <CheckCircle2 size={12} className="text-[#D85C2C]"/>
-                                    </div>
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-3">
+                                    <CheckCircle2 size={16} className="text-[#F96302]"/>
                                     Borehole Water
                                 </div>
-                                <div className="flex items-center gap-3 text-slate-600 text-[13px] font-bold">
-                                    <div className="w-5 h-5 bg-[#D85C2C]/10 flex items-center justify-center rounded-lg">
-                                        <CheckCircle2 size={12} className="text-[#D85C2C]"/>
-                                    </div>
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-3">
+                                    <CheckCircle2 size={16} className="text-[#F96302]"/>
                                     Backup Generator
                                 </div>
                             </div>
                         </div>
 
                         {/* Property Details Table */}
-                        <div className="bg-slate-50 p-8 rounded-lg border border-slate-200">
-                            <h3 className="text-lg font-black text-[#00356B] mb-6 uppercase tracking-tight">Technical Specs</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 text-sm">
-                                <div className="flex justify-between border-b border-slate-200 pb-3">
-                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Unit ID</span>
-                                    <span className="font-black text-[#00356B]">{item.id}</span>
+                        <div className="bg-white p-6 rounded-xl border border-slate-200/60">
+                            <div className="flex items-center gap-3 mb-5">
+                                <div className="h-px w-8 bg-[#F96302]"></div>
+                                <h3 className="text-lg font-semibold text-[#154279]">Technical Specs</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                    <span className="font-medium text-slate-500 text-sm">Unit ID</span>
+                                    <span className="font-semibold text-[#154279]">{item.id}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-200 pb-3">
-                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Monthly Fee</span>
-                                    <span className="font-black text-[#00356B]">KES {item.price.toLocaleString()}</span>
+                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                    <span className="font-medium text-slate-500 text-sm">Monthly Fee</span>
+                                    <span className="font-semibold text-[#F96302]">KES {item.price.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-200 pb-3">
-                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Floor Space</span>
-                                    <span className="font-black text-[#00356B]">{item.sqft} Sq Ft</span>
+                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                    <span className="font-medium text-slate-500 text-sm">Floor Space</span>
+                                    <span className="font-semibold text-[#154279]">{item.sqft} Sq Ft</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-200 pb-3">
-                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Unit Type</span>
-                                    <span className="font-black text-[#00356B]">{item.type}</span>
+                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                    <span className="font-medium text-slate-500 text-sm">Unit Type</span>
+                                    <span className="font-semibold text-[#154279]">{item.type}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-200 pb-3">
-                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Year Built</span>
-                                    <span className="font-black text-[#00356B]">2024</span>
+                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                    <span className="font-medium text-slate-500 text-sm">Year Built</span>
+                                    <span className="font-semibold text-[#154279]">2024</span>
                                 </div>
-                                <div className="flex justify-between border-b border-slate-200 pb-3">
-                                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-widest">Status</span>
-                                    <span className="bg-green-100 text-green-700 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest">Available</span>
+                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                    <span className="font-medium text-slate-500 text-sm">Status</span>
+                                    <span className="bg-green-100 text-green-700 px-3 py-1 text-xs font-medium rounded-full">Available</span>
                                 </div>
                             </div>
                         </div>
@@ -607,39 +601,40 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
 
                     {/* RIGHT COLUMN: Contact Form */}
                     <div className="lg:col-span-1">
-                        <div className="bg-[#00356B] border border-[#00356B] rounded-lg p-8 shadow-2xl sticky top-24 transform md:rotate-1">
-                            <h4 className="text-xl font-black text-white mb-6 uppercase tracking-tight flex items-center gap-3">
-                                <Clock size={20} className="text-[#D85C2C]" /> Schedule Visit
-                            </h4>
-                            <div className="flex items-center gap-4 mb-8 bg-white/5 p-4 rounded-lg border border-white/10 backdrop-blur-sm">
-                                <div className="w-12 h-12 bg-white/10 rounded-lg overflow-hidden border border-white/20 p-1">
+                        <div className="bg-[#154279] rounded-xl p-6 shadow-sm sticky top-24">
+                            <div className="flex items-center gap-2 mb-5">
+                                <Clock size={18} className="text-[#F96302]" />
+                                <h4 className="text-lg font-semibold text-white">Schedule Visit</h4>
+                            </div>
+                            <div className="flex items-center gap-4 mb-6 bg-white/10 p-4 rounded-lg">
+                                <div className="w-12 h-12 bg-white/10 rounded-lg overflow-hidden">
                                     <img src="https://i.pravatar.cc/150?u=ayden" alt="Agent" className="w-full h-full object-cover" />
                                 </div>
                                 <div>
-                                    <div className="font-black text-white text-sm uppercase tracking-wide">Ayden Office</div>
-                                    <div className="text-[10px] text-[#D85C2C] font-black uppercase tracking-[0.2em]">Primary Manager</div>
+                                    <div className="font-medium text-white text-sm">Ayden Office</div>
+                                    <div className="text-xs text-[#F96302]">Primary Manager</div>
                                 </div>
                             </div>
 
                             <form className="space-y-4">
                                 <div>
-                                    <label className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1.5 block">Full Name</label>
-                                    <input type="text" placeholder="John Doe" className="w-full bg-white/10 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#D85C2C] outline-none transition-all"/>
+                                    <label className="text-xs font-medium text-white/70 mb-1.5 block">Full Name</label>
+                                    <input type="text" placeholder="John Doe" className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all"/>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1.5 block">Email Address</label>
-                                    <input type="email" placeholder="john@example.com" className="w-full bg-white/10 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#D85C2C] outline-none transition-all"/>
+                                    <label className="text-xs font-medium text-white/70 mb-1.5 block">Email Address</label>
+                                    <input type="email" placeholder="john@example.com" className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all"/>
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1.5 block">Message</label>
-                                    <textarea rows={3} placeholder="I want to see this unit..." className="w-full bg-white/10 border border-white/10 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#D85C2C] outline-none transition-all resize-none"></textarea>
+                                    <label className="text-xs font-medium text-white/70 mb-1.5 block">Message</label>
+                                    <textarea rows={3} placeholder="I want to see this unit..." className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all resize-none"></textarea>
                                 </div>
                                 
-                                <button className="w-full bg-[#D85C2C] hover:bg-white hover:text-[#D85C2C] text-white font-black py-4 rounded-lg transition-all uppercase tracking-widest text-xs shadow-xl shadow-orange-950/20">
+                                <button className="w-full bg-[#F96302] hover:bg-[#e55a00] text-white font-medium py-3 rounded-lg transition-all text-sm">
                                     Reserve My Tour
                                 </button>
-                                <button className="w-full bg-transparent border-2 border-white/20 text-white font-black py-4 rounded-lg hover:bg-white/5 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs">
-                                    <Phone size={18} className="text-[#D85C2C]"/> Direct Line
+                                <button className="w-full bg-transparent border border-white/30 text-white font-medium py-3 rounded-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2 text-sm">
+                                    <Phone size={16} className="text-[#F96302]"/> Direct Line
                                 </button>
                             </form>
                         </div>
@@ -660,7 +655,7 @@ export default function AydenTowersListing() {
         maxPrice: 150000
     });
     const [currentPage, setCurrentPage] = useState(1);
-    const listingsPerPage = 6;
+    const listingsPerPage = 3;
     
     // Combine both sets of listings
     const ALL_LISTINGS = [...INITIAL_LISTINGS, ...PAGE_2_LISTINGS];
@@ -685,104 +680,97 @@ export default function AydenTowersListing() {
     return (
         <>
         <GlobalStyles />
-        <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-blue-50 text-[#1a1a1a] font-sans">
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-inter" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
             
-            {/* --- IMPROVED HERO SECTION --- */}
-            <section className="bg-white pt-8 pb-12 lg:pt-10 lg:pb-16 border-b border-slate-200 font-nunito">
-                <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+            {/* --- HERO SECTION (DIY Rental Guide Style) --- */}
+            <section className="bg-slate-50 pt-24 pb-12 lg:pt-28 lg:pb-16">
+                <div className="max-w-[1400px] mx-auto px-4">
                     
-                    {/* Main Image (7 Cols) - Clean centered layout */}
-                    <div className="lg:col-span-7 h-[320px] lg:h-[400px] w-full rounded-lg overflow-hidden shadow-md border border-slate-200 relative group">
-                        <div className="absolute top-6 left-6 z-20 bg-[#D85C2C] text-white text-[10px] font-black px-5 py-2 rounded-lg uppercase tracking-[0.2em] shadow-xl border border-white/10">
-                            Now Leasing
-                        </div>
-                        <img
-                            src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1600"
-                            alt="Ayden Home Towers Exterior"
-                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                        />
-                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#00356B] via-[#00356B]/40 to-transparent h-1/2 pointer-events-none"></div>
-                        <div className="absolute bottom-8 left-8 text-white z-20">
-                            <div className="text-[10px] font-black opacity-80 uppercase tracking-[0.3em] mb-2 text-[#D85C2C]">Premium Inventory</div>
-                            <div className="text-3xl lg:text-5xl font-black leading-none tracking-tight" style={{ fontFamily: "'Nunito', sans-serif" }}>AYDEN HOME TOWERS</div>
-                            <div className="text-sm font-bold opacity-70 mt-3 flex items-center gap-2">
-                                <MapPin size={14} className="text-[#D85C2C]" /> NAIROBI WEST, KENYA
-                            </div>
-                        </div>
-                    </div>
+                    {/* Page Header */}
+                    <motion.div 
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-10 pb-6 border-b border-slate-200/60"
+                    >
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-[#154279] leading-tight tracking-tight">
+                            Ayden Home Towers
+                        </h1>
+                        <p className="text-slate-500 mt-2 text-sm font-normal">
+                            Discover your perfect home from our selection of 100+ premium rental units
+                        </p>
+                    </motion.div>
 
-                    {/* Content Side (5 Cols) - Improved text hierarchy */}
-                    <div className="lg:col-span-5 space-y-6">
-                        <div>
-                        <div className="flex items-center gap-3 mb-4">
-                                    <div className="h-[2px] w-12 bg-[#D85C2C]"></div>
-                                    <h2 className="text-[9px] font-black text-[#D85C2C] uppercase tracking-[0.3em]">Signature Living</h2>
+                    {/* Featured Hero - Image Card + Text Side by Side */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                        {/* Image Card */}
+                        <motion.div 
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            className="lg:col-span-7 h-[280px] lg:h-[380px] relative rounded-none overflow-hidden shadow-2xl border-2 border-slate-300"
+                        >
+                            <img
+                                src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1600"
+                                alt="Ayden Home Towers Exterior"
+                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#154279]/80 via-[#154279]/20 to-transparent"></div>
+                            <div className="absolute bottom-6 left-6 text-white z-20">
+                                <div className="text-3xl lg:text-4xl font-semibold leading-tight tracking-tight">AYDEN HOME TOWERS</div>
+                                <div className="text-sm font-normal opacity-90 mt-2 flex items-center gap-2">
+                                    <MapPin size={14} className="text-[#F96302]" /> Nairobi West, Kenya
                                 </div>
-                                <h1 className="text-4xl lg:text-5xl font-black text-[#00356B] leading-[0.9] tracking-tight mb-6" style={{ fontFamily: "'Nunito', sans-serif" }}>
-                                    Modern Living<br/>
-                                    <span className="text-[#D85C2C]">Perfected.</span>
-                                </h1>
+                            </div>
+                        </motion.div>
+
+                        {/* Text Content - No Card */}
+                        <div className="lg:col-span-5 flex flex-col justify-center">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="h-px w-8 bg-[#F96302]"></div>
+                                <span className="text-xs font-medium text-[#F96302]">Signature Living</span>
+                            </div>
+                            <h2 className="text-2xl lg:text-3xl font-semibold text-[#154279] leading-tight tracking-tight mb-4">
+                                Modern Living<br/>
+                                <span className="text-[#F96302]">Perfected.</span>
+                            </h2>
                             
-                            <p className="text-slate-600 text-sm lg:text-base leading-relaxed mb-8 font-medium max-w-md">
-                                Discover <strong className="font-black text-[#00356B]">Ayden Home Towers</strong> — a premier rental residential complex offering diverse living options. With over 100 meticulously designed units ranging from studios to 4-bedroom apartments, we provide affordable luxury living for every lifestyle.
+                            <p className="text-slate-600 text-sm leading-relaxed mb-6 font-normal">
+                                Discover <strong className="text-[#154279]">Ayden Home Towers</strong> — a premier rental residential complex offering diverse living options. With over 100 meticulously designed units ranging from studios to 4-bedroom apartments.
                             </p>
                             
-                            {/* Features Grid */}
-                            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-10 pb-8 border-b border-slate-200">
-                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#00356B]">
-                                    <Shield size={16} className="text-[#D85C2C]" />
-                                    <span>24/7 Shield</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#00356B]">
-                                    <Wifi size={16} className="text-[#D85C2C]" />
-                                    <span>Giga Fiber</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#00356B]">
-                                    <Home size={16} className="text-[#D85C2C]" />
-                                    <span>Sleek Design</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-[#00356B]">
-                                    <Zap size={16} className="text-[#D85C2C]" />
-                                    <span>Grid Backup</span>
-                                </div>
-                            </div>
-                            
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                <button className="flex-1 bg-[#00356B] text-white py-4 px-8 rounded-lg font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-900/20 hover:bg-[#0f2e54] transition-all flex items-center justify-center gap-3 active:scale-95">
-                                    Explore Units <ArrowRight size={16} className="text-[#D85C2C]" />
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button className="bg-[#F96302] text-white py-3 px-6 rounded-lg font-medium text-sm hover:bg-[#e55a00] transition-all flex items-center justify-center gap-2">
+                                    Explore Units <ArrowRight size={16} />
                                 </button>
-                                <button className="flex-1 border-2 border-slate-200 text-[#00356B] py-4 px-8 rounded-lg font-black text-[10px] uppercase tracking-[0.2em] hover:border-[#00356B] hover:bg-slate-50 transition-all flex items-center justify-center gap-3 active:scale-95">
-                                    <PlayCircle size={16} className="text-[#D85C2C]" /> Virtual Tour
+                                <button className="border border-slate-200 text-[#154279] py-3 px-6 rounded-lg font-medium text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                                    <PlayCircle size={16} className="text-[#F96302]" /> Virtual Tour
                                 </button>
                             </div>
-                        </div>
 
-                        {/* Industrial Style Thumbnails */}
-                        <div className="mt-4">
-                            <div className="flex justify-between items-end mb-4">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Gallery Preview</p>
-                                <p className="text-[9px] font-black text-[#D85C2C] cursor-pointer hover:underline flex items-center gap-1 uppercase tracking-[0.2em]">
-                                    View All <ChevronRight size={12} />
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 h-20">
-                                <div className="relative rounded-lg overflow-hidden cursor-pointer group border border-slate-200">
-                                    <img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=400" 
-                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                            {/* Gallery Preview */}
+                            <div className="mt-6 pt-6 border-t border-slate-200">
+                                <div className="flex justify-between items-center mb-3">
+                                    <p className="text-xs font-medium text-slate-500">Gallery Preview</p>
+                                    <p className="text-xs font-medium text-[#F96302] cursor-pointer hover:underline flex items-center gap-1">
+                                        View All <ChevronRight size={12} />
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 h-16">
+                                    <div className="relative rounded-lg overflow-hidden cursor-pointer">
+                                        <img src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=400" 
+                                             className="w-full h-full object-cover" 
                                              alt="Residential Unit" />
-                                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all"></div>
-                                </div>
-                                <div className="relative rounded-lg overflow-hidden cursor-pointer group border border-slate-200">
-                                    <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=400" 
-                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                                    </div>
+                                    <div className="relative rounded-lg overflow-hidden cursor-pointer">
+                                        <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=400" 
+                                             className="w-full h-full object-cover" 
                                              alt="Building Exterior" />
-                                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all"></div>
-                                </div>
-                                <div className="relative rounded-lg overflow-hidden cursor-pointer group border border-slate-200">
-                                    <img src="https://images.unsplash.com/photo-1493857671505-72967e2e2760?q=80&w=400" 
-                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" 
+                                    </div>
+                                    <div className="relative rounded-lg overflow-hidden cursor-pointer">
+                                        <img src="https://images.unsplash.com/photo-1493857671505-72967e2e2760?q=80&w=400" 
+                                             className="w-full h-full object-cover" 
                                              alt="Common Area" />
-                                    <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-all"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -792,17 +780,20 @@ export default function AydenTowersListing() {
             {/* --- END HERO SECTION --- */}
 
             {/* MAIN CONTENT AREA */}
-            <div className="max-w-7xl mx-auto p-4 md:p-8 flex flex-col md:flex-row gap-6 relative z-30 mt-6">
+            <div className="max-w-[1400px] mx-auto px-4 pb-16 flex flex-col md:flex-row gap-6">
                 
-                {/* SIDEBAR FILTER - NOW WITH BLUE THEME */}
-                <div className="w-full md:w-[270px] flex-shrink-0">
+                {/* SIDEBAR FILTER */}
+                <div className="w-full md:w-[280px] flex-shrink-0">
                     <FilterSidebar filters={filters} setFilters={setFilters} />
                     
                     {/* Promo Banner */}
-                    <div className="mt-6 bg-gradient-to-r from-[#D85C2C] to-[#ff7b2e] rounded-lg p-5 text-white text-center shadow-lg hidden md:block">
-                        <h4 className="font-bold text-lg mb-2">Move In Special!</h4>
-                        <p className="text-xs opacity-90 mb-3">Get 50% OFF your first month's rent when you sign a lease for Wing A units.</p>
-                        <button className="bg-white text-[#D85C2C] px-4 py-2 rounded-lg font-bold text-xs hover:bg-gray-100 transition-colors">
+                    <div className="mt-6 bg-[#F96302] rounded-xl p-5 text-white shadow-sm hidden md:block">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Zap size={18} />
+                            <h4 className="font-semibold text-base">Move In Special!</h4>
+                        </div>
+                        <p className="text-sm opacity-90 mb-4 font-normal">Get 50% OFF your first month's rent when you sign a lease for Wing A units.</p>
+                        <button className="bg-white text-[#F96302] px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors w-full">
                             View Details
                         </button>
                     </div>
@@ -812,15 +803,19 @@ export default function AydenTowersListing() {
                 <div className="flex-1">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                            <h3 className="font-bold text-2xl text-navy">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="h-px w-8 bg-[#F96302]"></div>
+                                <span className="text-xs font-medium text-[#F96302]">Available Properties</span>
+                            </div>
+                            <h3 className="font-semibold text-xl text-[#154279]">
                                 Available Units
                             </h3>
-                            <p className="text-gray-500 text-sm mt-1">
+                            <p className="text-slate-500 text-sm mt-1 font-normal">
                                 {filteredListings.length} units matching your criteria
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#D85C2C] bg-white">
+                            <select className="border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F96302] bg-white font-medium text-slate-700">
                                 <option>Sort by: Newest</option>
                                 <option>Sort by: Price (Low to High)</option>
                                 <option>Sort by: Price (High to Low)</option>
@@ -829,111 +824,126 @@ export default function AydenTowersListing() {
                     </div>
 
                     {currentListings.length === 0 ? (
-                        <div className="bg-white p-10 text-center rounded-lg shadow-sm border border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-400 mb-2">No units match your criteria.</h3>
+                        <div className="bg-white p-10 text-center rounded-xl shadow-sm border border-slate-200/60">
+                            <h3 className="text-lg font-semibold text-slate-400 mb-2">No units match your criteria.</h3>
                             <button 
                                 onClick={()=>setFilters({keyword:"", type:"All", maxPrice:150000})} 
-                                className="text-[#D85C2C] font-bold hover:underline text-sm"
+                                className="text-[#F96302] font-medium hover:underline text-sm"
                             >
                                 Reset Filters
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             {currentListings.map((item) => (
-                                <div 
-                                    key={item.id} 
-                                    className="bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl group flex flex-col transition-all duration-500 hover:-translate-y-1"
+                                <motion.div 
+                                    key={item.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    className="bg-white rounded-none overflow-hidden border-2 border-slate-300 shadow-2xl hover:shadow-xl group flex flex-col transition-all duration-300 hover:border-[#154279]"
                                 >
-                                    <div className="relative h-56 overflow-hidden cursor-pointer" onClick={() => setSelectedItem(item)}>
-                                        <img src={item.gallery[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                                    <div className="relative h-48 overflow-hidden cursor-pointer" onClick={() => setSelectedItem(item)}>
+                                        <img src={item.gallery[0]} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                                         
                                         {/* Tag Overlay */}
-                                        <div className="absolute top-0 left-0 bg-[#00356B] text-white text-[9px] font-black px-4 py-2 rounded-lg uppercase tracking-[0.2em] shadow-lg z-10">
+                                        <div className="absolute top-0 left-0 bg-[#154279] text-white text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] z-10">
                                             {item.type}
                                         </div>
 
                                         {item.featured && (
-                                            <div className="absolute top-0 right-0 bg-[#D85C2C] text-white text-[9px] font-black px-4 py-2 rounded-lg uppercase tracking-[0.2em] shadow-lg z-10">
+                                            <div className="absolute top-0 right-0 bg-[#F96302] text-white text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] z-10">
                                                 Featured
                                             </div>
                                         )}
                                         
-                                        {/* Bottom Info Gradient overlay */}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-[#00356B]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                        {/* Bottom gradient overlay */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-[#154279]/80 via-transparent to-transparent"></div>
                                         
-                                        <div className="absolute bottom-4 right-4 bg-white text-[#00356B] px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-2 shadow-xl uppercase tracking-widest z-10">
-                                            <Maximize size={12} className="text-[#D85C2C]"/> {item.gallery.length} Photos
-                                        </div>
-                                        
-                                        <div className="absolute bottom-5 left-5 z-10 transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                                            <div className="bg-[#D85C2C] text-white font-black text-sm px-4 py-2 shadow-xl inline-block">
-                                                KES {item.price.toLocaleString()}
-                                            </div>
+                                        <div className="absolute bottom-3 right-3 bg-white/90 text-[#154279] px-2.5 py-1 rounded-none text-[10px] font-bold flex items-center gap-1.5 z-10 uppercase tracking-wide">
+                                            <Maximize size={12} className="text-[#F96302]"/> {item.gallery.length} Photos
                                         </div>
                                     </div>
                                     
-                                    <div className="p-6 flex-1 flex flex-col">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <h4 
-                                                className="font-black text-lg text-[#00356B] cursor-pointer hover:text-[#D85C2C] transition-colors leading-tight line-clamp-1 uppercase tracking-tight"
-                                                onClick={() => setSelectedItem(item)}
-                                            >
-                                                {item.title}
-                                            </h4>
+                                    <div className="p-5 flex-1 flex flex-col">
+                                        <h4 
+                                            className="font-bold text-sm text-[#154279] cursor-pointer hover:text-[#F96302] transition-colors leading-tight mb-2 line-clamp-1 uppercase tracking-tight"
+                                            onClick={() => setSelectedItem(item)}
+                                        >
+                                            {item.title}
+                                        </h4>
+
+                                        <div className="text-[10px] text-slate-500 mb-4 flex items-center gap-2 font-semibold uppercase tracking-wide">
+                                            <MapPin size={12} className="text-[#F96302]"/> {item.location}
                                         </div>
 
-                                        <div className="text-[10px] font-bold text-slate-400 mb-5 flex items-center gap-2 uppercase tracking-widest">
-                                            <MapPin size={12} className="text-[#D85C2C]"/> {item.location}
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2 mb-6">
+                                        <div className="flex flex-wrap gap-2 mb-4">
                                             {item.amenities.slice(0, 3).map((am:string, i:number) => (
-                                                <span key={i} className="bg-slate-50 text-slate-500 text-[9px] font-black px-2 py-1.5 rounded-lg border border-slate-100 uppercase tracking-wider">
+                                                <span key={i} className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-1 rounded-none uppercase">
                                                     {am}
                                                 </span>
                                             ))}
                                         </div>
 
-                                        <div className="flex justify-between items-center border-t border-slate-100 pt-5 mt-auto">
-                                            <div className="flex gap-5 text-[10px] font-black text-[#00356B] uppercase tracking-widest">
-                                                <span className="flex items-center gap-2"><BedDouble size={14} className="text-[#D85C2C]"/> {item.beds}</span>
-                                                <span className="flex items-center gap-1.2"><Maximize size={14} className="text-[#D85C2C]"/> {item.sqft}</span>
+                                        {/* Price Section - Like Pricing Page */}
+                                        <div className="border-t-2 border-[#154279] pt-4 mt-auto bg-gradient-to-r from-[#f0f4f8] via-white to-[#e8ecf1] -mx-5 -mb-5 p-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-[#154279]">Price/Month</span>
+                                                    <div className="flex items-baseline leading-none mt-1">
+                                                        <span className="text-[10px] font-bold mr-1 text-[#154279]">KES</span>
+                                                        <span className="text-xl font-bold tracking-tight text-[#154279]">{item.price.toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setSelectedItem(item)}
+                                                    className="px-3 py-2 bg-[#154279] hover:bg-[#F96302] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-lg"
+                                                >
+                                                    View <ChevronRight size={12}/>
+                                                </button>
                                             </div>
-                                            <button 
-                                                onClick={() => setSelectedItem(item)}
-                                                className="text-[#00356B] hover:text-[#D85C2C] text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 group/btn"
-                                            >
-                                                View Unit <ArrowRight size={14} className="transition-transform group-hover/btn:translate-x-1"/>
-                                            </button>
+                                            <div className="flex gap-4 text-[10px] text-[#154279] font-bold mt-2">
+                                                <span className="flex items-center gap-1"><BedDouble size={14} className="text-[#F96302]"/> {item.beds} Beds</span>
+                                                <span className="flex items-center gap-1"><Maximize size={14} className="text-[#F96302]"/> {item.sqft} sqft</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
                         </div>
                     )}
                     
                     {/* Pagination */}
                     {filteredListings.length > 0 && (
-                        <div className="mt-16 flex justify-center gap-3">
+                        <div className="mt-10 flex justify-center gap-2">
                             <button 
                                 onClick={() => setCurrentPage(1)}
-                                className={`w-12 h-12 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all shadow-md ${currentPage === 1 ? 'bg-[#00356B] text-white' : 'bg-white border border-slate-200 text-[#00356B] hover:bg-slate-50'}`}
+                                className={cn(
+                                    "w-10 h-10 rounded-lg font-medium text-sm transition-all",
+                                    currentPage === 1 
+                                        ? 'bg-[#154279] text-white' 
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                )}
                             >
-                                01
+                                1
                             </button>
                             <button 
                                 onClick={() => setCurrentPage(2)}
-                                className={`w-12 h-12 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all shadow-md ${currentPage === 2 ? 'bg-[#00356B] text-white' : 'bg-white border border-slate-200 text-[#00356B] hover:bg-slate-50'}`}
+                                className={cn(
+                                    "w-10 h-10 rounded-lg font-medium text-sm transition-all",
+                                    currentPage === 2 
+                                        ? 'bg-[#154279] text-white' 
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                )}
                             >
-                                02
+                                2
                             </button>
                             {totalPages > 2 && (
                                 <button 
                                     onClick={() => setCurrentPage(currentPage < totalPages ? currentPage + 1 : totalPages)}
-                                    className="w-12 h-12 rounded-lg bg-white border border-slate-200 text-[#00356B] font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 transition-all shadow-md"
+                                    className="px-4 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all flex items-center gap-2"
                                 >
-                                    Next
+                                    Next <ChevronRight size={16} />
                                 </button>
                             )}
                         </div>

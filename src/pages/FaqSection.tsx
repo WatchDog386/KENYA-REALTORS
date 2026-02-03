@@ -67,57 +67,57 @@ const CATEGORIES = [
 
 const RAW_FAQS = [
     {
-        id: "FAQ-101", category: "Billing", views: "1.2k", updated: "2 days ago",
-        question: "How do I handle M-Pesa STK Push timeouts?",
-        preview: "Steps to take when a customer does not receive the prompt.",
+        id: "FAQ-101", category: "General", views: "2.1k", updated: "2 days ago",
+        question: "What are your business hours?",
+        preview: "When can you reach our support team.",
         content: { 
-            answer: "If the STK push times out (approx 10s), do not immediately retry. First, verify the phone number format (must be 254...). If valid, check the transaction log. If the status is 'Failed', you may manually trigger a retry via the API.", 
-            code: "POST /api/v1/payments/retry \n{\n  \"transaction_id\": \"TX123\",\n  \"reason\": \"timeout\"\n}" 
+            answer: "We operate 24/7 to serve you better. Our customer support team is available round the clock via phone, email, and live chat. During peak hours (8 AM - 6 PM EAT), you'll get faster responses.", 
+            code: "" 
         }
     },
     {
-        id: "FAQ-102", category: "Billing", views: "856", updated: "1 week ago",
-        question: "What are the settlement timelines for M-Pesa deposits?",
-        preview: "Understanding when funds reach your account.",
+        id: "FAQ-102", category: "Support", views: "1.8k", updated: "1 week ago",
+        question: "How quickly will I receive a response?",
+        preview: "Expected response times for different channels.",
         content: { 
-            answer: "M-Pesa deposits typically settle within 24 hours. Business deposits may take 48 hours during weekends. Check your transaction status in the Dashboard > Payments section.",
-            code: "// Check settlement status\nGET /api/v1/settlements/{settlement_id}" 
+            answer: "Email inquiries are answered within 2 hours. Phone calls are answered immediately during business hours. Live chat responses are instant. Critical issues get priority response.",
+            code: "" 
         }
     },
     {
-        id: "FAQ-201", category: "Leases", views: "2.3k", updated: "3 days ago",
-        question: "How do I upload a lease document?",
-        preview: "Step-by-step guide for document uploads.",
+        id: "FAQ-201", category: "Support", views: "2.3k", updated: "3 days ago",
+        question: "Do you offer emergency support?",
+        preview: "How to get help with urgent issues.",
         content: { 
-            answer: "Navigate to Properties > Lease Documents. Click 'Upload Document', select your PDF or image file, and add metadata (start date, end date, tenant). The system will auto-extract key details.",
-            code: "POST /api/v1/leases/documents\nContent-Type: multipart/form-data" 
+            answer: "Yes! We have a dedicated emergency hotline for urgent property issues. Use the emergency option in the chat or call our 24/7 support line for immediate assistance.",
+            code: "" 
         }
     },
     {
-        id: "FAQ-202", category: "Leases", views: "1.9k", updated: "5 days ago",
-        question: "Can I set automatic lease renewal reminders?",
-        preview: "Configure renewal notifications.",
+        id: "FAQ-202", category: "General", views: "1.9k", updated: "5 days ago",
+        question: "Can I schedule a meeting with management?",
+        preview: "How to arrange a meeting with our team.",
         content: { 
-            answer: "Yes. In Lease Settings, enable 'Auto-Reminder' and set the alert date (e.g., 60 days before expiry). The system will notify all stakeholders via SMS and email.",
-            code: "// Enable renewal reminders\nPUT /api/v1/leases/{lease_id}/settings" 
+            answer: "Absolutely. You can request a meeting through the contact form by selecting 'Partnership' or 'General Inquiry'. We'll get back to you within 24 hours to schedule.",
+            code: "" 
         }
     },
     {
         id: "FAQ-301", category: "Tenants", views: "3.1k", updated: "1 day ago",
-        question: "How do tenants reset their portal password?",
-        preview: "Password recovery for tenant accounts.",
+        question: "How do I report a maintenance issue?",
+        preview: "Steps to report maintenance problems.",
         content: { 
-            answer: "Tenants can click 'Forgot Password' on the login page. They'll receive an email with a reset link valid for 24 hours. After reset, they can log in with the new password.",
-            code: "POST /api/v1/auth/password-reset\n{\n  \"email\": \"tenant@example.com\"\n}" 
+            answer: "Tenants can report maintenance through the tenant portal or call our maintenance hotline. Property managers should use the admin dashboard. Emergency issues should be reported immediately by phone.",
+            code: "" 
         }
     },
     {
-        id: "FAQ-401", category: "API", views: "2.7k", updated: "4 days ago",
-        question: "What are the API rate limits?",
-        preview: "Understanding API throttling and quotas.",
+        id: "FAQ-401", category: "General", views: "2.7k", updated: "4 days ago",
+        question: "What payment methods do you accept?",
+        preview: "Available payment options.",
         content: { 
-            answer: "Standard tier: 1000 requests/hour. Premium tier: 10,000 requests/hour. If you exceed limits, you'll receive a 429 status code. Rate limit info is in the response headers.",
-            code: "X-RateLimit-Limit: 1000\nX-RateLimit-Remaining: 950\nX-RateLimit-Reset: 1645000000" 
+            answer: "We accept M-Pesa, bank transfers, credit/debit cards, and online wallets. All payment methods are secure and encrypted for your protection.",
+            code: "" 
         }
     },
 ];

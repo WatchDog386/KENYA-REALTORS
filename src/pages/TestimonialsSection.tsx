@@ -140,12 +140,12 @@ export default function TestimonialsSleek() {
   };
 
   return (
-    <section className="relative py-24 bg-[#F8F9FB] font-nunito overflow-hidden text-[15px]">
+    <section className="relative py-24 bg-[#f7f7f7] font-nunito overflow-hidden text-[15px]">
       <GlobalStyles />
       
       {/* 1. BACKGROUND: Clean, Breathable */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white rounded-full blur-[120px] opacity-60"></div>
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#f7f7f7] rounded-full blur-[120px] opacity-60"></div>
           <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#E2E8F0] rounded-full blur-[100px] opacity-40"></div>
       </div>
 

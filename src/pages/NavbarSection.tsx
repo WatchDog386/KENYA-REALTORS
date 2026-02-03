@@ -76,6 +76,7 @@ const Navbar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
+  const [showTenantDropdown, setShowTenantDropdown] = useState(false);
   const [filteredResults, setFilteredResults] = useState<typeof SEARCH_DATA>([]);
 
   // Cart logic
@@ -235,14 +236,6 @@ const Navbar = () => {
             
             <div className="flex items-center justify-between w-full lg:w-auto">
               <div className="flex items-center gap-3">
-                {/* Mobile Toggle */}
-                <button 
-                  onClick={() => setMenuOpen(true)} 
-                  className={`lg:hidden text-[${COLORS.primary}] hover:text-[${COLORS.secondary}] p-2 rounded-none hover:bg-slate-50 transition-colors`}
-                >
-                  <FaBars size={24} />
-                </button>
-
                 {/* LOGO AREA */}
                 <div 
                   onClick={handleHomeClick} 
@@ -312,24 +305,136 @@ const Navbar = () => {
                 </div>
               </div>
 
-              {/* Mobile Icons */}
-              <div className="flex items-center gap-5 lg:hidden">
-                <button onClick={() => navigate('/login')} className={`text-[${COLORS.primary}] hover:text-[${COLORS.secondary}] transition-colors`}>
-                  <FaUser size={20} />
+              {/* Navigation Dropdown - Mobile/Tablet on Right */}
+              <div className="lg:hidden relative group h-full py-2">
+                <button className="flex items-center outline-none">
+                  <FaBars size={20} className={`text-[${COLORS.primary}]`} />
                 </button>
-                <button className={`relative text-[${COLORS.primary}] hover:text-[${COLORS.secondary}] transition-colors`}>
-                  <FaShoppingCart size={20} />
-                  {cart.count > 0 && (
-                    <span className={`absolute -top-1 -right-2 bg-[${COLORS.secondary}] text-white text-[10px] font-bold w-4 h-4 rounded-none flex items-center justify-center border border-white`}>
-                      {cart.count}
-                    </span>
-                  )}
-                </button>
+
+                {/* Dropdown Menu */}
+                <div className="absolute top-full right-0 pt-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-0 group-hover:translate-y-0 w-80 z-50 max-h-[500px] overflow-y-auto">
+                  {/* Blue Header Section */}
+                  <div className={`bg-[${COLORS.primary}] p-4 text-white`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <FaUser className={`text-[${COLORS.secondary}] text-lg`} />
+                      <div>
+                        <h3 className="font-bold text-sm">{MOBILE_HEADER.title}</h3>
+                        <p className="text-xs text-white/85">{MOBILE_HEADER.subtitle}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-none shadow-md border border-slate-200 overflow-hidden">
+                    {/* Account Section */}
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+                        <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">Account</p>
+                    </div>
+                    
+                    {ACCOUNT_DROPDOWN.items.map((item) => (
+                      <button 
+                        key={item.id}
+                        onClick={() => navigate(`/${item.action}`)}
+                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-none transition-all group/item border-b border-slate-100 last:border-0"
+                      >
+                        <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-none group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
+                          {item.id === 'signin' ? <FaSignInAlt size={14} /> : <FaUserPlus size={14} />}
+                        </div>
+                        <div>
+                            <span className={`block text-sm font-bold text-[${COLORS.primary}] group-hover/item:text-[${COLORS.secondary}] transition-colors`}>{item.label}</span>
+                            <span className="block text-[10px] text-slate-600">{item.description}</span>
+                        </div>
+                      </button>
+                    ))}
+
+                    {/* Navigation Section */}
+                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 mt-2">
+                        <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">Menu</p>
+                    </div>
+                    
+                    {NAVIGATION_SECTIONS.map((item) => {
+                      const IconComponent = item.icon;
+                      const isTenantSupport = item.id === "faq";
+                      const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+                      
+                      return (
+                        <div key={item.id}>
+                          <button 
+                            onClick={() => {
+                              if (isTenantSupport) {
+                                setMobileMenuOpen(!mobileMenuOpen);
+                              } else {
+                                handleNavClick(item.id);
+                              }
+                            }}
+                            className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 rounded-none transition-all border-b border-slate-100 last:border-0"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`text-slate-600 bg-slate-100 p-2 rounded-none`}>
+                                <IconComponent size={item.iconSize} />
+                              </span>
+                              <span className={`text-sm font-semibold text-slate-700`}>{item.name}</span>
+                            </div>
+                            {isTenantSupport && (
+                              <FaChevronDown size={12} className={`text-slate-500 transition-transform ${mobileMenuOpen ? "rotate-180" : ""}`} />
+                            )}
+                          </button>
+
+                          {/* Tenant Support Sub-dropdown */}
+                          {isTenantSupport && mobileMenuOpen && (
+                            <div className="bg-slate-50 border-l-[3px] border-[#F96302]">
+                              <button
+                                onClick={() => {
+                                  handleNavClick("faq");
+                                  setMobileMenuOpen(false);
+                                }}
+                                className="w-full px-8 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
+                              >
+                                <span>❓</span>
+                                FAQ Section
+                              </button>
+                              <button
+                                onClick={() => {
+                                  navigate("/contact");
+                                  setMobileMenuOpen(false);
+                                }}
+                                className="w-full px-8 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
+                              >
+                                <span>📧</span>
+                                Contact Us
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Promo Banner */}
+                  <div className={`m-3 p-4 bg-[${COLORS.primary}] rounded-none text-white shadow-md relative overflow-hidden`}>
+                    <div className="absolute -right-4 -bottom-4 text-white/5 text-6xl"><FaCity /></div>
+                    <div className={`absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-[${COLORS.secondary}]/25 to-transparent`}></div>
+                    <div className="relative z-10">
+                      <span className={`bg-[${COLORS.secondary}] text-[10px] font-bold px-2.5 py-1 rounded-none text-white uppercase tracking-wider shadow-md`}>{PROMO_BANNER.badge}</span>
+                      <h3 className="font-bold text-lg mt-2 leading-tight">{PROMO_BANNER.title}</h3>
+                      <p className="text-xs text-white/90 mt-1 mb-3 font-medium">{PROMO_BANNER.description}</p>
+                      <button onClick={() => handleNavClick(PROMO_BANNER.ctaAction)} className={`text-xs font-bold bg-white text-[${COLORS.primary}] px-3 py-1.5 rounded-none hover:bg-[${COLORS.secondary}] hover:text-white transition-colors shadow-md`}>
+                        {PROMO_BANNER.ctaLabel}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Logout Button */}
+                  <div className="p-3 bg-slate-50 border-t border-slate-200">
+                    <button onClick={() => { navigate('/login'); }} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-none transition-all px-4 justify-center`}>
+                      <FaSignOutAlt /> {LOGOUT_BUTTON.label}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* CHECK VISIBILITY: Sleek Rounded Design */}
-            <div className="flex-1 w-full relative group z-30 ml-4 lg:ml-8">
+            {/* CHECK VISIBILITY: Sleek Rounded Design - Hidden on tablet/mobile */}
+            <div className="hidden lg:flex flex-1 w-full relative group z-30 ml-4 lg:ml-8">
                 <div className={`w-full flex items-center bg-slate-50 border border-slate-200 rounded-full pl-1 pr-1 py-1 transition-all duration-300 shadow-sm group-hover:shadow-md focus-within:border-[${COLORS.secondary}] focus-within:shadow-[0_4px_15px_rgba(249,99,2,0.2)] focus-within:ring-1 focus-within:ring-[${COLORS.secondary}]/30`}>
                 <div className="relative flex-1">
                   <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[${COLORS.secondary}] transition-colors pointer-events-none`}>
@@ -400,7 +505,7 @@ const Navbar = () => {
                 </button>
 
                 {/* Dropdown Menu */}
-                <div className="absolute top-full right-0 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 w-64 z-50">
+                  <div className="absolute top-full right-0 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 w-64 z-50">
                   <div className="bg-white rounded-none shadow-md border border-slate-200 overflow-hidden p-2">
                     <div className="px-4 py-3 border-b border-slate-200 mb-1">
                         <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">{ACCOUNT_DROPDOWN.title}</p>
@@ -448,24 +553,66 @@ const Navbar = () => {
       </div>
 
       {/* Sub-Nav (Desktop) */}
-      <div className={`hidden lg:block bg-white h-14 ${isScrolled ? "border-b border-slate-200" : ""}`}>
+      <div className={`hidden lg:block ${isScrolled ? 'bg-white border-b border-slate-200' : 'bg-black/20 backdrop-blur-sm border-b border-white/10'} h-14 transition-all duration-300`}>
         <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-center h-full">
           <div className="flex items-center gap-10">
             {NAVIGATION_SECTIONS.map((item) => {
               const IconComponent = item.icon;
+              const isTenantSupport = item.id === "faq";
+              
               return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-none transition-all duration-200`}
-                >
-                  <span className={`text-[${COLORS.secondary}]`}>
-                    <IconComponent size={item.iconSize} />
-                  </span>
-                  <span className={`font-semibold text-sm text-[${COLORS.primary}]`}>
-                    {item.name}
-                  </span>
-                </button>
+                <div key={item.id} className="relative group">
+                  <button
+                    onClick={() => {
+                      if (isTenantSupport) {
+                        setShowTenantDropdown(!showTenantDropdown);
+                      } else {
+                        handleNavClick(item.id);
+                      }
+                    }}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-none transition-all duration-200 ${
+                      isTenantSupport ? "group-hover:text-[#F96302]" : ""
+                    }`}
+                  >
+                    <span className={`text-[${COLORS.secondary}]`}>
+                      <IconComponent size={item.iconSize} />
+                    </span>
+                    <span className={`font-semibold text-sm text-[${COLORS.primary}]`}>
+                      {item.name}
+                    </span>
+                    {isTenantSupport && (
+                      <FaChevronDown size={12} className="text-slate-600 group-hover:text-[#F96302] transition-colors" />
+                    )}
+                  </button>
+
+                  {/* Tenant Support Dropdown */}
+                  {isTenantSupport && (
+                    <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                      <div className="bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                        <button
+                          onClick={() => {
+                            handleNavClick("faq");
+                            setShowTenantDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3 border-b border-slate-100"
+                        >
+                          <span>❓</span>
+                          FAQ Section
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigate("/contact");
+                            setShowTenantDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3"
+                        >
+                          <span>📧</span>
+                          Contact Us
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -519,20 +666,61 @@ const Navbar = () => {
               <div className="px-6 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Menu</div>
               {NAVIGATION_SECTIONS.map((item) => {
                 const IconComponent = item.icon;
+                const isTenantSupport = item.id === "faq";
+                const [mobileDropdownOpen, setMobileDropdownOpen] = React.useState(false);
+                
                 return (
-                  <button 
-                    key={item.id} 
-                    onClick={() => handleNavClick(item.id)} 
-                    className={`w-full px-6 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 active:bg-slate-100 transition-colors border-l-[3px] border-transparent hover:border-[${COLORS.secondary}] group`}
-                  >
-                    <div className={`flex items-center gap-4 text-slate-700 group-hover:text-[${COLORS.primary}]`}>
-                      <span className={`text-slate-600 bg-slate-100 p-2 rounded-none group-hover:bg-[${COLORS.secondary}] group-hover:text-white transition-colors`}>
-                        <IconComponent size={item.iconSize} />
-                      </span>
-                      <span className="font-semibold text-sm">{item.name}</span>
-                    </div>
-                    <FaChevronDown className="-rotate-90 text-slate-400 text-xs group-hover:text-[#F96302]" />
-                  </button>
+                  <div key={item.id}>
+                    <button 
+                      onClick={() => {
+                        if (isTenantSupport) {
+                          setMobileDropdownOpen(!mobileDropdownOpen);
+                        } else {
+                          handleNavClick(item.id);
+                          setMenuOpen(false);
+                        }
+                      }}
+                      className={`w-full px-6 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 active:bg-slate-100 transition-colors border-l-[3px] border-transparent hover:border-[${COLORS.secondary}] group`}
+                    >
+                      <div className={`flex items-center gap-4 text-slate-700 group-hover:text-[${COLORS.primary}]`}>
+                        <span className={`text-slate-600 bg-slate-100 p-2 rounded-none group-hover:bg-[${COLORS.secondary}] group-hover:text-white transition-colors`}>
+                          <IconComponent size={item.iconSize} />
+                        </span>
+                        <span className="font-semibold text-sm">{item.name}</span>
+                      </div>
+                      {isTenantSupport && (
+                        <FaChevronDown size={12} className={`text-slate-500 transition-transform ${mobileDropdownOpen ? "rotate-180" : ""}`} />
+                      )}
+                    </button>
+
+                    {/* Mobile Tenant Support Dropdown */}
+                    {isTenantSupport && mobileDropdownOpen && (
+                      <div className="bg-slate-50 border-l-[3px] border-[#F96302]">
+                        <button
+                          onClick={() => {
+                            navigate("/faq");
+                            setMenuOpen(false);
+                            setMobileDropdownOpen(false);
+                          }}
+                          className="w-full px-12 py-3 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
+                        >
+                          <span>❓</span>
+                          FAQ Section
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigate("/contact");
+                            setMenuOpen(false);
+                            setMobileDropdownOpen(false);
+                          }}
+                          className="w-full px-12 py-3 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
+                        >
+                          <span>📧</span>
+                          Contact Us
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

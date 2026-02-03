@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { userSyncService } from "@/services/api/userSyncService";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -54,7 +55,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface User {
   id: string;
@@ -81,8 +81,7 @@ interface UserStats {
 const UserManagementNew: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
-  const [unassignedUsers, setUnassignedUsers] = useState<User[]>([]);
-  const [assignedUsers, setAssignedUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats>({
     totalUsers: 0,
     unassignedUsers: 0,
@@ -96,72 +95,74 @@ const UserManagementNew: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("unassigned");
 
   useEffect(() => {
     loadUsers();
   }, []);
 
+  useEffect(() => {
+    // Apply search and role filters
+    let filtered = users;
+
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (u) =>
+          u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          u.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          u.last_name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (roleFilter !== "all") {
+      if (roleFilter === "pending-approval") {
+        // Show all users with pending status (not approved)
+        filtered = filtered.filter((u) => u.status === "pending");
+      } else if (roleFilter === "no-role") {
+        filtered = filtered.filter((u) => !u.role);
+      } else {
+        filtered = filtered.filter((u) => u.role === roleFilter);
+      }
+    }
+
+    setFilteredUsers(filtered);
+  }, [searchQuery, roleFilter, users]);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
 
-      // Load all users from profiles table - NO FILTERING AT DATABASE LEVEL
-      const { data: allUsers, error: usersError } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // Step 1: Verify sync status between auth.users and profiles
+      const syncStatus = await userSyncService.verifySync();
+      console.log("🔄 Sync status:", syncStatus);
 
-      if (usersError) throw usersError;
+
+      // Step 2: Fetch all users from the all_users_with_profile view (ensures all auth.users are included)
+      const { data: allUsers, error: fetchError } = await supabase
+        .from("all_users_with_profile")
+        .select("*");
+      if (fetchError) throw fetchError;
+
 
       const typedUsers: User[] = (allUsers || []).map((u: any) => ({
         id: u.id,
         email: u.email,
         first_name: u.first_name || "",
         last_name: u.last_name || "",
-        phone: u.phone,
+        phone: u.phone || null,
         role: u.role,
         status: u.status,
         created_at: u.created_at,
-        last_login_at: u.last_login_at,
-        avatar_url: u.avatar_url,
+        last_login_at: u.last_login_at || null,
+        avatar_url: u.avatar_url || null,
       }));
 
-      console.log("📊 Total users loaded:", typedUsers.length);
-      console.log("📋 User details:", typedUsers);
+      console.log("📊 Total users loaded from profiles table:", typedUsers.length);
+      console.log("📋 All users (synced from auth.users):", typedUsers);
 
       setUsers(typedUsers);
+      setFilteredUsers(typedUsers);
 
-      // Separate unassigned and assigned users
-      // Unassigned: role is 'tenant', null, or status is 'pending' (newly created)
-      const unassigned = typedUsers.filter(
-        (u) => 
-          u.role === "tenant" || 
-          u.role === null || 
-          !u.role ||
-          u.status === "pending"
-      );
-      
-      // Assigned: Has a specific role (not tenant/null) and status is active
-      const assigned = typedUsers.filter(
-        (u) =>
-          u.role &&
-          u.role !== "tenant" &&
-          u.role !== null &&
-          (u.role === "super_admin" ||
-            u.role === "property_manager" ||
-            u.role === "accountant" ||
-            u.role === "maintenance" ||
-            u.role === "owner")
-      );
-
-      console.log("👥 Unassigned users:", unassigned.length, unassigned);
-      console.log("✅ Assigned users:", assigned.length, assigned);
-
-      setUnassignedUsers(unassigned);
-      setAssignedUsers(assigned);
-
-      // Calculate stats
+      // Step 3: Calculate stats from fetched users
       const superAdminCount = typedUsers.filter(
         (u) => u.role === "super_admin"
       ).length;
@@ -169,33 +170,141 @@ const UserManagementNew: React.FC = () => {
         (u) => u.role === "property_manager"
       ).length;
       const tenantCount = typedUsers.filter((u) => u.role === "tenant").length;
+      const noRoleCount = typedUsers.filter((u) => !u.role).length;
 
       setStats({
         totalUsers: typedUsers.length,
-        unassignedUsers: unassigned.length,
-        assignedUsers: assigned.length,
+        unassignedUsers: noRoleCount,
+        assignedUsers: typedUsers.length - noRoleCount,
         superAdmins: superAdminCount,
         propertyManagers: propertyManagerCount,
         tenants: tenantCount,
       });
+
+      console.log("✅ User stats calculated:", {
+        totalUsers: typedUsers.length,
+        superAdmins: superAdminCount,
+        propertyManagers: propertyManagerCount,
+        tenants: tenantCount,
+        unassigned: noRoleCount,
+      });
+
+      if (syncStatus.synced && syncStatus.profilesCount > 0) {
+        toast.success(`Loaded ${typedUsers.length} users from profiles table`);
+      }
     } catch (error) {
       console.error("Error loading users:", error);
-      toast.error("Failed to load users");
+      toast.error(
+        `Failed to load users: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAssignRole = async (userId: string, newRole: string) => {
+  const handleAssignRole = async (
+    userId: string, 
+    newRole: string,
+    managedProperties?: string[],
+    propertyId?: string,
+    unitId?: string
+  ) => {
     try {
-      const { error } = await supabase
+      // Update profile with new role and set to active using userSyncService
+      await userSyncService.updateUserRole(userId, newRole, "active");
+
+      // Also update the profile for additional fields
+      const currentUser = await supabase.auth.getUser();
+      const { error: profileError } = await supabase
         .from("profiles")
-        .update({ role: newRole, status: "active" })
+        .update({ 
+          status: "active",
+          is_active: true,
+          approved_at: new Date().toISOString(),
+          approved_by: currentUser.data.user?.id,
+          user_type: newRole, // Sync user_type with role
+        })
         .eq("id", userId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      toast.success(`User role updated to ${newRole}`);
+      // Update manager_approvals if property manager
+      if (newRole === "property_manager") {
+        const { error: approvalError } = await supabase
+          .from("manager_approvals")
+          .update({ 
+            status: "approved",
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: currentUser.data.user?.id,
+            managed_properties: managedProperties || [],
+          })
+          .eq("user_id", userId);
+        
+        if (approvalError) {
+          console.warn("Manager approval update warning:", approvalError.message);
+        }
+      }
+
+      // Update tenant_approvals if tenant
+      if (newRole === "tenant") {
+        const { error: approvalError } = await supabase
+          .from("tenant_approvals")
+          .update({ 
+            status: "approved",
+            reviewed_at: new Date().toISOString(),
+            reviewed_by: currentUser.data.user?.id,
+            property_id: propertyId || null,
+            unit_id: unitId || null,
+          })
+          .eq("user_id", userId);
+        
+        if (approvalError) {
+          console.warn("Tenant approval update warning:", approvalError.message);
+        }
+
+        // Update unit status to occupied if unit is assigned
+        if (unitId) {
+          const { error: unitError } = await supabase
+            .from("units_detailed")
+            .update({
+              status: "occupied",
+              occupant_id: userId,
+            })
+            .eq("id", unitId);
+          
+          if (unitError) {
+            console.warn("Unit status update warning:", unitError.message);
+          }
+        }
+      }
+
+      // Send notification to user
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        let message = `Your ${newRole === "property_manager" ? "Property Manager" : "Tenant"} account has been approved. `;
+        if (newRole === "property_manager" && managedProperties?.length) {
+          message += "You can now manage your assigned properties and access your portal.";
+        } else if (newRole === "tenant" && unitId) {
+          message += "You can now access your assigned unit and portal.";
+        } else {
+          message += "You can now login and access your portal.";
+        }
+
+        const { error: notifError } = await supabase
+          .from("notifications")
+          .insert({
+            recipient_id: userId,
+            type: "approval_granted",
+            title: "Registration Approved! 🎉",
+            message,
+          });
+        
+        if (notifError) {
+          console.warn("Notification creation warning:", notifError.message);
+        }
+      }
+
+      toast.success(`User approved as ${newRole}. They can now login!`);
       loadUsers();
       setIsAssignDialogOpen(false);
     } catch (error) {
@@ -359,13 +468,13 @@ const UserManagementNew: React.FC = () => {
         </Card>
       </div>
 
-      {/* Users Tabs */}
+      {/* Users Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>User Accounts</CardTitle>
+            <CardTitle>All User Accounts</CardTitle>
             <CardDescription>
-              Manage user accounts and role assignments
+              Manage all signed-up users and assign roles ({stats.totalUsers} total)
             </CardDescription>
           </div>
           <Button
@@ -379,61 +488,58 @@ const UserManagementNew: React.FC = () => {
             Refresh
           </Button>
         </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="unassigned">
-                Unassigned ({stats.unassignedUsers})
-              </TabsTrigger>
-              <TabsTrigger value="assigned">
-                Assigned ({stats.assignedUsers})
-              </TabsTrigger>
-            </TabsList>
+        <CardContent className="space-y-4">
+          {/* Search and Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name or email..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="pending-approval">⏳ Pending Approval</SelectItem>
+                <SelectItem value="super_admin">Super Admin</SelectItem>
+                <SelectItem value="property_manager">Property Manager</SelectItem>
+                <SelectItem value="accountant">Accountant</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="tenant">Tenant</SelectItem>
+                <SelectItem value="no-role">No Role</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <TabsContent value="unassigned" className="space-y-4">
-              {unassignedUsers.length === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    No unassigned users. All users have been assigned roles.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <UserTable
-                  users={unassignedUsers}
-                  onSelectUser={(user) => {
-                    setSelectedUser(user);
-                    setIsAssignDialogOpen(true);
-                  }}
-                  onDeleteUser={handleDeleteUser}
-                  onStatusChange={handleStatusChange}
-                  showAssignButton={true}
-                />
-              )}
-            </TabsContent>
-
-            <TabsContent value="assigned" className="space-y-4">
-              {assignedUsers.length === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    No assigned users yet. Assign roles to unassigned users.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <UserTable
-                  users={assignedUsers}
-                  onSelectUser={(user) => {
-                    setSelectedUser(user);
-                    setIsAssignDialogOpen(true);
-                  }}
-                  onDeleteUser={handleDeleteUser}
-                  onStatusChange={handleStatusChange}
-                  showAssignButton={true}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
+          {/* Users Table */}
+          {filteredUsers.length === 0 ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {users.length === 0
+                  ? "No users found. Create users to get started."
+                  : "No users match your search filters."}
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <UserTable
+              users={filteredUsers}
+              onSelectUser={(user) => {
+                setSelectedUser(user);
+                setIsAssignDialogOpen(true);
+              }}
+              onDeleteUser={handleDeleteUser}
+              onStatusChange={handleStatusChange}
+              showAssignButton={true}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -453,8 +559,8 @@ const UserManagementNew: React.FC = () => {
           {selectedUser && (
             <AssignRoleForm
               user={selectedUser}
-              onAssignRole={(role) => {
-                handleAssignRole(selectedUser.id, role);
+              onAssignRole={(role, properties, propertyId, unitId) => {
+                handleAssignRole(selectedUser.id, role, properties, propertyId, unitId);
               }}
             />
           )}
@@ -532,8 +638,10 @@ const UserTable: React.FC<UserTableProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="pending">
+                      ⏳ Pending
+                    </SelectItem>
                     <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
               </TableCell>
@@ -604,39 +712,47 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
     try {
       setLoading(true);
 
-      // Create auth user with trimmed, lowercase email
+      // Step 1: Create user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName.trim(),
+            last_name: formData.lastName.trim(),
+            phone: formData.phone?.trim() || null,
+            role: formData.role,
+            status: "active",
+          },
+        },
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("Failed to create user");
 
-      // Use the secure database function to create profile (bypasses RLS)
-      const { data: functionResult, error: functionError } = await supabase.rpc(
-        "create_user_profile",
-        {
-          p_user_id: authData.user.id,
-          p_email: trimmedEmail,
-          p_first_name: formData.firstName.trim(),
-          p_last_name: formData.lastName.trim(),
-          p_phone: formData.phone?.trim() || null,
-          p_role: formData.role,
-          p_status: "active",
+      // Step 2: Wait for the user to be synced to the profiles table (polling)
+      let profileSynced = false;
+      let attempts = 0;
+      const maxAttempts = 10;
+      const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+      while (!profileSynced && attempts < maxAttempts) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", authData.user.id)
+          .single();
+        if (profile && profile.id) {
+          profileSynced = true;
+        } else {
+          await delay(500); // wait 0.5s before next check
+          attempts++;
         }
-      );
-
-      if (functionError) {
-        console.error("Function error:", functionError);
-        throw new Error(`Failed to create profile: ${functionError.message}`);
+      }
+      if (!profileSynced) {
+        throw new Error("Profile was not synced after registration. Please try again.");
       }
 
-      if (functionResult && functionResult.length > 0 && !functionResult[0].success) {
-        throw new Error(functionResult[0].message);
-      }
-
-      toast.success("User created successfully");
+      toast.success("User created and synced successfully");
       onSuccess();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -753,7 +869,23 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
 // Assign Role Form Component
 interface AssignRoleFormProps {
   user: User;
-  onAssignRole: (role: string) => void;
+  onAssignRole: (role: string, properties?: string[], propertyId?: string, unitId?: string) => void;
+}
+
+interface Property {
+  id: string;
+  name: string;
+  address?: string;
+}
+
+interface Unit {
+  id: string;
+  unit_number: string;
+  unit_type: string;
+  floor_number: number;
+  price_monthly: number;
+  property_id: string;
+  status: string;
 }
 
 const AssignRoleForm: React.FC<AssignRoleFormProps> = ({
@@ -761,46 +893,196 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({
   onAssignRole,
 }) => {
   const [selectedRole, setSelectedRole] = useState(user.role || "tenant");
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [selectedProperties, setSelectedProperties] = useState<string[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [selectedUnit, setSelectedUnit] = useState<string>("");
+  const [loadingData, setLoadingData] = useState(false);
+
+  // Fetch properties on mount
+  React.useEffect(() => {
+    const fetchProperties = async () => {
+      try {
+        setLoadingData(true);
+        const { data, error } = await supabase
+          .from("properties")
+          .select("id, name, address")
+          .eq("status", "active")
+          .order("name");
+        
+        if (error) throw error;
+        setProperties(data || []);
+      } catch (error) {
+        console.error("Error fetching properties:", error);
+        toast.error("Failed to load properties");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchProperties();
+  }, []);
+
+  // Fetch units when property is selected
+  React.useEffect(() => {
+    if (!selectedProperty) {
+      setUnits([]);
+      return;
+    }
+
+    const fetchUnits = async () => {
+      try {
+        setLoadingData(true);
+        const { data, error } = await supabase
+          .from("units_detailed")
+          .select("*")
+          .eq("property_id", selectedProperty)
+          .eq("status", "vacant")
+          .order("unit_number");
+        
+        if (error) throw error;
+        setUnits(data || []);
+        setSelectedUnit(""); // Reset unit selection
+      } catch (error) {
+        console.error("Error fetching units:", error);
+        toast.error("Failed to load units");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchUnits();
+  }, [selectedProperty]);
+
+  const handlePropertyToggle = (propertyId: string) => {
+    setSelectedProperties(prev =>
+      prev.includes(propertyId)
+        ? prev.filter(id => id !== propertyId)
+        : [...prev, propertyId]
+    );
+  };
 
   return (
     <div className="space-y-4">
-      <div className="bg-gray-50 p-3 rounded-lg">
+      <div className="bg-gray-50 p-3 rounded-lg space-y-2">
         <p className="text-sm text-gray-600">
-          <strong>Current Role:</strong> {user.role || "None"}
+          <strong>Name:</strong> {user.first_name} {user.last_name}
         </p>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-sm text-gray-600">
           <strong>Email:</strong> {user.email}
+        </p>
+        <p className="text-sm text-gray-600">
+          <strong>Current Role:</strong> {user.role || <span className="text-orange-600 font-bold">No Role Assigned</span>}
+        </p>
+        <p className="text-sm text-gray-600">
+          <strong>Status:</strong> 
+          {user.status === "pending" ? (
+            <span className="text-orange-600 font-bold ml-1">⏳ Pending Approval</span>
+          ) : (
+            <span className="text-green-600 font-bold ml-1">✓ Active</span>
+          )}
         </p>
       </div>
 
       <div>
-        <Label htmlFor="newRole">Assign New Role *</Label>
+        <Label htmlFor="newRole">Assign Role & Approve *</Label>
         <Select value={selectedRole} onValueChange={setSelectedRole}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="tenant">Tenant</SelectItem>
-            <SelectItem value="property_manager">Property Manager</SelectItem>
-            <SelectItem value="super_admin">Super Admin</SelectItem>
-            <SelectItem value="accountant">Accountant</SelectItem>
-            <SelectItem value="maintenance">Maintenance</SelectItem>
+            <SelectItem value="tenant">✓ Tenant</SelectItem>
+            <SelectItem value="property_manager">✓ Property Manager</SelectItem>
+            <SelectItem value="super_admin">✓ Super Admin</SelectItem>
+            <SelectItem value="accountant">✓ Accountant</SelectItem>
+            <SelectItem value="maintenance">✓ Maintenance</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Assigning a new role will grant the user access to that role's
-          features and data.
+      {/* Property Manager Assignment */}
+      {selectedRole === "property_manager" && (
+        <div className="space-y-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <Label className="text-sm font-bold">Assign Properties (Manager)</Label>
+          <p className="text-xs text-gray-600 mb-2">Select properties this manager will oversee:</p>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {loadingData ? (
+              <p className="text-xs text-gray-500">Loading properties...</p>
+            ) : properties.length === 0 ? (
+              <p className="text-xs text-gray-500">No properties available</p>
+            ) : (
+              properties.map((prop) => (
+                <label key={prop.id} className="flex items-center gap-2 p-2 bg-white rounded border border-purple-200 hover:border-purple-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedProperties.includes(prop.id)}
+                    onChange={() => handlePropertyToggle(prop.id)}
+                    className="rounded accent-purple-600"
+                  />
+                  <span className="text-sm">{prop.name}</span>
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tenant Unit Assignment */}
+      {selectedRole === "tenant" && (
+        <div className="space-y-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <Label className="text-sm font-bold">Assign Unit (Tenant)</Label>
+          
+          <div>
+            <Label className="text-xs">Select Property</Label>
+            <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder="Choose property" />
+              </SelectTrigger>
+              <SelectContent>
+                {properties.map((prop) => (
+                  <SelectItem key={prop.id} value={prop.id}>
+                    {prop.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedProperty && (
+            <div>
+              <Label className="text-xs">Select Unit</Label>
+              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder={loadingData ? "Loading units..." : "Choose unit"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.id}>
+                      Unit {unit.unit_number} - {unit.unit_type} (${unit.price_monthly}/mo)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Alert className="bg-blue-50 border-blue-200">
+        <AlertCircle className="h-4 w-4 text-blue-600" />
+        <AlertDescription className="text-blue-800">
+          <strong>Approval Action:</strong> Selecting a role {selectedRole === "property_manager" && selectedProperties.length > 0 ? "and properties" : ""}{selectedRole === "tenant" && selectedUnit ? "and unit" : ""} will automatically approve this user and activate their account. They will receive a notification and can login immediately.
         </AlertDescription>
       </Alert>
 
       <DialogFooter>
         <Button variant="outline">Cancel</Button>
-        <Button onClick={() => onAssignRole(selectedRole)}>
-          Assign Role
+        <Button 
+          onClick={() => onAssignRole(selectedRole, selectedProperties, selectedProperty, selectedUnit)} 
+          className="bg-green-600 hover:bg-green-700"
+        >
+          ✓ Approve & Assign
         </Button>
       </DialogFooter>
     </div>

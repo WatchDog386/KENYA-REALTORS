@@ -5,8 +5,8 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::", // Listen on all IPv6 and IPv4 addresses
-    port: 8080,
-    strictPort: true, // Don't try other ports if 8080 is taken
+    port: 8081,
+    strictPort: false, // Try other ports if 8081 is taken
     cors: {
       origin: "*", // Allow all origins during development
       credentials: true, // Allow cookies/auth headers
@@ -22,7 +22,6 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       protocol: "ws",
       host: "localhost",
-      port: 8080,
     },
     // Proxy configuration for Supabase to avoid CORS
     proxy: {

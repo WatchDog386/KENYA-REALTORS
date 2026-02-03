@@ -19,16 +19,24 @@ const Navbar: React.FC = () => {
     <nav className="fixed w-full z-[60] bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-100 font-nunito">
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-20">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
+          {/* Mobile Menu Button - Left Side */}
+          <button
+            className="lg:hidden p-2 order-1"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+
+          {/* Logo - Center on Mobile, Left on Desktop */}
+          <Link to="/" className="flex items-center gap-2 group order-2 lg:order-1 mx-auto lg:mx-0">
             <div className="bg-[#154279] p-2 rounded-none group-hover:bg-[#F96302] transition-colors">
               <Home className="text-white" size={20} />
             </div>
             <span className="text-xl font-black text-[#154279] uppercase tracking-tighter">REALTORS<span className="text-[#F96302]">.</span></span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop Navigation - Only on Desktop */}
+          <div className="hidden lg:flex items-center gap-8 order-2">
             {navItems.map((item) => (
               <Link
                 key={item.path}
@@ -41,8 +49,8 @@ const Navbar: React.FC = () => {
             ))}
           </div>
 
-          {/* Auth Buttons */}
-          <div className="hidden md:flex items-center gap-6">
+          {/* Auth Buttons - Only on Desktop */}
+          <div className="hidden lg:flex items-center gap-6 order-3">
             {user ? (
               <Link
                 to={user.role === 'super_admin' ? '/portal/admin' : '/portal/tenant'}
@@ -60,14 +68,6 @@ const Navbar: React.FC = () => {
               </Link>
             )}
           </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
         </div>
 
         {/* Mobile Menu */}

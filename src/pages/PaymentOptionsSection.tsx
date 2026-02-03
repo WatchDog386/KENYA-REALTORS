@@ -393,7 +393,7 @@ const RentalGuidesSection = () => {
   return (
     <>
       <GlobalStyles />
-      <div className="font-nunito w-full bg-white text-[#484848]">
+      <div className="font-nunito w-full bg-slate-50 text-[#484848]">
       <AnimatePresence>
         {toastMsg && <Toast message={toastMsg} onClose={() => setToastMsg(null)} />}
       </AnimatePresence>
@@ -413,7 +413,7 @@ const RentalGuidesSection = () => {
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
-            className="pt-56 pb-12 bg-white font-nunito text-[#484848] min-h-screen"
+            className="pt-56 pb-12 bg-slate-50 font-nunito text-[#484848] min-h-screen"
           >
             <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
               

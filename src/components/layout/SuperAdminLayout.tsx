@@ -1,5 +1,5 @@
 // src/components/layout/SuperAdminLayout.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ReactNode } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -166,7 +166,7 @@ const getIconComponent = (iconName?: string) => {
   }
 };
 
-const SuperAdminLayout = () => {
+const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Dashboard"]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);

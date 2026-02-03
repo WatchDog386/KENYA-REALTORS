@@ -34,6 +34,9 @@ interface UserProfile {
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
+  status?: string;
+  approved?: boolean;
+  property_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +72,7 @@ interface AuthContextType {
   clearError: () => void;
   createProfileIfMissing: () => Promise<boolean>;
   isAdmin: () => boolean;
+  isApproved: () => boolean;
   getUserRole: () => string | null;
   hasPermission: (permission: string) => boolean;
   getAvailableRoles: () => typeof AVAILABLE_ROLES;
@@ -108,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       console.log("📄 Profile fetch result:", { data, fetchError }, userId);
 
@@ -140,7 +144,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const createUserProfileInDB = async (
     userId: string,
     email: string,
-    firstName: string
+    firstName: string,
+    lastName?: string,
+    phone?: string,
+    userType?: string,
+    status?: string
   ): Promise<UserProfile | null> => {
     try {
       console.log("🛠️ Creating profile for:", email);
@@ -151,7 +159,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           id: userId,
           email: email,
           first_name: firstName,
+          last_name: lastName || null,
+          phone: phone || null,
           role: null, // Default to null - user will select on profile page
+          user_type: userType || null,
+          status: status || null,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -166,7 +178,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           id: userId,
           email: email,
           first_name: firstName,
+          last_name: lastName,
+          phone: phone,
           role: null,
+          status: status,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -181,7 +196,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         id: userId,
         email: email,
         first_name: firstName,
+        last_name: lastName,
+        phone: phone,
         role: null,
+        status: status,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -189,35 +207,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Update user role - now routes through approval queue (required by DB triggers)
+  // Update user role - directly updates profile with approval flag
   const updateUserRole = async (role: string): Promise<void> => {
     if (!user) {
       throw new Error("No user logged in");
     }
 
     try {
-      console.log("🔄 Submitting role change request to:", role);
+      console.log("🔄 Updating role to:", role);
 
-      const { data, error } = await supabase
-        .from("approval_queue")
-        .insert({
-          requested_by: user.id,
-          request_type: "role_assignment",
-          request_id: user.id,
-          status: "pending",
-          metadata: { requested_role: role },
-          created_at: new Date().toISOString(),
+      // Default approval status is false for sensitive roles
+      const isAutoApproved = role === 'super_admin'; // Only super_admin via this method if allowed (usually restricted)
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          role: role,
+          approved: isAutoApproved, // Set approval status
           updated_at: new Date().toISOString(),
         })
-        .select()
-        .single();
+        .eq("id", user.id);
 
       if (error) {
-        console.error("❌ Error submitting role change:", error);
+        console.error("❌ Error updating role:", error);
         throw error;
       }
 
-      console.log("✅ Role change request submitted for approval", data);
+      console.log("✅ Role updated successfully");
+      await refreshUser();
+      
     } catch (err) {
       console.error("❌ Error in updateUserRole:", err);
       throw err;
@@ -227,6 +245,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Helper function to check if user is admin
   const isAdmin = (): boolean => {
     return user?.role === "super_admin";
+  };
+
+  // Helper check for approval
+  const isApproved = (): boolean => {
+    // Super admins are implicitly approved (or explicitly if DB says so, but safety first)
+    if (user?.role === "super_admin") return true;
+    return !!user?.approved;
   };
 
   // Get user role
@@ -267,15 +292,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       console.log("📝 Creating new profile...");
       const userEmail = supabaseUser.email || "";
-      const firstName =
+      const fullName =
         supabaseUser.user_metadata?.full_name ||
         supabaseUser.user_metadata?.name ||
         userEmail.split("@")[0];
+      const [firstName, ...rest] = fullName.split(" ");
+      const lastName =
+        supabaseUser.user_metadata?.last_name || rest.join(" ") || "";
+      const phone = supabaseUser.user_metadata?.phone || null;
+      const userType = supabaseUser.user_metadata?.account_type || null;
+      const status = userType ? "pending" : null;
 
       const newProfile = await createUserProfileInDB(
         supabaseUser.id,
         userEmail,
-        firstName
+        firstName,
+        lastName,
+        phone,
+        userType,
+        status
       );
 
       if (newProfile) {
@@ -298,19 +333,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const handlePostLoginRedirect = (userProfile: UserProfile | null) => {
     if (!userProfile) return;
 
-    console.log(`🚀 Redirecting based on role: ${userProfile.role}...`);
+    console.log(`🚀 Redirecting based on role: ${userProfile.role}, approved: ${userProfile.approved}...`);
 
+    // If no role yet, send to role selection
     if (!userProfile.role) {
+      console.log("⚠️ No role assigned yet");
       setTimeout(() => {
-        navigate("/profile", { replace: true });
+        navigate("/auth/role-selection", { replace: true });
       }, 100);
       return;
     }
 
+    // Check approval status 
+    const isUserApproved = 
+      userProfile.role === 'super_admin' || // Super admins are always approved
+      userProfile.approved === true;
+
+    if (!isUserApproved) {
+       console.log("⚠️ Account pending approval");
+       setTimeout(() => {
+         navigate("/pending-approval", { replace: true });
+       }, 100);
+       return;
+    }
+
+    // User is approved and has a role - redirect to dashboard
     setTimeout(() => {
       switch (userProfile.role) {
         case "super_admin":
-          navigate("/portal/super-admin", { replace: true });
+          navigate("/portal/super-admin/dashboard", { replace: true });
           break;
         case "property_manager":
           navigate("/portal/manager", { replace: true });
@@ -350,7 +401,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
           if (profile) {
             console.log("✅ User authenticated with profile");
-            handlePostLoginRedirect(profile);
+            // Don't redirect on initialization - only on explicit login events
           } else {
             console.log("⚠️ User authenticated but no profile");
           }
@@ -381,10 +432,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             const profile = await fetchUserProfileFromDB(session.user.id);
             setUser(profile);
 
-            if (
-              profile &&
-              (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")
-            ) {
+            // Only redirect on explicit SIGNED_IN event, not on token refresh
+            if (profile && event === "SIGNED_IN") {
               handlePostLoginRedirect(profile);
             } else if (!profile && event === "SIGNED_IN") {
               await createProfileIfMissing();
@@ -496,10 +545,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (error) return { success: false, error: error.message };
 
       if (authData.user) {
+        const [firstName, ...rest] = userData.full_name.split(" ");
+        const lastName = rest.join(" ");
         const profile = await createUserProfileInDB(
           authData.user.id,
           trimmedEmail,
-          userData.full_name
+          firstName,
+          lastName
         );
 
         if (profile) {
@@ -688,6 +740,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         clearError,
         createProfileIfMissing,
         isAdmin,
+        isApproved,
         getUserRole,
         hasPermission,
         getAvailableRoles,

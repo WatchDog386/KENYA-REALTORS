@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
   Search, 
   Heart,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  Home,
+  Key,
+  Building2,
+  Sparkles
 } from "lucide-react";
 
 // ==========================================
@@ -32,8 +36,297 @@ const GlobalStyles = () => (
         rgba(0, 0, 0, 0.05) 8px
       );
     }
+
+    /* Shimmer effect */
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    .shimmer-effect {
+      animation: shimmer 3s infinite;
+    }
   `}</style>
 );
+
+// ==========================================
+// 2. ANIMATED BACKGROUND COMPONENT
+// ==========================================
+const AnimatedBackground = () => {
+  // Floating icons that move across the banner
+  const floatingIcons = useMemo(() => [
+    { Icon: Home, delay: 0, duration: 8, startY: 20, size: 16 },
+    { Icon: Key, delay: 2, duration: 10, startY: 60, size: 14 },
+    { Icon: Building2, delay: 4, duration: 7, startY: 40, size: 18 },
+    { Icon: Sparkles, delay: 1, duration: 9, startY: 80, size: 12 },
+    { Icon: Home, delay: 3, duration: 11, startY: 30, size: 14 },
+    { Icon: Key, delay: 5, duration: 8, startY: 70, size: 16 },
+  ], []);
+
+  // Floating particles/dots
+  const particles = useMemo(() => 
+    Array.from({ length: 15 }, (_, i) => ({
+      id: i,
+      size: Math.random() * 4 + 2,
+      delay: Math.random() * 5,
+      duration: Math.random() * 4 + 6,
+      startY: Math.random() * 100,
+      opacity: Math.random() * 0.3 + 0.1,
+    })), []);
+
+  // Ripple circles
+  const ripples = useMemo(() => [
+    { delay: 0, duration: 3 },
+    { delay: 0.5, duration: 3 },
+    { delay: 1, duration: 3 },
+    { delay: 1.5, duration: 3 },
+  ], []);
+
+  // Radial beams
+  const radialBeams = useMemo(() => 
+    Array.from({ length: 12 }, (_, i) => ({
+      angle: (i * 30),
+      delay: i * 0.1,
+    })), []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ left: '192px' }}>
+      
+      {/* PHASE 1: RIPPLES - Circular waves emanating from center */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {ripples.map((ripple, index) => (
+          <motion.div
+            key={`ripple-${index}`}
+            className="absolute rounded-full border-2 border-[#F96302]"
+            style={{
+              width: 20,
+              height: 20,
+            }}
+            animate={{
+              width: [20, 400, 400],
+              height: [20, 400, 400],
+              opacity: [0.8, 0, 0],
+              borderWidth: [4, 1, 0],
+            }}
+            transition={{
+              duration: ripple.duration,
+              delay: ripple.delay,
+              repeat: Infinity,
+              ease: 'easeOut',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* PHASE 2: SPIRALS - Rotating spiral arms */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <motion.div
+          className="absolute"
+          style={{ width: 300, height: 300 }}
+          animate={{ rotate: 360 }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        >
+          {[0, 1, 2, 3].map((arm) => (
+            <motion.div
+              key={`spiral-arm-${arm}`}
+              className="absolute top-1/2 left-1/2 origin-left"
+              style={{
+                width: 150,
+                height: 4,
+                background: `linear-gradient(90deg, #F96302, transparent)`,
+                transform: `rotate(${arm * 90}deg)`,
+                borderRadius: 2,
+              }}
+              animate={{
+                opacity: [0.6, 0.2, 0.6],
+                scaleX: [0.5, 1, 0.5],
+              }}
+              transition={{
+                duration: 2,
+                delay: arm * 0.5,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            />
+          ))}
+        </motion.div>
+        
+        {/* Inner rotating spiral */}
+        <motion.div
+          className="absolute"
+          style={{ width: 200, height: 200 }}
+          animate={{ rotate: -360 }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        >
+          {[0, 1, 2].map((arm) => (
+            <motion.div
+              key={`inner-spiral-${arm}`}
+              className="absolute top-1/2 left-1/2 origin-left"
+              style={{
+                width: 100,
+                height: 3,
+                background: `linear-gradient(90deg, #FCD200, transparent)`,
+                transform: `rotate(${arm * 120}deg)`,
+                borderRadius: 2,
+              }}
+              animate={{
+                opacity: [0.5, 0.15, 0.5],
+              }}
+              transition={{
+                duration: 1.5,
+                delay: arm * 0.3,
+                repeat: Infinity,
+                ease: 'easeInOut',
+              }}
+            />
+          ))}
+        </motion.div>
+      </div>
+
+      {/* PHASE 3: RADIALS - Beams radiating outward */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {radialBeams.map((beam, index) => (
+          <motion.div
+            key={`radial-${index}`}
+            className="absolute origin-center"
+            style={{
+              width: 2,
+              height: 60,
+              background: 'linear-gradient(to top, #F96302, transparent)',
+              transform: `rotate(${beam.angle}deg) translateY(-80px)`,
+            }}
+            animate={{
+              height: [40, 100, 40],
+              opacity: [0.3, 0.7, 0.3],
+            }}
+            transition={{
+              duration: 2,
+              delay: beam.delay,
+              repeat: Infinity,
+              ease: 'easeInOut',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Pulsing center glow */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <motion.div
+          className="absolute w-16 h-16 bg-[#F96302] rounded-full filter blur-xl"
+          animate={{
+            scale: [1, 1.5, 1],
+            opacity: [0.3, 0.6, 0.3],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+        <motion.div
+          className="absolute w-8 h-8 bg-[#FCD200] rounded-full filter blur-lg"
+          animate={{
+            scale: [1.2, 0.8, 1.2],
+            opacity: [0.4, 0.8, 0.4],
+          }}
+          transition={{
+            duration: 1.5,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      </div>
+
+      {/* Color sweep overlay that ties it together */}
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: 'radial-gradient(circle at center, #F96302 0%, transparent 70%)',
+        }}
+        animate={{
+          opacity: [0.1, 0.25, 0.1],
+          scale: [0.8, 1.2, 0.8],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
+      />
+
+      {/* Shimmer line effect */}
+      <div className="absolute inset-0 overflow-hidden">
+        <motion.div
+          className="absolute top-0 left-0 w-1/3 h-full bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12"
+          animate={{
+            x: ['-100%', '400%'],
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            repeatDelay: 2,
+            ease: 'easeInOut',
+          }}
+        />
+      </div>
+
+      {/* Floating Icons */}
+      {floatingIcons.map(({ Icon, delay, duration, startY, size }, index) => (
+        <motion.div
+          key={`icon-${index}`}
+          className="absolute text-white/10"
+          style={{ top: `${startY}%` }}
+          initial={{ x: '-10%', opacity: 0 }}
+          animate={{ 
+            x: '110%', 
+            opacity: [0, 0.15, 0.15, 0],
+            rotate: [0, 15, -15, 0],
+          }}
+          transition={{
+            duration,
+            delay,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        >
+          <Icon size={size} />
+        </motion.div>
+      ))}
+
+      {/* Floating Particles */}
+      {particles.map((particle) => (
+        <motion.div
+          key={`particle-${particle.id}`}
+          className="absolute rounded-full bg-white"
+          style={{
+            width: particle.size,
+            height: particle.size,
+            top: `${particle.startY}%`,
+            opacity: particle.opacity,
+          }}
+          initial={{ x: '-5%' }}
+          animate={{ 
+            x: '105%',
+            y: [0, -20, 10, -10, 0],
+          }}
+          transition={{
+            duration: particle.duration,
+            delay: particle.delay,
+            repeat: Infinity,
+            ease: 'linear',
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 export default function TenantCTABanner() {
   const [isSaved, setIsSaved] = useState(() => {
@@ -50,7 +343,7 @@ export default function TenantCTABanner() {
   return (
     <>
     <GlobalStyles />
-    <section className="w-full bg-[#f7f7f7] py-4 px-4 text-[#484848]">
+    <section className="w-full bg-slate-50 py-4 px-4 text-[#484848]">
       <motion.div 
         initial={{ opacity: 0, y: 5 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -59,7 +352,10 @@ export default function TenantCTABanner() {
       >
         
         {/* COMPACT STRIP CONTAINER */}
-        <div className="bg-[#154279] realtor-strip-hover transition-colors duration-300 flex flex-col md:flex-row h-auto md:h-40 relative overflow-hidden border-b-4 border-black/20">
+        <div className="bg-[#154279] transition-colors duration-300 flex flex-col md:flex-row h-auto md:h-40 relative overflow-hidden">
+          
+          {/* Animated Background Effects */}
+          <AnimatedBackground />
           
           {/* Background Texture */}
           <div className="absolute inset-0 bg-texture-stripes opacity-20 pointer-events-none"></div>

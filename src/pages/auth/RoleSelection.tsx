@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Shield, 
   Users, 
   Home, 
   CheckCircle,
@@ -10,28 +9,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 
 const RoleSelection = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUserRole } = useAuth();
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const roles = [
-    {
-      id: 'super_admin',
-      title: 'Super Administrator',
-      icon: Shield,
-      description: 'Full system access. Can manage all properties, assign managers, and approve all requests.',
-      features: [
-        'Manage all properties',
-        'Assign property managers',
-        'Approve all requests',
-        'System configuration',
-        'View all financial data'
-      ],
-      color: 'border-blue-200 hover:border-blue-400 bg-blue-50'
-    },
     {
       id: 'property_manager',
       title: 'Property Manager',
@@ -71,23 +58,29 @@ const RoleSelection = () => {
     
     setIsSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateUserRole(selectedRole);
       
-      switch (selectedRole) {
-        case 'super_admin':
-          navigate('/portal/super-admin');
-          break;
-        case 'property_manager':
-          navigate('/portal/manager');
-          break;
-        case 'tenant':
-          navigate('/portal/tenant');
-          break;
-        default:
-          navigate('/portal');
-      }
+      toast({
+        title: "Role Updated",
+        description: "Your role has been updated. Redirecting...",
+      });
+
+      // Redirect handled by AuthContext or simplified here
+      setTimeout(() => {
+        if (selectedRole === 'property_manager' || selectedRole === 'tenant') {
+          navigate('/pending-approval');
+        } else {
+           navigate('/portal');
+        }
+      }, 1000);
+      
     } catch (error) {
       console.error('Error updating role:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update role. Please try again.",
+        variant: "destructive",
+      });
       setIsSubmitting(false);
     }
   };

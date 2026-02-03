@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,32 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { User, Phone, Mail, Lock, Loader2, ArrowLeft, Building2, Home } from "lucide-react";
-
-interface Property {
-  id: string;
-  name: string;
-  address?: string;
-}
-
-interface Unit {
-  id: string;
-  unit_number: string;
-  unit_type: string;
-  floor_number: number;
-  price_monthly: number;
-  property_id: string;
-  status: string;
-}
+import { User, Phone, Mail, Lock, Loader2, ArrowLeft } from "lucide-react";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [availableUnits, setAvailableUnits] = useState<Unit[]>([]);
-  const [loadingUnits, setLoadingUnits] = useState(false);
   
   const [formData, setFormData] = useState({
     fullName: "",
@@ -40,111 +21,10 @@ export default function RegisterPage() {
     phone: "",
     password: "",
     confirmPassword: "",
-    role: "tenant",
-    // Tenant specific fields
-    propertyId: "",
-    unitId: "",
-    // Property manager specific fields
-    managedPropertyIds: [] as string[],
+    accountType: "tenant", // Changed from 'role' to 'accountType' for clarity
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Fetch properties for dropdowns
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        console.log("🏢 Fetching properties...");
-        const { data, error } = await supabase
-          .from("properties")
-          .select("id, name, address")
-          .eq("status", "active")
-          .order("name", { ascending: true });
-
-        console.log("📊 Properties query - Error:", error, "Data:", data);
-        if (error) {
-          console.error("❌ Error fetching properties:", error);
-          throw error;
-        }
-        console.log("✅ Successfully fetched properties:", data);
-        setProperties(data || []);
-      } catch (error) {
-        console.error("❌ Error fetching properties:", error);
-        // Use mock properties as fallback
-        const mockProps = [
-          { id: 'prop-1', name: 'Westside Apartments', address: '123 Main Street' },
-          { id: 'prop-2', name: 'Downtown Plaza', address: '456 Business Avenue' },
-          { id: 'prop-3', name: 'Suburban Villas', address: '789 Residential Park' },
-        ];
-        setProperties(mockProps);
-      }
-    };
-
-    fetchProperties();
-  }, []);
-
-  // Fetch available units when property is selected
-  const handlePropertySelect = async (propertyId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      propertyId,
-      unitId: "", // Clear unit selection when property changes
-    }));
-
-    if (!propertyId) {
-      setAvailableUnits([]);
-      return;
-    }
-    const buildMockUnits = () => {
-      const pid = propertyId || "mock-property";
-      return [
-        { id: `${pid}-mock-1`, unit_number: "101", unit_type: "1BR", floor_number: 1, price_monthly: 950, property_id: pid, status: "vacant" },
-        { id: `${pid}-mock-2`, unit_number: "201", unit_type: "2BR", floor_number: 2, price_monthly: 1250, property_id: pid, status: "vacant" },
-        { id: `${pid}-mock-3`, unit_number: "PH-1", unit_type: "Penthouse", floor_number: 5, price_monthly: 2100, property_id: pid, status: "vacant" },
-      ];
-    };
-
-    setLoadingUnits(true);
-    try {
-      console.log("🔍 Fetching units for property:", propertyId);
-      
-      const { data, error } = await supabase
-        .from("units_detailed")
-        .select("id, unit_number, unit_type, floor_number, price_monthly, property_id, status")
-        .eq("property_id", propertyId)
-        .eq("status", "vacant")
-        .order("unit_number");
-
-      console.log("📊 Query response - Error:", error, "Data:", data);
-
-      if (error) {
-        console.error("❌ Database error fetching units:", error);
-        // Use mock units as fallback
-        console.log("⚠️ Using mock units due to error");
-        toast.error("Error loading units. Using sample units so you can continue.");
-        setAvailableUnits(buildMockUnits());
-        setLoadingUnits(false);
-        return;
-      }
-      
-      if (!data || data.length === 0) {
-        console.warn("⚠️ No vacant units found for property:", propertyId);
-        toast.info("ℹ️ No vacant units available right now. Showing sample units for demo.", { duration: 4000 });
-        setAvailableUnits(buildMockUnits());
-        setLoadingUnits(false);
-        return;
-      }
-      
-      console.log("✅ Successfully fetched units:", data);
-      setAvailableUnits(data);
-      setLoadingUnits(false);
-    } catch (error) {
-      console.error("❌ Error fetching units:", error);
-      toast.error("Unable to load units. Showing sample data.");
-      setAvailableUnits(buildMockUnits());
-      setLoadingUnits(false);
-    }
-  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>
@@ -165,15 +45,12 @@ export default function RegisterPage() {
   const handleRoleChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
-      role: value,
-      propertyId: "",
-      unitId: "",
-      managedPropertyIds: [],
+      accountType: value,
     }));
-    if (errors.role) {
+    if (errors.accountType) {
       setErrors((prev) => ({
         ...prev,
-        role: "",
+        accountType: "",
       }));
     }
   };
@@ -203,22 +80,8 @@ export default function RegisterPage() {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
-    if (!formData.role) {
-      newErrors.role = "Please select an account type";
-    }
-
-    // Role-specific validation
-    if (formData.role === "tenant") {
-      if (!formData.propertyId.trim()) {
-        newErrors.propertyId = "Property is required for tenants";
-      }
-      if (!formData.unitId.trim()) {
-        newErrors.unitId = "Please select a unit/house number";
-      }
-    } else if (formData.role === "property_manager") {
-      if (formData.managedPropertyIds.length === 0) {
-        newErrors.managedPropertyIds = "Select at least one property to manage";
-      }
+    if (!formData.accountType) {
+      newErrors.accountType = "Please select an account type";
     }
 
     setErrors(newErrors);
@@ -234,14 +97,17 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
+      console.log("📝 Attempting registration for:", formData.email, "Account Type:", formData.accountType);
       const { data, error: signupError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName,
+            first_name: formData.fullName.trim().split(" ")[0],
+            last_name: formData.fullName.trim().split(" ").slice(1).join(" "),
             phone: formData.phone,
-            role: formData.role,
+            account_type: formData.accountType, // Store account type, not role
+            // NOTE: role will be assigned by super admin after approval
           },
         },
       });
@@ -249,177 +115,105 @@ export default function RegisterPage() {
       if (signupError) throw signupError;
 
       if (data.user) {
-        // Create profile with role-specific fields
-        // The trigger handle_new_user() automatically creates a basic profile
-        // Now we update it with additional data
-        console.log("🔐 Creating/updating profile for user:", data.user.id);
-        
-        const profileData: any = {
-          id: data.user.id,
-          email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
-          status: formData.role === "property_manager" ? "pending" : "active",
-        };
+        console.log("✅ Auth user created successfully:", data.user.id);
 
-        // Add tenant-specific fields - get unit info
-        if (formData.role === "tenant") {
-          const selectedUnit = availableUnits.find(u => u.id === formData.unitId);
-          if (selectedUnit) {
-            profileData.unit_id = formData.unitId;
-            profileData.property_id = formData.propertyId;
-          }
-        }
+        // Wait a moment for any auth trigger to create the profile
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Update the profile (the trigger should have already created it)
-        console.log("📝 Updating profile with additional data:", profileData);
-        const { error: updateError } = await supabase
+        // Fetch or create the profile (fallback if trigger failed)
+        console.log("🔍 Fetching created profile...");
+        let { data: profileData, error: profileFetchError } = await supabase
           .from("profiles")
-          .update(profileData)
-          .eq("id", data.user.id);
-        
-        if (updateError) {
-          console.error("⚠️ Profile update warning (non-critical):", updateError.message);
-          // Don't throw - profile may already be created by trigger
-        } else {
-          console.log("✅ Profile updated successfully");
+          .select("id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (profileFetchError || !profileData) {
+          console.warn("⚠️ Profile missing, creating fallback profile...");
+
+          const [firstName, ...rest] = formData.fullName.trim().split(" ");
+          const lastName = rest.join(" ");
+
+          const { data: createdProfile, error: createProfileError } = await supabase
+            .from("profiles")
+            .insert({
+              id: data.user.id,
+              email: formData.email.trim().toLowerCase(),
+              first_name: firstName || "",
+              last_name: lastName || "",
+              phone: formData.phone,
+              role: null,
+              status: "pending",
+              user_type: formData.accountType,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select("id")
+            .single();
+
+          if (createProfileError || !createdProfile) {
+            console.error("❌ Profile create error:", createProfileError);
+            throw new Error("Profile could not be created. Please contact support.");
+          }
+
+          profileData = createdProfile;
         }
 
-        // Update unit status to reserved for tenant
-        if (formData.role === "tenant") {
-          console.log("📌 Marking unit as reserved for tenant:", formData.unitId);
-          const { error: unitError } = await supabase
-            .from("units_detailed")
-            .update({
-              status: "reserved",
-              occupant_id: data.user.id,
-            })
-            .eq("id", formData.unitId);
+        const profileId = profileData.id;
+        console.log("✅ Profile confirmed:", profileId);
 
-          if (unitError) {
-            console.warn("⚠️ Unit status update warning:", unitError.message);
-          }
+        // Mark user as pending approval by super admin
+        console.log("🔄 Marking user as pending approval...");
+        
+        // Create a single pending approval record
+        const { error: approvalError } = await supabase
+          .from("profiles")
+          .update({
+            status: "pending",
+            user_type: formData.accountType, // Store what they registered as
+            // role remains NULL until super admin assigns
+          })
+          .eq("id", profileId);
 
-          // Create approval request for tenant verification
-          console.log("📋 Creating tenant verification approval request");
-          const { error: verifyError } = await supabase
-            .from("approval_requests")
-            .insert({
-              submitted_by: data.user.id,
-              type: "tenant_verification",
-              title: `Tenant Verification: ${formData.fullName}`,
-              description: `New tenant registration for Unit ${availableUnits.find(u => u.id === formData.unitId)?.unit_number}`,
-              property_id: formData.propertyId,
-              unit_id: formData.unitId,
-              status: "pending",
-            });
+        if (approvalError) {
+          console.warn("⚠️ Profile update warning:", approvalError.message);
+        } else {
+          console.log("✅ User marked as pending approval");
+        }
 
-          if (verifyError) {
-            console.warn("⚠️ Verification request warning:", verifyError.message);
-          }
+        // Notify super admins about new registration
+        try {
+          console.log("🔔 Fetching super admins for notification");
+          const { data: superAdmins, error: adminError } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("role", "super_admin")
+            .eq("status", "active");
 
-          // Notify property manager
-          try {
-            const { data: property, error: propError } = await supabase
-              .from("properties")
-              .select("property_manager_id, name")
-              .eq("id", formData.propertyId)
-              .single();
-
-            if (propError) {
-              console.warn("⚠️ Property fetch warning:", propError.message);
-            } else if (property?.property_manager_id) {
-              const unit = availableUnits.find(u => u.id === formData.unitId);
-              console.log("📧 Sending notification to property manager:", property.property_manager_id);
-              const { error: notifError } = await supabase
+          if (!adminError && superAdmins && superAdmins.length > 0) {
+            for (const admin of superAdmins) {
+              await supabase
                 .from("notifications")
                 .insert({
-                  recipient_id: property.property_manager_id,
+                  recipient_id: admin.id,
                   sender_id: data.user.id,
-                  type: "tenant_verification",
-                  related_entity_type: "tenant",
+                  type: "new_user_registration",
+                  related_entity_type: "user",
                   related_entity_id: data.user.id,
-                  title: "New Tenant Registration",
-                  message: `${formData.fullName} has registered for Unit ${unit?.unit_number} at ${property.name}. Please verify their information in your dashboard.`,
+                  title: `New ${formData.accountType === 'tenant' ? 'Tenant' : 'Property Manager'} Registration`,
+                  message: `${formData.fullName} has registered as a ${formData.accountType === 'tenant' ? 'tenant' : 'property manager'}. Review and assign in User Management.`,
                 });
-              if (notifError) {
-                console.warn("⚠️ Notification warning:", notifError.message);
-              }
             }
-          } catch (error) {
-            console.warn("⚠️ Property manager notification warning:", error);
+            console.log("✅ Notifications sent to super admins");
           }
-
-          toast.success("✅ Registration successful! Awaiting property manager verification.");
-          toast.info("📧 You'll be able to login once the property manager approves your application.", { duration: 5000 });
-          setTimeout(() => navigate("/login"), 3000);
-        } else if (formData.role === "property_manager") {
-          // Create approval request for manager registration
-          const managedPropertyNames = properties
-            .filter(p => formData.managedPropertyIds.includes(p.id))
-            .map(p => p.name);
-          
-          console.log("📋 Creating manager approval request for:", data.user.id);
-          
-          const { error: approvalError } = await supabase
-            .from("approval_requests")
-            .insert({
-              submitted_by: data.user.id,
-              type: "manager_assignment",
-              title: `Property Manager Registration: ${formData.fullName}`,
-              description: `New property manager registration for: ${managedPropertyNames.join(", ")}`,
-              status: "pending",
-            });
-
-          if (approvalError) {
-            console.warn("⚠️ Manager approval creation warning:", approvalError.message);
-          } else {
-            console.log("✅ Manager approval request created");
-          }
-
-          // Notify super admin
-          try {
-            console.log("🔔 Fetching super admins for notification");
-            const { data: superAdmins, error: adminError } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("role", "super_admin");
-
-            if (adminError) {
-              console.warn("⚠️ Super admin fetch warning:", adminError.message);
-            } else if (superAdmins && superAdmins.length > 0) {
-              console.log("📧 Found", superAdmins.length, "super admins to notify");
-              for (const admin of superAdmins) {
-                const { error: notifError } = await supabase
-                  .from("notifications")
-                  .insert({
-                    recipient_id: admin.id,
-                    sender_id: data.user.id,
-                    type: "manager_approval",
-                    related_entity_type: "manager",
-                    related_entity_id: data.user.id,
-                    title: "New Property Manager Registration",
-                    message: `${formData.fullName} has registered as a property manager for ${managedPropertyNames.join(", ")}. Please review and approve in your dashboard.`,
-                  });
-                if (notifError) {
-                  console.warn("⚠️ Notification warning:", notifError.message);
-                }
-              }
-            } else {
-              console.warn("⚠️ No super admins found to notify");
-            }
-          } catch (notificationError) {
-            console.warn("⚠️ Notification error:", notificationError);
-          }
-
-          toast.success("✅ Registration successful! Awaiting admin approval.");
-          toast.info("📧 You'll be able to login once the administrator approves your registration.", { duration: 5000 });
-          setTimeout(() => navigate("/login"), 3000);
-        } else {
-          toast.success("✅ Account created! Please check your email to confirm your account.");
-          toast.info("📧 You will be redirected to login shortly.", { duration: 3000 });
-          setTimeout(() => navigate("/login"), 3000);
+        } catch (error) {
+          console.warn("⚠️ Notification error:", error);
         }
+
+        toast.success("✅ Registration successful!");
+        toast.info("📧 Awaiting administrator approval. You'll be assigned and activated soon.", { duration: 5000 });
+        setTimeout(() => navigate("/login"), 2000);
       }
     } catch (error: any) {
       console.error("❌ Registration error:", error);
@@ -437,8 +231,9 @@ export default function RegisterPage() {
         toast.error("Registration data invalid. Please check all fields and try again.");
       } else if (errorCode === "429" || errorMessage.includes("Too many")) {
         toast.error("Too many registration attempts. Please try again in a few minutes.");
-      } else if (errorCode === "500" || errorMessage.includes("Internal Server")) {
-        toast.error("Server error during registration. Please try again in a moment.");
+      } else if (errorCode === "500" || errorMessage.includes("Internal Server") || errorMessage.includes("Database error")) {
+        console.error("🔥 CRITICAL REGISTRATION ERROR: The database trigger likely failed or RLS policies are blocking creation.");
+        toast.error("Database error. PLEASE RUN '20260204_emergency_fix_rls_recursion.sql' in your Supabase SQL Editor.", { duration: 15000 });
       } else {
         toast.error(errorMessage || "Registration failed. Please try again.");
       }
@@ -448,7 +243,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f7f7] flex items-center justify-center p-4 md:p-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="min-h-screen flex items-center justify-center p-4 md:p-8" style={{ fontFamily: "'Montserrat', sans-serif", backgroundColor: "#1a232e" }}>
       <div className="w-full max-w-3xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -538,25 +333,24 @@ export default function RegisterPage() {
 
               {/* Two Column: Role & Password */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Role - Card Container */}
+                {/* Account Type Dropdown */}
                 <div className="space-y-2">
-                  <Label htmlFor="role" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Account Type</Label>
+                  <Label htmlFor="accountType" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Account Type</Label>
                   <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-50">
                     <Select 
-                      value={formData.role} 
+                      value={formData.accountType} 
                       onValueChange={handleRoleChange}
                     >
-                      <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm relative z-50 text-slate-800 dark:text-slate-800 ${errors.role ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select your role" />
+                      <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm relative z-50 text-slate-800 dark:text-slate-800 ${errors.accountType ? 'border-red-500' : ''}`}>
+                        <SelectValue placeholder="Select your account type" />
                       </SelectTrigger>
                       <SelectContent className="z-[9999] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
-                        <SelectItem value="tenant">Tenant / Looking to Rent</SelectItem>
-                        <SelectItem value="property_manager">Property Manager</SelectItem>
-                        <SelectItem value="property_owner">Property Owner</SelectItem>
+                        <SelectItem value="tenant">👤 Tenant / Renter</SelectItem>
+                        <SelectItem value="property_manager">🏢 Property Manager</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  {errors.role && <p className="text-xs text-red-500 font-bold">{errors.role}</p>}
+                  {errors.accountType && <p className="text-xs text-red-500 font-bold">{errors.accountType}</p>}
                 </div>
 
                 {/* Password */}
@@ -578,142 +372,6 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* TENANT-SPECIFIC FIELDS */}
-              {formData.role === "tenant" && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50 border border-blue-200 rounded-none"
-                >
-                  {/* Property Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="propertyId" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Select Property</Label>
-                    <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-40">
-                      <Select 
-                        value={formData.propertyId} 
-                        onValueChange={(value) => {
-                          handlePropertySelect(value);
-                          if (errors.propertyId) {
-                            setErrors((prev) => ({ ...prev, propertyId: "" }));
-                          }
-                        }}
-                      >
-                        <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm text-slate-800 dark:text-slate-800 ${errors.propertyId ? 'border-red-500' : ''}`}>
-                          <SelectValue placeholder="Choose your property" />
-                        </SelectTrigger>
-                        <SelectContent className="z-[9998] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
-                          {properties.map((prop) => (
-                            <SelectItem key={prop.id} value={prop.id}>
-                              {prop.name} {prop.address ? `- ${prop.address}` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {errors.propertyId && <p className="text-xs text-red-500 font-bold">{errors.propertyId}</p>}
-                  </div>
-
-                  {/* Unit Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="unitId" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Select Unit</Label>
-                    <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-40">
-                      {loadingUnits ? (
-                        <div className="h-10 flex items-center justify-center">
-                          <p className="text-xs text-slate-500">Loading available units...</p>
-                        </div>
-                      ) : (
-                        <Select 
-                          value={formData.unitId} 
-                          onValueChange={(value) => {
-                            setFormData((prev) => ({ ...prev, unitId: value }));
-                            if (errors.unitId) {
-                              setErrors((prev) => ({ ...prev, unitId: "" }));
-                            }
-                          }}
-                        >
-                          <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm text-slate-800 dark:text-slate-800 ${errors.unitId ? 'border-red-500' : ''}`}>
-                            <SelectValue placeholder={availableUnits.length === 0 ? "No units available" : "Choose your unit"} />
-                          </SelectTrigger>
-                          <SelectContent className="z-[9998] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
-                            {availableUnits.map((unit) => (
-                              <SelectItem key={unit.id} value={unit.id}>
-                                Unit {unit.unit_number} - {unit.unit_type} (${unit.price_monthly}/mo)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
-                    {errors.unitId && <p className="text-xs text-red-500 font-bold">{errors.unitId}</p>}
-                    {!loadingUnits && availableUnits.length === 0 && formData.propertyId && (
-                      <p className="text-xs text-orange-600 font-medium mt-1">
-                        ⚠️ No vacant units available. Please contact the property manager or select another property.
-                      </p>
-                    )}
-                    {formData.unitId && (
-                      <div className="text-xs text-slate-600 mt-1 p-2 bg-white border border-slate-100 rounded">
-                        <strong>Unit Details:</strong> {availableUnits.find(u => u.id === formData.unitId)?.unit_type} • Floor {availableUnits.find(u => u.id === formData.unitId)?.floor_number}
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="col-span-full text-xs text-slate-600 font-medium">
-                    ℹ️ Your information will be sent to the property manager for verification before you can access your tenant portal.
-                  </p>
-                </motion.div>
-              )}
-
-              {/* PROPERTY MANAGER-SPECIFIC FIELDS */}
-              {formData.role === "property_manager" && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-4 bg-purple-50 border border-purple-200 rounded-none space-y-3"
-                >
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-widest">Managed Properties</Label>
-                    <p className="text-xs text-slate-600 font-medium mb-2">Select the properties you manage:</p>
-                    <div className="grid grid-cols-1 gap-2">
-                      {properties.map((prop) => (
-                        <label key={prop.id} className="flex items-center gap-2 p-2 rounded-none bg-white border border-slate-200 hover:border-purple-300 cursor-pointer transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={formData.managedPropertyIds.includes(prop.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  managedPropertyIds: [...prev.managedPropertyIds, prop.id],
-                                }));
-                              } else {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  managedPropertyIds: prev.managedPropertyIds.filter(id => id !== prop.id),
-                                }));
-                              }
-                              if (errors.managedPropertyIds) {
-                                setErrors((prev) => ({ ...prev, managedPropertyIds: "" }));
-                              }
-                            }}
-                            className="w-4 h-4 rounded-none accent-purple-600 cursor-pointer"
-                          />
-                          <span className="text-sm text-slate-700 font-medium">
-                            {prop.name} {prop.address ? `- ${prop.address}` : ''}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    {errors.managedPropertyIds && <p className="text-xs text-red-500 font-bold">{errors.managedPropertyIds}</p>}
-                  </div>
-
-                  <p className="text-xs text-slate-600 font-medium bg-white p-2 rounded-none border border-purple-200">
-                    ℹ️ Your registration will be sent to the administrator for approval. Once approved, you can manage your properties and tenants.
-                  </p>
-                </motion.div>
-              )}
-
               {/* Confirm Password */}
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Confirm Password</Label>
@@ -730,6 +388,13 @@ export default function RegisterPage() {
                   />
                 </div>
                 {errors.confirmPassword && <p className="text-xs text-red-500 font-bold">{errors.confirmPassword}</p>}
+              </div>
+
+              {/* Info Box for signup message */}
+              <div className="p-4 border rounded-none bg-blue-50 border-blue-200">
+                <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                  💡 Sign up with your basic information. A super admin will review your registration, assign roles and properties, then activate your account.
+                </p>
               </div>
 
               {/* Show Passwords Toggle */}

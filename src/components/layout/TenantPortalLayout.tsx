@@ -34,7 +34,7 @@ interface NavItem {
   description: string;
 }
 
-const TenantPortalLayout = ({ children }: { children: ReactNode }) => {
+const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
