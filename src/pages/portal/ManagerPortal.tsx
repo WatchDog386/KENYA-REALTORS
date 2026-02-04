@@ -226,7 +226,7 @@ const ManagerPortal = () => {
       title: "Managed Properties",
       value: stats.managedProperties,
       icon: <Building className="w-8 h-8 text-[#154279]" />,
-      metric: `${stats.properties?.reduce((acc, p) => acc + (p.units_count || 0), 0) || 0} Units`,
+      metric: `${stats.properties?.reduce((acc, p) => acc + (p.total_units || 0), 0) || 0} Units`,
       progress: stats.occupancyRate || 0,
       label: "Occupancy",
       route: "/portal/manager/properties",

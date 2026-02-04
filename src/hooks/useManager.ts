@@ -15,6 +15,9 @@ export interface ManagerStats {
     tenants: number;
     occupancy: number;
     revenue: number;
+    total_units: number;
+    status: string;
+    property_unit_types?: any[];
   }>;
 }
 
@@ -131,8 +134,11 @@ export const useManager = (managerId?: string) => {
         .select(`
           id,
           name,
+          total_units,
+          status,
           property_unit_types(
-            price_per_unit
+            price_per_unit,
+            units_count
           ),
           tenants(
             id,
@@ -165,6 +171,9 @@ export const useManager = (managerId?: string) => {
           tenants: ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0),
           occupancy: 0,
           revenue: 0,
+          total_units: p.total_units || 0,
+          status: p.status || 'available',
+          property_unit_types: p.property_unit_types,
         })),
       };
     } catch (err) {
