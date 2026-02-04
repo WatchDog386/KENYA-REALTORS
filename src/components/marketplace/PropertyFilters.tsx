@@ -35,14 +35,14 @@ const PropertyFilters: React.FC<PropertyFiltersProps> = ({ onFilterChange }) => 
   ];
 
   const amenitiesList = [
+    'Swimming Pool',
+    'Gym Access',
+    'High-Speed Wifi',
+    'Smart Home',
+    'Panoramic View',
     'Parking',
-    'Pool',
-    'Gym',
-    'Laundry',
     'Pet Friendly',
     'Furnished',
-    'Air Conditioning',
-    'Balcony',
   ];
 
   const handleChange = (key: keyof FilterOptions, value: any) => {
@@ -65,58 +65,51 @@ const PropertyFilters: React.FC<PropertyFiltersProps> = ({ onFilterChange }) => 
   return (
     <div className="bg-white rounded-xl shadow-md p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Filter Properties</h3>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 text-primary hover:underline"
-        >
-          <Filter size={20} />
-          <span>{isExpanded ? 'Show Less' : 'More Filters'}</span>
-          <ChevronDown className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} size={20} />
-        </button>
+        <h3 className="text-lg font-semibold text-gray-900">Quick Search Filters</h3>
+        <span className="text-sm text-gray-600">Find your perfect property in seconds</span>
       </div>
 
       {/* Search Bar */}
-      <div className="relative mb-6">
+      <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
         <input
           type="text"
           value={filters.search}
           onChange={handleSearch}
-          placeholder="Search by location, property name, or amenities..."
+          placeholder="Search by location, property name..."
           className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
         />
       </div>
 
-      {/* Price Range */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Price Range: ${filters.minPrice} - ${filters.maxPrice}
-        </label>
-        <div className="flex gap-4">
-          <input
-            type="range"
-            min="0"
-            max="10000"
-            step="100"
-            value={filters.minPrice}
-            onChange={(e) => handleChange('minPrice', parseInt(e.target.value))}
-            className="flex-1"
-          />
-          <input
-            type="range"
-            min="0"
-            max="10000"
-            step="100"
-            value={filters.maxPrice}
-            onChange={(e) => handleChange('maxPrice', parseInt(e.target.value))}
-            className="flex-1"
-          />
+      {/* Main Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Price Range */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Price Range
+          </label>
+          <div className="flex gap-2 items-center">
+            <input
+              type="number"
+              min="0"
+              value={filters.minPrice}
+              onChange={(e) => handleChange('minPrice', parseInt(e.target.value) || 0)}
+              placeholder="Min"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+            <span className="text-gray-500">-</span>
+            <input
+              type="number"
+              min="0"
+              value={filters.maxPrice}
+              onChange={(e) => handleChange('maxPrice', parseInt(e.target.value) || 0)}
+              placeholder="Max"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Basic Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* Bedrooms */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Bedrooms
@@ -134,6 +127,7 @@ const PropertyFilters: React.FC<PropertyFiltersProps> = ({ onFilterChange }) => 
           </select>
         </div>
 
+        {/* Property Type */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Property Type
@@ -150,27 +144,23 @@ const PropertyFilters: React.FC<PropertyFiltersProps> = ({ onFilterChange }) => 
         </div>
       </div>
 
-      {/* Expanded Filters */}
-      {isExpanded && (
-        <div className="border-t pt-6">
-          <h4 className="font-medium text-gray-900 mb-4">Amenities</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {amenitiesList.map(amenity => (
-              <button
-                key={amenity}
-                onClick={() => toggleAmenity(amenity)}
-                className={`px-4 py-2 rounded-lg border transition-colors ${
-                  filters.amenities.includes(amenity)
-                    ? 'bg-primary/10 border-primary text-primary'
-                    : 'border-gray-300 hover:border-primary'
-                }`}
-              >
-                {amenity}
-              </button>
-            ))}
-          </div>
+      {/* Amenities Section */}
+      <div className="border-t pt-6">
+        <h4 className="font-semibold text-gray-900 mb-4">Select Amenities</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {amenitiesList.map(amenity => (
+            <label key={amenity} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={filters.amenities.includes(amenity)}
+                onChange={() => toggleAmenity(amenity)}
+                className="w-4 h-4 border border-gray-300 rounded focus:ring-2 focus:ring-primary"
+              />
+              <span className="text-sm text-gray-700">{amenity}</span>
+            </label>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -84,8 +84,7 @@ const PropertyManager: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('property_manager_assignments')
-        .select('property_id, property_manager_id, profiles(first_name, last_name, email)')
-        .eq('status', 'active');
+        .select('property_id, property_manager_id, profiles(first_name, last_name, email)');
 
       if (error) throw error;
 

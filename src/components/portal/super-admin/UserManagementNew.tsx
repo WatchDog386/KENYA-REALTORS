@@ -176,21 +176,76 @@ const UserManagementNew: React.FC = () => {
     newRole: string,
     managedProperties?: string[],
     propertyId?: string,
-    unitId?: string
+    unitId?: string,
+    userData?: User
   ) => {
     try {
       console.log("🔄 Assigning role to user:", { userId, newRole });
 
+      // Step 0: Check if profile exists, if not create it
+      const { data: existingProfile, error: checkError } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error("❌ Error checking profile:", checkError.message);
+        throw checkError;
+      }
+
+      // If profile doesn't exist, create it from user data
+      if (!existingProfile) {
+        console.log("⚠️  Profile missing, creating it from user data...");
+        
+        if (!userData) {
+          console.error("❌ User data not provided for profile creation");
+          throw new Error(`Cannot create profile: user data not available`);
+        }
+
+        // Create profile from user data
+        console.log("📝 Creating profile for user...");
+        const { error: createError, data: createdProfile } = await supabase
+          .from("profiles")
+          .insert({
+            id: userId,
+            email: userData.email,
+            first_name: userData.first_name || '',
+            last_name: userData.last_name || '',
+            phone: userData.phone || null,
+            role: newRole,
+            status: 'active',
+            is_active: true,
+            user_type: newRole,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select();
+
+        if (createError) {
+          // Ignore duplicate key errors - profile may have been created concurrently
+          if (!createError.message.includes("duplicate") && !createError.message.includes("violates unique")) {
+            console.error("❌ Failed to create profile:", createError.message);
+            throw createError;
+          }
+          console.log("ℹ️  Profile already exists (concurrent creation)");
+        } else {
+          console.log("✅ Profile created successfully");
+        }
+      }
+
       // Step 1: Get current super admin
       const currentUser = await supabase.auth.getUser();
       
-      // Step 2: Update profile with role - TRIGGER WILL AUTO-ACTIVATE
-      console.log("📝 Updating user role (trigger will auto-activate)...");
+      // Step 2: Update profile with role
+      console.log("📝 Updating user role...");
       const { data: updateData, error: profileError } = await supabase
         .from("profiles")
         .update({
           role: newRole,
           user_type: newRole,
+          status: 'active',
+          is_active: true,
           approved_at: new Date().toISOString(),
           approved_by: currentUser.data.user?.id,
           updated_at: new Date().toISOString(),
@@ -229,9 +284,7 @@ const UserManagementNew: React.FC = () => {
         console.log("🔗 Assigning properties to manager...");
         const assignments = managedProperties.map(propId => ({
           property_manager_id: userId,
-          property_id: propId,
-          status: 'active',
-          created_at: new Date().toISOString()
+          property_id: propId
         }));
 
         const { error: assignError, data: assignData } = await supabase
@@ -742,7 +795,7 @@ const UserManagementNew: React.FC = () => {
             <AssignRoleForm
               user={selectedUser}
               onAssignRole={(role, managedProperties, propertyId, unitId) => {
-                handleAssignRole(selectedUser.id, role, managedProperties, propertyId, unitId);
+                handleAssignRole(selectedUser.id, role, managedProperties, propertyId, unitId, selectedUser);
               }}
             />
           )}
@@ -961,21 +1014,26 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
       // Fetch all property managers for each property
       const { data: assignmentsData, error: assignError } = await supabase
         .from('property_manager_assignments')
-        .select(`
-          property_id,
-          property_manager_id,
-          profiles:property_manager_id (id, first_name, last_name, email)
-        `);
+        .select('property_id, property_manager_id');
 
       if (assignError) throw assignError;
 
-      // Map property to its manager(s)
+      // Map property to its manager(s) - fetch manager details separately
       const managerMap = new Map<string, any>();
-      assignmentsData?.forEach((assignment: any) => {
-        if (assignment.profiles) {
-          managerMap.set(assignment.property_id, assignment.profiles);
+      if (assignmentsData && assignmentsData.length > 0) {
+        for (const assignment of assignmentsData) {
+          // Fetch manager profile details
+          const { data: managerProfile } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', assignment.property_manager_id)
+            .single();
+          
+          if (managerProfile) {
+            managerMap.set(assignment.property_id, managerProfile);
+          }
         }
-      });
+      }
       setPropertyManagers(managerMap);
     } catch (error) {
       console.error("Error fetching properties/managers:", error);
