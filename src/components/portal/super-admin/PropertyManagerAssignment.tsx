@@ -174,7 +174,7 @@ const PropertyManagerAssignment: React.FC = () => {
 
       if (editingId) {
         // Update existing assignment
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from("property_manager_assignments")
           .update({
             property_id: selectedProperty,
@@ -182,36 +182,65 @@ const PropertyManagerAssignment: React.FC = () => {
           })
           .eq("id", editingId);
 
-        if (error) throw error;
-        toast.success("Assignment updated successfully");
+        if (updateError) throw updateError;
+
+        // Also update the profiles table with the assigned property
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            assigned_property_id: selectedProperty,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", selectedManager);
+
+        if (profileError) {
+          console.warn("Warning: Could not update profile with assigned property", profileError);
+        }
+
+        toast.success("✅ Assignment updated successfully!");
       } else {
-        // Create new assignment
-        const { error } = await supabase
+        // Create new assignment in property_manager_assignments
+        const { error: assignmentError } = await supabase
           .from("property_manager_assignments")
           .insert({
             property_id: selectedProperty,
             property_manager_id: selectedManager,
           });
 
-        if (error) {
-          if (error.message.includes("unique")) {
-            toast.error("This property manager is already assigned to this property");
+        if (assignmentError) {
+          if (assignmentError.message.includes("unique")) {
+            toast.error("❌ This property manager is already assigned to this property");
           } else {
-            throw error;
+            throw assignmentError;
           }
           return;
         }
-        toast.success("Property assigned to manager successfully");
+
+        // Also update the profiles table with the assigned property
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            assigned_property_id: selectedProperty,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", selectedManager);
+
+        if (profileError) {
+          console.warn("Warning: Could not update profile with assigned property", profileError);
+          // Don't fail the assignment if profile update fails, as assignment was created
+        }
+
+        toast.success("✅ Property assigned to manager successfully!");
       }
 
       setSelectedProperty("");
       setSelectedManager("");
       setEditingId(null);
       setIsDialogOpen(false);
-      loadData();
+      await loadData();
     } catch (error: any) {
       console.error("Error assigning property:", error);
-      toast.error(error.message || "Failed to assign property");
+      toast.error(`❌ ${error.message || "Failed to assign property"}`);
     } finally {
       setIsAssigning(false);
     }
@@ -230,17 +259,41 @@ const PropertyManagerAssignment: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
+      // First, get the assignment details to find the manager
+      const { data: assignment } = await supabase
+        .from("property_manager_assignments")
+        .select("property_manager_id")
+        .eq("id", id)
+        .single();
+
+      // Delete the assignment
+      const { error: deleteError } = await supabase
         .from("property_manager_assignments")
         .delete()
         .eq("id", id);
 
-      if (error) throw error;
-      toast.success("Assignment removed successfully");
-      loadData();
+      if (deleteError) throw deleteError;
+
+      // Clear the assigned property from the manager's profile
+      if (assignment) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            assigned_property_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", assignment.property_manager_id);
+
+        if (profileError) {
+          console.warn("Warning: Could not update profile", profileError);
+        }
+      }
+
+      toast.success("✅ Assignment removed successfully!");
+      await loadData();
     } catch (error: any) {
       console.error("Error deleting assignment:", error);
-      toast.error("Failed to remove assignment");
+      toast.error("❌ Failed to remove assignment");
     }
   };
 

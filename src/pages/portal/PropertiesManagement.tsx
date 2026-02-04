@@ -27,6 +27,13 @@ interface Property {
   updated_at: string;
   description?: string;
   manager_id?: string;
+  property_manager_assignments?: {
+    profiles: {
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+    } | null;
+  }[];
 }
 
 interface NewPropertyForm {
@@ -78,7 +85,16 @@ const PropertiesManagement: React.FC = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('properties')
-        .select('*')
+        .select(`
+          *,
+          property_manager_assignments (
+            profiles (
+              first_name,
+              last_name,
+              email
+            )
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -599,6 +615,14 @@ const PropertiesManagement: React.FC = () => {
                       <span className="text-sm text-gray-600 font-medium">Units</span>
                       <span className="font-medium text-gray-900">
                         {property.occupied_units}/{property.total_units} occupied
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                      <span className="text-sm text-gray-600 font-medium">Property Manager</span>
+                      <span className="font-medium text-gray-900">
+                        {property.property_manager_assignments?.[0]?.profiles
+                          ? `${property.property_manager_assignments[0].profiles.first_name} ${property.property_manager_assignments[0].profiles.last_name}`
+                          : <span className="text-gray-400 italic">Unassigned</span>}
                       </span>
                     </div>
                     <div className="flex items-center justify-between pb-3 border-b border-gray-200">

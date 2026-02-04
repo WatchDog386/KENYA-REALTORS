@@ -75,40 +75,6 @@ const LoginPage: React.FC = () => {
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
       
-      // Auto-approve user on login (ensure they're always approved)
-      if (signInData.user) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, role, status, approved, is_active")
-          .eq("id", signInData.user.id)
-          .single();
-        
-        if (profileError) {
-          console.warn("Profile fetch warning:", profileError);
-        }
-        
-        // If user is NOT already fully approved, approve them now
-        if (profile && (!profile.approved || profile.status !== "active" || !profile.is_active)) {
-          console.log("✅ Auto-approving user on login:", signInData.user.id);
-          
-          const { error: updateError } = await supabase
-            .from("profiles")
-            .update({
-              status: "active",
-              approved: true,
-              is_active: true,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", profile.id);
-          
-          if (updateError) {
-            console.warn("Warning: Could not auto-approve user", updateError);
-          } else {
-            console.log("✅ User auto-approved successfully");
-          }
-        }
-      }
-      
       toast.success("Login successful!");
       setIsSuccess(true);
     } catch (error: any) {

@@ -111,8 +111,8 @@ BEGIN
     v_user_type := v_role;
 
     -- Set status based on role
-    -- All users are now active immediately (auto-approved on login)
-    v_status := 'active';
+    -- All users start as pending (require super admin approval)
+    v_status := 'pending';
 
     -- Insert profile (with conflict handling for retries)
     INSERT INTO public.profiles (

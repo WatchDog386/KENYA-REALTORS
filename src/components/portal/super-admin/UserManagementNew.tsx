@@ -270,52 +270,14 @@ const UserManagementNew: React.FC = () => {
         is_active: updatedProfile.is_active,
       });
 
-      // NOTE: Property manager assignments are now handled separately in PropertyManagerAssignment component
-      // Property assignment should be done AFTER user role approval, not during
-
-      // Step 3: If tenant, assign unit in property
-      if (newRole === "tenant") {
-        // CRITICAL: Validate that property and unit are provided
-        if (!propertyId || !unitId) {
-          console.error("❌ CRITICAL ERROR: Tenant approved without property_id or unit_id", {
-            userId,
-            propertyId: propertyId || "NULL",
-            unitId: unitId || "NULL"
-          });
-          throw new Error("Tenant must be assigned to a property and unit before approval. This should not happen - UI should prevent this.");
-        }
-        
-        console.log("🏠 Assigning tenant to unit...");
-        const { error: tenantError, data: tenantData } = await supabase
-          .from("tenants")
-          .insert({
-            user_id: userId,
-            property_id: propertyId,
-            unit_id: unitId,
-            status: "active",
-            move_in_date: new Date().toISOString()
-          })
-          .select();
-
-        if (tenantError) {
-          if (!tenantError.message.includes("violates unique constraint")) {
-            console.error("❌ Tenant assignment error:", tenantError.message);
-            throw tenantError;
-          }
-          console.warn("⚠️ Duplicate assignment (tenant already assigned)");
-        } else {
-          console.log("✅ Tenant assigned successfully to unit:", {
-            propertyId,
-            unitId,
-            assignmentCount: tenantData?.length || 0
-          });
-        }
-      }
-
+      // NOTE: Property manager assignments are handled in PropertyManagerAssignment component
+      // NOTE: Tenant assignments should be handled in Leases/Properties section
+      
       // Step 5: Send approval notification
       const user = users.find(u => u.id === userId);
       if (user) {
-         await sendApprovalEmail(user, newRole, propertyId, unitId);
+         // Pass undefined for property/unit as assignment is separate
+         await sendApprovalEmail(user, newRole, undefined, undefined);
       }
 
       toast.success(`✅ User approved as ${newRole} and account ACTIVATED!`);
@@ -957,122 +919,11 @@ interface AssignRoleFormProps {
 
 const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) => {
   const [selectedRole, setSelectedRole] = useState(user.role || "tenant");
-  const [properties, setProperties] = useState<any[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string>("");
-  const [selectedUnit, setSelectedUnit] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [units, setUnits] = useState<any[]>([]);
-  const [selectedProperties, setSelectedProperties] = useState<string[]>([]);
-  const [propertyManagers, setPropertyManagers] = useState<Map<string, any>>(new Map());
-  const [selectedPropertyManager, setSelectedPropertyManager] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchPropertiesAndManagers();
-  }, []);
-
-  const fetchPropertiesAndManagers = async () => {
-    try {
-      setLoading(true);
-      const { data: propertiesData, error: propsError } = await supabase
-        .from('properties')
-        .select('id, name, location, type')
-        .order('name');
-
-      if (propsError) throw propsError;
-      setProperties(propertiesData || []);
-
-      // Fetch all property managers for each property
-      const { data: assignmentsData, error: assignError } = await supabase
-        .from('property_manager_assignments')
-        .select('property_id, property_manager_id');
-
-      if (assignError) throw assignError;
-
-      // Map property to its manager(s) - fetch manager details separately
-      const managerMap = new Map<string, any>();
-      if (assignmentsData && assignmentsData.length > 0) {
-        for (const assignment of assignmentsData) {
-          // Fetch manager profile details
-          const { data: managerProfile } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', assignment.property_manager_id)
-            .single();
-          
-          if (managerProfile) {
-            managerMap.set(assignment.property_id, managerProfile);
-          }
-        }
-      }
-      setPropertyManagers(managerMap);
-    } catch (error) {
-      console.error("Error fetching properties/managers:", error);
-      toast.error("Failed to load properties");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePropertyChange = async (propertyId: string) => {
-    setSelectedProperty(propertyId);
-    setSelectedUnit("");
-
-    // Set the property manager for this property
-    const manager = propertyManagers.get(propertyId);
-    if (manager) {
-      setSelectedPropertyManager(`${manager.first_name} ${manager.last_name}`);
-    } else {
-      setSelectedPropertyManager("No manager assigned to this property");
-    }
-
-    if (!propertyId) {
-      setUnits([]);
-      return;
-    }
-
-    // For property managers, track selected properties
-    if (selectedRole === "property_manager") {
-      if (selectedProperties.includes(propertyId)) {
-        setSelectedProperties(selectedProperties.filter(p => p !== propertyId));
-      } else {
-        setSelectedProperties([...selectedProperties, propertyId]);
-      }
-    }
-
-    // Fetch units for selected property
-    if (selectedRole === "tenant") {
-      try {
-        const { data: unitsData, error: unitsError } = await supabase
-          .from('property_unit_types')
-          .select('id, name, units_count')
-          .eq('property_id', propertyId);
-
-        if (unitsError) throw unitsError;
-        setUnits(unitsData || []);
-      } catch (error) {
-        console.error("Error fetching units:", error);
-        toast.error("Failed to load units");
-      }
-    }
-  };
-
+  // Simplified handler: Just pass role. Property/Unit handled elsewhere.
   const handleAssign = () => {
-    if (selectedRole === "property_manager" && selectedProperties.length === 0) {
-      toast.error("Please select at least one property for the property manager");
-      return;
-    }
-
-    if (selectedRole === "tenant") {
-      if (!selectedProperty || !selectedUnit) {
-        toast.error("Please select a property and unit for the tenant");
-        return;
-      }
-      onAssignRole(selectedRole, undefined, selectedProperty, selectedUnit);
-    } else if (selectedRole === "property_manager") {
-      onAssignRole(selectedRole, selectedProperties);
-    } else {
-      onAssignRole(selectedRole);
-    }
+    onAssignRole(selectedRole);
   };
 
   return (
@@ -1095,17 +946,11 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
         </p>
       </div>
 
-      <div>
+       <div>
         <Label htmlFor="newRole" className="text-slate-700 font-bold text-sm">
           Assign Role *
         </Label>
-        <Select value={selectedRole} onValueChange={(value) => {
-          setSelectedRole(value);
-          setSelectedProperty("");
-          setSelectedUnit("");
-          setUnits([]);
-          setSelectedProperties([]);
-        }}>
+        <Select value={selectedRole} onValueChange={setSelectedRole}>
           <SelectTrigger className="border-2 border-slate-200 rounded-xl mt-1 bg-white">
             <SelectValue />
           </SelectTrigger>
@@ -1115,175 +960,18 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
             <SelectItem value="super_admin">Super Admin</SelectItem>
           </SelectContent>
         </Select>
+         <p className="text-xs text-slate-500 mt-2">
+           Note: Property, Unit, and Manager assignments are managed in their respective sections after user approval.
+        </p>
       </div>
-
-      {/* Property Selection for Property Managers */}
-      {selectedRole === "property_manager" && (
-        <div className="space-y-3 p-4 bg-green-50 rounded-xl border-2 border-green-200">
-          <Label className="text-slate-700 font-bold text-sm flex items-center gap-2">
-            <Building className="w-4 h-4 text-green-600" />
-            Assign Properties *
-          </Label>
-          {loading ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-4 h-4 animate-spin text-green-600" />
-              <span className="ml-2 text-sm text-slate-600">Loading properties...</span>
-            </div>
-          ) : properties.length === 0 ? (
-            <Alert className="bg-amber-50 border-amber-200">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                No properties available. Create properties first before assigning property managers.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
-              {properties.map((property) => (
-                <label key={property.id} className="flex items-center gap-3 p-2 hover:bg-green-100 rounded-lg cursor-pointer transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={selectedProperties.includes(property.id)}
-                    onChange={() => handlePropertyChange(property.id)}
-                    className="w-4 h-4 text-green-600 rounded"
-                  />
-                  <span className="text-sm text-slate-700 font-medium">{property.name}</span>
-                  <span className="text-xs text-slate-500">({property.location})</span>
-                </label>
-              ))}
-            </div>
-          )}
-          <p className="text-xs text-green-800">
-            Selected: {selectedProperties.length} propert{selectedProperties.length === 1 ? "y" : "ies"}
-          </p>
-        </div>
-      )}
-
-      {/* Property & Unit Selection for Tenants */}
-      {selectedRole === "tenant" && (
-        <div className="space-y-3 p-4 bg-purple-50 rounded-xl border-2 border-purple-200">
-          <div>
-            <Label htmlFor="tenantProperty" className="text-slate-700 font-bold text-sm flex items-center gap-2">
-              <Home className="w-4 h-4 text-purple-600" />
-              Select Property *
-            </Label>
-            {loading ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-              </div>
-            ) : (
-              <Select value={selectedProperty} onValueChange={handlePropertyChange}>
-                <SelectTrigger className="border-2 border-purple-200 rounded-xl mt-1 bg-white focus:border-purple-400">
-                  <SelectValue placeholder="Choose a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.name} ({property.location})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
-          {selectedProperty && selectedPropertyManager && (
-            <div className="p-3 bg-blue-100 rounded-lg border-2 border-blue-300">
-              <p className="text-sm text-slate-700">
-                <strong className="text-slate-800">Property Manager:</strong>
-              </p>
-              <p className={`text-sm font-semibold ${selectedPropertyManager.includes("No manager") ? "text-amber-700" : "text-blue-700"}`}>
-                {selectedPropertyManager}
-              </p>
-              {selectedPropertyManager.includes("No manager") && (
-                <p className="text-xs text-amber-600 mt-1">⚠️ This property has no assigned manager yet. Assign a property manager first.</p>
-              )}
-            </div>
-          )}
-
-          {selectedProperty && units.length > 0 && (
-            <div>
-              <Label htmlFor="tenantUnit" className="text-slate-700 font-bold text-sm">
-                Select Unit *
-              </Label>
-              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-                <SelectTrigger className="border-2 border-purple-200 rounded-xl mt-1 bg-white focus:border-purple-400">
-                  <SelectValue placeholder="Choose a unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((unit) => (
-                    <SelectItem key={unit.id} value={unit.id}>
-                      {unit.name} ({unit.units_count} available)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {selectedProperty && units.length === 0 && (
-            <Alert className="bg-amber-50 border-amber-200">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                No units available for this property.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-      )}
-
-      {selectedRole === "tenant" && (!selectedProperty || !selectedUnit) && (
-        <Alert className="bg-red-50 border-2 border-red-200">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800 font-medium">
-            ⚠️ REQUIRED: Select a property AND unit before approving this tenant. This ensures they can access their assigned unit.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {selectedRole === "property_manager" && selectedProperties.length === 0 && (
-        <Alert className="bg-red-50 border-2 border-red-200">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800 font-medium">
-            ⚠️ REQUIRED: Select at least one property before approving this property manager. This ensures they can manage properties.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <Alert className="bg-blue-50 border-2 border-blue-200">
-        <AlertCircle className="h-4 w-4 text-blue-600" />
-        <AlertDescription className="text-blue-800 font-medium">
-          This will approve the user and activate their account. They will receive a notification email and can login immediately.
-        </AlertDescription>
-      </Alert>
 
       <div className="flex gap-3 pt-4">
         <Button
-          variant="outline"
-          className="border-2 border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 font-semibold"
-        >
-          Cancel
-        </Button>
-        <Button
           onClick={handleAssign}
-          disabled={
-            (selectedRole === "tenant" && (!selectedProperty || !selectedUnit)) ||
-            (selectedRole === "property_manager" && selectedProperties.length === 0)
-          }
-          className={`flex-1 font-bold rounded-xl transition-colors ${
-            (selectedRole === "tenant" && (!selectedProperty || !selectedUnit)) ||
-            (selectedRole === "property_manager" && selectedProperties.length === 0)
-              ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-              : "bg-emerald-600 hover:bg-emerald-700 text-white"
-          }`}
-          title={
-            selectedRole === "tenant" && (!selectedProperty || !selectedUnit)
-              ? "Select a property and unit first"
-              : selectedRole === "property_manager" && selectedProperties.length === 0
-              ? "Select at least one property first"
-              : "Approve and assign this user"
-          }
+          className="flex-1 font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
         >
-          ✓ Approve & Assign
+          <CheckCircle className="w-4 h-4 mr-2" />
+          Approve User
         </Button>
       </div>
     </div>

@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import PropertyManagerAssignment from "./PropertyManagerAssignment";
+import QuickPropertyAssignment from "./QuickPropertyAssignment";
 
 interface PropertyManager {
   id: string;
@@ -301,7 +301,7 @@ const PropertyManagersOverview: React.FC = () => {
                     ? "Ready to manage properties"
                     : "Activate to assign properties"}
                 </p>
-                <PropertyManagerAssignment
+                <QuickPropertyAssignment
                   managerId={manager.id}
                   managerName={`${manager.first_name} ${manager.last_name || ""}`}
                   onAssignmentComplete={handleAssignmentComplete}
