@@ -50,7 +50,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { supabase } from "@/services/supabase"; // Ensure this path is correct
+import { supabase } from "@/integrations/supabase/client";
 import { propertyService, Property, CreatePropertyDTO } from '@/services/propertyService';
 
 const PropertyManager: React.FC = () => {
@@ -59,6 +59,10 @@ const PropertyManager: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddPropertyForm, setShowAddPropertyForm] = useState(false);
   const [savingProperty, setSavingProperty] = useState(false);
+  const [showViewProperty, setShowViewProperty] = useState(false);
+  const [showEditProperty, setShowEditProperty] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [assignedManagers, setAssignedManagers] = useState<Record<string, string>>({});
 
   // Form State
   const [formData, setFormData] = useState<CreatePropertyDTO>({
@@ -73,7 +77,30 @@ const PropertyManager: React.FC = () => {
 
   useEffect(() => {
     fetchProperties();
+    fetchAssignedManagers();
   }, []);
+
+  const fetchAssignedManagers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('property_manager_assignments')
+        .select('property_id, property_manager_id, profiles(first_name, last_name, email)')
+        .eq('status', 'active');
+
+      if (error) throw error;
+
+      const managers: Record<string, string> = {};
+      data?.forEach((assignment: any) => {
+        const profile = assignment.profiles;
+        if (profile) {
+          managers[assignment.property_id] = `${profile.first_name} ${profile.last_name}`;
+        }
+      });
+      setAssignedManagers(managers);
+    } catch (error) {
+      console.error("Error fetching assigned managers:", error);
+    }
+  };
 
   const fetchProperties = async () => {
     try {
@@ -150,6 +177,64 @@ const PropertyManager: React.FC = () => {
           toast.error("Failed to delete property");
           console.error(err);
       }
+  }
+
+  const handleViewProperty = (property: Property) => {
+    setSelectedProperty(property);
+    setShowViewProperty(true);
+  }
+
+  const handleEditProperty = (property: Property) => {
+    setSelectedProperty(property);
+    setFormData({
+      name: property.name,
+      location: property.location,
+      image_url: property.image_url || '',
+      type: property.type || 'Apartment',
+      description: property.description || '',
+      amenities: property.amenities || '',
+      units: property.property_unit_types?.map(u => ({
+        name: u.name,
+        units_count: u.units_count,
+        price_per_unit: u.price_per_unit
+      })) || [{ name: '', units_count: 0, price_per_unit: 0 }]
+    });
+    setShowEditProperty(true);
+  }
+
+  const handleUpdateProperty = async () => {
+    if (!formData.name || !formData.location || !selectedProperty) {
+        toast.error("Please fill in property name and location");
+        return;
+    }
+
+    try {
+      setSavingProperty(true);
+      const { error } = await supabase
+        .from('properties')
+        .update({
+          name: formData.name,
+          location: formData.location,
+          image_url: formData.image_url,
+          type: formData.type,
+          description: formData.description,
+          amenities: formData.amenities,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedProperty.id);
+
+      if (error) throw error;
+
+      toast.success("Property updated successfully");
+      setShowEditProperty(false);
+      setSelectedProperty(null);
+      fetchProperties();
+    } catch (error) {
+      console.error("Error updating property:", error);
+      toast.error("Failed to update property");
+    } finally {
+      setSavingProperty(false);
+    }
   }
 
   // Derived Stats
@@ -430,6 +515,237 @@ const PropertyManager: React.FC = () => {
       </div>
       </section>
 
+      {/* VIEW PROPERTY DIALOG */}
+      <Dialog open={showViewProperty} onOpenChange={setShowViewProperty}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl shadow-2xl">
+          {selectedProperty && (
+            <>
+              {/* Header with Image */}
+              <div className="relative h-80 bg-slate-200 rounded-t-2xl overflow-hidden">
+                {selectedProperty.image_url ? (
+                  <img 
+                    src={selectedProperty.image_url} 
+                    alt={selectedProperty.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/900x300?text=Property+Image';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
+                    <Building className="w-24 h-24 text-slate-500 opacity-50" />
+                  </div>
+                )}
+                <button 
+                  onClick={() => setShowViewProperty(false)}
+                  className="absolute top-4 right-4 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all"
+                >
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-8 space-y-6">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-900 mb-2">{selectedProperty.name}</h2>
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <MapPin className="w-5 h-5" />
+                    <span className="font-medium">{selectedProperty.location}</span>
+                  </div>
+                  <Badge className="mt-3 bg-blue-100 text-blue-800 px-3 py-1">{selectedProperty.type || 'Apartment'}</Badge>
+                </div>
+
+                {/* Description */}
+                {selectedProperty.description && (
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-2">Description</h3>
+                    <p className="text-slate-700 leading-relaxed">{selectedProperty.description}</p>
+                  </div>
+                )}
+
+                {/* Amenities */}
+                {selectedProperty.amenities && (
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-2">Amenities</h3>
+                    <p className="text-slate-700 leading-relaxed">{selectedProperty.amenities}</p>
+                  </div>
+                )}
+
+                {/* Assigned Manager */}
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 mb-2">Assigned Manager</h3>
+                  <p className="text-lg font-semibold text-blue-900">
+                    {assignedManagers[selectedProperty.id] || <span className="text-slate-500">No manager assigned</span>}
+                  </p>
+                </div>
+
+                {/* Units Overview */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-1">Total Units</p>
+                    <p className="text-2xl font-bold text-emerald-900">{selectedProperty.total_units}</p>
+                  </div>
+                  <div className="bg-orange-50 border border-orange-100 rounded-lg p-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-orange-900 mb-1">Monthly Income</p>
+                    <p className="text-2xl font-bold text-orange-900">KES {(selectedProperty.expected_income || 0).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-slate-100 flex gap-3 justify-end bg-slate-50 rounded-b-2xl">
+                <Button variant="ghost" onClick={() => setShowViewProperty(false)} className="font-semibold">
+                  Close
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setShowViewProperty(false);
+                    handleEditProperty(selectedProperty);
+                  }}
+                  className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold"
+                >
+                  Edit Property
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* EDIT PROPERTY DIALOG */}
+      <Dialog open={showEditProperty} onOpenChange={setShowEditProperty}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 gap-0 overflow-hidden bg-white shadow-xl rounded-xl border border-slate-200">
+          {/* Header */}
+          <div className="bg-white border-b border-slate-100 p-6">
+            <DialogHeader className="p-0 space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-100 rounded-lg">
+                  <Building className="w-5 h-5 text-slate-700" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">Edit Property</DialogTitle>
+                  <p className="text-slate-500 text-sm font-medium">
+                    Update property details and unit information.
+                  </p>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-8 bg-white">
+            {/* Section 1: Property Details */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                Property Information
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <Label className="text-slate-700 font-semibold text-sm">Property Name</Label>
+                  <Input 
+                    value={formData.name} 
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    placeholder="e.g. Sunrise Apartments"
+                    className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-slate-700 font-semibold text-sm">Location</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <Input 
+                      value={formData.location} 
+                      onChange={(e) => setFormData({...formData, location: e.target.value})}
+                      placeholder="e.g. Westlands, Nairobi"
+                      className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-700 font-semibold text-sm">Type</Label>
+                  <Select 
+                    value={formData.type} 
+                    onValueChange={(val) => setFormData({...formData, type: val})}
+                  >
+                    <SelectTrigger className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Apartment">Apartment</SelectItem>
+                      <SelectItem value="Commercial">Commercial</SelectItem>
+                      <SelectItem value="Mixed">Mixed Use</SelectItem>
+                      <SelectItem value="Villa">Villa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <Label className="text-slate-700 font-semibold text-sm">Cover Image URL</Label>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input 
+                        value={formData.image_url} 
+                        onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                        placeholder="https://example.com/image.jpg"
+                        className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                      />
+                    </div>
+                    {formData.image_url && (
+                      <div className="rounded-lg overflow-hidden border border-slate-200">
+                        <img 
+                          src={formData.image_url} 
+                          alt="Preview"
+                          className="w-full h-40 object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x160?text=Invalid+Image';
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <Label className="text-slate-700 font-semibold text-sm">Description</Label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    placeholder="Property description..."
+                    className="w-full min-h-[80px] p-3 border-slate-200 border rounded-lg focus:border-slate-400 focus:ring-slate-400 bg-white"
+                  />
+                </div>
+
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <Label className="text-slate-700 font-semibold text-sm">Amenities</Label>
+                  <textarea
+                    value={formData.amenities || ''}
+                    onChange={(e) => setFormData({...formData, amenities: e.target.value})}
+                    placeholder="e.g. Gym, Swimming Pool, Security..."
+                    className="w-full min-h-[80px] p-3 border-slate-200 border rounded-lg focus:border-slate-400 focus:ring-slate-400 bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 border-t border-slate-100 bg-white">
+            <Button variant="ghost" onClick={() => setShowEditProperty(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdateProperty} 
+              disabled={savingProperty || !formData.name} 
+              className="bg-slate-900 hover:bg-slate-800 text-white px-6 font-bold rounded-lg shadow-sm"
+            >
+              {savingProperty ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <span>Update Property</span>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
       
       {/* Stats Cards */}
@@ -529,6 +845,7 @@ const PropertyManager: React.FC = () => {
                     <TableRow>
                         <TableHead className="font-bold text-[#154279]">Property Name</TableHead>
                         <TableHead className="font-bold text-[#154279]">Location</TableHead>
+                        <TableHead className="font-bold text-[#154279]">Assigned Manager</TableHead>
                         <TableHead className="font-bold text-[#154279] text-center">Total Units</TableHead>
                         <TableHead className="font-bold text-[#154279] text-right">Proj. Income</TableHead>
                         <TableHead className="font-bold text-[#154279] text-center">Actions</TableHead>
@@ -546,6 +863,11 @@ const PropertyManager: React.FC = () => {
                                    <MapPin className="w-3 h-3" /> {property.location}
                                </div>
                            </TableCell>
+                           <TableCell className="font-medium text-slate-700">
+                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                   {assignedManagers[property.id] || 'Unassigned'}
+                               </Badge>
+                           </TableCell>
                            <TableCell className="text-center font-bold text-slate-700">
                                {property.total_units}
                            </TableCell>
@@ -554,6 +876,22 @@ const PropertyManager: React.FC = () => {
                            </TableCell>
                            <TableCell className="text-center">
                                <div className="flex items-center justify-center gap-2">
+                                   <Button 
+                                       variant="outline" 
+                                       size="sm" 
+                                       onClick={() => handleViewProperty(property)}
+                                       className="h-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200 rounded-lg"
+                                   >
+                                       View
+                                   </Button>
+                                   <Button 
+                                       variant="outline" 
+                                       size="sm" 
+                                       onClick={() => handleEditProperty(property)}
+                                       className="h-8 text-slate-600 hover:text-orange-600 hover:bg-orange-50 border-slate-200 rounded-lg"
+                                   >
+                                       Edit
+                                   </Button>
                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteProperty(property.id)} className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                                        <Trash2 className="w-4 h-4" />
                                    </Button>

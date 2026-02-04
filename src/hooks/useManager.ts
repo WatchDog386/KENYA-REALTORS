@@ -101,15 +101,29 @@ export const useManager = (managerId?: string) => {
 
   const fetchManagerStats = async (userId: string): Promise<ManagerStats> => {
     try {
+      // Try RPC first
       const { data, error } = await supabase.rpc(
         "get_manager_dashboard_stats",
         { manager_id: userId }
       );
 
-      if (error) throw error;
+      if (!error && data) {
+        return data;
+      }
 
-      return (
-        data || {
+      // Fallback: fetch stats manually from assignment table
+      console.warn("RPC failed, using fallback method for stats");
+      
+      // Get assigned properties
+      const { data: assignments, error: assignmentError } = await supabase
+        .from("property_manager_assignments")
+        .select("property_id")
+        .eq("property_manager_id", userId);
+
+      if (assignmentError) throw assignmentError;
+
+      if (!assignments || assignments.length === 0) {
+        return {
           managedProperties: 0,
           activeTenants: 0,
           pendingRent: 0,
@@ -117,8 +131,53 @@ export const useManager = (managerId?: string) => {
           totalRevenue: 0,
           occupancyRate: 0,
           properties: [],
-        }
-      );
+        };
+      }
+
+      const propertyIds = assignments.map(a => a.property_id);
+
+      // Get properties and their tenants
+      const { data: properties, error: propsError } = await supabase
+        .from("properties")
+        .select(`
+          id,
+          name,
+          property_unit_types(
+            price_per_unit
+          ),
+          tenants(
+            id,
+            status
+          )
+        `)
+        .in("id", propertyIds);
+
+      if (propsError) throw propsError;
+
+      // Calculate stats
+      const managedProperties = properties?.length || 0;
+      const activeTenants = properties?.reduce((sum, p) => sum + ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0), 0) || 0;
+      const totalRevenue = properties?.reduce((sum, p) => {
+        const avgPrice = ((p.property_unit_types as any[])?.reduce((s, u: any) => s + (u.price_per_unit || 0), 0) || 0) / Math.max(1, (p.property_unit_types as any[])?.length || 1);
+        return sum + (avgPrice * ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0));
+      }, 0) || 0;
+      const occupancyRate = managedProperties > 0 ? (activeTenants / (managedProperties * 10)) * 100 : 0; // Assume avg 10 units per property
+
+      return {
+        managedProperties,
+        activeTenants,
+        pendingRent: 0,
+        maintenanceCount: 0,
+        totalRevenue,
+        occupancyRate,
+        properties: (properties || []).map(p => ({
+          id: p.id,
+          name: p.name,
+          tenants: ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0),
+          occupancy: 0,
+          revenue: 0,
+        })),
+      };
     } catch (err) {
       console.error("Error fetching manager stats:", err);
       return {
@@ -255,6 +314,10 @@ export const useManager = (managerId?: string) => {
         ? {
             id: data.id,
             user_id: data.id,
+            experience_years: 0,
+            specializations: [],
+            performance_rating: 0,
+            is_available: true,
             user: {
               first_name: data.first_name,
               last_name: data.last_name,
@@ -276,23 +339,41 @@ export const useManager = (managerId?: string) => {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
+      // First, fetch property IDs from the assignment table
+      const { data: assignments, error: assignmentError } = await supabase
+        .from("property_manager_assignments")
+        .select("property_id")
+        .eq("property_manager_id", user.id);
+
+      if (assignmentError) throw assignmentError;
+
+      if (!assignments || assignments.length === 0) {
+        return [];
+      }
+
+      const propertyIds = assignments.map(a => a.property_id);
+
+      // Then fetch the property details
       const { data, error } = await supabase
         .from("properties")
         .select(
           `
           *,
-          tenants:tenant_properties(
-            tenant:users!tenant_properties_tenant_id_fkey (
-              id,
-              first_name,
-              last_name,
-              email
-            )
+          property_unit_types(
+            id,
+            name,
+            units_count,
+            price_per_unit
+          ),
+          tenants(
+            id,
+            user_id,
+            status
           )
         `
         )
-        .eq("property_manager_id", user.id)
-        .eq("is_active", true)
+        .in("id", propertyIds)
+        .eq("status", "Active")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -390,10 +471,10 @@ export const useManager = (managerId?: string) => {
         )
         .in(
           "property_id",
-          supabase
+          (await supabase
             .from("properties")
             .select("id")
-            .eq("property_manager_id", user.id)
+            .eq("property_manager_id", user.id)).data?.map(p => p.id) || []
         )
         .order("created_at", { ascending: false });
 

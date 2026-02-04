@@ -85,6 +85,10 @@ export function PropertyManagerAssignment({
   const handleAssignProperties = async () => {
     setAssigning(true);
     try {
+      // Get current admin user ID
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+      const adminId = adminUser?.id;
+
       // 1. Revoke all current assignments
       if (currentAssignments.length > 0) {
         const { error: revokeError } = await supabase
@@ -100,7 +104,7 @@ export function PropertyManagerAssignment({
       const newAssignments = selectedProperties.map(propertyId => ({
         manager_id: managerId,
         property_id: propertyId,
-        assigned_by: (await supabase.auth.getUser()).data.user?.id,
+        assigned_by: adminId,
         assignment_date: new Date().toISOString(),
         status: 'active',
         approved_at: new Date().toISOString(),
@@ -114,9 +118,24 @@ export function PropertyManagerAssignment({
         if (insertError) throw insertError;
       }
 
+      // 3. IMPORTANT: Auto-approve property manager and update profile to active
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          status: 'active',
+          is_active: true,
+          role: 'property_manager',
+          approved_by: adminId,
+          approved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', managerId);
+
+      if (profileError) throw profileError;
+
       toast({
-        title: 'Properties Assigned',
-        description: `Successfully assigned ${selectedProperties.length} properties to ${managerName}`,
+        title: 'Manager Approved & Properties Assigned',
+        description: `Successfully approved ${managerName} and assigned ${selectedProperties.length} properties`,
         className: 'bg-green-50 border-green-200'
       });
 

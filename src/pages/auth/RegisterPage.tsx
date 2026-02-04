@@ -16,12 +16,13 @@ export default function RegisterPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   
   const [formData, setFormData] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
     password: "",
     confirmPassword: "",
-    accountType: "tenant", // Changed from 'role' to 'accountType' for clarity
+    accountType: "tenant", 
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -58,8 +59,11 @@ export default function RegisterPage() {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Full name is required";
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = "First name is required";
+    }
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = "Last name is required";
     }
     if (!formData.phone.trim()) {
       newErrors.phone = "Phone number is required";
@@ -98,17 +102,19 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       console.log("📝 Attempting registration for:", formData.email, "Account Type:", formData.accountType);
-      const [firstName, ...rest] = formData.fullName.trim().split(" ");
-      const lastName = rest.join(" ");
+
+      const redirectTo =
+        import.meta.env.VITE_AUTH_REDIRECT_URL || import.meta.env.VITE_APP_URL;
 
       // IMPORTANT: Use 'role' as the key for the trigger to work
       const { data, error: signupError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: redirectTo,
           data: {
-            first_name: firstName,
-            last_name: lastName,
+            first_name: formData.firstName.trim(),
+            last_name: formData.lastName.trim(),
             phone: formData.phone,
             role: formData.accountType, // <-- must be 'role' for the trigger
           },
@@ -119,6 +125,12 @@ export default function RegisterPage() {
 
       if (data.user) {
         console.log("✅ Auth user created successfully:", data.user.id);
+
+        if (!data.session) {
+          toast.info("📧 Check your email to confirm your account before approval.", { duration: 5000 });
+          setTimeout(() => navigate("/login"), 2000);
+          return;
+        }
 
         // Wait for the trigger to create the profile
         await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -175,7 +187,7 @@ export default function RegisterPage() {
                   related_entity_type: "user",
                   related_entity_id: data.user.id,
                   title: `New ${formData.accountType === 'tenant' ? 'Tenant' : 'Property Manager'} Registration`,
-                  message: `${formData.fullName} has registered as a ${formData.accountType === 'tenant' ? 'tenant' : 'property manager'}. Review and assign in User Management.`,
+                  message: `${formData.firstName} ${formData.lastName} has registered as a ${formData.accountType === 'tenant' ? 'tenant' : 'property manager'}. Review and assign in User Management.`,
                 });
             }
             console.log("✅ Notifications sent to super admins");
@@ -206,7 +218,7 @@ export default function RegisterPage() {
         toast.error("Too many registration attempts. Please try again in a few minutes.");
       } else if (errorCode === "500" || errorMessage.includes("Internal Server") || errorMessage.includes("Database error")) {
         console.error("🔥 CRITICAL REGISTRATION ERROR: The database trigger likely failed or RLS policies are blocking creation.");
-        toast.error("Database error. PLEASE RUN '20260204_emergency_fix_rls_recursion.sql' in your Supabase SQL Editor.", { duration: 15000 });
+        toast.error("Database error. PLEASE RUN '20260204_comprehensive_registration_fix.sql' in your Supabase SQL Editor.", { duration: 15000 });
       } else {
         toast.error(errorMessage || "Registration failed. Please try again.");
       }
@@ -247,26 +259,47 @@ export default function RegisterPage() {
           {/* Form Container */}
           <div className="p-8 md:p-10 relative z-0 overflow-visible">
             <form onSubmit={handleRegister} className="space-y-5">
-              {/* Two Column Layout */}
+              {/* Two Column Layout: Names */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Full Name */}
+                {/* First Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Full Name</Label>
+                  <Label htmlFor="firstName" className="text-xs font-bold text-slate-700 uppercase tracking-widest">First Name</Label>
                   <div className="relative group">
                     <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
                     <Input
-                      id="fullName"
-                      name="fullName"
+                      id="firstName"
+                      name="firstName"
                       type="text"
-                      placeholder="John Kamau"
-                      value={formData.fullName}
+                      placeholder="John"
+                      value={formData.firstName}
                       onChange={handleChange}
-                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.fullName ? 'border-red-500' : 'border-slate-200'}`}
+                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.firstName ? 'border-red-500' : 'border-slate-200'}`}
                     />
                   </div>
-                  {errors.fullName && <p className="text-xs text-red-500 font-bold">{errors.fullName}</p>}
+                  {errors.firstName && <p className="text-xs text-red-500 font-bold">{errors.firstName}</p>}
                 </div>
 
+                {/* Last Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="lastName" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Last Name</Label>
+                  <div className="relative group">
+                    <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      placeholder="Kamau"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.lastName ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                  </div>
+                  {errors.lastName && <p className="text-xs text-red-500 font-bold">{errors.lastName}</p>}
+                </div>
+              </div>
+
+              {/* Phone and Email */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Phone */}
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Phone Number</Label>
@@ -284,24 +317,24 @@ export default function RegisterPage() {
                   </div>
                   {errors.phone && <p className="text-xs text-red-500 font-bold">{errors.phone}</p>}
                 </div>
-              </div>
 
-              {/* Full Width Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Email Address</Label>
-                <div className="relative group">
-                  <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.email ? 'border-red-500' : 'border-slate-200'}`}
-                  />
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Email Address</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.email ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                  </div>
+                  {errors.email && <p className="text-xs text-red-500 font-bold">{errors.email}</p>}
                 </div>
-                {errors.email && <p className="text-xs text-red-500 font-bold">{errors.email}</p>}
               </div>
 
               {/* Two Column: Role & Password */}

@@ -62,6 +62,8 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
   });
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [managedProperties, setManagedProperties] = useState<string[]>([]);
+  const [firstPropertyName, setFirstPropertyName] = useState<string>("MANAGER PORTAL");
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -94,7 +96,41 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       }
     };
 
+    // Fetch assigned properties
+    const fetchAssignedProperties = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Get property IDs from assignment table
+        const { data: assignments, error: assignmentError } = await supabase
+          .from("property_manager_assignments")
+          .select("property_id")
+          .eq("property_manager_id", user.id);
+
+        if (assignmentError) throw assignmentError;
+
+        if (assignments && assignments.length > 0) {
+          const propertyIds = assignments.map(a => a.property_id);
+
+          // Fetch property details
+          const { data: properties, error: propsError } = await supabase
+            .from("properties")
+            .select("id, name")
+            .in("id", propertyIds);
+
+          if (!propsError && properties && properties.length > 0) {
+            const names = properties.map(p => p.name);
+            setManagedProperties(names);
+            setFirstPropertyName(names[0].toUpperCase());
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching assigned properties:', err);
+      }
+    };
+
     fetchUserProfile();
+    fetchAssignedProperties();
   }, [user?.id]);
 
   // Fetch notifications
@@ -560,7 +596,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
             </div>
             <div>
               <h1 className="font-extrabold text-2xl tracking-tight text-slate-900">
-                AYDEN<span className="text-[#00356B]">HOMES</span>
+                {firstPropertyName.split(' ')[0]}<span className="text-[#00356B]">{firstPropertyName.split(' ').slice(1).join(' ')}</span>
               </h1>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider -mt-1">Manager Portal</p>
             </div>

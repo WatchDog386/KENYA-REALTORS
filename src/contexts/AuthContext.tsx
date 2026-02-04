@@ -161,10 +161,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           first_name: firstName,
           last_name: lastName || null,
           phone: phone || null,
-          role: null, // Default to null - user will select on profile page
+          role: userType || null, 
           user_type: userType || null,
-          status: status || null,
-          is_active: true,
+          status: status || 'pending',
+          is_active: userType === 'super_admin',
+          approved: userType === 'super_admin',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -180,9 +181,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           first_name: firstName,
           last_name: lastName,
           phone: phone,
-          role: null,
-          status: status,
-          is_active: true,
+          role: (userType as any) || null,
+          status: status ?? 'pending',
+          is_active: userType === 'super_admin',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -198,9 +199,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         first_name: firstName,
         last_name: lastName,
         phone: phone,
-        role: null,
-        status: status,
-        is_active: true,
+        role: (userType as any) || null,
+        status: status ?? 'pending',
+        is_active: userType === 'super_admin',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -300,8 +301,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const lastName =
         supabaseUser.user_metadata?.last_name || rest.join(" ") || "";
       const phone = supabaseUser.user_metadata?.phone || null;
-      const userType = supabaseUser.user_metadata?.account_type || null;
-      const status = userType ? "pending" : null;
+      // Check both 'role' and 'account_type' metadata keys
+      const userType = supabaseUser.user_metadata?.role || supabaseUser.user_metadata?.account_type || null;
+      // Status is pending if they have a role (except super_admin), otherwise null
+      const status = (userType && userType !== 'super_admin') ? "pending" : null;
 
       const newProfile = await createUserProfileInDB(
         supabaseUser.id,

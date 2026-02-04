@@ -1,4 +1,4 @@
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface PropertyUnitType {
   id?: string;
@@ -40,28 +40,47 @@ export interface CreatePropertyDTO {
 export const propertyService = {
   async fetchProperties() {
     console.log('Fetching properties...');
-    const { data, error } = await supabase
+    
+    // Fetch properties separately from unit types to avoid PostgREST schema cache issues
+    const { data: properties, error: propsError } = await supabase
       .from('properties')
-      .select(`
-        *,
-        property_unit_types (*)
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching properties:', error);
-      throw error;
+    if (propsError) {
+      console.error('Error fetching properties:', propsError);
+      throw propsError;
     }
 
-    // Process data to add computed fields
-    return (data || []).map((prop: any) => {
-      const unitTypes = prop.property_unit_types || [];
-      const totalUnits = unitTypes.reduce((sum: number, unit: any) => sum + (unit.units_count || 0), 0);
-        // Using Number() to ensure we don't get string concatenation if DB returns strings
-      const expectedIncome = unitTypes.reduce((sum: number, unit: any) => sum + (Number(unit.units_count || 0) * Number(unit.price_per_unit || 0)), 0);
+    if (!properties || properties.length === 0) {
+      return [];
+    }
+
+    // Fetch unit types separately
+    const { data: unitTypes, error: unitsError } = await supabase
+      .from('property_unit_types')
+      .select('*');
+
+    if (unitsError) {
+      console.error('Error fetching unit types:', unitsError);
+      // Don't fail - just continue with properties
+      return properties.map((prop: any) => ({
+        ...prop,
+        property_unit_types: [],
+        total_units: 0,
+        expected_income: 0
+      }));
+    }
+
+    // Manually join unit types to properties
+    return (properties || []).map((prop: any) => {
+      const propUnitTypes = (unitTypes || []).filter((unit: any) => unit.property_id === prop.id);
+      const totalUnits = propUnitTypes.reduce((sum: number, unit: any) => sum + (unit.units_count || 0), 0);
+      const expectedIncome = propUnitTypes.reduce((sum: number, unit: any) => sum + (Number(unit.units_count || 0) * Number(unit.price_per_unit || 0)), 0);
 
       return {
         ...prop,
+        property_unit_types: propUnitTypes,
         total_units: totalUnits,
         expected_income: expectedIncome
       };

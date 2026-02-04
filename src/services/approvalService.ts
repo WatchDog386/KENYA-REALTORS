@@ -919,6 +919,16 @@ export const verifyTenant = async (
   try {
     const status = approved ? "verified" : "rejected";
 
+    // Get verification details first to find tenant ID
+    const { data: verification } = await supabase
+      .from("tenant_verifications")
+      .select("tenant_id")
+      .eq("id", verificationId)
+      .single();
+
+    if (!verification?.tenant_id) throw new Error("Tenant not found");
+
+    // 1. Update tenant verification record
     const { error: updateError } = await supabase
       .from("tenant_verifications")
       .update({
@@ -933,27 +943,32 @@ export const verifyTenant = async (
 
     if (updateError) throw updateError;
 
-    // Get verification details to send notification
-    const { data: verification } = await supabase
-      .from("tenant_verifications")
-      .select("tenant_id")
-      .eq("id", verificationId)
-      .single();
+    // 2. If approved, update tenant's profile to active
+    if (approved) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          status: "active",
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", verification.tenant_id);
 
-    if (verification?.tenant_id) {
-      // Create notification for tenant
-      await supabase.from("notifications").insert({
-        recipient_id: verification.tenant_id,
-        sender_id: managerId,
-        type: approved ? "verification_approved" : "verification_rejected",
-        related_entity_type: "tenant",
-        related_entity_id: verification.tenant_id,
-        title: approved ? "Verification Approved" : "Verification Rejected",
-        message: approved
-          ? `Your tenant registration has been approved. You can now access your tenant portal.`
-          : `Your tenant registration was rejected. Reason: ${notes || "See property manager for details"}`,
-      });
+      if (profileError) throw profileError;
     }
+
+    // 3. Create notification for tenant
+    await supabase.from("notifications").insert({
+      recipient_id: verification.tenant_id,
+      sender_id: managerId,
+      type: approved ? "verification_approved" : "verification_rejected",
+      related_entity_type: "tenant",
+      related_entity_id: verification.tenant_id,
+      title: approved ? "Verification Approved" : "Verification Rejected",
+      message: approved
+        ? `Your tenant registration has been approved. You can now access your tenant portal and login.`
+        : `Your tenant registration was rejected. Reason: ${notes || "See property manager for details"}`,
+    });
 
     toast.success(approved ? "Tenant verified successfully" : "Tenant verification rejected");
   } catch (error) {
@@ -998,13 +1013,13 @@ export const approvePropertyManager = async (
 
     if (!approval) throw new Error("Approval not found");
 
-    // Update approval status
+    // 1. Update approval status in manager_approvals table
     const { error: updateApprovalError } = await supabase
       .from("manager_approvals")
       .update({
         status,
-        approved_by: adminId,
-        approved_at: new Date().toISOString(),
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
         approval_notes: approved ? notes : undefined,
         rejection_reason: !approved ? notes : undefined,
         updated_at: new Date().toISOString(),
@@ -1013,13 +1028,17 @@ export const approvePropertyManager = async (
 
     if (updateApprovalError) throw updateApprovalError;
 
-    // If approved, update the manager's role in profiles
+    // 2. If approved, update the manager's profile to active immediately
+    // Manager can login right away without waiting for email confirmation
     if (approved) {
       const { error: updateProfileError } = await supabase
         .from("profiles")
         .update({
           role: "property_manager",
           status: "active",
+          is_active: true,
+          approved_by: adminId,
+          approved_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", approval.manager_id);
@@ -1027,7 +1046,7 @@ export const approvePropertyManager = async (
       if (updateProfileError) throw updateProfileError;
     }
 
-    // Create notification for manager
+    // 3. Create notification for manager
     await supabase.from("notifications").insert({
       recipient_id: approval.manager_id,
       sender_id: adminId,
@@ -1036,7 +1055,7 @@ export const approvePropertyManager = async (
       related_entity_id: approval.manager_id,
       title: approved ? "Registration Approved" : "Registration Rejected",
       message: approved
-        ? `Your property manager registration has been approved. You can now access your property management portal.`
+        ? `Your property manager registration has been approved. You can now login and access your property management portal immediately.`
         : `Your property manager registration was rejected. Reason: ${notes || "See administrator for details"}`,
     });
 

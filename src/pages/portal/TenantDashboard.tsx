@@ -222,9 +222,7 @@ const TenantDashboard: React.FC = () => {
           property_id,
           unit_id,
           status,
-          move_in_date,
-          properties(id, name, address, city),
-          units(id, unit_number, unit_type, property_id)
+          move_in_date
         `)
         .eq("user_id", user.id)
         .eq("status", "active")
@@ -236,6 +234,43 @@ const TenantDashboard: React.FC = () => {
       }
 
       setTenantInfo(data as any);
+
+      // Fetch property details
+      if (data.property_id) {
+        const { data: propertyData } = await supabase
+          .from("properties")
+          .select("id, name, location, address, city, status")
+          .eq("id", data.property_id)
+          .single();
+
+        if (propertyData) {
+          setPropertyData({
+            id: propertyData.id,
+            name: propertyData.name,
+            address: propertyData.location || propertyData.address,
+            city: propertyData.city,
+            state: "",
+            zip_code: "",
+          } as Property);
+        }
+      }
+
+      // Fetch unit details if unit_id exists
+      if (data.unit_id) {
+        const { data: unitData } = await supabase
+          .from("property_unit_types")
+          .select("id, name")
+          .eq("id", data.unit_id)
+          .single();
+
+        if (unitData) {
+          setPropertyData((prev) => ({
+            ...prev,
+            unit_number: unitData.name,
+          } as Property));
+        }
+      }
+
       return true;
     } catch (err) {
       console.error("Error fetching tenant info:", err);

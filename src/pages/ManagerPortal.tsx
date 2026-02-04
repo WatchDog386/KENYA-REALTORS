@@ -196,16 +196,32 @@ export default function ManagerPortal() {
 
       if (verifyError) throw verifyError;
 
-      // 2. Activate tenant profile
+      // 2. Activate tenant profile (important for login)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           status: 'active',
-          is_active: true
+          is_active: true,
+          updated_at: new Date().toISOString()
         })
         .eq('id', tenantId);
 
       if (profileError) throw profileError;
+
+      // 3. Create notification for tenant that they are approved
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          recipient_id: tenantId,
+          sender_id: user?.id,
+          type: 'verification_approved',
+          related_entity_type: 'tenant',
+          related_entity_id: tenantId,
+          title: 'Application Approved',
+          message: 'Your tenant application has been approved. You can now login to your account and access the tenant portal.'
+        });
+
+      if (notificationError) console.error('Notification error:', notificationError);
 
       toast({
         title: 'Tenant Approved',

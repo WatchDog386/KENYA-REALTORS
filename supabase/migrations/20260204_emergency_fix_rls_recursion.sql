@@ -36,6 +36,16 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- 5. CREATE SAFE POLICIES (No Recursion)
 
+-- Drop existing policies that may already exist (avoid 42710 errors)
+DROP POLICY IF EXISTS "users_select_own_profile" ON public.profiles;
+DROP POLICY IF EXISTS "users_update_own_profile" ON public.profiles;
+DROP POLICY IF EXISTS "users_delete_own_profile" ON public.profiles;
+DROP POLICY IF EXISTS "authenticated_can_select_profiles" ON public.profiles;
+DROP POLICY IF EXISTS "service_role_full_access" ON public.profiles;
+DROP POLICY IF EXISTS "users_insert_own_profile" ON public.profiles;
+DROP POLICY IF EXISTS "service_role_insert_profile" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_auth_admin_all" ON public.profiles;
+
 -- Users can read their OWN profile
 CREATE POLICY "users_select_own_profile" 
 ON public.profiles FOR SELECT
@@ -74,6 +84,13 @@ CREATE POLICY "service_role_insert_profile"
 ON public.profiles FOR INSERT
 WITH CHECK (auth.role() = 'service_role');
 
+-- Allow supabase_auth_admin (auth trigger role) full access
+CREATE POLICY "profiles_auth_admin_all"
+  ON public.profiles FOR ALL
+  TO supabase_auth_admin
+  USING (true)
+  WITH CHECK (true);
+
 -- Other Tables (drop if exists to avoid errors)
 DROP POLICY IF EXISTS "manager_approvals_own" ON public.manager_approvals;
 CREATE POLICY "manager_approvals_own" ON public.manager_approvals FOR ALL USING (user_id = auth.uid());
@@ -87,12 +104,17 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 SECURITY DEFINER
 SET search_path = public
+SET row_security = off
 LANGUAGE plpgsql
 AS $$
 DECLARE
   v_role TEXT;
 BEGIN
-  v_role := COALESCE(NEW.raw_user_meta_data->>'role', 'tenant');
+  v_role := COALESCE(
+    NEW.raw_user_meta_data->>'role',
+    NEW.raw_user_meta_data->>'account_type',
+    'tenant'
+  );
   
   INSERT INTO public.profiles (id, email, first_name, last_name, role, status, user_type, created_at, updated_at)
   VALUES (

@@ -187,18 +187,24 @@ const SuperAdminDashboard = () => {
 
   const loadStats = async () => {
     try {
+      // Fetch properties and unit types separately to avoid PostgREST schema cache issues
       const { data: properties, error: propertiesError } = await supabase
         .from("properties")
-        .select("status, property_unit_types(units_count, price_per_unit)");
+        .select("id, status");
+      
+      const { data: unitTypes } = await supabase
+        .from("property_unit_types")
+        .select("property_id, units_count, price_per_unit");
 
       const propertiesData = properties || [];
+      const unitsData = unitTypes || [];
       
       let totalUnits = 0;
       // Note: occupied_units support is pending lease implementation.
       const occupiedUnits = 0; 
 
       propertiesData.forEach((prop: any) => {
-        const units = prop.property_unit_types || [];
+        const units = unitsData.filter((u: any) => u.property_id === prop.id);
         units.forEach((u: any) => {
              totalUnits += (u.units_count || 0);
              // Assuming totalRevenue estimate for dashboard usage if needed, 
@@ -295,13 +301,19 @@ const SuperAdminDashboard = () => {
 
       const { data: recentProperties } = await supabase
         .from("properties")
-        .select("id, name, status, created_at, property_unit_types(units_count)")
+        .select("id, name, status, created_at")
         .order("created_at", { ascending: false })
         .limit(3);
+      
+      // Fetch all unit types for manual join
+      const { data: allUnitTypes } = await supabase
+        .from("property_unit_types")
+        .select("property_id, units_count");
 
       if (recentProperties) {
         recentProperties.forEach((prop: any) => {
-          const totalUnits = (prop.property_unit_types || []).reduce((sum: number, u: any) => sum + (u.units_count || 0), 0);
+          const propUnits = (allUnitTypes || []).filter((u: any) => u.property_id === prop.id);
+          const totalUnits = propUnits.reduce((sum: number, u: any) => sum + (u.units_count || 0), 0);
           items.push({
             id: prop.id,
             title: prop.name || 'Unnamed Property',
