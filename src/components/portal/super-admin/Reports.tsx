@@ -762,7 +762,7 @@ const Reports = () => {
                 <Input
                   placeholder="Search units by type or remarks..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                   className="pl-9"
                 />
               </div>

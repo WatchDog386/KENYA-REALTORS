@@ -104,7 +104,7 @@ export default function RegisterPage() {
       console.log("📝 Attempting registration for:", formData.email, "Account Type:", formData.accountType);
 
       const redirectTo =
-        import.meta.env.VITE_AUTH_REDIRECT_URL || import.meta.env.VITE_APP_URL;
+        ((import.meta as any).env.VITE_AUTH_REDIRECT_URL as string) || ((import.meta as any).env.VITE_APP_URL as string);
 
       // IMPORTANT: Use 'role' as the key for the trigger to work
       const { data, error: signupError } = await supabase.auth.signUp({

@@ -125,11 +125,11 @@ const PropertyManagementNew: React.FC = () => {
       if (error) throw error;
 
       const totalUnits = (properties || []).reduce(
-        (sum, p) => sum + (p.total_units || 0),
+        (sum: number, p: any) => sum + (p.total_units || 0),
         0
       );
       const occupiedUnits = (properties || []).reduce(
-        (sum, p) => sum + (p.occupied_units || 0),
+        (sum: number, p: any) => sum + (p.occupied_units || 0),
         0
       );
 
@@ -141,11 +141,11 @@ const PropertyManagementNew: React.FC = () => {
         );
 
       const totalMonthlyIncome = (projections || []).reduce(
-        (sum, p) => sum + (p.total_monthly_income || 0),
+        (sum: number, p: any) => sum + (p.total_monthly_income || 0),
         0
       );
       const projectedMonthlyIncome = (projections || []).reduce(
-        (sum, p) => sum + (p.projected_monthly_income || 0),
+        (sum: number, p: any) => sum + (p.projected_monthly_income || 0),
         0
       );
 
@@ -321,7 +321,7 @@ const PropertyManagementNew: React.FC = () => {
                   placeholder="Search properties..."
                   className="pl-10 border-2 border-slate-200 rounded-xl focus:border-[#154279] focus:ring-0 bg-white"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -525,7 +525,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
               id="name"
               placeholder="e.g., Westlands Luxury Apartments"
               value={formData.name}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setFormData({ ...formData, name: e.target.value })
               }
             />
@@ -536,7 +536,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
               id="city"
               placeholder="e.g., Nairobi"
               value={formData.city}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setFormData({ ...formData, city: e.target.value })
               }
             />
@@ -547,7 +547,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
               id="address"
               placeholder="e.g., Mpaka Road, Westlands"
               value={formData.address}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setFormData({ ...formData, address: e.target.value })
               }
             />
@@ -558,7 +558,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
               id="description"
               placeholder="Property description"
               value={formData.description}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                 setFormData({ ...formData, description: e.target.value })
               }
             />
@@ -567,7 +567,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
             <Label htmlFor="type">Property Type</Label>
             <Select
               value={formData.type}
-              onValueChange={(value) =>
+              onValueChange={(value: string) =>
                 setFormData({ ...formData, type: value })
               }
             >
@@ -599,7 +599,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
                     type="number"
                     min="0"
                     value={unitType.count}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const newUnitTypes = [...unitTypes];
                       newUnitTypes[index].count = parseInt(e.target.value) || 0;
                       setUnitTypes(newUnitTypes);
@@ -613,7 +613,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
                     type="number"
                     min="0"
                     value={unitType.basePrice}
-                    onChange={(e) => {
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const newUnitTypes = [...unitTypes];
                       newUnitTypes[index].basePrice =
                         parseInt(e.target.value) || 0;

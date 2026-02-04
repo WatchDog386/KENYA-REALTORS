@@ -81,7 +81,7 @@ export default defineConfig(({ mode }) => ({
   base: "./",
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "../src"),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   // Clear console on restart

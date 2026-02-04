@@ -134,7 +134,7 @@ export const useManager = (managerId?: string) => {
         };
       }
 
-      const propertyIds = assignments.map(a => a.property_id);
+      const propertyIds = assignments.map((a: any) => a.property_id);
 
       // Get properties and their tenants
       const { data: properties, error: propsError } = await supabase
@@ -170,7 +170,7 @@ export const useManager = (managerId?: string) => {
         maintenanceCount: 0,
         totalRevenue,
         occupancyRate,
-        properties: (properties || []).map(p => ({
+        properties: (properties || []).map((p: any) => ({
           id: p.id,
           name: p.name,
           tenants: ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0),

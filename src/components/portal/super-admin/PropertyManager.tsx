@@ -193,7 +193,7 @@ const PropertyManager: React.FC = () => {
       type: property.type || 'Apartment',
       description: property.description || '',
       amenities: property.amenities || '',
-      units: property.property_unit_types?.map(u => ({
+      units: property.property_unit_types?.map((u: any) => ({
         name: u.name,
         units_count: u.units_count,
         price_per_unit: u.price_per_unit
@@ -239,12 +239,12 @@ const PropertyManager: React.FC = () => {
 
   // Derived Stats
   const totalProperties = properties.length;
-  const totalUnits = properties.reduce((sum, p) => sum + (p.total_units || 0), 0);
-  const totalIncome = properties.reduce((sum, p) => sum + (p.expected_income || 0), 0);
+  const totalUnits = properties.reduce((sum: number, p: Property) => sum + (p.total_units || 0), 0);
+  const totalIncome = properties.reduce((sum: number, p: Property) => sum + (p.expected_income || 0), 0);
 
   // Form Calculations
-  const formTotalUnits = formData.units.reduce((sum, u) => sum + Number(u.units_count || 0), 0);
-  const formExpectedIncome = formData.units.reduce((sum, u) => sum + (Number(u.units_count || 0) * Number(u.price_per_unit || 0)), 0);
+  const formTotalUnits = formData.units.reduce((sum: number, u: any) => sum + Number(u.units_count || 0), 0);
+  const formExpectedIncome = formData.units.reduce((sum: number, u: any) => sum + (Number(u.units_count || 0) * Number(u.price_per_unit || 0)), 0);
 
   const unitTypeOptions = [
     "Bedsitter", "Studio", "One Bedroom", "Two Bedroom", "Three Bedroom", "Shop", "Office", "Penthouse", "Maisonette", "Villa", "Other"
@@ -323,7 +323,7 @@ const PropertyManager: React.FC = () => {
                                 <Label className="text-slate-700 font-semibold text-sm">Property Name</Label>
                                 <Input 
                                     value={formData.name} 
-                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})}
                                     placeholder="e.g. Sunrise Apartments"
                                     className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                                 />
@@ -335,7 +335,7 @@ const PropertyManager: React.FC = () => {
                                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                     <Input 
                                         value={formData.location} 
-                                        onChange={(e) => setFormData({...formData, location: e.target.value})}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, location: e.target.value})}
                                         placeholder="e.g. Westlands, Nairobi"
                                         className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                                     />
@@ -346,7 +346,7 @@ const PropertyManager: React.FC = () => {
                                 <Label className="text-slate-700 font-semibold text-sm">Type</Label>
                                 <Select 
                                     value={formData.type} 
-                                    onValueChange={(val) => setFormData({...formData, type: val})}
+                                    onValueChange={(val: string) => setFormData({...formData, type: val})}
                                 >
                                     <SelectTrigger className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white">
                                         <SelectValue placeholder="Select type" />
@@ -366,7 +366,7 @@ const PropertyManager: React.FC = () => {
                                     <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                                     <Input 
                                         value={formData.image_url} 
-                                        onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, image_url: e.target.value})}
                                         placeholder="https://example.com/image.jpg"
                                         className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                                     />
@@ -390,7 +390,7 @@ const PropertyManager: React.FC = () => {
 
                             <div className="space-y-3">
                             <AnimatePresence initial={false}>
-                                {formData.units.map((unit, index) => (
+                                {formData.units.map((unit: any, index: number) => (
                                 <motion.div 
                                     key={index}
                                     initial={{ opacity: 0, y: 10 }}
@@ -406,7 +406,7 @@ const PropertyManager: React.FC = () => {
                                             list={`unit-types-${index}`}
                                             placeholder="Select or type..." 
                                             value={unit.name}
-                                            onChange={(e) => handleUnitChange(index, 'name', e.target.value)}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'name', e.target.value)}
                                             className="h-9 border-slate-200 bg-white text-sm font-medium focus:border-slate-400 focus:ring-slate-400 rounded-md shadow-sm" 
                                         />
                                         <datalist id={`unit-types-${index}`}>
@@ -422,7 +422,7 @@ const PropertyManager: React.FC = () => {
                                         min="0"
                                         placeholder="0" 
                                         value={unit.units_count}
-                                        onChange={(e) => handleUnitChange(index, 'units_count', Number(e.target.value))}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'units_count', Number(e.target.value))}
                                         className="h-9 border-slate-200 bg-white text-sm font-medium text-center focus:border-slate-400 focus:ring-slate-400 rounded-md shadow-sm"
                                     />
                                     </div>
@@ -436,7 +436,7 @@ const PropertyManager: React.FC = () => {
                                         min="0"
                                         placeholder="0" 
                                         value={unit.price_per_unit}
-                                        onChange={(e) => handleUnitChange(index, 'price_per_unit', Number(e.target.value))}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'price_per_unit', Number(e.target.value))}
                                         className="pl-10 h-9 border-slate-200 bg-white text-sm font-medium text-right focus:border-slate-400 focus:ring-slate-400 rounded-md shadow-sm"
                                         />
                                     </div>
@@ -644,7 +644,7 @@ const PropertyManager: React.FC = () => {
                   <Label className="text-slate-700 font-semibold text-sm">Property Name</Label>
                   <Input 
                     value={formData.name} 
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})}
                     placeholder="e.g. Sunrise Apartments"
                     className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                   />
@@ -656,7 +656,7 @@ const PropertyManager: React.FC = () => {
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     <Input 
                       value={formData.location} 
-                      onChange={(e) => setFormData({...formData, location: e.target.value})}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, location: e.target.value})}
                       placeholder="e.g. Westlands, Nairobi"
                       className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                     />
@@ -667,7 +667,7 @@ const PropertyManager: React.FC = () => {
                   <Label className="text-slate-700 font-semibold text-sm">Type</Label>
                   <Select 
                     value={formData.type} 
-                    onValueChange={(val) => setFormData({...formData, type: val})}
+                    onValueChange={(val: string) => setFormData({...formData, type: val})}
                   >
                     <SelectTrigger className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white">
                       <SelectValue placeholder="Select type" />
@@ -688,7 +688,7 @@ const PropertyManager: React.FC = () => {
                       <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <Input 
                         value={formData.image_url} 
-                        onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, image_url: e.target.value})}
                         placeholder="https://example.com/image.jpg"
                         className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                       />
@@ -816,7 +816,7 @@ const PropertyManager: React.FC = () => {
                 <Input
                   placeholder="Search properties by name, location..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                   className="pl-10 border-slate-200 rounded-xl focus:border-[#F96302] focus:ring-0 bg-white h-10"
                 />
               </div>

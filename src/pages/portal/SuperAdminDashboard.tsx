@@ -215,7 +215,7 @@ const SuperAdminDashboard = () => {
       });
       
       // Calculate estimated monthly rent potential from the units
-       const estimatedMonthlyRent = propertiesData.reduce((sum, prop: any) => {
+       const estimatedMonthlyRent = propertiesData.reduce((sum: number, prop: any) => {
           return sum + (prop.property_unit_types || []).reduce((subSum: number, u: any) => subSum + (u.units_count * u.price_per_unit), 0);
        }, 0);
        // We'll map this to 'totalRevenue' or wherever it was used. 
@@ -259,9 +259,9 @@ const SuperAdminDashboard = () => {
         .eq("status", "completed")
         .gte("created_at", startOfMonth.toISOString());
 
-      const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      const totalRevenue = payments?.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0) || 0;
 
-      const totalExpectedRevenue = propertiesData.reduce((sum, p: any) => {
+      const totalExpectedRevenue = propertiesData.reduce((sum: number, p: any) => {
         // Use potential income calculated from unit types
         const potential = (p.property_unit_types || []).reduce((acc: number, u: any) => acc + (u.units_count * u.price_per_unit), 0);
         return sum + potential;
@@ -333,7 +333,7 @@ const SuperAdminDashboard = () => {
         .limit(3);
 
       if (recentUsers) {
-        recentUsers.forEach(userItem => {
+        recentUsers.forEach((userItem: any) => {
           items.push({
             id: userItem.id,
             title: `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim() || userItem.email,
@@ -352,7 +352,7 @@ const SuperAdminDashboard = () => {
         .limit(2);
 
       if (recentPayments) {
-        recentPayments.forEach(payment => {
+        recentPayments.forEach((payment: any) => {
           items.push({
             id: payment.id,
             title: `Payment of ${formatCurrency(payment.amount || 0)}`,
@@ -377,7 +377,7 @@ const SuperAdminDashboard = () => {
         .limit(5);
 
       if (recentApprovals) {
-        recentApprovals.forEach(approval => {
+        recentApprovals.forEach((approval: any) => {
           const titleMap: Record<string, string> = {
             role_assignment: "Role Assignment",
             manager_assignment: "Manager Assignment",
@@ -416,7 +416,7 @@ const SuperAdminDashboard = () => {
         .limit(3);
 
       if (emergencyMaintenance && emergencyMaintenance.length > 0) {
-        emergencyMaintenance.forEach(req => {
+        emergencyMaintenance.forEach((req: any) => {
           alerts.push({
             id: `maintenance-${req.id}`,
             title: `Emergency Maintenance: ${req.title}`,

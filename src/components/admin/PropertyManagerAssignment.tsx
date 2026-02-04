@@ -68,7 +68,7 @@ export function PropertyManagerAssignment({
 
       if (assignmentError) throw assignmentError;
 
-      const currentPropIds = (assignmentData || []).map(a => a.property_id);
+      const currentPropIds = (assignmentData || []).map((a: any) => a.property_id);
       setCurrentAssignments(currentPropIds);
       setSelectedProperties(currentPropIds);
     } catch (error: any) {

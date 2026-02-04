@@ -303,8 +303,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const phone = supabaseUser.user_metadata?.phone || null;
       // Check both 'role' and 'account_type' metadata keys
       const userType = supabaseUser.user_metadata?.role || supabaseUser.user_metadata?.account_type || null;
-      // Status is pending if they have a role (except super_admin), otherwise null
-      const status = (userType && userType !== 'super_admin') ? "pending" : null;
+      // Status is pending if they have a role (except super_admin), otherwise undefined
+      const status: string | undefined = (userType && userType !== 'super_admin') ? "pending" : undefined;
 
       const newProfile = await createUserProfileInDB(
         supabaseUser.id,
@@ -422,7 +422,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
       console.log("🔄 Auth state changed:", event);
 
       setIsLoading(true);

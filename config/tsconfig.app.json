@@ -22,14 +22,14 @@
     "noImplicitAny": false,
     "noFallthroughCasesInSwitch": false,
 
-    "baseUrl": ".",
+    "baseUrl": "..",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
   "include": [
-    "src",
-    "jtech-plan-api/payments/payment_verification.ts",
-    "jtech-plan-api/payments/index.ts"
+    "../src",
+    "../jtech-plan-api/payments/payment_verification.ts",
+    "../jtech-plan-api/payments/index.ts"
   ]
 }

@@ -635,7 +635,7 @@ const UserManagementNew: React.FC = () => {
                   placeholder="Search by name or email..."
                   className="pl-10 border-2 border-slate-200 rounded-xl focus:border-[#154279] focus:ring-0 bg-white"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
@@ -858,7 +858,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
           placeholder="john@example.com"
           className="border-2 border-slate-200 rounded-xl focus:border-[#154279] focus:ring-0 mt-1 bg-white"
           value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, email: e.target.value })}
         />
       </div>
 
@@ -894,7 +894,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
         <Label htmlFor="role" className="text-slate-700 font-bold text-sm">
           Initial Role
         </Label>
-        <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+        <Select value={formData.role} onValueChange={(value: string) => setFormData({ ...formData, role: value })}>
           <SelectTrigger className="border-2 border-slate-200 rounded-xl mt-1 bg-white">
             <SelectValue />
           </SelectTrigger>

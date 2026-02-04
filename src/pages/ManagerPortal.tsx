@@ -96,7 +96,7 @@ export default function ManagerPortal() {
 
       if (assignmentError) throw assignmentError;
 
-      const propertyIds = (assignmentData || []).map(a => a.property_id);
+      const propertyIds = (assignmentData || []).map((a: any) => a.property_id);
 
       if (propertyIds.length === 0) {
         setManagedProperties([]);

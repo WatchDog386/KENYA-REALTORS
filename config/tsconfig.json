@@ -5,7 +5,7 @@
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
-    "baseUrl": ".",
+    "baseUrl": "..",
     "paths": {
       "@/*": ["./src/*"]
     },
@@ -22,12 +22,12 @@
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",
     "moduleResolution": "node",
-    "rootDir": "src",
+    "rootDir": "../src",
     "jsx": "react-jsx"
   },
   "include": [
-    "src",
-    "jtech-plan-api/payments/payment_verification.ts",
-    "jtech-plan-api/payments/index.ts"
+    "../src",
+    "../jtech-plan-api/payments/payment_verification.ts",
+    "../jtech-plan-api/payments/index.ts"
   ]
 }
