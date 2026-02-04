@@ -194,7 +194,6 @@ const SuperAdminDashboard = () => {
       const propertiesData = properties || [];
       
       let totalUnits = 0;
-      let totalRevenue = 0; // Was monthly_rent or totalRevenue in state?
       // Note: occupied_units support is pending lease implementation.
       const occupiedUnits = 0; 
 
