@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { HeroBackground } from '@/components/ui/HeroBackground';
 
 interface Refund {
   id: string;
@@ -484,24 +485,38 @@ const RefundStatusPage = () => {
 
   // Main refund list view
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Refund Status Tracking</h1>
-          <p className="text-gray-600">Track and manage security deposit refunds</p>
+    <div className="min-h-screen bg-gray-50/50">
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 max-w-[1400px] mx-auto">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-extrabold tracking-tight">Refund Status Tracking</h1>
+              <p className="text-lg text-blue-100 max-w-2xl font-light">
+                Track and manage security deposit refunds
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                onClick={loadRefunds}
+                className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+               <Button 
+                className="bg-white text-[#154279] hover:bg-gray-100 font-bold transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={loadRefunds}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <Button>
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
-          </Button>
-        </div>
-      </div>
+      </section>
+      
+      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -693,6 +708,7 @@ const RefundStatusPage = () => {
           </div>
         </CardFooter>
       </Card>
+      </div>
     </div>
   );
 };

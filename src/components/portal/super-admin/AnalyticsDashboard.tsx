@@ -25,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { HeroBackground } from "@/components/ui/HeroBackground";
 import {
   Select,
   SelectContent,
@@ -201,56 +202,68 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   };
 
   return (
-    <div className="space-y-8 font-nunito bg-gradient-to-br from-gray-50 to-white min-h-screen p-6 rounded-lg">
+    <div className="bg-slate-50 min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Analytics Dashboard
-          </h2>
-          <p className="text-gray-500 font-medium">Comprehensive insights and metrics</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="hover:bg-gray-100 transition-colors duration-200"
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="hover:bg-gray-100 transition-colors duration-200">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Export Format</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => handleExport("csv")}>
-                CSV Format
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("json")}>
-                JSON Format
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
+          <div className="space-y-1">
+             <div className="flex items-center gap-3 mb-2">
+                 <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
+                    <BarChart3 className="w-5 h-5 text-white" />
+                 </div>
+                 <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Dashboard</span>
+             </div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+              Analytics <span className="text-[#F96302]">Overview</span>
+            </h1>
+            <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
+              Comprehensive system insights, financial metrics, and performance analytics.
+            </p>
+          </div>
 
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="group flex items-center gap-2 bg-white text-[#154279] px-5 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-blue-50 transition-all duration-300 rounded-xl shadow-lg border-2 border-white hover:shadow-xl hover:-translate-y-0.5"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`}
+              />
+              Refresh
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="group flex items-center gap-2 bg-white/10 text-white px-5 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all duration-300 rounded-xl border border-white/20 hover:border-white/40 shadow-sm backdrop-blur-sm">
+                  <Download className="h-3.5 w-3.5" />
+                  Export
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-2">
+                <DropdownMenuLabel className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Export Format</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleExport("csv")} className="cursor-pointer font-medium">
+                  CSV Format
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("json")} className="cursor-pointer font-medium">
+                  JSON Format
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-6 space-y-8">
       {/* Timeframe Selector */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border-2 border-slate-200">
         <Tabs
           value={selectedMetric}
           onValueChange={setSelectedMetric}
           className="w-full"
         >
-          <TabsList className="bg-gray-100 rounded-lg p-1">
+          <TabsList className="bg-slate-100 rounded-lg p-1">
             <TabsTrigger value="overview" className="rounded-md transition-all">Overview</TabsTrigger>
             <TabsTrigger value="financial" className="rounded-md transition-all">Financial</TabsTrigger>
             <TabsTrigger value="properties" className="rounded-md transition-all">Properties</TabsTrigger>
@@ -264,7 +277,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             value={selectedTimeframe}
             onValueChange={handleTimeframeChange}
           >
-            <SelectTrigger className="w-[140px] bg-white border-gray-200 hover:border-gray-300 transition-colors">
+            <SelectTrigger className="w-[140px] bg-white border-2 border-slate-200 rounded-xl">
               <SelectValue placeholder="Timeframe" />
             </SelectTrigger>
             <SelectContent>
@@ -282,9 +295,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       <TabsContent value="overview" className="space-y-8">
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-sm font-semibold text-gray-700">
+              <CardTitle className="text-sm font-bold text-slate-700">
                 Total Revenue
               </CardTitle>
               <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -292,7 +305,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-3xl font-bold text-gray-900">
+              <div className="text-3xl font-black text-[#154279]">
                 {formatCurrency(financialMetrics.totalRevenue || 0)}
               </div>
               <div className="flex items-center gap-2 text-xs font-medium">
@@ -315,7 +328,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-sm font-semibold text-gray-700">
                 Occupancy Rate
@@ -348,7 +361,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-sm font-semibold text-gray-700">
                 Active Users
@@ -381,7 +394,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 bg-white">
+          <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-sm font-semibold text-gray-700">Properties</CardTitle>
               <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
@@ -402,7 +415,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Revenue Trend */}
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">Revenue Trend</CardTitle>
               <CardDescription className="text-gray-600">Monthly revenue over time</CardDescription>
@@ -436,7 +449,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </Card>
 
           {/* Occupancy Trend */}
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">Occupancy Trend</CardTitle>
               <CardDescription className="text-gray-600">Property occupancy rates</CardDescription>
@@ -467,7 +480,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         {/* Charts Row 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Property Type Distribution */}
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">Property Type Distribution</CardTitle>
               <CardDescription className="text-gray-600">Breakdown by property type</CardDescription>
@@ -506,7 +519,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </Card>
 
           {/* User Growth */}
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">User Growth</CardTitle>
               <CardDescription className="text-gray-600">New user registrations</CardDescription>
@@ -537,7 +550,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       {/* Financial Tab */}
       <TabsContent value="financial" className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-base font-semibold text-gray-900">Revenue Summary</CardTitle>
             </CardHeader>
@@ -579,7 +592,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="md:col-span-2 border-0 shadow-md bg-white">
+          <Card className="md:col-span-2 border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-base font-semibold text-gray-900">Payment Status</CardTitle>
             </CardHeader>
@@ -640,7 +653,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       {/* Properties Tab */}
       <TabsContent value="properties" className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">Property Status</CardTitle>
             </CardHeader>
@@ -681,7 +694,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">Top Performing Properties</CardTitle>
             </CardHeader>
@@ -724,7 +737,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       {/* Users Tab */}
       <TabsContent value="users" className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">User Distribution by Role</CardTitle>
             </CardHeader>
@@ -760,7 +773,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-md bg-white">
+          <Card className="border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg font-semibold text-gray-900">User Activity</CardTitle>
             </CardHeader>
@@ -795,6 +808,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </Card>
         </div>
       </TabsContent>
+    </div>
     </div>
   );
 };

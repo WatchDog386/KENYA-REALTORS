@@ -27,6 +27,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { HeroBackground } from "@/components/ui/HeroBackground";
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -279,34 +280,55 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
   };
 
   return (
-    <div className="space-y-6 font-nunito">
+    <div className="bg-slate-50 min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-gray-900">System Settings</h2>
-          <p className="text-gray-500 font-semibold mt-1">Configure and manage system settings</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={backupSettings} className="text-gray-700 bg-white hover:bg-gray-50 border-gray-200 rounded-lg font-bold shadow-sm">
-            <Download className="h-4 w-4 mr-2" />
-            Backup
-          </Button>
-          <Button variant="outline" asChild className="text-gray-700 bg-white hover:bg-gray-50 border-gray-200 rounded-lg font-bold shadow-sm">
-            <Label htmlFor="restore-settings" className="cursor-pointer">
-              <Upload className="h-4 w-4 mr-2" />
-              Restore
-              <input
-                id="restore-settings"
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={restoreSettings}
-              />
-            </Label>
-          </Button>
-        </div>
-      </div>
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
+          <div className="space-y-1">
+             <div className="flex items-center gap-3 mb-2">
+                 <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
+                    <Settings className="w-5 h-5 text-white" />
+                 </div>
+                 <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Configuration</span>
+             </div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+              System <span className="text-[#F96302]">Settings</span>
+            </h1>
+            <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
+              Configure general preferences, security, notifications, and payment gateways.
+            </p>
+          </div>
 
+          <div className="flex items-center gap-3">
+             <button
+              onClick={backupSettings}
+              className="group flex items-center gap-2 bg-white text-[#154279] px-5 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/90 transition-all duration-300 rounded-xl shadow-lg border-2 border-white hover:shadow-xl hover:-translate-y-0.5"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Backup Settings
+            </button>
+             <div className="relative">
+            <input
+              id="restore-settings"
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={restoreSettings}
+            />
+            <label
+              htmlFor="restore-settings"
+              className="group flex items-center gap-2 bg-white text-[#154279] px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest hover:bg-blue-50 transition-all duration-300 rounded-xl shadow-lg border-2 border-white hover:shadow-xl cursor-pointer"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Restore
+            </label>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-6 space-y-8">
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid grid-cols-5 w-full">
@@ -334,7 +356,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
 
         {/* General Settings */}
         <TabsContent value="general" className="space-y-6">
-          <Card>
+          <Card className="border-2 border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <CardTitle>General Settings</CardTitle>
               <CardDescription>Basic system configuration</CardDescription>
@@ -450,7 +472,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
 
         {/* Security Settings */}
         <TabsContent value="security" className="space-y-6">
-          <Card>
+          <Card className="border-2 border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <CardTitle>Security Settings</CardTitle>
               <CardDescription>Configure authentication and security</CardDescription>
@@ -595,7 +617,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
 
         {/* Notification Settings */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card>
+          <Card className="border-2 border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <CardTitle>Notification Settings</CardTitle>
               <CardDescription>Configure system notifications</CardDescription>
@@ -702,7 +724,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
 
         {/* Email Settings */}
         <TabsContent value="email" className="space-y-6">
-          <Card>
+          <Card className="border-2 border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <CardTitle>Email Settings</CardTitle>
               <CardDescription>Configure email server and templates</CardDescription>
@@ -819,7 +841,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
 
         {/* Payment Settings */}
         <TabsContent value="payment" className="space-y-6">
-          <Card>
+          <Card className="border-2 border-slate-200 bg-white shadow-sm">
             <CardHeader>
               <CardTitle>Payment Settings</CardTitle>
               <CardDescription>Configure payment gateways and settings</CardDescription>
@@ -950,7 +972,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
       </Tabs>
 
       {/* System Status */}
-      <Card>
+      <Card className="border-2 border-slate-200 bg-white shadow-sm">
         <CardHeader>
           <CardTitle>System Status</CardTitle>
           <CardDescription>Current system health and status</CardDescription>
@@ -996,6 +1018,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({ onSettingsUpdate }) => 
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 };

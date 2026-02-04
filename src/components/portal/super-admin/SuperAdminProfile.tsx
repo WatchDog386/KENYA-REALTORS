@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2, Upload, Check, X, Edit2, Shield } from "lucide-react";
+import { HeroBackground } from "@/components/ui/HeroBackground";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -226,8 +227,8 @@ const SuperAdminProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#00356B]" />
+      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
       </div>
     );
   }
@@ -256,32 +257,45 @@ const SuperAdminProfile: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate("/portal/super-admin")}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ArrowLeft size={20} className="text-gray-600" />
-        </button>
-        <div>
-          <h1 className="text-3xl font-light text-[#00356B] tracking-tight">
-            My Profile
-          </h1>
-          <p className="text-sm text-gray-600">
-            {isEditing ? "Edit your personal information" : "Manage your personal information and roles"}
-          </p>
+    <div className="min-h-screen bg-slate-50 pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+
+      {/* Header */}
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 flex items-center gap-4 max-w-7xl mx-auto">
+          <button
+             onClick={() => navigate("/portal/super-admin")}
+             className="p-2 mb-auto bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+           >
+             <ArrowLeft size={20} />
+           </button>
+           <div>
+             <div className="flex items-center gap-3 mb-2">
+                 <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
+                    <Shield className="w-5 h-5 text-white" />
+                 </div>
+                 <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Account Settings</span>
+             </div>
+             <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
+               My Profile
+             </h1>
+             <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
+               {isEditing ? "Edit your personal information" : "Manage your personal information, security settings, and role permissions."}
+             </p>
+           </div>
         </div>
-      </div>
+      </section>
+
+      <div className="max-w-4xl mx-auto px-6 space-y-6">
 
       {/* Personal Information Card */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Personal Information</CardTitle>
+      <Card className="border-2 border-slate-200 bg-white shadow-lg">
+        <CardHeader className="border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white flex flex-row items-center justify-between">
+          <CardTitle className="text-[#154279] font-black text-xl">Personal Information</CardTitle>
           {!isEditing && (
             <button
               onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 px-3 py-1 bg-[#00356B] text-white rounded-lg hover:bg-[#002647] transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-[#154279] hover:bg-[#0f325e] text-white rounded-xl transition-colors font-bold shadow-lg hover:shadow-xl text-sm"
             >
               <Edit2 size={16} />
               Edit Profile
@@ -292,7 +306,7 @@ const SuperAdminProfile: React.FC = () => {
           {/* Avatar Section */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
-              <div className="w-32 h-32 bg-gradient-to-br from-[#00356B] to-[#004B97] rounded-full flex items-center justify-center overflow-hidden shadow-lg border-4 border-white">
+              <div className="w-32 h-32 bg-gradient-to-br from-[#154279] to-blue-700 rounded-full flex items-center justify-center overflow-hidden shadow-lg border-4 border-white">
                 {previewImage ? (
                   <img
                     src={previewImage}
@@ -306,7 +320,7 @@ const SuperAdminProfile: React.FC = () => {
                 )}
               </div>
               {isEditing && (
-                <label className="absolute bottom-0 right-0 bg-[#00356B] text-white p-3 rounded-full cursor-pointer hover:bg-[#002647] transition-colors shadow-md">
+                <label className="absolute bottom-0 right-0 bg-[#154279] hover:bg-[#0f325e] text-white p-3 rounded-full cursor-pointer transition-colors shadow-md hover:shadow-lg">
                   <Upload size={20} />
                   <input
                     type="file"
@@ -524,6 +538,7 @@ const SuperAdminProfile: React.FC = () => {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 };

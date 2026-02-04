@@ -17,7 +17,7 @@ import {
 import {
   Users, DollarSign, Activity, Crown, Search,
   Server, ShieldCheck, Database, ArrowUpRight, Loader2,
-  CheckCircle, XCircle, Clock, RefreshCw
+  CheckCircle, XCircle, Clock, RefreshCw, BarChart3, TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -43,7 +43,7 @@ interface DashboardStats {
   totalRevenue: number;
 }
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b']; // Indigo, Emerald, Amber
+const COLORS = ['#154279', '#F96302', '#10b981']; // Primary, Secondary, Emerald
 
 const AdminDashboard = () => {
   const { user, profile } = useAuth();
@@ -160,86 +160,92 @@ const AdminDashboard = () => {
     }
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-indigo-600" /></div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin h-10 w-10 text-[#154279]" /></div>;
 
   return (
-    <div className="min-h-screen bg-slate-50/50 p-6 md:p-8 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-8 font-nunito text-slate-900">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <Crown className="text-indigo-600 h-6 w-6" /> Admin Dashboard
+          <h1 className="text-3xl font-extrabold tracking-tight text-[#154279] flex items-center gap-3">
+             Admin Dashboard
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Overview of system performance and user metrics.</p>
+          <p className="text-slate-500 mt-2 font-medium">Overview of system performance and user metrics.</p>
         </div>
-        <div className="flex items-center gap-2">
-            <Badge variant="outline" className="px-3 py-1 bg-white">v2.4.0</Badge>
-            <Badge className="bg-emerald-600 hover:bg-emerald-700">System Online</Badge>
+        <div className="flex items-center gap-3">
+            <Badge variant="outline" className="px-3 py-1.5 bg-white border-slate-200 text-slate-600 shadow-sm rounded-lg">v2.4.0</Badge>
+            <Badge className="bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-lg shadow-emerald-200 shadow-md">System Online</Badge>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* KPI Cards - Sleek Design */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {[
-          { label: "Total Revenue", value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-600" },
-          { label: "Total Users", value: stats.totalUsers.toLocaleString(), icon: Users, color: "text-blue-600" },
-          { label: "Pending Approvals", value: stats.pendingApprovals, icon: Clock, color: "text-amber-600" },
-          { label: "Growth Rate", value: `+${stats.growthRate}%`, icon: ArrowUpRight, color: "text-purple-600" },
+          { label: "Total Revenue", value: `$${stats.totalRevenue.toLocaleString()}`, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-100" },
+          { label: "Total Users", value: stats.totalUsers.toLocaleString(), icon: Users, color: "text-[#154279]", bg: "bg-blue-100" },
+          { label: "Pending Approvals", value: stats.pendingApprovals, icon: Clock, color: "text-[#F96302]", bg: "bg-orange-100" },
+          { label: "Growth Rate", value: `+${stats.growthRate}%`, icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-100" },
         ].map((stat, i) => (
-          <Card key={i} className="shadow-sm border-slate-200">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.label}</p>
-                <h3 className="text-2xl font-bold mt-2 text-slate-900">{stat.value}</h3>
+          <Card key={i} className="bg-white rounded-2xl border-none shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+            <CardContent className="p-6 flex items-center justify-between relative overflow-hidden">
+              <div className="z-10">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{stat.label}</p>
+                <h3 className="text-3xl font-extrabold text-slate-800">{stat.value}</h3>
               </div>
-              <div className={`p-3 rounded-full bg-slate-50 ${stat.color}`}>
-                <stat.icon size={24} />
+              <div className={`p-4 rounded-xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
+                <stat.icon size={26} strokeWidth={2.5} />
               </div>
+              <div className={`absolute -bottom-4 -right-4 w-24 h-24 rounded-full opacity-10 ${stat.bg.replace('bg-', 'bg-')}`} />
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Main Content Tabs */}
-      <Tabs defaultValue="approvals" className="space-y-6">
-        <TabsList className="bg-white border border-slate-200 p-1 rounded-lg">
-          <TabsTrigger value="approvals" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900">Approvals {stats.pendingApprovals > 0 && <Badge className="ml-2 bg-amber-500">{stats.pendingApprovals}</Badge>}</TabsTrigger>
-          <TabsTrigger value="users" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900">All Users</TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-slate-100 data-[state=active]:text-slate-900">Analytics</TabsTrigger>
+      <Tabs defaultValue="approvals" className="space-y-8">
+        <TabsList className="bg-white p-1.5 rounded-xl shadow-md border border-slate-100 w-full md:w-auto inline-flex h-auto">
+          <TabsTrigger value="approvals" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-[#154279] data-[state=active]:text-white data-[state=active]:shadow-md transition-all">
+            Approvals {stats.pendingApprovals > 0 && <Badge className="ml-2 bg-[#F96302] text-white hover:bg-[#d65502]">{stats.pendingApprovals}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="users" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-[#154279] data-[state=active]:text-white data-[state=active]:shadow-md transition-all">All Users</TabsTrigger>
+          <TabsTrigger value="analytics" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-[#154279] data-[state=active]:text-white data-[state=active]:shadow-md transition-all">Analytics</TabsTrigger>
         </TabsList>
 
-        {/* Approvals Tab (NEW) */}
+        {/* Approvals Tab */}
         <TabsContent value="approvals">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Pending Approvals</CardTitle>
+          <Card className="bg-white rounded-2xl border-none shadow-lg overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+              <CardTitle className="text-xl font-bold text-[#154279]">Pending Approvals</CardTitle>
               <CardDescription>Property managers waiting for account activation.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {users.filter(u => u.role === 'property_manager' && u.status === 'pending').length === 0 ? (
-                 <div className="text-center py-10 text-slate-500">
-                   <ShieldCheck className="mx-auto h-12 w-12 text-slate-300 mb-2" />
-                   <p>No pending approvals found.</p>
+                 <div className="text-center py-16 flex flex-col items-center">
+                   <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-4">
+                     <CheckCircle className="h-10 w-10 text-green-500" />
+                   </div>
+                   <h3 className="text-lg font-bold text-slate-800">All caught up!</h3>
+                   <p className="text-slate-500">No pending approvals found.</p>
                  </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid gap-4">
                   {users.filter(u => u.role === 'property_manager' && u.status === 'pending').map((u) => (
-                    <div key={u.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-100 gap-4">
-                       <div className="flex items-center gap-4 flex-1">
-                          <Avatar className="h-12 w-12 border border-amber-200">
-                            <AvatarFallback className="bg-amber-100 text-amber-700">{u.first_name ? u.first_name.charAt(0) : 'U'}</AvatarFallback>
+                    <div key={u.id} className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all gap-4 group">
+                       <div className="flex items-center gap-5 flex-1">
+                          <Avatar className="h-14 w-14 border-2 border-orange-100 shadow-sm">
+                            <AvatarFallback className="bg-orange-50 text-[#F96302] font-bold text-lg">{u.first_name ? u.first_name.charAt(0) : 'U'}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-bold text-slate-900">{u.first_name} {u.last_name || ''}</p>
-                            <p className="text-sm text-slate-600">{u.email}</p>
-                            <Badge variant="outline" className="mt-1 bg-white text-xs">Property Manager</Badge>
+                            <p className="font-bold text-lg text-[#154279] group-hover:text-[#F96302] transition-colors">{u.first_name} {u.last_name || ''}</p>
+                            <p className="text-sm text-slate-500 font-medium">{u.email}</p>
+                            <Badge variant="outline" className="mt-2 bg-orange-50 text-[#F96302] border-orange-100 text-xs py-0.5">Property Manager</Badge>
                           </div>
                        </div>
-                       <div className="flex gap-2 flex-1 md:flex-initial md:w-auto">
+                       <div className="flex gap-3 flex-wrap md:flex-nowrap">
                          <Button 
                           onClick={() => handleApproveUser(u.id, u.role)}
-                          className="flex-1 md:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                          className="flex-1 md:flex-initial bg-emerald-500 hover:bg-emerald-600 text-white gap-2 rounded-xl shadow-lg shadow-emerald-200"
                         >
                            <CheckCircle className="h-4 w-4" /> Approve Access
                          </Button>
@@ -257,78 +263,83 @@ const AdminDashboard = () => {
           </Card>
         </TabsContent>
 
-        {/* Users Tab (Modified) */}
+        {/* Users Tab */}
         <TabsContent value="users">
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Info Banner */}
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="pt-6 flex items-start gap-3">
-                <Database className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-blue-900">User Sync Active</p>
-                  <p className="text-sm text-blue-700 mt-1">Auth users automatically sync to profiles table on signup. Super admin can manage all users.</p>
+            <div className="bg-gradient-to-r from-[#154279] to-blue-900 rounded-2xl p-6 shadow-lg text-white relative overflow-hidden">
+              <div className="relative z-10 flex items-start gap-4">
+                <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                  <Database className="h-6 w-6 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <h3 className="font-bold text-lg">User Sync Active</h3>
+                  <p className="text-white/80 mt-1 max-w-2xl">Auth users are automatically synced to the profiles table on signup. Use the dashboard to manage roles, permissions, and account status.</p>
+                </div>
+              </div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+            </div>
 
             {/* Users List Card */}
-            <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
+            <Card className="bg-white rounded-2xl border-none shadow-lg">
+              <CardHeader className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-100 p-6 gap-4">
                 <div>
-                  <CardTitle>Registered Users ({users.length})</CardTitle>
-                  <CardDescription>Manage all user accounts and roles.</CardDescription>
+                  <CardTitle className="text-xl font-bold text-[#154279]">Registered Users</CardTitle>
+                  <CardDescription>Manage {users.length} user accounts and roles.</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={handleSyncUsers}
                     disabled={syncing}
-                    className="gap-2"
+                    className="gap-2 rounded-lg border-slate-200 hover:bg-slate-50 text-slate-600"
                   >
                     {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} 
                     {syncing ? 'Syncing...' : 'Sync Users'}
                   </Button>
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-                    <input type="text" placeholder="Search users..." className="pl-9 pr-4 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64" />
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Search users..." 
+                      className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#154279]/20 focus:border-[#154279] w-full md:w-64 transition-all" 
+                    />
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {users.length === 0 ? (
-                  <div className="text-center py-10 text-slate-500">
+                  <div className="text-center py-16 text-slate-500">
                     <Users className="mx-auto h-12 w-12 text-slate-300 mb-2" />
                     <p>No users registered yet.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="divide-y divide-slate-50">
                     {users.map((u) => (
-                      <div key={u.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100">
+                      <div key={u.id} className="flex items-center justify-between p-4 px-6 hover:bg-slate-50 transition-colors group">
                         <div className="flex items-center gap-4 flex-1">
-                          <Avatar className="h-10 w-10 border border-slate-200">
+                          <Avatar className="h-10 w-10 border border-slate-100 shadow-sm">
                             <AvatarImage src={u.avatar_url} />
-                            <AvatarFallback className="bg-indigo-50 text-indigo-700">{u.first_name ? u.first_name.charAt(0) : 'U'}</AvatarFallback>
+                            <AvatarFallback className="bg-[#154279]/5 text-[#154279] font-bold">{u.first_name ? u.first_name.charAt(0) : 'U'}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium text-slate-900">{u.first_name} {u.last_name || ''}</p>
-                            <p className="text-xs text-slate-500">{u.email}</p>
-                            {u.email === 'duncanmarshel@gmail.com' && (
-                              <Badge className="mt-1 bg-purple-600 hover:bg-purple-700 text-xs">
-                                <Crown className="h-3 w-3 mr-1" /> Super Admin
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <p className="font-bold text-slate-800 group-hover:text-[#154279] transition-colors">{u.first_name} {u.last_name || ''}</p>
+                                {u.email === 'duncanmarshel@gmail.com' && (
+                                  <Crown className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium">{u.email}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Badge variant="secondary" className="capitalize bg-slate-100 text-slate-700 text-xs">
+                          <Badge variant="secondary" className="capitalize bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs px-2.5 py-0.5 rounded-md border border-slate-200">
                             {u.user_type || u.role || 'No Role'}
                           </Badge>
-                          <Badge className={`text-xs ${u.status === 'active' ? 'bg-emerald-100 text-emerald-700' : u.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
-                            {u.status || 'Unknown'}
-                          </Badge>
+                          <div className={`h-2.5 w-2.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500 shadow-emerald-200 shadow-sm' : u.status === 'pending' ? 'bg-amber-500 shadow-amber-200' : 'bg-slate-300'}`}></div>
                           {u.is_active === false && (
-                            <Badge variant="destructive" className="text-xs">Inactive</Badge>
+                            <Badge variant="destructive" className="text-xs rounded-md">Inactive</Badge>
                           )}
                         </div>
                       </div>
@@ -340,29 +351,45 @@ const AdminDashboard = () => {
           </div>
         </TabsContent>
 
-        {/* Analytics Tab (Kept mostly same with responsive container fix) */}
+        {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
-            <Card className="col-span-1 lg:col-span-4 shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
+            <Card className="col-span-1 lg:col-span-4 bg-white rounded-2xl border-none shadow-lg">
               <CardHeader>
-                <CardTitle>Revenue Overview</CardTitle>
+                <CardTitle className="text-[#154279] font-bold">Revenue Overview</CardTitle>
               </CardHeader>
-              <CardContent className="h-[300px]">
+              <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={[
                       { name: 'Jan', revenue: 4000 }, { name: 'Feb', revenue: 3000 },
                       { name: 'Mar', revenue: 5000 }, { name: 'Apr', revenue: 2780 },
                       { name: 'May', revenue: 1890 }, { name: 'Jun', revenue: 6390 },
-                  ]}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                      { name: 'Jul', revenue: 7890 }, { name: 'Aug', revenue: 6090 },
+                  ]} barSize={32}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(value) => `$${value}`} />
+                    <Tooltip 
+                      cursor={{fill: 'transparent'}}
+                      contentStyle={{borderRadius: '0.75rem', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
+                    />
+                    <Bar dataKey="revenue" fill="#154279" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+            
+             <Card className="col-span-1 lg:col-span-3 bg-white rounded-2xl border-none shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-[#154279] font-bold">User Distribution</CardTitle>
+              </CardHeader>
+              <CardContent className="h-[350px] flex items-center justify-center">
+                   <div className="text-center text-slate-400 p-8 border-2 border-dashed border-slate-100 rounded-xl w-full">
+                       <BarChart3 className="w-12 h-12 mx-auto mb-2 text-slate-200" />
+                       <p>More Analytics Coming Soon</p>
+                   </div>
+              </CardContent>
+             </Card>
           </div>
         </TabsContent>
       </Tabs>

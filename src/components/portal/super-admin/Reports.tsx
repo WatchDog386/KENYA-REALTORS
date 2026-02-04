@@ -1,5 +1,6 @@
 // src/components/portal/super-admin/Reports.tsx
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   FileText,
   Download,
@@ -60,6 +61,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import { HeroBackground } from "@/components/ui/HeroBackground";
 
 interface ReportData {
   units: UnitReport[];
@@ -463,30 +465,76 @@ const Reports = () => {
   };
 
   return (
-    <div className="space-y-6 print:space-y-2 font-nunito">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="text-gray-600">
-            Generate and export system reports in various formats
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={printReport}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
+    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Nunito', sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
+      `}</style>
+      
+      {/* HERO SECTION */}
+      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg mb-8 print:hidden relative">
+        <HeroBackground />
+        <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col md:flex-row items-center justify-between gap-10"
           >
-            <Printer className="w-4 h-4" />
-            Print
-          </Button>
+            <div className="md:w-1/2">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/30">
+                  Analytics
+                </span>
+                <span className="text-blue-100 text-[10px] font-semibold uppercase tracking-widest">
+                  Reports
+                </span>
+              </div>
+              
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
+                System <span className="text-[#F96302]">Reports</span>
+              </h1>
+              
+              <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
+                Generate detailed financial, rental, and occupancy reports for your properties.
+              </p>
+              
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={printReport}
+                  className="group flex items-center gap-2 bg-white text-[#154279] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                >
+                  <Printer className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                  Print Report
+                </button>
+              </div>
+            </div>
+            
+             <div className="md:w-1/2 w-full mt-6 md:mt-0 flex justify-end">
+               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-white max-w-xs w-full">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="p-3 bg-white/20 rounded-lg">
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-blue-100 uppercase tracking-wider">Generated</div>
+                      <div className="text-xl font-bold">{reportData ? "1 Report" : "0 Reports"}</div>
+                    </div>
+                  </div>
+                  <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#F96302] w-[70%]"></div>
+                  </div>
+               </div>
+            </div>
+          </motion.div>
         </div>
-      </div>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8 print:space-y-2">
 
       {/* Report Controls */}
-      <Card className="print:hidden">
+      <Card className="print:hidden border-2 border-slate-200 bg-white shadow-lg">
         <CardHeader>
           <CardTitle>Generate Report</CardTitle>
           <CardDescription>
@@ -499,17 +547,17 @@ const Reports = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium">Report Type</label>
               <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-white hover:border-[#154279] hover:text-[#154279] transition-colors border-slate-200">
                   <SelectValue placeholder="Select report type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border-slate-200 shadow-lg z-50">
                   {reportTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
+                    <SelectItem key={type.id} value={type.id} className="focus:bg-[#154279] focus:text-white cursor-pointer">
                       <div className="flex items-center gap-2">
                         <type.icon className="w-4 h-4" />
                         <div>
                           <div>{type.name}</div>
-                          <div className="text-xs text-gray-500">{type.description}</div>
+                          <div className="text-xs opacity-80">{type.description}</div>
                         </div>
                       </div>
                     </SelectItem>
@@ -522,13 +570,13 @@ const Reports = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium">Property</label>
               <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-white hover:border-[#154279] hover:text-[#154279] transition-colors border-slate-200">
                   <SelectValue placeholder="Select property" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Properties</SelectItem>
+                <SelectContent className="bg-white border-slate-200 shadow-lg z-50">
+                  <SelectItem value="all" className="focus:bg-[#154279] focus:text-white cursor-pointer">All Properties</SelectItem>
                   {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
+                    <SelectItem key={property.id} value={property.id} className="focus:bg-[#154279] focus:text-white cursor-pointer">
                       {property.name} ({property.location})
                     </SelectItem>
                   ))}
@@ -540,10 +588,10 @@ const Reports = () => {
             <div className="space-y-2">
               <label className="text-sm font-medium">Month</label>
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-white hover:border-[#154279] hover:text-[#154279] transition-colors border-slate-200">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border-slate-200 shadow-lg z-50">
                   {Array.from({ length: 12 }, (_, i) => {
                     const date = new Date();
                     date.setMonth(date.getMonth() - i);
@@ -553,7 +601,7 @@ const Reports = () => {
                       year: "numeric",
                     });
                     return (
-                      <SelectItem key={value} value={value}>
+                      <SelectItem key={value} value={value} className="focus:bg-[#154279] focus:text-white cursor-pointer">
                         {label}
                       </SelectItem>
                     );
@@ -567,7 +615,7 @@ const Reports = () => {
               <label className="text-sm font-medium invisible">Action</label>
               <Button
                 onClick={generateReport}
-                className="w-full"
+                className="w-full bg-[#154279] hover:bg-[#0f325e] text-white font-bold rounded-xl"
                 disabled={generatingReport || !selectedMonth}
               >
                 {generatingReport ? (
@@ -595,7 +643,7 @@ const Reports = () => {
       ) : reportData ? (
         <div className="space-y-6 print:space-y-4">
           {/* Report Header */}
-          <div className="bg-white border rounded-lg p-6 print:border-0 print:p-4 print:shadow-none">
+          <div className="bg-white border-2 border-slate-200 rounded-xl p-6 shadow-sm print:border-0 print:p-4 print:shadow-none">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 print:mb-4">
               <div>
                 <h2 className="text-2xl font-bold">RENTAL REMITTANCE REPORT</h2>
@@ -697,9 +745,9 @@ const Reports = () => {
                 <SelectTrigger className="w-[180px] bg-white border-gray-200 text-gray-700">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white border-slate-200 shadow-lg z-50">
                   {statusOptions.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>
+                    <SelectItem key={option.id} value={option.id} className="hover:bg-slate-50 focus:bg-slate-50 cursor-pointer">
                       {option.name}
                     </SelectItem>
                   ))}
@@ -708,21 +756,21 @@ const Reports = () => {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="bg-white border-slate-200 text-[#154279] hover:bg-slate-50 hover:text-[#154279] font-medium rounded-xl">
                     <Download className="w-4 h-4 mr-2" />
                     Export
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={exportToPDF}>
+                <DropdownMenuContent className="bg-white border-slate-200 shadow-lg z-50">
+                  <DropdownMenuItem onClick={exportToPDF} className="hover:bg-slate-50 focus:bg-slate-50 cursor-pointer">
                     <FileText className="w-4 h-4 mr-2" />
                     Export as PDF
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportToCSV}>
+                  <DropdownMenuItem onClick={exportToCSV} className="hover:bg-slate-50 focus:bg-slate-50 cursor-pointer">
                     <FileOutput className="w-4 h-4 mr-2" />
                     Export as CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportToExcel}>
+                  <DropdownMenuItem onClick={exportToExcel} className="hover:bg-slate-50 focus:bg-slate-50 cursor-pointer">
                     <FileOutput className="w-4 h-4 mr-2" />
                     Export as Excel
                   </DropdownMenuItem>
@@ -888,7 +936,7 @@ const Reports = () => {
           </div>
 
           {/* Quick Stats Panel (Non-printable) */}
-          <Card className="print:hidden">
+          <Card className="print:hidden border-2 border-slate-200 bg-white shadow-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -947,7 +995,7 @@ const Reports = () => {
           </Card>
         </div>
       ) : (
-        <Card className="print:hidden">
+        <Card className="print:hidden border-2 border-slate-200 bg-white shadow-lg">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="w-16 h-16 text-gray-300 mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No Report Generated</h3>
@@ -956,11 +1004,11 @@ const Reports = () => {
               Reports can be exported to PDF, CSV, or printed for official use.
             </p>
             <div className="flex gap-3">
-              <Button onClick={generateReport}>
+              <Button onClick={generateReport} className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl">
                 <FileText className="w-4 h-4 mr-2" />
                 Generate Report
               </Button>
-              <Button variant="outline" onClick={() => setSelectedMonth('2025-12')}>
+              <Button variant="outline" onClick={() => setSelectedMonth('2025-12')} className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl border-none">
                 <Calendar className="w-4 h-4 mr-2" />
                 Use Sample Data
               </Button>
@@ -968,6 +1016,7 @@ const Reports = () => {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 };

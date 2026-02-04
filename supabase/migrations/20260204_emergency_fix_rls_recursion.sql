@@ -36,11 +36,27 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- 5. CREATE SAFE POLICIES (No Recursion)
 
--- Users can read/update their OWN profile
-CREATE POLICY "users_manage_own_profile" 
-ON public.profiles FOR ALL 
+-- Users can read their OWN profile
+CREATE POLICY "users_select_own_profile" 
+ON public.profiles FOR SELECT
+USING (auth.uid() = id);
+
+-- Users can update their OWN profile
+CREATE POLICY "users_update_own_profile" 
+ON public.profiles FOR UPDATE
 USING (auth.uid() = id)
 WITH CHECK (auth.uid() = id);
+
+-- Users can delete their OWN profile
+CREATE POLICY "users_delete_own_profile" 
+ON public.profiles FOR DELETE
+USING (auth.uid() = id);
+
+-- Allow all authenticated users to select profiles (needed for login/session)
+CREATE POLICY "authenticated_can_select_profiles"
+ON public.profiles FOR SELECT
+TO authenticated
+USING (true);
 
 -- Service Role (Full Access)
 CREATE POLICY "service_role_full_access" 
@@ -48,6 +64,15 @@ ON public.profiles FOR ALL
 USING (auth.role() = 'service_role')
 WITH CHECK (auth.role() = 'service_role');
 
+-- Allow self-registration (INSERT) for new users (for both authenticated and anon)
+CREATE POLICY "users_insert_own_profile"
+ON public.profiles FOR INSERT
+WITH CHECK (auth.uid() = id);
+
+-- Allow trigger/service role to insert profiles (for triggers/automation)
+CREATE POLICY "service_role_insert_profile"
+ON public.profiles FOR INSERT
+WITH CHECK (auth.role() = 'service_role');
 
 -- Other Tables (drop if exists to avoid errors)
 DROP POLICY IF EXISTS "manager_approvals_own" ON public.manager_approvals;

@@ -1,31 +1,28 @@
 // src/components/layout/SuperAdminLayout.tsx
-import React, { useState, useEffect, ReactNode } from "react";
-import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
+import React, { useState, ReactNode } from "react";
+import { Outlet, useLocation, Link, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Building,
-  Users,
-  FileText,
-  Settings,
-  Bell,
-  LogOut,
   Menu,
   X,
   ChevronDown,
-  CheckCircle,
-  AlertCircle,
-  UserPlus,
-  Shield,
-  Database,
-  BarChart3,
-  Home,
-  Search,
   ChevronRight,
+  Bell,
+  Search,
+  LogOut,
+  LayoutDashboard,
+  Building,
+  Users,
+  CheckCircle,
+  BarChart3,
+  Settings,
+  FileText,
+  Database,
+  Shield,
+  UserPlus,
   Mail,
   Key,
   Globe,
   DollarSign,
-  TrendingUp,
   FileBarChart,
   FileCheck,
   ClipboardList,
@@ -42,15 +39,11 @@ import {
   Plus,
   Filter,
   MoreVertical,
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
-import {
-  SUPER_ADMIN_ROUTES,
-  getNavigationItems,
-} from "@/config/superAdminRoutes";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/utils/formatCurrency";
 
 // Add missing type definitions
 interface User {
@@ -99,6 +92,41 @@ interface RecentActivity {
   time: string;
   icon?: string;
 }
+
+// Get navigation items function
+const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
+  return [
+    {
+      title: "Properties",
+      path: "/portal/super-admin/properties",
+      icon: "building",
+      description: "Manage all properties",
+      permission: "manage_properties",
+    },
+    {
+      title: "Users",
+      path: "/portal/super-admin/users",
+      icon: "users",
+      description: "Manage system users",
+      permission: "manage_users",
+    },
+    {
+      title: "Approvals",
+      path: "/portal/super-admin/approvals",
+      icon: "check-circle",
+      description: "Review pending approvals",
+      permission: "manage_approvals",
+      badge: stats?.pendingApprovals?.toString(),
+    },
+    {
+      title: "Analytics",
+      path: "/portal/super-admin/analytics",
+      icon: "bar-chart",
+      description: "View analytics",
+      permission: "view_analytics",
+    },
+  ];
+};
 
 // Define getIconComponent FIRST so it's available in getNavItems
 const getIconComponent = (iconName?: string) => {
@@ -193,33 +221,29 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const safeRecentActivities: RecentActivity[] = (recentActivities as unknown as RecentActivity[]) || [];
 
   // Inject Fonts and Styles
-  useEffect(() => {
-    // Add Montserrat font
+  React.useEffect(() => {
+    // Add Nunito font
     const link = document.createElement("link");
     link.href =
-      "https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap";
+      "https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
     const style = document.createElement("style");
     style.textContent = `
-      .risa-font { font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
-      .risa-heading { font-family: 'Montserrat', sans-serif; font-weight: 800; letter-spacing: -0.03em; }
-      .risa-subheading { font-family: 'Montserrat', sans-serif; font-weight: 600; letter-spacing: -0.01em; }
-      .risa-body { font-family: 'Montserrat', sans-serif; font-weight: 400; letter-spacing: -0.01em; }
-      .risa-uppercase { font-family: 'Montserrat', sans-serif; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-      .risa-mono { font-family: 'SF Mono', 'Roboto Mono', monospace; letter-spacing: -0.01em; }
-      
-      body { font-family: 'Montserrat', sans-serif; }
+      * { font-family: 'Nunito', sans-serif; }
+      body { font-family: 'Nunito', sans-serif; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
       
       .custom-scroll::-webkit-scrollbar { width: 6px; }
       .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
-      .custom-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 0px; } /* Sharp scrollbar */
-      .custom-scroll::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+      .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .custom-scroll::-webkit-scrollbar-thumb:hover { background: #154279; }
       
       .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 0px; }
+      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(21, 66, 121, 0.05); }
+      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(21, 66, 121, 0.3); border-radius: 4px; }
+      .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(21, 66, 121, 0.5); }
     `;
     document.head.appendChild(style);
 
@@ -251,7 +275,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
       "manage_database",
     ];
 
-    const navigationItems = getNavigationItems(superAdminPermissions);
+    const navigationItems = getNavigationItems(superAdminPermissions, safeStats);
 
     const baseNavItems: NavItem[] = [
       {
@@ -284,12 +308,12 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
         : undefined,
     }));
 
-    // Add Reports item (if not already in routes) - FIXED PATH
+    // Add Reports item
     const hasReports = routeNavItems.some(item => item.title === "Reports");
     if (!hasReports) {
       routeNavItems.push({
         title: "Reports",
-        href: "/portal/super-admin/reports", // Changed to lowercase
+        href: "/portal/super-admin/reports",
         icon: <FileBarChart size={20} />,
         description: "Generate & Export Reports",
         permission: "view_reports",
@@ -324,18 +348,6 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             icon: <DollarSign size={18} />,
             description: "Payment gateway configuration",
           },
-          {
-            title: "Email Settings",
-            href: "/portal/super-admin/settings#email",
-            icon: <Mail size={18} />,
-            description: "Email server configuration",
-          },
-          {
-            title: "Report Settings",
-            href: "/portal/super-admin/settings#reports",
-            icon: <FileBarChart size={18} />,
-            description: "Report generation settings",
-          },
         ],
       },
     ];
@@ -365,13 +377,6 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
         permission: "manage_approvals",
         badge: safeStats.pendingApplications?.toString(),
       },
-      {
-        title: "Refunds",
-        href: "/portal/super-admin/refunds",
-        icon: <DollarSign size={20} />,
-        description: "Refund processing",
-        permission: "manage_finances",
-      },
     ];
 
     return [...baseNavItems, ...routeNavItems, ...additionalRoutes, ...systemItems];
@@ -387,11 +392,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // Implement search functionality
       console.log("Searching for:", searchQuery);
-      // You can add search logic here
-      // Example: navigate to search results page
-      // navigate(`/portal/super-admin/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 
@@ -425,13 +426,13 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "warning":
-        return <AlertTriangle size={14} className="text-yellow-600" />;
+        return <AlertTriangle size={14} className="text-amber-600" />;
       case "error":
         return <AlertCircle size={14} className="text-red-600" />;
       case "critical":
         return <AlertCircle size={14} className="text-red-600" />;
       case "success":
-        return <CheckCircle size={14} className="text-green-600" />;
+        return <CheckCircle size={14} className="text-emerald-600" />;
       default:
         return <Bell size={14} className="text-blue-600" />;
     }
@@ -440,20 +441,19 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const getAlertColor = (type: string) => {
     switch (type) {
       case "warning":
-        return "bg-yellow-50 border-yellow-200";
+        return "bg-amber-50 border-amber-200";
       case "error":
         return "bg-red-50 border-red-200";
       case "critical":
         return "bg-red-50 border-red-200";
       case "success":
-        return "bg-green-50 border-green-200";
+        return "bg-emerald-50 border-emerald-200";
       default:
         return "bg-blue-50 border-blue-200";
     }
   };
 
   const hasPermission = (permission?: string): boolean => {
-    // Super admin has all permissions
     if (!permission) return true;
     return user?.role === "super_admin";
   };
@@ -479,10 +479,10 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             }
           }}
           className={cn(
-            "flex items-center justify-between px-4 py-3 mx-2 rounded-lg transition-all duration-200 group relative mb-1",
+            "flex items-center justify-between px-4 py-3 mx-2 rounded-xl transition-all duration-200 group relative mb-1 font-nunito",
             isItemActive
-              ? "bg-[#00356B] text-white shadow-lg shadow-blue-900/30"
-              : "text-slate-900 hover:bg-orange-50 hover:text-orange-700",
+              ? "bg-[#154279] text-white shadow-lg"
+              : "text-slate-700 hover:bg-slate-100 hover:text-[#154279]",
             depth > 0 && "pl-8"
           )}
         >
@@ -490,18 +490,18 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div
               className={`${
                 isItemActive
-                  ? "text-white"
-                  : "text-slate-900 group-hover:text-orange-600"
+                  ? "text-[#F96302]"
+                  : "text-slate-500 group-hover:text-[#F96302]"
               } relative transition-colors`}
             >
               {item.icon}
               {typeof item.badge === "number" && item.badge > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-orange-600 text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {item.badge}
                 </span>
               )}
               {typeof item.badge === "string" && parseInt(item.badge) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-orange-600 text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {item.badge}
                 </span>
               )}
@@ -509,43 +509,38 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div className="flex-1">
               <span
                 className={cn(
-                  "text-[13px] tracking-wide",
+                  "text-[14px] tracking-wide font-nunito",
                   isItemActive
-                    ? "font-black"
-                    : "font-bold"
+                    ? "font-bold"
+                    : "font-medium"
                 )}
               >
                 {item.title}
               </span>
-              <div className={cn("text-[10px] mt-0.5 hidden xl:block transition-opacity", isItemActive ? "text-white/80 font-medium" : "text-slate-500 opacity-0 group-hover:opacity-100 font-semibold")}>
+              <div className={cn("text-[10px] mt-0.5 hidden xl:block transition-opacity font-nunito", isItemActive ? "text-white/70 font-medium" : "text-slate-500 opacity-0 group-hover:opacity-100 font-medium")}>
                 {item.description}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {typeof item.badge === "string" && parseInt(item.badge) > 0 && (
-              <span className="badge-navy hidden">
-                {item.badge}
-              </span>
-            )}
             {hasChildren ? (
               <ChevronDown
                 className={cn(
                   "w-4 h-4 transition-transform",
                   isExpanded && "rotate-180",
-                  isItemActive ? "text-white" : "text-slate-900 group-hover:text-orange-600"
+                  isItemActive ? "text-white" : "text-slate-500 group-hover:text-[#154279]"
                 )}
               />
             ) : (
               isItemActive && (
-                <ChevronRight size={14} className="text-white/90" />
+                <ChevronRight size={14} className="text-[#F96302]" />
               )
             )}
           </div>
-        </Link>
+        </Link> 
 
         {hasChildren && isExpanded && (
-          <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 pl-2 mb-2">
+          <div className="ml-4 mt-1 space-y-1 border-l-2 border-[#154279]/20 pl-2 mb-2">
             {item.children!.map((child) => renderNavItem(child, depth + 1))}
           </div>
         )}
@@ -554,19 +549,19 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="min-h-screen bg-white text-[#154279] font-nunito selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 w-full bg-gradient-to-r from-navy via-blue-700 to-navy z-50 px-4 py-3 flex items-center justify-between shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 w-full bg-gradient-to-r from-[#154279] via-blue-700 to-[#154279] z-50 px-4 py-3 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-white p-2 bg-white/10 hover:bg-white/20 hover:text-cta transition-all rounded-lg border border-white/10"
+            className="text-white p-2 bg-white/10 hover:bg-white/20 transition-all rounded-lg border border-white/10"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="text-white font-black tracking-tight risa-heading">
+            <span className="text-white font-bold tracking-tight text-sm">
               KENYA REALTORS
             </span>
           </div>
@@ -578,30 +573,30 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
           >
             <Bell size={20} />
             {unreadNotifications > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-cta text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-white/20">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-white/20">
                 {unreadNotifications}
               </span>
             )}
           </button>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-9 h-9 rounded-lg bg-navy flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-cta"
+            className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-white"
           >
             {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
           </button>
         </div>
       </div>
 
-      {/* Sidebar - Sharp Edges */}
+      {/* Sidebar - Sleek White Background */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full bg-slate-50 text-slate-600 z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r border-gray-200",
+          "fixed top-0 left-0 h-full bg-white text-[#154279] z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r-2 border-slate-200",
           sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full",
           "lg:translate-x-0 lg:w-72"
         )}
       >
         {/* Logo Section */}
-        <div className="h-20 flex items-center px-6 border-b border-gray-200 bg-slate-50">
+        <div className="h-20 flex items-center px-6 border-b-2 border-slate-200 bg-white">
           <div className="shrink-0 cursor-pointer flex items-center gap-2 md:gap-3 w-full">
             <svg
               viewBox="0 0 200 200"
@@ -668,7 +663,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                 strokeWidth="2"
                 strokeLinejoin="round"
               />
-              <g fill="#1a232e">
+              <g fill="#154279">
                 <path d="M85 50 L100 56 V86 L85 80 Z" />
                 <path d="M85 90 L100 96 V126 L85 120 Z" />
                 <path d="M45 60 L55 54 V124 L45 130 Z" />
@@ -677,77 +672,74 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             </svg>
 
             <div className="flex flex-col justify-center select-none ml-1">
-              <span className="text-[9px] font-bold uppercase tracking-[0.35em] text-gray-500 leading-none ml-0.5 risa-uppercase">
+              <span className="text-[9px] font-bold uppercase tracking-[0.35em] text-[#154279] leading-none ml-0.5">
                 Kenya
               </span>
               <div className="flex items-baseline -mt-1 relative">
-                <span className="text-[20px] font-black tracking-tighter text-gray-900 risa-heading">
+                <span className="text-[20px] font-black tracking-tighter text-[#154279]">
                   REALTOR
                 </span>
-                <span className="text-[20px] font-black tracking-tighter text-navy risa-heading">
+                <span className="text-[20px] font-black tracking-tighter text-[#F96302]">
                   S
                 </span>
-                <div className="h-1.5 w-1.5 bg-cta rounded-none ml-1 mb-1.5 shadow-sm"></div>
+                <div className="h-1.5 w-1.5 bg-[#F96302] rounded-full ml-1 mb-1.5 shadow-lg shadow-orange-500/50"></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* User Card - Removed as requested */}
-
         {/* Navigation */}
-        <nav className="flex-1 px-4 overflow-y-auto sidebar-scroll pb-4 mt-6">
+        <nav className="flex-1 px-4 overflow-y-auto sidebar-scroll pb-4 mt-4">
           <div className="mb-2">
-            <div className="px-4 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="px-4 mb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <span>Main Menu</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-slate-300 to-transparent"></div>
             </div>
             <div className="space-y-0.5">
               {navItems.map((item) => renderNavItem(item))}
             </div>
           </div>
 
-          {/* Quick Stats - Removed as requested */}
-
           {/* Report Quick Links */}
-          <div className="px-2 mt-6">
-            <div className="px-4 mb-2 text-[10px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+          <div className="px-2 mt-8">
+            <div className="px-4 mb-3 text-[10px] font-bold text-[#154279] uppercase tracking-widest flex items-center gap-2">
               <span>Quick Reports</span>
             </div>
-            <div className="space-y-1 mx-2">
+            <div className="space-y-2 mx-2">
               <Link
                 to="/portal/super-admin/reports?type=rental&month=current"
-                className="block p-3 bg-white rounded-lg hover:bg-orange-50 transition-all duration-200 group border-2 border-cta/20 hover:border-cta shadow-sm hover:shadow-md"
+                className="block p-3 bg-slate-50 rounded-xl hover:bg-[#154279] hover:text-white transition-all duration-200 group border border-slate-200 hover:border-[#154279] shadow-sm hover:shadow-md"
               >
-                <div className="text-xs font-black text-slate-900 group-hover:text-cta transition-colors">Monthly Rental</div>
-                <div className="text-[10px] text-slate-600 font-bold mt-0.5">Current month collection</div>
+                <div className="text-xs font-bold text-[#154279] group-hover:text-white transition-colors">Monthly Rental</div>
+                <div className="text-[10px] text-slate-600 group-hover:text-white/80 font-medium mt-0.5">Current month collection</div>
               </Link>
               <Link
                 to="/portal/super-admin/reports?type=arrears"
-                className="block p-3 bg-white rounded-lg hover:bg-orange-50 transition-all duration-200 group border-2 border-cta/20 hover:border-cta shadow-sm hover:shadow-md"
+                className="block p-3 bg-slate-50 rounded-xl hover:bg-[#F96302] hover:text-white transition-all duration-200 group border border-slate-200 hover:border-[#F96302] shadow-sm hover:shadow-md"
               >
-                <div className="text-xs font-black text-slate-900 group-hover:text-cta transition-colors">Arrears Report</div>
-                <div className="text-[10px] text-slate-600 font-bold mt-0.5">Outstanding payments</div>
+                <div className="text-xs font-bold text-[#154279] group-hover:text-white transition-colors">Arrears Report</div>
+                <div className="text-[10px] text-slate-600 group-hover:text-white/80 font-medium mt-0.5">Outstanding payments</div>
               </Link>
             </div>
           </div>
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200 bg-slate-50">
-          <div className="flex items-center justify-between mb-3">
+        <div className="p-4 border-t-2 border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-electric rounded-full animate-pulse ring-2 ring-electric/20"></div>
-              <span className="text-[10px] text-electric font-black uppercase tracking-wider">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse ring-2 ring-emerald-500/20"></div>
+              <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
                 System Online
               </span>
             </div>
-            <span className="text-[10px] text-slate-900 font-bold">v2.4.0</span>
+            <span className="text-[10px] text-slate-600 font-bold">v2.4.0</span>
           </div>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 text-xs text-white transition-colors py-3 bg-cta hover:bg-cta-hover rounded-lg font-black uppercase tracking-wider border-2 border-cta hover:border-cta-hover shadow-sm hover:shadow-lg"
+            className="w-full flex items-center justify-center gap-2 text-xs text-white transition-all py-3 bg-gradient-to-r from-[#154279] to-[#0f325e] hover:from-[#F96302] hover:to-[#ff8c42] rounded-xl font-bold uppercase tracking-wider shadow-md hover:shadow-lg"
           >
-            <LogOut size={14} className="stroke-[3]" />
+            <LogOut size={14} className="stroke-[2.5]" />
             <span>Sign Out</span>
           </button>
         </div>
@@ -756,18 +748,18 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
       {/* Main Content */}
       <main
         className={cn(
-          "transition-all duration-300 min-h-screen flex flex-col bg-slate-50",
+          "transition-all duration-300 min-h-screen flex flex-col bg-white",
           sidebarOpen ? "lg:ml-72" : "lg:ml-0"
         )}
       >
         {/* Desktop Header */}
-        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-slate-50/80 backdrop-blur-md sticky top-0 z-30 transition-all duration-300">
+        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b-2 border-slate-200 sticky top-0 z-30 transition-all duration-300 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-lg font-black text-navy tracking-tight uppercase">
+              <h2 className="text-lg font-black text-[#154279] tracking-tight uppercase">
                 {currentPage.title}
               </h2>
-              <div className="text-[11px] text-gray-600 font-semibold uppercase tracking-wide">
+              <div className="text-[11px] text-slate-600 font-semibold uppercase tracking-wide">
                 {currentPage.description}
               </div>
             </div>
@@ -776,7 +768,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
           <div className="flex items-center gap-6">
             <form onSubmit={handleSearch} className="relative group">
               <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-cta transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F96302] transition-colors"
                 size={16}
               />
               <input
@@ -784,7 +776,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                 placeholder="Search database..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-cta focus:shadow-sm w-72 outline-none placeholder:text-gray-400 transition-all duration-200 risa-body font-medium"
+                className="pl-11 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-[#F96302] focus:shadow-sm w-72 outline-none placeholder:text-slate-400 transition-all duration-200 font-medium font-nunito"
               />
             </form>
 
@@ -792,11 +784,11 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative p-2.5 text-gray-500 hover:text-[#0056A6] hover:bg-white bg-white/50 border border-transparent hover:border-blue-100 hover:shadow-sm rounded-lg transition-all"
+                className="relative p-2.5 text-slate-600 hover:text-[#154279] hover:bg-slate-100 bg-white border-2 border-slate-200 hover:border-[#F96302] hover:shadow-sm rounded-lg transition-all"
               >
                 <Bell size={20} />
                 {unreadNotifications > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-cta text-[10px] font-bold text-white rounded-full flex items-center justify-center shadow-sm">
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-[#F96302] text-[10px] font-bold text-white rounded-full flex items-center justify-center shadow-sm">
                     {unreadNotifications}
                   </span>
                 )}
@@ -808,72 +800,34 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                     className="fixed inset-0 z-40"
                     onClick={() => setNotificationsOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-4 w-96 bg-white rounded-xl shadow-[0_15px_50px_-10px_rgba(0,0,0,0.2)] border border-gray-150 z-50 overflow-hidden ring-1 ring-black/5">
-                    <div className="p-5 border-b border-gray-150 bg-gradient-subtle">
-                      <h3 className="font-black text-navy risa-heading">
-                        System Alerts
-                      </h3>
-                      <div className="text-xs text-cta font-bold uppercase mt-1.5 risa-uppercase tracking-wider">
-                        {safeSystemAlerts.filter((a) => a.type !== "success").length} alerts
-                      </div>
+                  <div className="absolute right-0 top-full mt-4 w-96 bg-white rounded-xl shadow-[0_15px_50px_-10px_rgba(0,0,0,0.2)] border-2 border-slate-200 z-50 overflow-hidden">
+                    <div className="px-4 py-3 bg-[#154279] text-white font-bold text-sm">
+                      Notifications ({unreadNotifications})
                     </div>
-                    <div className="max-h-80 overflow-y-auto custom-scroll">
+                    <div className="max-h-96 overflow-y-auto">
                       {safeSystemAlerts.length > 0 ? (
-                        safeSystemAlerts.map((alert, index) => (
+                        safeSystemAlerts.slice(0, 5).map((alert) => (
                           <div
-                            key={alert.id || index}
-                            className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200 ${getAlertColor(
-                              alert.type
-                            )} hover:shadow-sm`}
+                            key={alert.id}
+                            className={`px-4 py-3 border-b border-slate-100 last:border-0 ${getAlertColor(alert.type)} cursor-pointer hover:bg-opacity-80 transition-all`}
                           >
                             <div className="flex items-start gap-3">
-                              <div className="p-2 bg-white border border-gray-100 shadow-sm rounded-none shrink-0">
+                              <div className="mt-1">
                                 {getNotificationIcon(alert.type)}
                               </div>
                               <div className="flex-1">
-                                <h4 className="font-bold text-sm text-[#1a232e] risa-subheading">
-                                  {alert.title}
-                                </h4>
-                                <div className="text-xs text-gray-600 my-1 risa-body">
-                                  {alert.description}
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] text-gray-500 risa-mono">
-                                    {alert.timestamp}
-                                  </span>
-                                  {alert.action && (
-                                    <Link
-                                      to={alert.action}
-                                      className="text-[10px] text-[#0056A6] font-bold hover:underline risa-uppercase"
-                                      onClick={() => setNotificationsOpen(false)}
-                                    >
-                                      Take Action →
-                                    </Link>
-                                  )}
-                                </div>
+                                <h3 className="text-sm font-bold text-[#154279]">{alert.title}</h3>
+                                <p className="text-xs text-slate-600 mt-1">{alert.description}</p>
+                                <span className="text-[10px] text-slate-500 font-medium mt-1 block">{alert.timestamp}</span>
                               </div>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="p-8 text-center">
-                          <CheckCircle className="w-12 h-12 text-green-300 mx-auto mb-4" />
-                          <p className="text-gray-500">No active alerts</p>
-                          <p className="text-sm text-gray-400 mt-1">
-                            All systems are operating normally
-                          </p>
+                        <div className="px-4 py-8 text-center text-slate-500 text-sm">
+                          No notifications
                         </div>
                       )}
-                    </div>
-                    <div className="p-4 border-t border-gray-150 bg-gradient-to-r from-gray-50 to-gray-100">
-                      <Link
-                        to="/portal/super-admin/analytics"
-                        className="text-xs text-cta font-bold hover:underline flex items-center gap-2 risa-uppercase tracking-wider group"
-                        onClick={() => setNotificationsOpen(false)}
-                      >
-                        <TrendingUp size={12} className="group-hover:text-orange-600 transition-colors" />
-                        View All Analytics →
-                      </Link>
                     </div>
                   </div>
                 </>
@@ -884,22 +838,20 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 pl-1 pr-3 py-1.5 hover:bg-white rounded-lg border border-transparent hover:border-gray-100 hover:shadow-sm transition-all"
+                className="flex items-center gap-3 pl-1 pr-3 py-1.5 hover:bg-slate-100 rounded-lg border-2 border-slate-200 hover:border-[#F96302] hover:shadow-sm transition-all"
               >
-                <div className="w-9 h-9 rounded-full bg-navy flex items-center justify-center text-white font-bold border-2 border-cta">
-                  {user?.first_name?.[0] ||
-                    user?.email?.[0]?.toUpperCase() ||
-                    "A"}
+                <div className="w-9 h-9 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold border-2 border-[#F96302]">
+                  {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
                 </div>
                 <div className="text-left hidden xl:block">
-                  <div className="text-xs font-bold text-[#1a232e] risa-heading">
-                    {user?.first_name || "Super"} {user?.last_name || "Admin"}
+                  <div className="text-xs font-bold text-[#154279]">
+                    {user?.first_name || user?.email?.split("@")[0] || "Admin"}
                   </div>
-                  <div className="text-[10px] text-cta font-bold uppercase risa-uppercase">
-                    Super Admin
+                  <div className="text-[10px] text-slate-600 font-medium">
+                    {user?.role || "Super Admin"}
                   </div>
                 </div>
-                <ChevronDown size={14} className="text-gray-400" />
+                <ChevronDown size={14} className="text-slate-400" />
               </button>
 
               {userMenuOpen && (
@@ -908,88 +860,28 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                     className="fixed inset-0 z-40"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] border border-gray-100 z-50 overflow-hidden ring-1 ring-black/5">
-                    <div className="p-5 border-b border-gray-100 bg-gradient-hero text-white">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-white text-gray-900 flex items-center justify-center font-black text-lg border-2 border-cta">
-                          {user?.first_name?.[0] || "A"}
-                        </div>
-                        <div>
-                          <div className="font-bold text-sm risa-heading">
-                            {user?.first_name || "Super"}{" "}
-                            {user?.last_name || "Admin"}
-                          </div>
-                          <div className="text-[10px] text-blue-200 opacity-80 risa-mono">
-                            {user?.email || "superadmin@kenyarealtors.com"}
-                          </div>
-                          <div className="text-[9px] text-cta font-bold mt-1 risa-uppercase">
-                            Super Administrator
-                          </div>
-                        </div>
-                      </div>
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-[0_15px_50px_-10px_rgba(0,0,0,0.2)] border-2 border-slate-200 z-50 overflow-hidden">
+                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account</p>
                     </div>
-                    <div className="p-2">
-                      <Link
-                        to="/portal/super-admin/profile"
-                        className="flex items-center gap-3 p-3 hover:bg-navy/5 rounded-none w-full text-gray-600 hover:text-navy transition-colors border-l-2 border-transparent hover:border-cta"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Shield size={16} />
-                        <span className="text-sm font-semibold risa-subheading">
-                          My Profile
-                        </span>
-                      </Link>
-                      <Link
-                        to="/portal/super-admin/users"
-                        className="flex items-center gap-3 p-3 hover:bg-navy/5 rounded-none w-full text-gray-600 hover:text-navy transition-colors border-l-2 border-transparent hover:border-cta"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Users size={16} />
-                        <span className="text-sm font-semibold risa-subheading">
-                          Manage Users
-                        </span>
-                      </Link>
-                      <Link
-                        to="/portal/super-admin/reports"
-                        className="flex items-center gap-3 p-3 hover:bg-navy/5 rounded-none w-full text-gray-600 hover:text-navy transition-colors border-l-2 border-transparent hover:border-cta"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <FileBarChart size={16} />
-                        <span className="text-sm font-semibold risa-subheading">
-                          Generate Reports
-                        </span>
-                      </Link>
-                      <Link
-                        to="/portal/super-admin/settings"
-                        className="flex items-center gap-3 p-3 hover:bg-blue-50 rounded-none w-full text-gray-600 hover:text-[#0056A6] transition-colors border-l-2 border-transparent hover:border-[#F96302]"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Settings size={16} />
-                        <span className="text-sm font-semibold risa-subheading">
-                          System Settings
-                        </span>
-                      </Link>
-                      <Link
-                        to="/portal"
-                        className="flex items-center gap-3 p-3 hover:bg-blue-50 rounded-none w-full text-gray-600 hover:text-[#0056A6] transition-colors border-l-2 border-transparent hover:border-[#F96302]"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Home size={16} />
-                        <span className="text-sm font-semibold risa-subheading">
-                          Main Portal
-                        </span>
-                      </Link>
-                      <div className="h-px bg-gray-100 my-2 mx-3"></div>
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 p-3 text-left hover:bg-red-50 rounded-none text-red-600 transition-colors border-l-2 border-transparent hover:border-red-500"
-                      >
-                        <LogOut size={16} />
-                        <span className="text-sm font-bold risa-subheading">
-                          Sign Out
-                        </span>
-                      </button>
-                    </div>
+                    <Link
+                      to="/portal/super-admin/profile"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#154279] transition-all font-medium border-b border-slate-100"
+                    >
+                      View Profile
+                    </Link>
+                    <Link
+                      to="/portal/super-admin/settings"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#154279] transition-all font-medium border-b border-slate-100"
+                    >
+                      Settings
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full text-left px-4 py-3 text-sm text-white bg-[#F96302] hover:bg-[#ff8c42] transition-all font-bold"
+                    >
+                      Sign Out
+                    </button>
                   </div>
                 </>
               )}
@@ -997,47 +889,47 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
           </div>
         </header>
 
-        {/* Content Area - CLEAN BACKGROUND */}
-        <div className="flex-1 overflow-visible bg-slate-50 relative z-10">
+        {/* Content Area - WHITE BACKGROUND */}
+        <div className="flex-1 overflow-visible bg-white relative z-10">
           <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto overflow-y-auto custom-scroll max-h-[calc(100vh-120px)]">
             <Outlet />
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="px-8 py-5 border-t border-gray-200 bg-slate-50 hidden lg:block shadow-sm">
+        <footer className="px-8 py-5 border-t-2 border-slate-200 bg-white hidden lg:block shadow-sm">
           <div className="flex justify-between items-center">
-            <div className="text-xs text-gray-600 font-medium">
-              <span className="font-black text-navy tracking-tight">KENYA REALTORS</span> © {new Date().getFullYear()}. All rights reserved.
+            <div className="text-xs text-slate-700 font-medium font-nunito">
+              <span className="font-bold text-[#154279] tracking-tight">KENYA REALTORS</span> © {new Date().getFullYear()}. All rights reserved.
             </div>
-            <div className="flex gap-6 text-xs text-gray-600 font-semibold">
-              <span className="text-[10px] text-gray-500">
+            <div className="flex gap-6 text-xs text-slate-600 font-semibold font-nunito">
+              <span className="text-[10px] text-slate-500">
                 {safeRecentActivities.length > 0
                   ? `Last activity: ${safeRecentActivities[0]?.time}`
                   : "No recent activity"}
               </span>
               <Link
                 to="/portal/super-admin/reports"
-                className="hover:text-[#D85C2C] transition-colors duration-200 flex items-center gap-1 hover:font-bold"
+                className="hover:text-[#F96302] transition-colors duration-200 flex items-center gap-1 hover:font-bold"
               >
                 <FileBarChart size={12} />
                 Reports
               </Link>
               <Link
                 to="/portal/super-admin/settings"
-                className="hover:text-[#D85C2C] transition-colors duration-200 hover:font-bold"
+                className="hover:text-[#F96302] transition-colors duration-200 hover:font-bold"
               >
                 Privacy Policy
               </Link>
               <Link
                 to="/portal/super-admin/settings"
-                className="hover:text-[#D85C2C] transition-colors duration-200 hover:font-bold"
+                className="hover:text-[#F96302] transition-colors duration-200 hover:font-bold"
               >
                 Terms of Service
               </Link>
               <Link
                 to="/portal/help"
-                className="hover:text-[#D85C2C] transition-colors duration-200 hover:font-bold"
+                className="hover:text-[#F96302] transition-colors duration-200 hover:font-bold"
               >
                 Help Center
               </Link>
@@ -1049,7 +941,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
       {/* Mobile Backdrop */}
       {sidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-[#00356B]/80 z-30 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 bg-black/40 z-30 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}

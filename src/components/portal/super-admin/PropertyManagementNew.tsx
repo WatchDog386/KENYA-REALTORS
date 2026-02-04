@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { HeroBackground } from "@/components/ui/HeroBackground";
 import {
   Card,
   CardContent,
@@ -191,35 +192,37 @@ const PropertyManagementNew: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#00356B]" />
+      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-nunito bg-slate-50 min-h-screen p-6 rounded-lg" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-[#154279] to-[#0f325e] p-8 rounded-xl shadow-lg text-white relative overflow-hidden">
+        <HeroBackground />
+        <div className="relative z-10">
+          <h2 className="text-3xl font-black tracking-tight">
             Property Management
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+          <p className="text-slate-100 text-sm mt-2 font-medium">
             Manage residential properties, units, and income projections
           </p>
         </div>
+        <div className="relative z-10">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-white text-[#154279] hover:bg-slate-100 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all">
               <Plus className="h-4 w-4 mr-2" />
               Add Property
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto bg-white border-2 border-slate-200">
             <DialogHeader>
-              <DialogTitle>Add New Property</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-[#154279] font-black text-xl">Add New Property</DialogTitle>
+              <DialogDescription className="text-slate-600 font-medium">
                 Create a new residential or commercial property with unit specifications
               </DialogDescription>
             </DialogHeader>
@@ -232,68 +235,69 @@ const PropertyManagementNew: React.FC = () => {
             />
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-bold text-slate-700">
               Total Properties
             </CardTitle>
-            <Building className="h-4 w-4 text-blue-600" />
+            <Building className="h-5 w-5 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProperties}</div>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-2xl font-black text-[#154279]">{stats.totalProperties}</div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               {stats.totalUnits} total units
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Occupancy</CardTitle>
-            <Home className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-bold text-slate-700">Occupancy</CardTitle>
+            <Home className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-black text-[#154279]">
               {stats.totalUnits > 0
                 ? Math.round((stats.occupiedUnits / stats.totalUnits) * 100)
                 : 0}
               %
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               {stats.occupiedUnits}/{stats.totalUnits} occupied
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Income</CardTitle>
-            <DollarSign className="h-4 w-4 text-purple-600" />
+            <CardTitle className="text-sm font-bold text-slate-700">Monthly Income</CardTitle>
+            <DollarSign className="h-5 w-5 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-black text-[#154279]">
               KSH {(stats.totalMonthlyIncome / 1000).toFixed(0)}K
             </div>
-            <p className="text-xs text-gray-500 mt-1">All units at capacity</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">All units at capacity</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-bold text-slate-700">
               Projected Income
             </CardTitle>
-            <BarChart3 className="h-4 w-4 text-orange-600" />
+            <BarChart3 className="h-5 w-5 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-black text-[#154279]">
               KSH {(stats.projectedMonthlyIncome / 1000).toFixed(0)}K
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               Current occupancy rate
             </p>
           </CardContent>
@@ -301,27 +305,27 @@ const PropertyManagementNew: React.FC = () => {
       </div>
 
       {/* Properties List */}
-      <Card>
-        <CardHeader>
+      <Card className="border-2 border-slate-200 bg-white shadow-lg">
+        <CardHeader className="border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Properties</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-[#154279] font-black text-xl">Properties</CardTitle>
+              <CardDescription className="text-slate-600 font-medium mt-1">
                 Manage all residential and commercial properties
               </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Search properties..."
-                  className="pl-10"
+                  className="pl-10 border-2 border-slate-200 rounded-xl focus:border-[#154279] focus:ring-0 bg-white"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-[150px] border-2 border-slate-200 rounded-xl bg-white">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -334,25 +338,25 @@ const PropertyManagementNew: React.FC = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           {filteredProperties.length === 0 ? (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
+            <Alert className="bg-amber-50 border-2 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 font-medium">
                 No properties found. Create your first property to get started.
               </AlertDescription>
             </Alert>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="rounded-xl border-2 border-slate-200 overflow-hidden bg-white">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Property Name</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Units</TableHead>
-                    <TableHead>Occupancy</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                <TableHeader className="bg-slate-50 border-b-2 border-slate-200">
+                  <TableRow className="hover:bg-slate-50">
+                    <TableHead className="text-[#154279] font-black">Property Name</TableHead>
+                    <TableHead className="text-[#154279] font-black">Location</TableHead>
+                    <TableHead className="text-[#154279] font-black">Units</TableHead>
+                    <TableHead className="text-[#154279] font-black">Occupancy</TableHead>
+                    <TableHead className="text-[#154279] font-black">Status</TableHead>
+                    <TableHead className="text-[#154279] font-black">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

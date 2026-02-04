@@ -4,19 +4,20 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, User, ArrowLeft } from "lucide-react";
+import { Loader2, CheckCircle, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { COLORS } from "@/config/navbarConfig";
 
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
-    .font-technical { font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+    .font-nunito { font-family: 'Nunito', sans-serif; }
   `}</style>
 );
 
 // Brand Colors
 const BRAND = {
-  PRIMARY: "#00356B",
-  ACCENT: "#D85C2C",
+  PRIMARY: COLORS.primary,
+  ACCENT: COLORS.secondary,
   SUCCESS: "#86bc25",
 };
 
@@ -27,6 +28,7 @@ const LoginPage: React.FC = () => {
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -111,23 +113,20 @@ const LoginPage: React.FC = () => {
     <>
       <GlobalStyles />
       <div
-        className="min-h-screen w-full flex items-center justify-center p-4 font-technical relative"
-        style={{
-          backgroundColor: "#1a232e",
-        }}
+        className="min-h-screen w-full flex items-center justify-center p-4 font-nunito relative bg-slate-100"
       >
 
         {/* Back to Home Button */}
         <button
           onClick={() => navigate("/")}
-          className="absolute top-6 left-6 z-20 flex items-center gap-2 text-white hover:text-gray-200 transition-colors group"
+          className="absolute top-6 left-6 z-20 flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors group"
           aria-label="Back to home"
         >
           <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="text-sm font-medium">Back Home</span>
+          <span className="text-sm font-bold">Back Home</span>
         </button>
 
-        <div className="relative bg-white rounded-xl shadow-xl overflow-hidden w-full max-w-[850px] min-h-[600px] md:min-h-[520px] z-10">
+        <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden w-full max-w-[850px] min-h-[600px] md:min-h-[520px] z-10">
           
           {/* SIGN UP FORM */}
           <div
@@ -200,18 +199,27 @@ const LoginPage: React.FC = () => {
                     setEmail(e.target.value);
                     setError("");
                   }}
-                  className="bg-gray-50 border border-[#d1d5db] px-4 py-3 text-sm w-full outline-none rounded-lg focus:ring-1 focus:ring-[#00356B] focus:border-[#00356B] transition-all"
+                  className="bg-gray-50 border border-[#d1d5db] px-4 py-3 text-sm w-full outline-none rounded-lg focus:ring-1 focus:ring-[#154279] focus:border-[#154279] transition-all"
                 />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
-                  className="bg-gray-50 border border-[#d1d5db] px-4 py-3 text-sm w-full outline-none rounded-lg focus:ring-1 focus:ring-[#00356B] focus:border-[#00356B] transition-all"
-                />
+                <div className="relative w-full">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    className="bg-gray-50 border border-[#d1d5db] px-4 py-3 text-sm w-full outline-none rounded-lg focus:ring-1 focus:ring-[#154279] focus:border-[#154279] transition-all pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
 
               <Link
@@ -369,17 +377,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* SUCCESS MESSAGE */}
-          {isSuccess && (
-            <div className="absolute inset-0 z-[200] bg-white/95 backdrop-blur-sm flex items-center justify-center rounded-xl">
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${BRAND.SUCCESS}20` }}>
-                  <CheckCircle className="w-8 h-8" style={{ color: BRAND.SUCCESS }} strokeWidth={2} />
-                </div>
-                <h2 className="text-xl font-bold" style={{ color: BRAND.PRIMARY }}>Success!</h2>
-                <p className="text-gray-600 text-sm">Redirecting to dashboard...</p>
-              </div>
-            </div>
-          )}
+          {/* Success overlay removed to provide a smoother transitions and rely on toast notification */}
         </div>
       </div>
     </>

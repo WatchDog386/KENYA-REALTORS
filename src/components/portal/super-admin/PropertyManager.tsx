@@ -1,42 +1,32 @@
 // src/components/portal/super-admin/PropertyManager.tsx
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { HeroBackground } from "@/components/ui/HeroBackground";
 import {
   Building,
-  UserPlus,
-  Search,
-  Filter,
-  Download,
-  Edit,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  Users,
   Home,
-  MapPin,
-  Phone,
-  Mail,
-  MoreVertical,
-  Plus,
-  X,
-  Loader2,
   DollarSign,
-  Shield,
-  Calendar,
-  Eye,
-  Settings,
-  Database,
+  Search,
+  Plus,
+  Trash2,
+  Loader2,
   AlertCircle,
+  Filter,
+  RefreshCw,
+  BarChart3,
+  MapPin,
+  Calculator,
+  ImageIcon
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -52,1281 +42,533 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { usePropertyManagement } from "@/hooks/usePropertyManagement";
-import { useUserManagement } from "@/hooks/useUserManagement";
-import { toast } from "sonner";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { formatCurrency } from "@/utils/formatCurrency";
-import { formatDate } from "@/utils/dateHelpers";
-import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
+import { supabase } from "@/services/supabase"; // Ensure this path is correct
+import { propertyService, Property, CreatePropertyDTO } from '@/services/propertyService';
 
-interface PropertyManagerProps {
-  onPropertySelect?: (propertyId: string) => void;
-  onManagerAssign?: (propertyId: string, managerId: string) => void;
-}
-
-interface Property {
-  id: string;
-  name: string;
-  property_name?: string;
-  description?: string;
-  address: string;
-  city: string;
-  state?: string;
-  zip_code?: string;
-  country: string;
-  postal_code?: string;
-  property_type: string;
-  type: string;
-  status: string;
-  is_active: boolean;
-  total_units: number;
-  occupied_units: number;
-  available_units: number;
-  monthly_rent?: number;
-  security_deposit?: number;
-  property_manager_id?: string;
-  manager_id?: string;
-  owner_id?: string;
-  super_admin_id?: string;
-  amenities?: string[];
-  images?: string[];
-  coordinates?: any;
-  latitude?: number;
-  longitude?: number;
-  year_built?: number;
-  square_feet?: number;
-  created_at: string;
-  updated_at: string;
-  manager?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone?: string;
-  };
-}
-
-interface Manager {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  status: string;
-}
-
-const PropertyManager: React.FC<PropertyManagerProps> = ({
-  onPropertySelect,
-  onManagerAssign,
-}) => {
-  const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+const PropertyManager: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [managerFilter, setManagerFilter] = useState("all");
-  const [assigningManager, setAssigningManager] = useState<string | null>(null);
-  const [selectedManager, setSelectedManager] = useState<string>("");
   const [showAddPropertyForm, setShowAddPropertyForm] = useState(false);
-  const [addingProperty, setAddingProperty] = useState(false);
-  const [editingProperty, setEditingProperty] = useState<string | null>(null);
-  const [exportingData, setExportingData] = useState(false);
-  const [dbError, setDbError] = useState<string | null>(null);
-  
-  const [newProperty, setNewProperty] = useState({
-    name: "",
-    address: "",
-    city: "",
-    state: "",
-    zip_code: "",
-    country: "Kenya",
-    property_type: "apartment",
-    total_units: 1,
-    monthly_rent: 0,
-    security_deposit: 0,
-    description: "",
-    amenities: [] as string[],
-    status: "active",
+  const [savingProperty, setSavingProperty] = useState(false);
+
+  // Form State
+  const [formData, setFormData] = useState<CreatePropertyDTO>({
+    name: '',
+    location: '',
+    image_url: '',
+    type: 'Apartment',
+    description: '',
+    amenities: '',
+    units: [{ name: '', units_count: 0, price_per_unit: 0 }]
   });
 
-  const {
-    properties,
-    managers,
-    loading,
-    fetchProperties,
-    fetchManagers,
-    assignManager,
-    deleteProperty,
-    searchProperties,
-    createProperty,
-    updateProperty,
-  } = usePropertyManagement();
-
-  const { fetchUsers } = useUserManagement();
-
-  // Load initial data
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        await Promise.all([fetchProperties(), fetchManagers(), fetchUsers()]);
-        setDbError(null);
-      } catch (error: any) {
-        console.error("Error loading data:", error);
-        setDbError(error.message || "Failed to load property data");
-      }
-    };
-    loadData();
+    fetchProperties();
   }, []);
 
-  // Add Ayden Homes property if it doesn't exist
-  useEffect(() => {
-    const addAydenHomesIfNeeded = async () => {
-      if (properties.length > 0) {
-        const aydenHomesExists = properties.some(p => p.name?.toLowerCase() === "ayden homes");
-        if (!aydenHomesExists) {
-          try {
-            await createProperty({
-              name: "Ayden Homes",
-              property_name: "Ayden Homes",
-              address: "123 Ayden Road",
-              city: "Nairobi",
-              state: "Nairobi County",
-              zip_code: "00100",
-              country: "Kenya",
-              property_type: "apartment",
-              type: "apartment",
-              total_units: 24,
-              monthly_rent: 45000,
-              security_deposit: 90000,
-              description: "Modern apartment complex with premium amenities and strategic location",
-              amenities: ["Swimming Pool", "Gym", "Parking", "Security", "Wi-Fi", "24/7 Power"],
-              status: "active",
-              is_active: true,
-            });
-            toast.success("Ayden Homes property added successfully");
-            await fetchProperties();
-          } catch (error: any) {
-            if (!error.message?.includes("already exists")) {
-              console.error("Error adding Ayden Homes:", error);
-            }
-          }
-        }
-      }
-    };
-    addAydenHomesIfNeeded();
-  }, [properties.length]);
-
-  // Handle property search
-  const handleSearch = async () => {
+  const fetchProperties = async () => {
     try {
-      if (searchQuery.trim()) {
-        await searchProperties(searchQuery);
-      } else {
-        await fetchProperties();
-      }
-      setDbError(null);
-    } catch (error: any) {
-      setDbError(error.message || "Search failed");
+      setLoading(true);
+      const data = await propertyService.fetchProperties();
+      setProperties(data);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+      toast.error("Failed to load properties");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle manager assignment
-  const handleAssignManager = async (propertyId: string) => {
-    if (!selectedManager) {
-      toast.error("Please select a manager");
-      return;
-    }
-
-    try {
-      await assignManager(propertyId, selectedManager);
-      toast.success("Manager assigned successfully");
-      setAssigningManager(null);
-      setSelectedManager("");
-
-      if (onManagerAssign) {
-        onManagerAssign(propertyId, selectedManager);
-      }
-    } catch (error: any) {
-      toast.error(`Failed to assign manager: ${error.message}`);
-    }
-  };
-
-  // Handle property deletion
-  const handleDeleteProperty = async (propertyId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this property? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await deleteProperty(propertyId);
-      toast.success("Property deleted successfully");
-    } catch (error: any) {
-      toast.error(`Failed to delete property: ${error.message}`);
-    }
-  };
-
-  // Reset form
-  const resetPropertyForm = () => {
-    setNewProperty({
-      name: "",
-      address: "",
-      city: "",
-      state: "",
-      zip_code: "",
-      country: "Kenya",
-      property_type: "apartment",
-      total_units: 1,
-      monthly_rent: 0,
-      security_deposit: 0,
-      description: "",
-      amenities: [],
-      status: "active",
+  const handleAddUnit = () => {
+    setFormData({
+      ...formData,
+      units: [...formData.units, { name: '', units_count: 0, price_per_unit: 0 }]
     });
-    setEditingProperty(null);
   };
 
-  // Handle adding/editing property
+  const handleRemoveUnit = (index: number) => {
+    const newUnits = [...formData.units];
+    newUnits.splice(index, 1);
+    setFormData({ ...formData, units: newUnits });
+  };
+
+  const handleUnitChange = (index: number, field: keyof typeof formData.units[0], value: any) => {
+    const newUnits = [...formData.units];
+    newUnits[index] = { ...newUnits[index], [field]: value };
+    setFormData({ ...formData, units: newUnits });
+  };
+
   const handleSaveProperty = async () => {
-    // Validate required fields
-    if (!newProperty.name || !newProperty.address || !newProperty.city) {
-      toast.error("Please fill in required fields: Name, Address, and City");
-      return;
+    if (!formData.name || !formData.location) {
+        toast.error("Please fill in property name and location");
+        return;
     }
 
-    const isEditing = !!editingProperty;
-    setAddingProperty(true);
-
     try {
-      const propertyData = {
-        name: newProperty.name,
-        property_name: newProperty.name,
-        address: newProperty.address,
-        city: newProperty.city,
-        state: newProperty.state,
-        zip_code: newProperty.zip_code,
-        country: newProperty.country,
-        property_type: newProperty.property_type,
-        type: newProperty.property_type,
-        total_units: newProperty.total_units,
-        monthly_rent: newProperty.monthly_rent,
-        security_deposit: newProperty.security_deposit,
-        description: newProperty.description,
-        amenities: newProperty.amenities,
-        status: newProperty.status,
-        is_active: newProperty.status === "active",
-        occupied_units: 0,
-        available_units: newProperty.total_units,
-      };
-
-      if (isEditing) {
-        await updateProperty(editingProperty, propertyData);
-        toast.success('Property updated successfully');
-      } else {
-        await createProperty(propertyData);
-        toast.success('Property added successfully');
-      }
-
+      setSavingProperty(true);
+      await propertyService.createProperty(formData);
+      toast.success("Property created successfully");
       setShowAddPropertyForm(false);
-      resetPropertyForm();
-      await fetchProperties();
-      setDbError(null);
-    } catch (error: any) {
-      console.error('Error saving property:', error);
-      setDbError(error.message);
-      toast.error(`Failed to save property: ${error.message}`);
-    } finally {
-      setAddingProperty(false);
-    }
-  };
-
-  // Start editing a property
-  const startEditingProperty = (property: Property) => {
-    setEditingProperty(property.id);
-    setNewProperty({
-      name: property.name,
-      address: property.address,
-      city: property.city,
-      state: property.state || "",
-      zip_code: property.zip_code || "",
-      country: property.country || "Kenya",
-      property_type: property.property_type || "apartment",
-      total_units: property.total_units || 1,
-      monthly_rent: property.monthly_rent || 0,
-      security_deposit: property.security_deposit || 0,
-      description: property.description || "",
-      amenities: property.amenities || [],
-      status: property.status || "active",
-    });
-    setShowAddPropertyForm(true);
-  };
-
-  // Filter properties based on selected filters
-  const filteredProperties = properties.filter((property: Property) => {
-    if (statusFilter !== "all" && property.status !== statusFilter) return false;
-    if (typeFilter !== "all" && property.property_type !== typeFilter) return false;
-    if (managerFilter !== "all") {
-      if (managerFilter === "assigned" && !property.manager_id) return false;
-      if (managerFilter === "unassigned" && property.manager_id) return false;
-      if (
-        managerFilter !== "assigned" &&
-        managerFilter !== "unassigned" &&
-        property.manager_id !== managerFilter
-      )
-        return false;
-    }
-    return true;
-  });
-
-  // Handle export data
-  const handleExportData = async () => {
-    try {
-      setExportingData(true);
-      let data: any[] = [];
       
-      if (filteredProperties.length > 0) {
-        data = filteredProperties;
-      } else {
-        const { data: propertiesData, error }: any = await supabase
-          .from("properties")
-          .select("*")
-          .order("created_at", { ascending: false });
+      // Reset form
+      setFormData({
+        name: '',
+        location: '',
+        image_url: '',
+        type: 'Apartment',
+        description: '',
+        amenities: '',
+        units: [{ name: '', units_count: 0, price_per_unit: 0 }]
+      });
 
-        if (error) throw error;
-        data = propertiesData || [];
+      fetchProperties();
+    } catch (error) {
+      console.error("Error creating property:", error);
+      toast.error("Failed to create property");
+    } finally {
+      setSavingProperty(false);
+    }
+  };
+
+  const handleDeleteProperty = async (id: string) => {
+      if(!confirm("Are you sure? This will delete the property and all its units.")) return;
+      try {
+          const { error } = await supabase.from('properties').delete().eq('id', id);
+          if(error) throw error;
+          toast.success("Property deleted");
+          fetchProperties();
+      } catch (err) {
+          toast.error("Failed to delete property");
+          console.error(err);
       }
+  }
 
-      // Convert to CSV
-      const headers = ['Name', 'Address', 'City', 'Type', 'Status', 'Total Units', 'Occupied Units', 'Monthly Rent', 'Created At'];
-      const csvRows = [
-        headers.join(','),
-        ...data.map((property: any) => {
-          const values = [
-            `"${property.name || ''}"`,
-            `"${property.address || ''}"`,
-            `"${property.city || ''}"`,
-            `"${property.property_type || ''}"`,
-            `"${property.status || ''}"`,
-            property.total_units || 0,
-            property.occupied_units || 0,
-            property.monthly_rent || 0,
-            `"${new Date(property.created_at).toLocaleDateString()}"`
-          ];
-          return values.join(',');
-        })
-      ];
-      
-      const csvContent = csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `properties_export_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      
-      toast.success(`${data.length} properties exported successfully`);
-    } catch (error: any) {
-      console.error("Error exporting properties:", error);
-      toast.error(`Failed to export properties: ${error.message}`);
-    } finally {
-      setExportingData(false);
-    }
-  };
+  // Derived Stats
+  const totalProperties = properties.length;
+  const totalUnits = properties.reduce((sum, p) => sum + (p.total_units || 0), 0);
+  const totalIncome = properties.reduce((sum, p) => sum + (p.expected_income || 0), 0);
 
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "active":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "inactive":
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case "maintenance":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
-      case "vacant":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      case "occupied":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
-    }
-  };
+  // Form Calculations
+  const formTotalUnits = formData.units.reduce((sum, u) => sum + Number(u.units_count || 0), 0);
+  const formExpectedIncome = formData.units.reduce((sum, u) => sum + (Number(u.units_count || 0) * Number(u.price_per_unit || 0)), 0);
 
-  // Get type badge color
-  const getTypeColor = (type: string) => {
-    switch (type?.toLowerCase()) {
-      case "apartment":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      case "house":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "commercial":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
-      case "condo":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case "townhouse":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400";
-    }
-  };
-
-  // Get property stats
-  const stats = {
-    total: properties.length,
-    active: properties.filter((p: Property) => p.status === "active" && p.is_active).length,
-    assignedManagers: new Set(properties.map((p: Property) => p.manager_id).filter(Boolean)).size,
-    totalUnits: properties.reduce((sum: number, p: Property) => sum + (p.total_units || 0), 0),
-    occupiedUnits: properties.reduce((sum: number, p: Property) => sum + (p.occupied_units || 0), 0),
-    availableUnits: properties.reduce((sum: number, p: Property) => sum + (p.available_units || 0), 0),
-    cities: new Set(properties.map((p: Property) => p.city).filter(Boolean)).size,
-    totalRevenue: properties.reduce((sum: number, p: Property) => sum + ((p.monthly_rent || 0) * (p.occupied_units || 0)), 0),
-  };
-
-  const occupancyRate = stats.totalUnits > 0 ? Math.round((stats.occupiedUnits / stats.totalUnits) * 100) : 0;
+  const unitTypeOptions = [
+    "Bedsitter", "Studio", "One Bedroom", "Two Bedroom", "Three Bedroom", "Shop", "Office", "Penthouse", "Maisonette", "Villa", "Other"
+  ];
 
   return (
-    <div className="space-y-6 font-nunito">
-      {/* Database Error Alert */}
-      {dbError && (
-        <Alert variant="destructive">
-          <Database className="h-4 w-4" />
-          <AlertDescription>
-            Database error: {dbError}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Property Management
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage all properties and assign managers
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => {
-              fetchProperties();
-              toast.info("Refreshing properties...");
-            }}
-          >
-            <Loader2 className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleExportData}
-            disabled={exportingData}
-          >
-            {exportingData ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
-            Export
-          </Button>
-          <Dialog
-            open={showAddPropertyForm}
-            onOpenChange={(open: boolean) => {
-              if (!open) {
-                setShowAddPropertyForm(false);
-                resetPropertyForm();
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={() => {
-                resetPropertyForm();
-                setShowAddPropertyForm(true);
-              }}>
-                <Building className="h-4 w-4 mr-2" />
-                Add Property
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingProperty ? 'Edit Property' : 'Add New Property'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingProperty 
-                    ? 'Update property information below.' 
-                    : 'Fill in the property details below.'}
-                </DialogDescription>
-              </DialogHeader>
+    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Nunito', sans-serif; }
+      `}</style>
+      
+      {/* HERO SECTION */}
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-10 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
+          <div className="space-y-1">
+             <div className="flex items-center gap-3 mb-2">
+                 <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
+                    <Building className="w-5 h-5 text-white" />
+                 </div>
+                 <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Management</span>
+             </div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+              Property <span className="text-[#F96302]">Management</span>
+            </h1>
+            <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
+              Manage your real estate portfolio, units, and income projections.
+            </p>
+          </div>
               
-              <div className="space-y-4 py-4">
-                {/* Basic Information */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Basic Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Property Name *</Label>
-                      <Input
-                        id="name"
-                        value={newProperty.name}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, name: e.target.value})}
-                        placeholder="Sunrise Apartments"
-                        required
-                      />
+          <div className="flex items-center gap-3">
+            <Button
+                variant="ghost"
+                onClick={() => { fetchProperties(); toast.info("Refreshing..."); }}
+                className="bg-white/10 hover:bg-white/20 text-white border-none"
+            >
+                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+            </Button>
+            
+            <Dialog open={showAddPropertyForm} onOpenChange={setShowAddPropertyForm}>
+                <DialogTrigger asChild>
+                <Button className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl shadow-lg border-none">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Property
+                </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 gap-0 overflow-hidden bg-white shadow-xl rounded-xl border border-slate-200">
+                     {/* Header - Clean White */}
+                    <div className="bg-white border-b border-slate-100 p-6">
+                    <DialogHeader className="p-0 space-y-1">
+                        <div className="flex items-center gap-3">
+                        <div className="p-2 bg-slate-100 rounded-lg">
+                            <Building className="w-5 h-5 text-slate-700" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">Add New Property</DialogTitle>
+                            <p className="text-slate-500 text-sm font-medium">
+                            Enter property details and unit breakdown below.
+                            </p>
+                        </div>
+                        </div>
+                    </DialogHeader>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="property_type">Property Type</Label>
-                      <Select
-                        value={newProperty.property_type}
-                        onValueChange={(value: string) => 
-                          setNewProperty({...newProperty, property_type: value})
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="apartment">Apartment</SelectItem>
-                          <SelectItem value="house">House</SelectItem>
-                          <SelectItem value="commercial">Commercial</SelectItem>
-                          <SelectItem value="condo">Condo</SelectItem>
-                          <SelectItem value="townhouse">Townhouse</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address *</Label>
-                    <Input
-                      id="address"
-                      value={newProperty.address}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, address: e.target.value})}
-                      placeholder="123 Main Street"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        value={newProperty.city}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, city: e.target.value})}
-                        placeholder="Kisumu"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State/Region</Label>
-                      <Input
-                        id="state"
-                        value={newProperty.state}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, state: e.target.value})}
-                        placeholder="Kisumu County"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="zip_code">Postal Code</Label>
-                      <Input
-                        id="zip_code"
-                        value={newProperty.zip_code}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, zip_code: e.target.value})}
-                        placeholder="40100"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      value={newProperty.country}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, country: e.target.value})}
-                      placeholder="Kenya"
-                    />
-                  </div>
-                </div>
+                
+                    <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-8 bg-white">
+                        {/* Section 1: Property Details */}
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                            Property Information
+                            </h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="col-span-1 md:col-span-2 space-y-2">
+                                <Label className="text-slate-700 font-semibold text-sm">Property Name</Label>
+                                <Input 
+                                    value={formData.name} 
+                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                    placeholder="e.g. Sunrise Apartments"
+                                    className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                                />
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <Label className="text-slate-700 font-semibold text-sm">Location</Label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                    <Input 
+                                        value={formData.location} 
+                                        onChange={(e) => setFormData({...formData, location: e.target.value})}
+                                        placeholder="e.g. Westlands, Nairobi"
+                                        className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                                    />
+                                </div>
+                            </div>
 
-                {/* Property Details */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Property Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="total_units">Total Units</Label>
-                      <Input
-                        id="total_units"
-                        type="number"
-                        min="1"
-                        value={newProperty.total_units}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, total_units: parseInt(e.target.value) || 1})}
-                      />
+                            <div className="space-y-2">
+                                <Label className="text-slate-700 font-semibold text-sm">Type</Label>
+                                <Select 
+                                    value={formData.type} 
+                                    onValueChange={(val) => setFormData({...formData, type: val})}
+                                >
+                                    <SelectTrigger className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white">
+                                        <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Apartment">Apartment</SelectItem>
+                                        <SelectItem value="Commercial">Commercial</SelectItem>
+                                        <SelectItem value="Mixed">Mixed Use</SelectItem>
+                                        <SelectItem value="Villa">Villa</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            
+                            <div className="col-span-1 md:col-span-2 space-y-2">
+                                <Label className="text-slate-700 font-semibold text-sm">Cover Image URL</Label>
+                                <div className="relative">
+                                    <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                    <Input 
+                                        value={formData.image_url} 
+                                        onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                                        placeholder="https://example.com/image.jpg"
+                                        className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                                    />
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+
+                        <Separator className="bg-slate-100" />
+
+                        {/* Section 2: Unit Configuration */}
+                        <div className="space-y-5">
+                            <div className="flex justify-between items-end">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                                Unit Configuration
+                                </h3>
+                                <Button size="sm" variant="outline" onClick={handleAddUnit} className="h-8 border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg gap-1.5 text-xs font-bold transition-all">
+                                <Plus className="w-3.5 h-3.5" /> Add Unit Type
+                                </Button>
+                            </div>
+
+                            <div className="space-y-3">
+                            <AnimatePresence initial={false}>
+                                {formData.units.map((unit, index) => (
+                                <motion.div 
+                                    key={index}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="group relative grid grid-cols-12 gap-3 items-end bg-slate-50/50 p-4 rounded-lg border border-slate-200 hover:border-slate-300 transition-all"
+                                >
+                                    <div className="col-span-12 md:col-span-5 space-y-1.5">
+                                    <Label className="text-xs font-semibold text-slate-500">Unit Type</Label>
+                                    <div className="relative">
+                                        <Input 
+                                            list={`unit-types-${index}`}
+                                            placeholder="Select or type..." 
+                                            value={unit.name}
+                                            onChange={(e) => handleUnitChange(index, 'name', e.target.value)}
+                                            className="h-9 border-slate-200 bg-white text-sm font-medium focus:border-slate-400 focus:ring-slate-400 rounded-md shadow-sm" 
+                                        />
+                                        <datalist id={`unit-types-${index}`}>
+                                            {unitTypeOptions.map(opt => <option key={opt} value={opt} />)}
+                                        </datalist>
+                                    </div>
+                                    </div>
+                                    
+                                    <div className="col-span-4 md:col-span-2 space-y-1.5">
+                                    <Label className="text-xs font-semibold text-slate-500">Count</Label>
+                                    <Input 
+                                        type="number"
+                                        min="0"
+                                        placeholder="0" 
+                                        value={unit.units_count}
+                                        onChange={(e) => handleUnitChange(index, 'units_count', Number(e.target.value))}
+                                        className="h-9 border-slate-200 bg-white text-sm font-medium text-center focus:border-slate-400 focus:ring-slate-400 rounded-md shadow-sm"
+                                    />
+                                    </div>
+                                    
+                                    <div className="col-span-7 md:col-span-4 space-y-1.5">
+                                    <Label className="text-xs font-semibold text-slate-500">Rent (KES)</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold z-10">KES</span>
+                                        <Input 
+                                        type="number"
+                                        min="0"
+                                        placeholder="0" 
+                                        value={unit.price_per_unit}
+                                        onChange={(e) => handleUnitChange(index, 'price_per_unit', Number(e.target.value))}
+                                        className="pl-10 h-9 border-slate-200 bg-white text-sm font-medium text-right focus:border-slate-400 focus:ring-slate-400 rounded-md shadow-sm"
+                                        />
+                                    </div>
+                                    </div>
+                                    
+                                    <div className="col-span-1 flex justify-center pb-1">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => handleRemoveUnit(index)} 
+                                        className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                        disabled={formData.units.length === 1}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                    </div>
+                                </motion.div>
+                                ))}
+                            </AnimatePresence>
+                            
+                            {formData.units.length === 0 && (
+                                <div onClick={handleAddUnit} className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-slate-400 hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50 transition-all cursor-pointer">
+                                    <Home className="w-8 h-8 mb-2 opacity-50" />
+                                    <p className="font-semibold text-sm">Add your first unit type</p>
+                                </div>
+                            )}
+                            </div>
+                        </div>
+
+                        {/* Financial Summary Card - Clean & Minimal */}
+                        <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 p-5 mt-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                <div className="p-2.5 bg-white border border-slate-100 rounded-full shadow-sm">
+                                    <Calculator className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">Projected Monthly Income</p>
+                                    <p className="text-2xl font-bold text-slate-900 tracking-tight">
+                                    <span className="text-sm text-slate-500 mr-1 font-medium">KES</span>
+                                    {formExpectedIncome.toLocaleString()}
+                                    </p>
+                                </div>
+                                </div>
+                                
+                                <div className="flex gap-6 text-sm">
+                                    <div className="px-4 py-2 bg-white rounded-lg border border-slate-100 shadow-sm">
+                                        <span className="text-slate-500 text-xs font-semibold uppercase mr-2">Units:</span>
+                                        <span className="font-bold text-slate-900">{formTotalUnits}</span>
+                                    </div>
+                                    <div className="px-4 py-2 bg-white rounded-lg border border-slate-100 shadow-sm">
+                                        <span className="text-slate-500 text-xs font-semibold uppercase mr-2">Types:</span>
+                                        <span className="font-bold text-slate-900">{formData.units.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="monthly_rent">Monthly Rent (KES)</Label>
-                      <Input
-                        id="monthly_rent"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={newProperty.monthly_rent}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, monthly_rent: parseFloat(e.target.value) || 0})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="security_deposit">Security Deposit (KES)</Label>
-                      <Input
-                        id="security_deposit"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={newProperty.security_deposit}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({...newProperty, security_deposit: parseFloat(e.target.value) || 0})}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select
-                      value={newProperty.status}
-                      onValueChange={(value: string) => 
-                        setNewProperty({...newProperty, status: value})
-                      }
+
+                    <DialogFooter className="p-4 border-t border-slate-100 bg-white">
+                    <Button variant="ghost" onClick={() => setShowAddPropertyForm(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg">
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleSaveProperty} 
+                        disabled={savingProperty || !formData.name || formTotalUnits === 0} 
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-6 font-bold rounded-lg shadow-sm"
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Description & Amenities</h3>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={newProperty.description}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewProperty({...newProperty, description: e.target.value})}
-                      placeholder="Describe the property, including notable features, amenities, etc."
-                      className="min-h-[100px]"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Amenities (comma separated)</Label>
-                    <Input
-                      value={newProperty.amenities.join(', ')}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewProperty({
-                        ...newProperty, 
-                        amenities: e.target.value.split(',').map((item: string) => item.trim()).filter((item: string) => item)
-                      })}
-                      placeholder="e.g., Swimming Pool, Gym, Parking, Security"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Separate amenities with commas
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddPropertyForm(false);
-                    resetPropertyForm();
-                  }}
-                  disabled={addingProperty}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveProperty}
-                  disabled={addingProperty || !newProperty.name || !newProperty.address || !newProperty.city}
-                >
-                  {addingProperty ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {editingProperty ? 'Updating...' : 'Adding...'}
-                    </>
-                  ) : editingProperty ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Update Property
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Property
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+                        {savingProperty ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                        Create Property
+                    </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+          </div>
       </div>
+      </section>
 
+      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
+      
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Properties
-            </CardTitle>
-            <Building className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-gray-500">
-              {stats.active} active
-            </p>
-          </CardContent>
-        </Card>
+        {[
+          { label: "Total Properties", value: totalProperties, icon: Building, color: "blue", subtext: "Active Listings" },
+          { label: "Total Units", value: totalUnits, icon: Home, color: "green", subtext: `Across ${totalProperties} Properties` },
+          { label: "Monthly Income", value: `KES ${(totalIncome / 1000).toFixed(0)}K`, icon: DollarSign, color: "purple", subtext: "Projected" },
+          { label: "Avg Rent/Unit", value: `KES ${totalUnits > 0 ? ((totalIncome/totalUnits)/1000).toFixed(1) : 0}K`, icon: BarChart3, color: "orange", subtext: "Estimated" },
+        ].map((stat, idx) => {
+          const IconComponent = stat.icon;
+          const colorMap: any = { 
+            blue: "text-blue-600 bg-blue-50 border-blue-100", 
+            green: "text-green-600 bg-green-50 border-green-100", 
+            purple: "text-purple-600 bg-purple-50 border-purple-100", 
+            orange: "text-orange-600 bg-orange-50 border-orange-100" 
+          };
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Units & Occupancy
-            </CardTitle>
-            <Home className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {occupancyRate}%
-            </div>
-            <p className="text-xs text-gray-500">
-              {stats.occupiedUnits}/{stats.totalUnits} units occupied
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Monthly Revenue
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(stats.totalRevenue)}
-            </div>
-            <p className="text-xs text-gray-500">
-              Projected monthly income
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Assigned Managers
-            </CardTitle>
-            <Users className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.assignedManagers}
-            </div>
-            <p className="text-xs text-gray-500">
-              {managers?.length || 0} managers available
-            </p>
-          </CardContent>
-        </Card>
+          return (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: idx * 0.05 }}
+            >
+              <Card className="border-2 border-slate-200 hover:border-[#F96302] transition-all duration-300 hover:shadow-xl hover:-translate-y-1 rounded-2xl h-full">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-bold text-slate-700 uppercase tracking-wider">{stat.label}</CardTitle>
+                  <div className={`p-2 rounded-lg ${colorMap[stat.color]}`}>
+                    <IconComponent className="h-4 w-4" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-black text-[#154279] mt-2">{stat.value}</div>
+                  <p className="text-xs text-slate-500 font-semibold mt-1">{stat.subtext}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
       </div>
 
-      {/* Filters and Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+      {/* Properties Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Card className="border-2 border-slate-200 rounded-2xl shadow-lg border-t-4 border-t-[#154279]">
+          <CardHeader className="border-b-2 border-slate-100 bg-white rounded-t-2xl py-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <CardTitle className="text-[#154279] font-black text-xl flex items-center gap-2">
+                    <Building className="h-5 w-5" />
+                    Property Directory
+                </CardTitle>
+                <CardDescription className="text-slate-500 font-medium mt-1">
+                  Managing {properties.length} active properties
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-6 bg-white rounded-b-2xl">
+            {/* Search */}
+            <div className="flex flex-col lg:flex-row gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Search properties by name, address, city, or type..."
+                  placeholder="Search properties by name, location..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                  className="pl-10"
+                  className="pl-10 border-slate-200 rounded-xl focus:border-[#F96302] focus:ring-0 bg-white h-10"
                 />
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-900 dark:text-gray-100 dark:bg-gray-950 dark:border-gray-700">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="vacant">Vacant</SelectItem>
-                  <SelectItem value="occupied">Occupied</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-900 dark:text-gray-100 dark:bg-gray-950 dark:border-gray-700">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="apartment">Apartment</SelectItem>
-                  <SelectItem value="house">House</SelectItem>
-                  <SelectItem value="commercial">Commercial</SelectItem>
-                  <SelectItem value="condo">Condo</SelectItem>
-                  <SelectItem value="townhouse">Townhouse</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={managerFilter} onValueChange={setManagerFilter}>
-                <SelectTrigger className="w-[160px] bg-white border-gray-200 text-gray-900 dark:text-gray-100 dark:bg-gray-950 dark:border-gray-700">
-                  <SelectValue placeholder="Manager" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Managers</SelectItem>
-                  <SelectItem value="assigned">Assigned</SelectItem>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {managers?.map((manager) => (
-                    <SelectItem key={manager.id} value={manager.id}>
-                      {manager.first_name} {manager.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" onClick={handleSearch}>
-                <Filter className="h-4 w-4 mr-2" />
-                Apply Filters
-              </Button>
-              <Button variant="ghost" onClick={() => {
-                setSearchQuery("");
-                setStatusFilter("all");
-                setTypeFilter("all");
-                setManagerFilter("all");
-                fetchProperties();
-              }} className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">
-                Clear
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Properties Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Properties</CardTitle>
-          <CardDescription>
-            {filteredProperties.length} properties found • Showing {Math.min(filteredProperties.length, 20)} of {filteredProperties.length}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredProperties.length === 0 ? (
-            <div className="text-center py-8">
-              <Building className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">No properties found</h3>
-              <p className="text-gray-500">
-                Try adjusting your filters or search query
-              </p>
-              <Button 
-                className="mt-4" 
-                onClick={() => {
-                  resetPropertyForm();
-                  setShowAddPropertyForm(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Property
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Property</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Unit Details</TableHead>
-                    <TableHead>Occupancy</TableHead>
-                    <TableHead>Rent</TableHead>
-                    <TableHead>Manager</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProperties.slice(0, 20).map((property) => (
-                    <TableRow
-                      key={property.id}
-                      className={
-                        selectedProperty === property.id ? "bg-gray-50 dark:bg-gray-800" : ""
-                      }
-                      onClick={() => {
-                        setSelectedProperty(property.id);
-                        if (onPropertySelect) {
-                          onPropertySelect(property.id);
-                        }
-                      }}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                            <Home className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <div>
-                            <div className="font-medium">{property.name}</div>
-                            {property.description && (
-                              <div className="text-sm text-gray-500 truncate max-w-[200px]">
-                                {property.description}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="text-sm">{property.city}</div>
-                          {property.state && (
-                            <div className="text-xs text-gray-500">{property.state}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getTypeColor(property.property_type || 'other')}
-                        >
-                          {property.property_type?.replace("_", " ") || 'other'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getStatusColor(property.status || 'active')}
-                        >
-                          {property.status?.replace("_", " ") || 'active'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm space-y-1">
-                          <div className="font-medium text-xs text-slate-600 dark:text-slate-400">Total: {property.total_units || 0} units</div>
-                          <div className="text-xs text-slate-500">
-                            <span className="text-green-600 font-medium">{property.occupied_units || 0} occupied</span>
-                            <span className="text-slate-400 mx-1">•</span>
-                            <span className="text-blue-600 font-medium">{(property.total_units || 0) - (property.occupied_units || 0)} vacant</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full"
-                            style={{
-                              width: `${property.total_units ? ((property.occupied_units || 0) / property.total_units) * 100 : 0}%`,
-                            }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {property.total_units ? Math.round(((property.occupied_units || 0) / property.total_units) * 100) : 0}% occupied
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">
-                          {property.monthly_rent ? formatCurrency(property.monthly_rent) : 'N/A'}
-                        </div>
-                        {property.security_deposit && (
-                          <div className="text-xs text-gray-500">
-                            Deposit: {formatCurrency(property.security_deposit)}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {assigningManager === property.id ? (
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={selectedManager}
-                              onValueChange={setSelectedManager}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select manager" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">Unassign</SelectItem>
-                                {managers.map((manager) => (
-                                  <SelectItem
-                                    key={manager.id}
-                                    value={manager.id}
-                                  >
-                                    {manager.first_name} {manager.last_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              size="sm"
-                              onClick={() => handleAssignManager(property.id)}
-                              disabled={!selectedManager}
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setAssigningManager(null);
-                                setSelectedManager("");
-                              }}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : property.manager ? (
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                {property.manager.first_name?.[0]}
-                                {property.manager.last_name?.[0]}
-                              </span>
-                            </div>
-                            <div>
-                              <div className="font-medium">
-                                {property.manager.first_name}{" "}
-                                {property.manager.last_name}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {property.manager.email}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-gray-500 italic text-sm">Unassigned</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => startEditingProperty(property)}
-                            className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setAssigningManager(property.id);
-                              setSelectedManager(property.manager_id || "");
-                            }}
-                            className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
-                          >
-                            <UserPlus className="h-4 w-4" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem
-                                onClick={() => startEditingProperty(property)}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Property
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setAssigningManager(property.id);
-                                  setSelectedManager(property.manager_id || "");
-                                }}
-                              >
-                                <UserPlus className="h-4 w-4 mr-2" />
-                                Assign Manager
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${property.name}, ${property.address}, ${property.city}`);
-                                  toast.success("Property address copied");
-                                }}
-                              >
-                                <MapPin className="h-4 w-4 mr-2" />
-                                Copy Address
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => handleDeleteProperty(property.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Property
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
+            {/* Properties Table */}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                    <Loader2 className="h-8 w-8 text-[#154279] animate-spin mx-auto mb-2" />
+                    <p className="text-slate-500 font-medium">Loading...</p>
+                </div>
+              </div>
+            ) : properties.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <div className="bg-white p-4 rounded-full shadow-sm inline-block mb-3">
+                    <Building className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-700">No properties found</h3>
+                <p className="text-slate-500 mt-1 max-w-xs mx-auto">Create your first property to get started.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow>
+                        <TableHead className="font-bold text-[#154279]">Property Name</TableHead>
+                        <TableHead className="font-bold text-[#154279]">Location</TableHead>
+                        <TableHead className="font-bold text-[#154279] text-center">Total Units</TableHead>
+                        <TableHead className="font-bold text-[#154279] text-right">Proj. Income</TableHead>
+                        <TableHead className="font-bold text-[#154279] text-center">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Available Managers Section */}
-      {managers && managers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Managers</CardTitle>
-            <CardDescription>
-              {managers.length} property managers available for assignment
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {managers.slice(0, 6).map((manager) => {
-                const assignedProperties = properties.filter(p => p.manager_id === manager.id).length;
-                
-                return (
-                  <div
-                    key={manager.id}
-                    className="border dark:border-gray-800 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                          <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                            {manager.first_name?.[0]}
-                            {manager.last_name?.[0]}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold">
-                            {manager.first_name} {manager.last_name}
-                          </h4>
-                          <p className="text-sm text-gray-500">{manager.email}</p>
-                          {manager.phone && (
-                            <p className="text-sm text-gray-500 flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {manager.phone}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={manager.status === 'active' ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-50 text-gray-700"}
-                      >
-                        {manager.status || 'active'}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-gray-500">Assigned:</span>
-                        <span className="ml-2 font-medium">
-                          {assignedProperties} properties
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Role:</span>
-                        <span className="ml-2 font-medium capitalize">
-                          {manager.role?.replace("_", " ")}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1 text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Contact
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-600 dark:hover:bg-blue-700" 
-                        onClick={() => {
-                          // Find an unassigned property
-                          const unassignedProperty = properties.find(p => !p.manager_id);
-                          if (unassignedProperty) {
-                            setAssigningManager(unassignedProperty.id);
-                            setSelectedManager(manager.id);
-                            toast.info(`Assigning ${manager.first_name} to ${unassignedProperty.name}`);
-                          } else {
-                            toast.info("All properties are already assigned. Add a new property first.");
-                          }
-                        }}
-                      >
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Assign
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {managers.length > 6 && (
-              <div className="mt-4 text-center">
-                <Button variant="outline" size="sm">
-                  View All {managers.length} Managers
-                </Button>
+                  </TableHeader>
+                  <TableBody>
+                   {properties.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase())).map((property) => (
+                       <TableRow key={property.id} className="hover:bg-slate-50">
+                           <TableCell className="font-medium text-slate-800">
+                              {property.name}
+                              <div className="text-xs text-slate-400 font-normal">{property.type || 'Apartment'}</div>
+                           </TableCell>
+                           <TableCell className="text-slate-600">
+                               <div className="flex items-center gap-1">
+                                   <MapPin className="w-3 h-3" /> {property.location}
+                               </div>
+                           </TableCell>
+                           <TableCell className="text-center font-bold text-slate-700">
+                               {property.total_units}
+                           </TableCell>
+                           <TableCell className="text-right font-bold text-emerald-600">
+                               KES {(property.expected_income || 0).toLocaleString()}
+                           </TableCell>
+                           <TableCell className="text-center">
+                               <div className="flex items-center justify-center gap-2">
+                                   <Button variant="ghost" size="icon" onClick={() => handleDeleteProperty(property.id)} className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                       <Trash2 className="w-4 h-4" />
+                                   </Button>
+                               </div>
+                           </TableCell>
+                       </TableRow>
+                   ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
         </Card>
-      )}
+      </motion.div>
+    </div>
     </div>
   );
 };

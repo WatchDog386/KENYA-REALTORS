@@ -113,7 +113,7 @@ import MainLayout from "@/components/layout/MainLayout";
 ====================== */
 import AnalyticsDashboard from "@/components/portal/super-admin/AnalyticsDashboard";
 import ApprovalQueue from "@/components/portal/super-admin/ApprovalQueue";
-import PropertyManagementNew from "@/components/portal/super-admin/PropertyManagementNew";
+import PropertyManager from "@/components/portal/super-admin/PropertyManager";
 import UserManagementNew from "@/components/portal/super-admin/UserManagementNew";
 import SystemSettings from "@/components/portal/super-admin/SystemSettings";
 import Reports from "@/components/portal/super-admin/Reports"; // Fixed import name
@@ -662,7 +662,7 @@ const App = () => {
                     }
                   />
                   <Route path="dashboard" element={<SuperAdminDashboard />} />
-                  <Route path="properties" element={<PropertyManagementNew />} />
+                  <Route path="properties" element={<PropertyManager />} />
                   <Route path="users" element={<UserManagementNew />} />
                   <Route path="approvals" element={<ApprovalQueue />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />

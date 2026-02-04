@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { HeroBackground } from '@/components/ui/HeroBackground';
 
 interface Property {
   id: string;
@@ -266,20 +267,30 @@ const PropertiesManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 bg-gradient-to-br from-gray-50 to-white min-h-screen p-6 rounded-lg">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Properties <span className="font-semibold text-[#D85C2C]">Management</span></h1>
-          <p className="text-gray-500 font-medium">Manage all properties in your portfolio</p>
+    <div className="min-h-screen bg-gray-50/50">
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 max-w-[1400px] mx-auto">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-extrabold tracking-tight">Properties Management</h1>
+              <p className="text-lg text-blue-100 max-w-2xl font-light">
+                Manage all properties in your portfolio
+              </p>
+            </div>
+            
+            <Button
+                onClick={() => setShowAddForm(true)}
+                className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 font-semibold"
+            >
+              <Plus className="mr-2 h-5 w-5" /> 
+              Add Property
+            </Button>
+          </div>
         </div>
-        <Button
-          onClick={() => setShowAddForm(true)}
-          className="bg-[#D85C2C] text-white px-6 py-3 font-semibold uppercase tracking-wide hover:bg-[#b84520] transition-all duration-200 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add Property
-        </Button>
-      </div>
+      </section>
+      
+      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
 
       {/* Add Property Form Modal */}
       {showAddForm && (
@@ -634,6 +645,7 @@ const PropertiesManagement: React.FC = () => {
           )}
         </>
       )}
+      </div>
     </div>
   );
 };

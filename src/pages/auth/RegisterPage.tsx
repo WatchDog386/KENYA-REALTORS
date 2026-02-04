@@ -98,16 +98,19 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       console.log("📝 Attempting registration for:", formData.email, "Account Type:", formData.accountType);
+      const [firstName, ...rest] = formData.fullName.trim().split(" ");
+      const lastName = rest.join(" ");
+
+      // IMPORTANT: Use 'role' as the key for the trigger to work
       const { data, error: signupError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           data: {
-            first_name: formData.fullName.trim().split(" ")[0],
-            last_name: formData.fullName.trim().split(" ").slice(1).join(" "),
+            first_name: firstName,
+            last_name: lastName,
             phone: formData.phone,
-            account_type: formData.accountType, // Store account type, not role
-            // NOTE: role will be assigned by super admin after approval
+            role: formData.accountType, // <-- must be 'role' for the trigger
           },
         },
       });
@@ -117,47 +120,18 @@ export default function RegisterPage() {
       if (data.user) {
         console.log("✅ Auth user created successfully:", data.user.id);
 
-        // Wait a moment for any auth trigger to create the profile
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Wait for the trigger to create the profile
+        await new Promise((resolve) => setTimeout(resolve, 1200));
 
-        // Fetch or create the profile (fallback if trigger failed)
-        console.log("🔍 Fetching created profile...");
-        let { data: profileData, error: profileFetchError } = await supabase
+        // Check if profile exists
+        const { data: profileData, error: profileFetchError } = await supabase
           .from("profiles")
           .select("id")
           .eq("id", data.user.id)
           .maybeSingle();
 
-        if (profileFetchError || !profileData) {
-          console.warn("⚠️ Profile missing, creating fallback profile...");
-
-          const [firstName, ...rest] = formData.fullName.trim().split(" ");
-          const lastName = rest.join(" ");
-
-          const { data: createdProfile, error: createProfileError } = await supabase
-            .from("profiles")
-            .insert({
-              id: data.user.id,
-              email: formData.email.trim().toLowerCase(),
-              first_name: firstName || "",
-              last_name: lastName || "",
-              phone: formData.phone,
-              role: null,
-              status: "pending",
-              user_type: formData.accountType,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .select("id")
-            .single();
-
-          if (createProfileError || !createdProfile) {
-            console.error("❌ Profile create error:", createProfileError);
-            throw new Error("Profile could not be created. Please contact support.");
-          }
-
-          profileData = createdProfile;
+        if (!profileData || profileFetchError) {
+          throw new Error("Profile creation failed. Please contact support.");
         }
 
         const profileId = profileData.id;
@@ -184,14 +158,13 @@ export default function RegisterPage() {
 
         // Notify super admins about new registration
         try {
-          console.log("🔔 Fetching super admins for notification");
-          const { data: superAdmins, error: adminError } = await supabase
+          const { data: superAdmins } = await supabase
             .from("profiles")
             .select("id")
             .eq("role", "super_admin")
             .eq("status", "active");
 
-          if (!adminError && superAdmins && superAdmins.length > 0) {
+          if (superAdmins && superAdmins.length > 0) {
             for (const admin of superAdmins) {
               await supabase
                 .from("notifications")

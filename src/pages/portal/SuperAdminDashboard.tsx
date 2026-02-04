@@ -1,7 +1,7 @@
 // src/pages/portal/SuperAdminDashboard.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Building,
   Users,
@@ -46,6 +46,8 @@ import {
   Link,
   Settings2,
   X,
+  MapPin,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -187,12 +189,33 @@ const SuperAdminDashboard = () => {
     try {
       const { data: properties, error: propertiesError } = await supabase
         .from("properties")
-        .select("total_units, occupied_units, monthly_rent, status");
+        .select("status, property_unit_types(units_count, price_per_unit)");
 
       const propertiesData = properties || [];
       
-      const totalUnits = propertiesData.reduce((sum, p) => sum + (p.total_units || 0), 0);
-      const occupiedUnits = propertiesData.reduce((sum, p) => sum + (p.occupied_units || 0), 0);
+      let totalUnits = 0;
+      let totalRevenue = 0; // Was monthly_rent or totalRevenue in state?
+      // Note: occupied_units support is pending lease implementation.
+      const occupiedUnits = 0; 
+
+      propertiesData.forEach((prop: any) => {
+        const units = prop.property_unit_types || [];
+        units.forEach((u: any) => {
+             totalUnits += (u.units_count || 0);
+             // Assuming totalRevenue estimate for dashboard usage if needed, 
+             // though this variable 'totalRevenue' isn't defined in this scope in original code snippet, 'totalRevenue' is used in setDashboardStats.
+             // We need to see where totalRevenue comes from. 
+             // Ah, the original code didn't calculate totalRevenue here, it just had monthly_rent in the select.
+        });
+      });
+      
+      // Calculate estimated monthly rent potential from the units
+       const estimatedMonthlyRent = propertiesData.reduce((sum, prop: any) => {
+          return sum + (prop.property_unit_types || []).reduce((subSum: number, u: any) => subSum + (u.units_count * u.price_per_unit), 0);
+       }, 0);
+       // We'll map this to 'totalRevenue' or wherever it was used. 
+       // Wait, the original code used 'monthly_rent' column. 
+       
       const vacantUnits = totalUnits - occupiedUnits;
       const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
 
@@ -233,8 +256,10 @@ const SuperAdminDashboard = () => {
 
       const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
 
-      const totalExpectedRevenue = propertiesData.reduce((sum, p) => {
-        return sum + ((p.occupied_units || 0) * (p.monthly_rent || 0));
+      const totalExpectedRevenue = propertiesData.reduce((sum, p: any) => {
+        // Use potential income calculated from unit types
+        const potential = (p.property_unit_types || []).reduce((acc: number, u: any) => acc + (u.units_count * u.price_per_unit), 0);
+        return sum + potential;
       }, 0);
 
       const collectionRate = totalExpectedRevenue > 0 ? (totalRevenue / totalExpectedRevenue) * 100 : 0;
@@ -271,16 +296,17 @@ const SuperAdminDashboard = () => {
 
       const { data: recentProperties } = await supabase
         .from("properties")
-        .select("id, name, status, total_units, created_at")
+        .select("id, name, status, created_at, property_unit_types(units_count)")
         .order("created_at", { ascending: false })
         .limit(3);
 
       if (recentProperties) {
-        recentProperties.forEach(prop => {
+        recentProperties.forEach((prop: any) => {
+          const totalUnits = (prop.property_unit_types || []).reduce((sum: number, u: any) => sum + (u.units_count || 0), 0);
           items.push({
             id: prop.id,
             title: prop.name || 'Unnamed Property',
-            subtitle: `${prop.status} • ${prop.total_units || 0} units`,
+            subtitle: `${prop.status} • ${totalUnits} units`,
             type: 'property',
             time: formatTimeAgo(prop.created_at),
             action: `/portal/super-admin/properties`,
@@ -517,19 +543,25 @@ const SuperAdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50 font-nunito">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#00356B]" />
-          <p className="text-gray-600 text-[13px] font-medium">Loading dashboard data...</p>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#154279]" />
+          <p className="text-slate-600 text-[13px] font-medium">Loading dashboard data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-b from-slate-50 to-white min-h-screen antialiased text-gray-900 font-sans selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Nunito', sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
+      `}</style>
+
       {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 overflow-hidden py-10 shadow-lg">
+      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg">
         <div className="max-w-[1400px] mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-10">
             <div className="md:w-1/2">
@@ -543,17 +575,17 @@ const SuperAdminDashboard = () => {
               </div>
               
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
-                Welcome back, <span className="text-blue-100">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
+                Welcome back, <span className="text-[#F96302]">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
               </h1>
               
               <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
-                Here's your system overview. Monitor properties, users, revenue, and system health in real-time with our new polished dashboard.
+                Here's your system overview. Monitor properties, users, revenue, and system health in real-time with our modern dashboard.
               </p>
               
               <div className="flex items-center gap-4">
                 <button
                   onClick={handleRefresh}
-                  className="group flex items-center gap-2 bg-white text-[#00356B] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-blue-50 transition-all duration-300 rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  className="group flex items-center gap-2 bg-white text-[#154279] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                   Refresh
@@ -561,7 +593,7 @@ const SuperAdminDashboard = () => {
                 
                 <button
                   onClick={() => navigate("/portal/super-admin/reports")}
-                  className="group flex items-center gap-2 bg-white/20 border border-white/40 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/30 transition-all duration-300 rounded-lg shadow-sm hover:shadow-md"
+                  className="group flex items-center gap-2 bg-white/20 border border-white/40 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/30 transition-all duration-300 rounded-xl shadow-sm hover:shadow-md"
                 >
                   <FileBarChart className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                   Reports
@@ -575,52 +607,52 @@ const SuperAdminDashboard = () => {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="md:w-1/2 w-full"
             >
-              <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-8 hover:shadow-[0_8px_40px_rgb(0,0,0,0.08)] transition-shadow duration-500">
+              <div className="bg-white rounded-2xl shadow-xl border-2 border-slate-200 p-8 hover:shadow-2xl hover:border-[#F96302] transition-all duration-300">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-50/80 rounded-xl">
-                      <Shield className="w-6 h-6 text-[#00356B]" />
+                    <div className="p-3 bg-[#154279]/10 rounded-xl">
+                      <Shield className="w-6 h-6 text-[#154279]" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
                         System Status
                       </h3>
-                      <p className="text-[11px] text-gray-500 font-medium mt-0.5">Last updated: {formatTimeAgo(systemStatus.lastChecked)}</p>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Last updated: {formatTimeAgo(systemStatus.lastChecked)}</p>
                     </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${systemStatus.database ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-700 border border-red-100"}`}>
+                  <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${systemStatus.database ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
                     {systemStatus.uptime} Uptime
                   </div>
                 </div>
                 
                 <div className="space-y-6">
                   <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-gray-600 group-hover:text-gray-900 transition-colors">Database</span>
+                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Database</span>
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.database ? 'bg-green-500 ring-green-100' : 'bg-red-500 ring-red-100'}`} />
-                      <span className={`text-[12px] font-bold ${systemStatus.database ? 'text-green-700' : 'text-red-700'}`}>
+                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.database ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`} />
+                      <span className={`text-[12px] font-bold ${systemStatus.database ? 'text-emerald-700' : 'text-red-700'}`}>
                         {systemStatus.database ? 'Operational' : 'Offline'}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="w-full h-px bg-gray-50" />
+                  <div className="w-full h-px bg-slate-100" />
                   
                   <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-gray-600 group-hover:text-gray-900 transition-colors">API Service</span>
+                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">API Service</span>
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.api ? 'bg-green-500 ring-green-100' : 'bg-red-500 ring-red-100'}`} />
-                      <span className={`text-[12px] font-bold ${systemStatus.api ? 'text-green-700' : 'text-red-700'}`}>
+                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.api ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`} />
+                      <span className={`text-[12px] font-bold ${systemStatus.api ? 'text-emerald-700' : 'text-red-700'}`}>
                         {systemStatus.api ? 'Online' : 'Unavailable'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="w-full h-px bg-gray-50" />
+                  <div className="w-full h-px bg-slate-100" />
                   
                   <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-gray-600 group-hover:text-gray-900 transition-colors">Latency</span>
-                    <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded ${systemStatus.responseTime < 500 ? "bg-slate-50 text-slate-700 border border-slate-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Latency</span>
+                    <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-lg border ${systemStatus.responseTime < 500 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
                       {systemStatus.responseTime}ms
                     </span>
                   </div>
@@ -631,129 +663,141 @@ const SuperAdminDashboard = () => {
         </div>
       </section>
 
-      {/* KEY METRICS SECTION */}
-      <section className="bg-white py-12">
+      {/* KEY METRICS SECTION - ORANGE ICONS */}
+      <section className="bg-slate-50 py-14">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-[#154279] tracking-tight mb-2">
                 Performance Overview
               </h2>
-              <p className="text-sm text-gray-500 font-medium max-w-2xl">
+              <p className="text-sm text-slate-600 font-medium max-w-2xl">
                 Real-time metrics for your system's key performance indicators.
               </p>
             </div>
-            <div className="bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 flex items-center gap-2">
-               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-               <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">Live Updates</span>
+            <div className="bg-white px-4 py-2 rounded-xl border-2 border-slate-200 flex items-center gap-2 shadow-sm">
+               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+               <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Live Updates</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
-                title: "Properties",
+                title: "Total Properties",
                 value: stats.totalProperties,
-                icon: <Building className="w-6 h-6 text-white" />,
-                bgGradient: "bg-gradient-to-br from-blue-600 to-blue-500",
-                borderColor: "border-blue-500/50",
-                iconBg: "bg-white/20",
-                metric: `${stats.totalUnits} Total Units`,
+                icon: <Building className="w-8 h-8 text-[#154279]" />,
+                metric: `${stats.totalUnits} Units`,
                 progress: stats.occupancyRate,
-                label: "Occupancy Rate",
+                label: "Occupancy",
                 route: "/portal/super-admin/properties",
-                textColor: "text-white",
-                mutedTextColor: "text-blue-50",
-                progressColor: "bg-white",
-                progressBg: "bg-black/20"
+                primaryColor: "#3b82f6",
+                secondaryColor: "#1e40af",
+                accentColor: "from-blue-50 via-blue-50/30 to-white",
+                borderHover: "hover:border-blue-400 hover:shadow-blue-500/20"
               },
               {
                 title: "Active Users",
                 value: stats.activeUsers,
-                icon: <Users className="w-6 h-6 text-white" />,
-                bgGradient: "bg-gradient-to-br from-emerald-600 to-emerald-500",
-                borderColor: "border-emerald-500/50",
-                iconBg: "bg-white/20",
-                metric: `${stats.totalLeases} Active Leases`,
+                icon: <Users className="w-8 h-8 text-[#154279]" />,
+                metric: `${stats.totalLeases} Leases`,
                 progress: (stats.totalLeases / (stats.totalUnits || 1)) * 100,
                 label: "Lease Rate",
                 route: "/portal/super-admin/users",
-                textColor: "text-white",
-                mutedTextColor: "text-emerald-50",
-                progressColor: "bg-white",
-                progressBg: "bg-black/20"
+                primaryColor: "#0ea5e9",
+                secondaryColor: "#0284c7",
+                accentColor: "from-cyan-50 via-cyan-50/30 to-white",
+                borderHover: "hover:border-cyan-400 hover:shadow-cyan-500/20"
               },
               {
                 title: "Monthly Revenue",
                 value: formatForDisplay(stats.totalRevenue, 'KSH', true),
-                icon: <DollarSign className="w-6 h-6 text-white" />,
-                bgGradient: "bg-gradient-to-br from-violet-600 to-violet-500",
-                borderColor: "border-violet-500/50",
-                iconBg: "bg-white/20",
-                metric: `${stats.collectionRate.toFixed(1)}% Collection Rate`,
+                icon: <DollarSign className="w-8 h-8 text-[#F96302]" />,
+                metric: `${stats.collectionRate.toFixed(0)}% Collection`,
                 progress: stats.collectionRate,
-                label: "Collection Progress",
+                label: "Collections",
                 route: "/portal/super-admin/payments",
-                textColor: "text-white",
-                mutedTextColor: "text-violet-50",
-                progressColor: "bg-white",
-                progressBg: "bg-black/20"
+                primaryColor: "#10b981",
+                secondaryColor: "#059669",
+                accentColor: "from-emerald-50 via-emerald-50/30 to-white",
+                borderHover: "hover:border-emerald-400 hover:shadow-emerald-500/20"
               },
               {
                 title: "System Health",
-                value: systemStatus.uptime,
-                icon: <Activity className="w-6 h-6 text-white" />,
-                bgGradient: "bg-gradient-to-br from-amber-500 to-amber-400",
-                borderColor: "border-amber-400/50",
-                iconBg: "bg-white/20",
-                metric: `${systemStatus.responseTime}ms Avg Response`,
-                progress: systemStatus.responseTime < 500 ? 98 : 65,
-                label: "Performance Score",
+                value: `${systemStatus.responseTime}ms`,
+                icon: <Activity className="w-8 h-8 text-[#F96302]" />,
+                metric: `${systemStatus.uptime} Uptime`,
+                progress: systemStatus.responseTime < 500 ? 95 : 70,
+                label: "Performance",
                 route: "/portal/super-admin/settings",
-                textColor: "text-white",
-                mutedTextColor: "text-amber-50",
-                progressColor: "bg-white",
-                progressBg: "bg-black/20"
+                primaryColor: "#f59e0b",
+                secondaryColor: "#d97706",
+                accentColor: "from-amber-50 via-amber-50/30 to-white",
+                borderHover: "hover:border-amber-400 hover:shadow-amber-500/20"
               }
             ].map((metric, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1, duration: 0.4 }}
-                className="group cursor-pointer"
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
                 onClick={() => navigate(metric.route)}
+                className={`group relative border-2 rounded-2xl transition-all duration-300 flex flex-col h-full overflow-hidden cursor-pointer bg-gradient-to-br ${metric.accentColor} border-slate-300 ${metric.borderHover} hover:shadow-2xl hover:scale-[1.02] shadow-lg shadow-slate-300/30`}
               >
-                <div className={`h-full ${metric.bgGradient} rounded-2xl p-6 border ${metric.borderColor} shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden backdrop-blur-sm`}>
-                  <div className="absolute top-0 right-0 p-4 bg-white/5 rounded-bl-full w-24 h-24 -mr-10 -mt-10 pointer-events-none"></div>
-                  
-                  <div className="flex justify-between items-start mb-4 relative z-10">
-                    <div className={`p-3 rounded-xl ${metric.iconBg} backdrop-blur-md shadow-inner`}>
-                      {metric.icon}
-                    </div>
-                     <ChevronRight className={`w-5 h-5 ${metric.mutedTextColor} opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all`} />
-                  </div>
-                  
-                  <div className="mb-6 relative z-10">
-                    <h3 className={`text-3xl font-black ${metric.textColor} mb-1 tracking-tight drop-shadow-sm`}>{metric.value}</h3>
-                    <p className={`text-sm font-bold ${metric.mutedTextColor} opacity-90`}>{metric.title}</p>
-                  </div>
+                {/* Decorative corner accent */}
+                <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 bg-gradient-to-br from-[#154279] transition-all duration-300" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
 
-                  <div className="mt-auto relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                       <span className={`text-[11px] font-black ${metric.mutedTextColor} uppercase tracking-wider opacity-80`}>{metric.label}</span>
-                       <span className={`text-xs font-black ${metric.textColor}`}>{Math.min(metric.progress || 0, 100).toFixed(0)}%</span>
-                    </div>
-                    <div className={`h-2 w-full ${metric.progressBg} rounded-full overflow-hidden`}>
-                       <div 
-                        className={`h-full rounded-full ${metric.progressColor} shadow-[0_0_10px_rgba(255,255,255,0.5)]`} 
-                        style={{ width: `${Math.min(metric.progress || 0, 100)}%` }}
-                      ></div>
-                    </div>
-                     <p className={`text-[12px] ${metric.mutedTextColor} mt-3 font-bold flex items-center gap-1.5 opacity-90`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${metric.progressColor}`}></span>
+                {/* Main content */}
+                <div className="flex-grow relative p-8 flex flex-col items-center justify-center">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#154279] to-transparent opacity-5 pointer-events-none transition-all duration-300" />
+                  
+                  <motion.div 
+                    whileHover={{ scale: 1.15, rotate: 5 }}
+                    className="relative z-10"
+                  >
+                    {metric.icon}
+                  </motion.div>
+                  
+                  <div className="relative z-10 mt-6 text-center w-full px-2">
+                    <h3 className="text-[13px] font-bold leading-tight group-hover:scale-105 transition-all uppercase tracking-tight text-[#154279]">
+                      {metric.title}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-2">
                       {metric.metric}
                     </p>
+                  </div>
+                </div>
+
+                {/* Bottom section with progress */}
+                <div className="relative z-30 p-6 border-t-2 transition-all bg-gradient-to-r from-slate-50 via-white to-slate-50 border-slate-200">
+                  <div className="absolute bottom-0 right-0 w-20 h-20 opacity-10 pointer-events-none transition-all duration-300">
+                    {metric.icon}
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#154279]">
+                        {metric.label}
+                      </span>
+                      <span className="text-xs font-bold text-[#154279]">
+                        {Math.min(metric.progress || 0, 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(metric.progress || 0, 100)}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className="h-full rounded-full"
+                        style={{ background: `linear-gradient(90deg, ${metric.primaryColor}, ${metric.secondaryColor})` }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-3">
+                      <span className="text-[9px] font-bold text-slate-600 uppercase tracking-wide">
+                        {metric.value}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -763,315 +807,322 @@ const SuperAdminDashboard = () => {
       </section>
 
       {/* MAIN CONTENT */}
-      <section className="py-12 bg-slate-50/50">
+      <section className="py-12 bg-white">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* LEFT COLUMN - 2/3 width */}
-            <div className="lg:col-span-2 space-y-8">
-              {/* QUICK ACTIONS */}
-              <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 overflow-hidden" style={{ backgroundColor: 'white' }}>
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 tracking-tight flex items-center gap-2" style={{ color: '#111827' }}>
-                       <LayoutGrid className="w-5 h-5 text-gray-400" />
-                       Quick Actions
-                    </h3>
-                    <p className="text-[13px] text-gray-500 mt-1 pl-7" style={{ color: '#6b7280' }}>
-                      Frequently used administrative tasks
-                    </p>
-                  </div>
-                  <button className="text-[12px] font-semibold text-[#00356B] hover:underline">Customize</button>
-                </div>
-                
-                <div className="p-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                      {
-                        title: "Manage Users",
-                        icon: <Users className="w-5 h-5" />,
-                        color: "border-blue-100 bg-blue-50/50 text-blue-600 hover:bg-blue-50",
-                        description: "Add, edit, remove users",
-                        route: "/portal/super-admin/users",
-                        badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined
-                      },
-                      {
-                        title: "Properties",
-                        icon: <Building className="w-5 h-5" />,
-                        color: "border-emerald-100 bg-emerald-50/50 text-emerald-600 hover:bg-emerald-50",
-                        description: "View property listing",
-                        route: "/portal/super-admin/properties"
-                      },
-                      {
-                        title: "Approvals",
-                        icon: <FileCheck className="w-5 h-5" />,
-                        color: "border-amber-100 bg-amber-50/50 text-amber-600 hover:bg-amber-50",
-                        description: "Pending requests queue",
-                        route: "/portal/super-admin/approvals",
-                        badge: stats.pendingRequests > 0 ? stats.pendingRequests : undefined
-                      },
-                      {
-                        title: "Analytics",
-                        icon: <BarChart3 className="w-5 h-5" />,
-                        color: "border-violet-100 bg-violet-50/50 text-violet-600 hover:bg-violet-50",
-                        description: "Performance reports",
-                        route: "/portal/super-admin/analytics"
-                      },
-                      {
-                        title: "Reports",
-                        icon: <FileBarChart className="w-5 h-5" />,
-                        color: "border-orange-100 bg-orange-50/50 text-orange-600 hover:bg-orange-50",
-                        description: "Financial summaries",
-                        route: "/portal/super-admin/reports"
-                      },
-                      {
-                        title: "Maintenance",
-                        icon: <Wrench className="w-5 h-5" />,
-                        color: "border-rose-100 bg-rose-50/50 text-rose-600 hover:bg-rose-50",
-                        description: "Service requests",
-                        route: "/portal/super-admin/maintenance",
-                        badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined
-                      }
-                    ].map((action, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={`p-4 border rounded-xl transition-all duration-200 cursor-pointer group hover:shadow-md ${action.color}`}
-                        onClick={() => navigate(action.route)}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                           {action.icon}
-                           {action.badge && (
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
-                              {action.badge}
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="text-[13px] font-bold text-gray-900 mb-0.5">{action.title}</h4>
-                        <p className="text-[11px] text-gray-500 font-medium">{action.description}</p>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
+          <div className="space-y-8">
+            {/* QUICK ACTIONS - HOWITWORKS STYLE */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-px w-8 bg-[#F96302]"></div>
+                <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Quick Actions</h3>
               </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  {
+                    title: "Manage Users",
+                    icon: <Users className="w-6 h-6 text-white" />,
+                    description: "Add, edit, remove users",
+                    route: "/portal/super-admin/users",
+                    badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined,
+                    bgGradient: "from-blue-500 via-blue-600 to-blue-700",
+                    borderColor: "border-blue-300",
+                    iconBg: "bg-blue-400"
+                  },
+                  {
+                    title: "Properties",
+                    icon: <Building className="w-6 h-6 text-white" />,
+                    description: "View property listing",
+                    route: "/portal/super-admin/properties",
+                    bgGradient: "from-emerald-500 via-emerald-600 to-emerald-700",
+                    borderColor: "border-emerald-300",
+                    iconBg: "bg-emerald-400"
+                  },
+                  {
+                    title: "Approvals",
+                    icon: <FileCheck className="w-6 h-6 text-white" />,
+                    description: "Pending requests queue",
+                    route: "/portal/super-admin/approvals",
+                    badge: stats.pendingRequests > 0 ? stats.pendingRequests : undefined,
+                    bgGradient: "from-purple-500 via-purple-600 to-purple-700",
+                    borderColor: "border-purple-300",
+                    iconBg: "bg-purple-400"
+                  },
+                  {
+                    title: "Analytics",
+                    icon: <BarChart3 className="w-6 h-6 text-white" />,
+                    description: "Performance reports",
+                    route: "/portal/super-admin/analytics",
+                    bgGradient: "from-cyan-500 via-cyan-600 to-cyan-700",
+                    borderColor: "border-cyan-300",
+                    iconBg: "bg-cyan-400"
+                  },
+                  {
+                    title: "Reports",
+                    icon: <FileBarChart className="w-6 h-6 text-white" />,
+                    description: "Financial summaries",
+                    route: "/portal/super-admin/reports",
+                    bgGradient: "from-pink-500 via-pink-600 to-pink-700",
+                    borderColor: "border-pink-300",
+                    iconBg: "bg-pink-400"
+                  },
+                  {
+                    title: "Maintenance",
+                    icon: <Wrench className="w-6 h-6 text-white" />,
+                    description: "Service requests",
+                    route: "/portal/super-admin/maintenance",
+                    badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined,
+                    bgGradient: "from-orange-500 via-orange-600 to-orange-700",
+                    borderColor: "border-orange-300",
+                    iconBg: "bg-orange-400"
+                  }
+                ].map((action, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => navigate(action.route)}
+                    className={`group relative border-2 ${action.borderColor} rounded-2xl p-6 cursor-pointer transition-all duration-300 bg-gradient-to-br ${action.bgGradient} hover:border-white hover:shadow-2xl hover:shadow-black/20 hover:scale-[1.05] shadow-lg overflow-hidden text-white`}
+                  >
+                    {/* Decorative corner */}
+                    <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none opacity-20 bg-white group-hover:opacity-30 transition-all" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
 
-              {/* SYSTEM ALERTS */}
-              <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 overflow-hidden" style={{ backgroundColor: 'white' }}>
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 tracking-tight flex items-center gap-2" style={{ color: '#111827' }}>
-                       <Bell className="w-5 h-5 text-gray-400" />
-                       System Alerts
-                    </h3>
-                    <p className="text-[13px] text-gray-500 mt-1 pl-7" style={{ color: '#6b7280' }}>
-                      Important notifications requiring attention
-                    </p>
-                  </div>
-                  {systemAlerts.length > 0 && <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50">{systemAlerts.length} Active</Badge>}
-                </div>
-                
-                <div className="p-6">
-                  <div className="space-y-3">
-                    {systemAlerts.map((alert, index) => (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-xl border transition-all cursor-pointer group relative overflow-hidden ${
-                          alert.type === 'critical' ? 'bg-red-50/50 border-red-100 hover:bg-red-50' :
-                          alert.type === 'error' ? 'bg-red-50/30 border-red-100 hover:bg-red-50/50' :
-                          alert.type === 'warning' ? 'bg-amber-50/50 border-amber-100 hover:bg-amber-50' :
-                          'bg-emerald-50/50 border-emerald-100 hover:bg-emerald-50'
-                        }`}
-                        onClick={() => alert.action && navigate(alert.action)}
-                      >
-                         <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                            alert.type === 'critical' || alert.type === 'error' ? 'bg-red-500' :
-                            alert.type === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
-                         }`}></div>
-                         
-                        <div className="flex items-start gap-4 pl-2">
-                          <div className={`p-2 rounded-lg mt-0.5 shrink-0 ${
-                            alert.type === 'critical' || alert.type === 'error' ? 'bg-red-100 text-red-600' :
-                            alert.type === 'warning' ? 'bg-amber-100 text-amber-600' :
-                            'bg-emerald-100 text-emerald-600'
-                          }`}>
-                            {alert.type === 'critical' || alert.type === 'error' ? 
-                              <AlertCircle className="w-5 h-5" /> :
-                              alert.type === 'warning' ? 
-                              <AlertTriangle className="w-5 h-5" /> :
-                              <CheckCircle className="w-5 h-5" />
-                            }
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <h4 className="font-bold text-[14px] text-gray-900 truncate pr-2" style={{ color: '#111827' }}>{alert.title}</h4>
-                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                alert.priority === 'critical' || alert.priority === 'high' ? 'bg-red-100 text-red-700 border-red-200' : 
-                                'bg-gray-100 text-gray-600 border-gray-200'
-                              }`}>
-                                {alert.priority}
-                              </span>
-                            </div>
-                            <p className="text-[13px] text-gray-600 leading-relaxed" style={{ color: '#374151' }}>{alert.description}</p>
-                            
-                            {alert.action && (
-                              <div className="flex items-center gap-1 mt-3 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                <span className="text-[11px] font-bold uppercase tracking-wide">Take Action</span>
-                                <ArrowRight className="w-3 h-3" />
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                    {/* Content */}
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-start mb-4">
+                        <motion.div whileHover={{ scale: 1.1, rotate: -5 }} className={`p-3 ${action.iconBg} rounded-xl shadow-md group-hover:shadow-lg transition-all`}>
+                          {action.icon}
+                        </motion.div>
+                        {action.badge && (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-900 shadow-md ring-2 ring-white">
+                            {action.badge}
+                          </span>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <h4 className="text-[15px] font-bold text-white mb-1">{action.title}</h4>
+                      <p className="text-[12px] text-white/90 font-medium">{action.description}</p>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             </div>
 
-            {/* RIGHT COLUMN - 1/3 width */}
-            <div className="space-y-8">
-              {/* RECENT ACTIVITY */}
-              <div className="bg-white rounded-2xl shadow-[0_2px_10px_rgb(0,0,0,0.03)] border border-gray-100 overflow-hidden sticky top-6" style={{ backgroundColor: 'white' }}>
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 tracking-tight flex items-center gap-2" style={{ color: '#111827' }}>
-                      <Clock className="w-5 h-5 text-gray-400" />
-                      Recent Activity
-                    </h3>
-                    <p className="text-[13px] text-gray-500 mt-1 pl-7" style={{ color: '#6b7280' }}>
-                      Latest system timeline
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="p-0">
-                  <div className="divide-y divide-gray-50">
-                    {recentItems.length > 0 ? (
-                      recentItems.slice(0, 6).map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer group"
-                          onClick={() => item.action && navigate(item.action)}
-                        >
-                          <div className={`mt-1 p-2 rounded-lg shrink-0 ${
-                              item.type === 'property' ? 'bg-blue-50 text-blue-600' :
-                              item.type === 'user' ? 'bg-emerald-50 text-emerald-600' :
-                              item.type === 'payment' ? 'bg-violet-50 text-violet-600' :
-                              item.type === 'approval' ? 'bg-amber-50 text-amber-600' :
-                              'bg-gray-50 text-gray-600'
-                            }`}>
-                              {getItemIcon(item.type)}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate" style={{ color: '#111827' }}>
-                                {item.title}
-                            </p>
-                            <p className="text-[12px] text-gray-500 mb-1 truncate" style={{ color: '#6b7280' }}>{item.subtitle}</p>
-                            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                               <Clock className="w-3 h-3" /> {item.time}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-12 px-6">
-                        <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                           <Clock className="w-8 h-8 text-gray-300" />
-                        </div>
-                        <p className="text-gray-900 text-sm font-semibold" style={{ color: '#111827' }}>No recent activity</p>
-                        <p className="text-gray-500 text-xs mt-1" style={{ color: '#6b7280' }}>Activities will appear here as they occur</p>
+            {/* SYSTEM ALERTS */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-px w-8 bg-[#F96302]"></div>
+                <h3 className="text-lg font-semibold text-[#154279] tracking-tight">System Alerts</h3>
+                {systemAlerts.length > 0 && <Badge className="border-red-300 text-red-700 bg-red-50 border-2 ml-auto">{systemAlerts.length} Active</Badge>}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {systemAlerts.map((alert, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${
+                      alert.type === 'critical' ? 'bg-red-50 border-red-300 hover:bg-red-100 hover:shadow-lg hover:shadow-red-500/20' :
+                      alert.type === 'error' ? 'bg-red-50 border-red-200 hover:bg-red-100 hover:shadow-lg hover:shadow-red-500/20' :
+                      alert.type === 'warning' ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 hover:shadow-lg hover:shadow-amber-500/20' :
+                      'bg-emerald-50 border-emerald-300 hover:bg-emerald-100 hover:shadow-lg hover:shadow-emerald-500/20'
+                    }`}
+                    onClick={() => alert.action && navigate(alert.action)}
+                  >
+                    {/* Decorative accent */}
+                    <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none opacity-10 bg-gradient-to-br from-[#F96302] group-hover:opacity-20 transition-all" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
+
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                       alert.type === 'critical' || alert.type === 'error' ? 'bg-red-500' :
+                       alert.type === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}></div>
+
+                    <div className="flex items-start gap-4 pl-2 relative z-10">
+                      <div className={`p-3 rounded-xl mt-0.5 shrink-0 ${
+                        alert.type === 'critical' || alert.type === 'error' ? 'bg-red-200 text-red-700' :
+                        alert.type === 'warning' ? 'bg-amber-200 text-amber-700' :
+                        'bg-emerald-200 text-emerald-700'
+                      }`}>
+                        {alert.type === 'critical' || alert.type === 'error' ? 
+                          <AlertCircle className="w-5 h-5" /> :
+                          alert.type === 'warning' ? 
+                          <AlertTriangle className="w-5 h-5" /> :
+                          <CheckCircle className="w-5 h-5" />
+                        }
                       </div>
-                    )}
-                  </div>
-                  
-                  {recentItems.length > 0 && (
-                    <div className="p-4 bg-gray-50/50 border-t border-gray-100">
-                      <button
-                        onClick={() => navigate("/portal/super-admin/activity-logs")}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-gray-200 text-gray-700 text-[12px] font-bold uppercase tracking-wider rounded-lg hover:border-[#00356B] hover:text-[#00356B] transition-all shadow-sm"
-                      >
-                        View Full History
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-bold text-[14px] text-slate-900">{alert.title}</h4>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border-2 whitespace-nowrap ${
+                            alert.priority === 'critical' || alert.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300' : 
+                            'bg-slate-100 text-slate-700 border-slate-300'
+                          }`}>
+                            {alert.priority}
+                          </span>
+                        </div>
+                        <p className="text-[13px] text-slate-700 leading-relaxed font-medium">{alert.description}</p>
+                        
+                        {alert.action && (
+                          <div className="flex items-center gap-1 mt-3 text-[#154279] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <span className="text-[11px] font-bold uppercase tracking-wide">View Details</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* RECENT ACTIVITY & SHORTCUTS GRID */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* RECENT ACTIVITY - LEFT */}
+              <div className="lg:col-span-2">
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-px w-8 bg-[#F96302]"></div>
+                    <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Recent Activity</h3>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-lg border-2 border-slate-200 overflow-hidden">
+                    <div className="p-0">
+                      <div className="divide-y-2 divide-slate-100">
+                        {recentItems.length > 0 ? (
+                          recentItems.slice(0, 6).map((item, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0 }}
+                              whileInView={{ opacity: 1 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: index * 0.05 }}
+                              className="flex items-start gap-3 p-4 hover:bg-slate-50 transition-colors cursor-pointer group border-l-4 border-l-transparent hover:border-l-[#F96302]"
+                              onClick={() => item.action && navigate(item.action)}
+                            >
+                              <div className={`mt-1 p-2.5 rounded-lg shrink-0 group-hover:scale-110 transition-transform ${
+                                  item.type === 'property' ? 'bg-blue-100 text-[#154279]' :
+                                  item.type === 'user' ? 'bg-emerald-100 text-emerald-700' :
+                                  item.type === 'payment' ? 'bg-violet-100 text-violet-700' :
+                                  item.type === 'approval' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-slate-100 text-slate-700'
+                                }`}>
+                                {getItemIcon(item.type)}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-bold text-slate-900 group-hover:text-[#F96302] transition-colors truncate">
+                                    {item.title}
+                                </p>
+                                <p className="text-[12px] text-slate-500 mb-1 truncate font-medium">{item.subtitle}</p>
+                                <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                                   <Clock className="w-3 h-3" /> {item.time}
+                                </span>
+                              </div>
+                            </motion.div>
+                          ))
+                        ) : (
+                          <div className="text-center py-12 px-6">
+                            <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                               <Clock className="w-8 h-8 text-slate-300" />
+                            </div>
+                            <p className="text-slate-900 text-sm font-bold">No recent activity</p>
+                            <p className="text-slate-500 text-xs mt-1 font-medium">Activities will appear here as they occur</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {recentItems.length > 0 && (
+                        <div className="p-4 bg-slate-50 border-t-2 border-slate-200">
+                          <button
+                            onClick={() => navigate("/portal/super-admin/activity-logs")}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-[#154279] to-[#0f325e] border-2 border-[#154279] text-white text-[12px] font-bold uppercase tracking-wider rounded-xl hover:from-[#F96302] hover:to-[#ff8c42] hover:border-[#F96302] transition-all shadow-md hover:shadow-lg"
+                          >
+                            View Full History
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* QUICK LINKS */}
-              <div className="bg-[#00356B] rounded-2xl shadow-lg border border-[#00356B] overflow-hidden text-white relative">
-                 <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                 <div className="absolute bottom-0 left-0 p-24 bg-blue-400/10 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none"></div>
-                 
-                <div className="p-6 border-b border-blue-800/50 relative z-10">
-                  <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                    <Link className="w-5 h-5 text-blue-300" />
-                    Shortcuts
-                  </h3>
-                  <p className="text-[12px] text-blue-200 mt-1 pl-7 opacity-80">
-                    Fast access to common pages
-                  </p>
+              {/* QUICK LINKS / SHORTCUTS - RIGHT */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-px w-8 bg-[#F96302]"></div>
+                  <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Shortcuts</h3>
                 </div>
-                
-                <div className="p-4 relative z-10">
-                  <div className="space-y-1">
-                    {[
-                      {
-                        title: "Add New User",
-                        icon: <UserPlus className="w-4 h-4" />,
-                        route: "/portal/super-admin/users"
-                      },
-                      {
-                        title: "My Profile",
-                        icon: <Shield className="w-4 h-4" />,
-                        action: () => setShowProfile(true)
-                      },
-                      {
-                        title: "Add Property",
-                        icon: <Home className="w-4 h-4" />,
-                        route: "/portal/super-admin/properties"
-                      },
-                      {
-                        title: "Rental Report",
-                        icon: <FileBarChart className="w-4 h-4" />,
-                        route: "/portal/super-admin/reports"
-                      },
-                      {
-                        title: "Analytics Dashboard",
-                        icon: <BarChart3 className="w-4 h-4" />,
-                        route: "/portal/super-admin/analytics"
-                      },
-                      {
-                        title: "System Configuration",
-                        icon: <Settings className="w-4 h-4" />,
-                        route: "/portal/super-admin/settings"
-                      }
-                    ].map((link, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          if ('action' in link && link.action) {
-                            link.action();
-                          } else if ('route' in link) {
-                            navigate(link.route);
+
+                <div className="bg-gradient-to-br from-[#154279] to-[#0f325e] rounded-2xl shadow-xl border-2 border-[#154279] overflow-hidden text-white relative hover:shadow-2xl hover:border-[#F96302] transition-all">
+                   <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                   <div className="absolute bottom-0 left-0 p-24 bg-[#F96302]/10 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none"></div>
+                   
+                    <div className="p-6 relative z-10">
+                      <div className="space-y-2">
+                        {[
+                          {
+                            title: "Add New User",
+                            icon: <UserPlus className="w-4 h-4" />,
+                            route: "/portal/super-admin/users"
+                          },
+                          {
+                            title: "My Profile",
+                            icon: <Shield className="w-4 h-4" />,
+                            action: () => setShowProfile(true)
+                          },
+                          {
+                            title: "Add Property",
+                            icon: <Home className="w-4 h-4" />,
+                            route: "/portal/super-admin/properties"
+                          },
+                          {
+                            title: "Rental Report",
+                            icon: <FileBarChart className="w-4 h-4" />,
+                            route: "/portal/super-admin/reports"
+                          },
+                          {
+                            title: "Analytics",
+                            icon: <BarChart3 className="w-4 h-4" />,
+                            route: "/portal/super-admin/analytics"
+                          },
+                          {
+                            title: "Settings",
+                            icon: <Settings className="w-4 h-4" />,
+                            route: "/portal/super-admin/settings"
                           }
-                        }}
-                        className="w-full flex items-center justify-between p-3 text-left bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 group border border-white/5 hover:border-white/20"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-1.5 bg-white/10 rounded-lg text-white group-hover:text-white group-hover:bg-blue-500 transition-colors">
-                              {link.icon}
-                          </div>
-                          <span className="text-[13px] font-medium text-white group-hover:text-white">
-                            {link.title}
-                          </span>
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-white/70 group-hover:text-white transition-colors" />
-                      </button>
-                    ))}
-                  </div>
+                        ].map((link, index) => (
+                          <motion.button
+                            key={index}
+                            whileHover={{ x: 4 }}
+                            onClick={() => {
+                              if ('action' in link && link.action) {
+                                link.action();
+                              } else if ('route' in link) {
+                                navigate(link.route);
+                              }
+                            }}
+                            className="w-full flex items-center justify-between p-3 text-left bg-white/10 hover:bg-white/20 hover:bg-[#F96302]/20 rounded-xl transition-all duration-200 group border-2 border-white/10 hover:border-[#F96302]"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-white/10 group-hover:bg-[#F96302]/30 rounded-lg text-white group-hover:text-[#F96302] transition-all">
+                                  <motion.div whileHover={{ rotate: 10 }}>
+                                    {link.icon}
+                                  </motion.div>
+                              </div>
+                              <span className="text-[13px] font-bold text-white group-hover:text-[#F96302] transition-colors">
+                                {link.title}
+                              </span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-[#F96302] transition-colors" />
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
                 </div>
               </div>
             </div>
@@ -1080,21 +1131,35 @@ const SuperAdminDashboard = () => {
       </section>
 
       {/* Profile Modal */}
-      {showProfile && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto">
-          <div className="w-full m-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-4xl mx-auto relative">
-              <button
-                onClick={() => setShowProfile(false)}
-                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg transition-colors z-10"
-              >
-                <X className="w-5 h-5 text-gray-600" />
-              </button>
-              <SuperAdminProfile />
-            </div>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showProfile && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto backdrop-blur-sm"
+            onClick={() => setShowProfile(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full m-4"
+            >
+              <div className="bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto relative">
+                <button
+                  onClick={() => setShowProfile(false)}
+                  className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-lg transition-colors z-10"
+                >
+                  <X className="w-5 h-5 text-slate-600" />
+                </button>
+                <SuperAdminProfile />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

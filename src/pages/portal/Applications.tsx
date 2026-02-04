@@ -2,10 +2,12 @@
 // Unauthorized copying, distribution, or modification of this file is strictly prohibited.
 
 import React from "react";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, CheckCircle, XCircle, Eye, Download } from "lucide-react";
+import { HeroBackground } from "@/components/ui/HeroBackground";
+import { FileText, Clock, CheckCircle, XCircle, Eye, Download, Plus, Search } from "lucide-react";
 
 const Applications = () => {
   // Mock data for applications
@@ -75,18 +77,73 @@ const Applications = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="bg-gradient-to-r from-[#00356B] to-[#00356B]/80 rounded-xl shadow-lg p-6 flex items-center gap-4">
-        <div className="bg-white/20 p-3 rounded-lg">
-          <FileText className="w-6 h-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-white">My Applications</h1>
-          <p className="text-blue-100 text-sm mt-1">Track and manage your rental applications</p>
-        </div>
-      </div>
+    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Nunito', sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
+      `}</style>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* HERO SECTION */}
+      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg mb-8 relative">
+        <HeroBackground />
+        <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col md:flex-row items-center justify-between gap-10"
+          >
+            <div className="md:w-1/2">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/30">
+                  Tenant Portal
+                </span>
+                <span className="text-blue-100 text-[10px] font-semibold uppercase tracking-widest">
+                  Applications
+                </span>
+              </div>
+              
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
+                My <span className="text-[#F96302]">Applications</span>
+              </h1>
+              
+              <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
+                Track and manage your rental applications, view status updates, and submit documents.
+              </p>
+              
+              <div className="flex items-center gap-4">
+                <button
+                  className="group flex items-center gap-2 bg-[#F96302] text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-[#e05802] transition-all duration-300 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                >
+                  <Plus className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                  New Application
+                </button>
+              </div>
+            </div>
+            
+             <div className="md:w-1/2 w-full mt-6 md:mt-0 flex justify-end">
+               <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-white max-w-xs w-full">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="p-3 bg-white/20 rounded-lg">
+                      <FileText className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-blue-100 uppercase tracking-wider">Total Active</div>
+                      <div className="text-xl font-bold">{applications.length} Applications</div>
+                    </div>
+                  </div>
+                  <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#F96302] w-[40%]"></div>
+                  </div>
+               </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {applications.map((app) => (
@@ -124,11 +181,11 @@ const Applications = () => {
                       <p className="font-medium">{app.nextStep}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl border-none mb-1">
                         <Eye className="w-4 h-4 mr-2" />
                         View Details
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl border-none mb-1">
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>
@@ -171,13 +228,13 @@ const Applications = () => {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full" variant="default">
+              <Button className="w-full bg-[#154279] hover:bg-[#0f325e] text-white font-bold rounded-xl" variant="default">
                 Apply for New Property
               </Button>
-              <Button className="w-full" variant="outline">
+              <Button className="w-full bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl border-none" variant="outline">
                 View Available Properties
               </Button>
-              <Button className="w-full" variant="outline">
+              <Button className="w-full bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl border-none" variant="outline">
                 Download All Documents
               </Button>
             </CardContent>
@@ -197,6 +254,7 @@ const Applications = () => {
         </div>
       </div>
     </div>
+  </div>
   );
 };
 

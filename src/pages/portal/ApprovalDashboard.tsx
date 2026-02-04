@@ -4,6 +4,7 @@ import { useApprovalContext } from '@/contexts/ApprovalContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { HeroBackground } from '@/components/ui/HeroBackground';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Clock, Filter, AlertCircle, Users, Home, DollarSign } from 'lucide-react';
 import { formatDate } from '@/utils/dateHelpers';
@@ -128,19 +129,31 @@ const ApprovalDashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Approval Dashboard</h1>
-          <p className="text-gray-600">Review and manage all pending approval requests</p>
+    <div className="min-h-screen bg-gray-50/50">
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+        <HeroBackground />
+        <div className="relative z-10 max-w-[1400px] mx-auto">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-extrabold tracking-tight">Approval Dashboard</h1>
+              <p className="text-lg text-blue-100 max-w-2xl font-light">
+                Review and manage all pending approval requests
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Filter className="w-4 h-4 mr-2" />
-            Filter
-          </Button>
-        </div>
-      </div>
+      </section>
+      
+      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -403,6 +416,7 @@ const ApprovalDashboard = () => {
           )}
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };
