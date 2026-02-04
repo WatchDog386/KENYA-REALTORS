@@ -101,18 +101,7 @@ export const useManager = (managerId?: string) => {
 
   const fetchManagerStats = async (userId: string): Promise<ManagerStats> => {
     try {
-      // Try RPC first
-      const { data, error } = await supabase.rpc(
-        "get_manager_dashboard_stats",
-        { manager_id: userId }
-      );
-
-      if (!error && data) {
-        return data;
-      }
-
-      // Fallback: fetch stats manually from assignment table
-      console.warn("RPC failed, using fallback method for stats");
+      // Fetch stats directly from assignment table (no RPC needed)
       
       // Get assigned properties
       const { data: assignments, error: assignmentError } = await supabase
@@ -255,7 +244,6 @@ export const useManager = (managerId?: string) => {
         `
         )
         .eq("assigned_to", userId)
-        .not("scheduled_date", "is", null)
         .gte("scheduled_date", new Date().toISOString())
         .order("scheduled_date", { ascending: true })
         .limit(3);

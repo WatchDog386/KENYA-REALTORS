@@ -75,13 +75,11 @@ const LoginPage: React.FC = () => {
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
       
-      // Check if user is approved before allowing login
-      // FIXED: Property managers are auto-approved on assignment
-      // Tenants don't need to wait for property managers
+      // Auto-approve user on login (ensure they're always approved)
       if (signInData.user) {
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("role, status")
+          .select("id, role, status, approved, is_active")
           .eq("id", signInData.user.id)
           .single();
         
@@ -89,27 +87,25 @@ const LoginPage: React.FC = () => {
           console.warn("Profile fetch warning:", profileError);
         }
         
-        // Only block login if user is pending AND they are a property manager
-        // Tenants can login once THEY are approved (don't wait for manager)
-        if (profile && profile.status === "pending" && profile.role === "property_manager") {
-          console.log("⏳ Property Manager pending approval:", signInData.user.id);
-          // Sign out property manager who isn't approved yet
-          await supabase.auth.signOut();
-          setIsSubmitting(false);
-          setError(`Your Property Manager account is pending approval. You'll be able to login once the administrator assigns you properties.`);
-          toast.error(`⏳ Approval Pending - Awaiting property assignment.`, { duration: 7000 });
-          return;
-        }
-        
-        // For tenants, no approval blocking - they can login once they are active
-        if (profile && profile.status === "pending" && profile.role === "tenant") {
-          console.log("⏳ Tenant pending approval:", signInData.user.id);
-          // Sign out tenant who isn't approved yet
-          await supabase.auth.signOut();
-          setIsSubmitting(false);
-          setError(`Your Tenant account is pending approval. You'll be able to login once your property manager approves your application.`);
-          toast.error(`⏳ Approval Pending - Awaiting property manager approval.`, { duration: 7000 });
-          return;
+        // If user is NOT already fully approved, approve them now
+        if (profile && (!profile.approved || profile.status !== "active" || !profile.is_active)) {
+          console.log("✅ Auto-approving user on login:", signInData.user.id);
+          
+          const { error: updateError } = await supabase
+            .from("profiles")
+            .update({
+              status: "active",
+              approved: true,
+              is_active: true,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", profile.id);
+          
+          if (updateError) {
+            console.warn("Warning: Could not auto-approve user", updateError);
+          } else {
+            console.log("✅ User auto-approved successfully");
+          }
         }
       }
       

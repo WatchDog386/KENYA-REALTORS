@@ -270,40 +270,10 @@ const UserManagementNew: React.FC = () => {
         is_active: updatedProfile.is_active,
       });
 
-      // Step 3: If property manager, assign properties
-      if (newRole === "property_manager") {
-        // CRITICAL: Validate that at least one property is provided
-        if (!managedProperties || managedProperties.length === 0) {
-          console.error("❌ CRITICAL ERROR: Property manager approved without properties", {
-            userId,
-            managedProperties: managedProperties || []
-          });
-          throw new Error("Property manager must be assigned to at least one property before approval. This should not happen - UI should prevent this.");
-        }
-        
-        console.log("🔗 Assigning properties to manager...");
-        const assignments = managedProperties.map(propId => ({
-          property_manager_id: userId,
-          property_id: propId
-        }));
+      // NOTE: Property manager assignments are now handled separately in PropertyManagerAssignment component
+      // Property assignment should be done AFTER user role approval, not during
 
-        const { error: assignError, data: assignData } = await supabase
-          .from("property_manager_assignments")
-          .insert(assignments)
-          .select();
-
-        if (assignError) {
-          if (!assignError.message.includes("violates unique constraint")) {
-            console.error("❌ Property assignment error:", assignError.message);
-            throw assignError;
-          }
-          console.warn("⚠️ Duplicate assignment (user already assigned to property)");
-        } else {
-          console.log("✅ Properties assigned successfully:", assignData?.length || 0, "assignments stored");
-        }
-      }
-
-      // Step 4: If tenant, assign unit in property
+      // Step 3: If tenant, assign unit in property
       if (newRole === "tenant") {
         // CRITICAL: Validate that property and unit are provided
         if (!propertyId || !unitId) {

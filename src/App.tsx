@@ -82,6 +82,20 @@ import TenantRefundStatusPageComponent from "@/pages/portal/tenant/RefundStatus"
 // Import Super Admin Context
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
 
+// Manager portal components
+import ManagerDashboard from "@/components/portal/manager/ManagerDashboard";
+import ManagerTenants from "@/components/portal/manager/ManagerTenants";
+import ManagerMaintenance from "@/components/portal/manager/ManagerMaintenance";
+import ManagerPayments from "@/components/portal/manager/ManagerPayments";
+import ManagerSettings from "@/components/portal/manager/ManagerSettings";
+import ManagerMessages from "@/components/portal/manager/ManagerMessages";
+import ManagerUnits from "@/components/portal/manager/ManagerUnits";
+import ManagerRentCollection from "@/components/portal/manager/ManagerRentCollection";
+import ManagerApplications from "@/components/portal/manager/ManagerApplications";
+import ManagerDeposits from "@/components/portal/manager/ManagerDeposits";
+import ManagerLeases from "@/components/portal/manager/ManagerLeases";
+import ManagerProfile from "@/components/portal/manager/ManagerProfile";
+
 // Create a fallback component in case of import issues
 const ComponentFallback = ({ title }: { title: string }) => (
   <div className="p-8">
@@ -240,7 +254,7 @@ const RoleBasedRoute = ({
   children: React.ReactNode;
   allowedRoles: ("super_admin" | "property_manager" | "tenant" | "owner")[];
 }) => {
-  const { user, supabaseUser, isLoading, getUserRole, isApproved } = useAuth();
+  const { user, supabaseUser, isLoading, getUserRole } = useAuth();
 
   if (isLoading) {
     return (
@@ -255,11 +269,6 @@ const RoleBasedRoute = ({
       return <Navigate to="/profile" replace />;
     }
     return <Navigate to="/login" replace />;
-  }
-
-  // Check approval
-  if (!isApproved()) {
-    return <Navigate to="/pending-approval" replace />;
   }
 
   // Get user role
@@ -438,37 +447,10 @@ const UserCreationWrapper = () => {
 /* ======================
    MANAGER PAGES
 ====================== */
-const ManagerPropertiesPage = () => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold mb-6">My Properties</h1>
-    <p className="text-gray-600">Manager properties page will appear here.</p>
-  </div>
-);
-
-const ManagerTenantsPage = () => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold mb-6">Tenant Management</h1>
-    <p className="text-gray-600">
-      Manager tenant management page will appear here.
-    </p>
-  </div>
-);
-
-const ManagerMaintenancePage = () => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold mb-6">Maintenance Requests</h1>
-    <p className="text-gray-600">
-      Manager maintenance requests page will appear here.
-    </p>
-  </div>
-);
-
-const ManagerReportsPage = () => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold mb-6">Reports</h1>
-    <p className="text-gray-600">Manager reports page will appear here.</p>
-  </div>
-);
+const ManagerPropertiesPage = () => <ManagerDashboard />;
+const ManagerTenantsPage = () => <ManagerTenants />;
+const ManagerMaintenancePage = () => <ManagerMaintenance />;
+const ManagerReportsPage = () => <ManagerPayments />;
 
 /* ======================
    COMPONENT DEMO PAGE
@@ -717,12 +699,19 @@ const App = () => {
                     path="properties"
                     element={<ManagerPropertiesPage />}
                   />
+                  <Route path="properties/units" element={<ManagerUnits />} />
                   <Route path="tenants" element={<ManagerTenantsPage />} />
+                  <Route path="tenants/applications" element={<ManagerApplications />} />
                   <Route
                     path="maintenance"
                     element={<ManagerMaintenancePage />}
                   />
                   <Route path="reports" element={<ManagerReportsPage />} />
+                  <Route path="payments" element={<ManagerRentCollection />} />
+                  <Route path="payments/deposits" element={<ManagerDeposits />} />
+                  <Route path="leases" element={<ManagerLeases />} />
+                  <Route path="messages" element={<ManagerMessages />} />
+                  <Route path="profile" element={<ManagerProfile />} />
                   <Route
                     path="approval-requests"
                     element={<ApprovalRequests />}

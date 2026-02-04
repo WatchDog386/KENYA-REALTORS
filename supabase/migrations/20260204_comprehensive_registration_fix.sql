@@ -111,12 +111,8 @@ BEGIN
     v_user_type := v_role;
 
     -- Set status based on role
-    -- Super admins are active immediately, others are pending approval
-    IF v_role = 'super_admin' THEN
-        v_status := 'active';
-    ELSE
-        v_status := 'pending';
-    END IF;
+    -- All users are now active immediately (auto-approved on login)
+    v_status := 'active';
 
     -- Insert profile (with conflict handling for retries)
     INSERT INTO public.profiles (

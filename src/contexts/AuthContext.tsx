@@ -336,7 +336,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const handlePostLoginRedirect = (userProfile: UserProfile | null) => {
     if (!userProfile) return;
 
-    console.log(`🚀 Redirecting based on role: ${userProfile.role}, approved: ${userProfile.approved}...`);
+    console.log(`🚀 Redirecting based on role: ${userProfile.role}...`);
 
     // If no role yet, send to role selection
     if (!userProfile.role) {
@@ -347,20 +347,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
-    // Check approval status 
-    const isUserApproved = 
-      userProfile.role === 'super_admin' || // Super admins are always approved
-      userProfile.approved === true;
-
-    if (!isUserApproved) {
-       console.log("⚠️ Account pending approval");
-       setTimeout(() => {
-         navigate("/pending-approval", { replace: true });
-       }, 100);
-       return;
-    }
-
-    // User is approved and has a role - redirect to dashboard
+    // User is approved (auto-approved on login) and has a role - redirect to dashboard
     setTimeout(() => {
       switch (userProfile.role) {
         case "super_admin":

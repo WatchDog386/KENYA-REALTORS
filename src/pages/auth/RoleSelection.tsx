@@ -65,12 +65,21 @@ const RoleSelection = () => {
         description: "Your role has been updated. Redirecting...",
       });
 
-      // Redirect handled by AuthContext or simplified here
+      // Redirect to appropriate portal based on role
+      // No pending-approval page - users are auto-approved on login
       setTimeout(() => {
-        if (selectedRole === 'property_manager' || selectedRole === 'tenant') {
-          navigate('/pending-approval');
-        } else {
-           navigate('/portal');
+        switch (selectedRole) {
+          case 'property_manager':
+            navigate('/portal/manager');
+            break;
+          case 'tenant':
+            navigate('/portal/tenant');
+            break;
+          case 'super_admin':
+            navigate('/portal/super-admin/dashboard');
+            break;
+          default:
+            navigate('/portal');
         }
       }, 1000);
       

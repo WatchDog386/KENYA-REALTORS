@@ -433,25 +433,42 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
             }
           }}
           className={cn(
-            "flex items-center justify-between px-3 py-3 mx-2 rounded-lg transition-all duration-200 group relative mb-1",
+            "flex items-center justify-between px-4 py-3 mx-2 rounded-xl transition-all duration-200 group relative mb-1 font-nunito",
             isItemActive
-              ? "bg-[#00356B] text-white shadow-lg shadow-blue-900/30"
-              : "text-slate-900 hover:bg-orange-50 hover:text-orange-700",
+              ? "bg-[#154279] text-white shadow-lg"
+              : "text-slate-700 hover:bg-slate-100 hover:text-[#154279]",
             depth > 0 && "pl-8"
           )}
         >
           <div className="flex items-center gap-3">
-            <div className={`${isItemActive ? 'text-white' : 'text-slate-900 group-hover:text-orange-600'} relative`}>
+            <div
+              className={`${
+                isItemActive
+                  ? "text-[#F96302]"
+                  : "text-slate-500 group-hover:text-[#F96302]"
+              } relative transition-colors`}
+            >
               {item.icon}
               {typeof item.badge === 'number' && item.badge > 0 && (
-                <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-[10px] font-bold text-white rounded-full flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
                   {item.badge > 9 ? '9+' : item.badge}
                 </span>
               )}
             </div>
             <div className="flex-1">
-              <span className={cn("text-sm tracking-wide", isItemActive ? "font-bold" : "font-medium")}>{item.title}</span>
-              <p className={cn("text-[10px] mt-0.5 transition-opacity", isItemActive ? "text-white/80 font-medium" : "text-slate-500 opacity-70 group-hover:opacity-100")}>{item.description}</p>
+              <span
+                className={cn(
+                  "text-[14px] tracking-wide font-nunito",
+                  isItemActive
+                    ? "font-bold"
+                    : "font-medium"
+                )}
+              >
+                {item.title}
+              </span>
+              <div className={cn("text-[10px] mt-0.5 hidden xl:block transition-opacity font-nunito", isItemActive ? "text-white/70 font-medium" : "text-slate-500 opacity-0 group-hover:opacity-100 font-medium")}>
+                {item.description}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -461,20 +478,22 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
               </span>
             )}
             {hasChildren ? (
-              <ChevronDown className={cn(
-                "w-4 h-4 transition-transform",
-                isExpanded && "rotate-180",
-                isItemActive ? "text-white" : "text-slate-900 group-hover:text-orange-600"
-              )} />
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 transition-transform",
+                  isExpanded && "rotate-180",
+                  isItemActive ? "text-white" : "text-slate-500 group-hover:text-[#154279]"
+                )}
+              />
             ) : isItemActive && (
-              <ChevronRight size={16} className="text-white/90" />
+              <ChevronRight size={14} className="text-[#F96302]" />
             )}
           </div>
-        </Link>
-        
+        </Link> 
+
         {hasChildren && isExpanded && (
-          <div className="ml-4 mt-1 space-y-1 border-l-2 border-slate-200 pl-2">
-            {item.children!.map(child => renderNavItem(child, depth + 1))}
+          <div className="ml-4 mt-1 space-y-1 border-l-2 border-[#154279]/20 pl-2 mb-2">
+            {item.children!.map((child) => renderNavItem(child, depth + 1))}
           </div>
         )}
       </div>
@@ -494,31 +513,28 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
 
   // Load custom fonts and styles
   useEffect(() => {
+    // Add Nunito font
     const link = document.createElement("link");
     link.href =
-      "https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800;900&display=swap";
+      "https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
     const style = document.createElement("style");
     style.textContent = `
-      .risa-font { font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: -0.015em; }
-      .risa-heading { font-family: 'Montserrat', sans-serif; font-weight: 800; letter-spacing: -0.03em; }
-      .risa-subheading { font-family: 'Montserrat', sans-serif; font-weight: 600; letter-spacing: -0.01em; }
-      .risa-body { font-family: 'Montserrat', sans-serif; font-weight: 400; letter-spacing: -0.01em; }
-      .risa-uppercase { font-family: 'Montserrat', sans-serif; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-      .risa-mono { font-family: 'SF Mono', 'Roboto Mono', monospace; letter-spacing: -0.01em; }
-      
-      body { font-family: 'Montserrat', sans-serif; }
+      * { font-family: 'Nunito', sans-serif; }
+      body { font-family: 'Nunito', sans-serif; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
       
       .custom-scroll::-webkit-scrollbar { width: 6px; }
       .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
-      .custom-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 0px; }
-      .custom-scroll::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+      .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .custom-scroll::-webkit-scrollbar-thumb:hover { background: #154279; }
       
       .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 0px; }
+      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(21, 66, 121, 0.05); }
+      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(21, 66, 121, 0.3); border-radius: 4px; }
+      .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(21, 66, 121, 0.5); }
     `;
     document.head.appendChild(style);
 
@@ -529,151 +545,221 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900 font-sans">
-      {/* Font & Scrollbar Styles */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-        body { font-family: 'Montserrat', sans-serif; }
-        
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
-        
-        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
-      `}</style>
-
+    <div className="min-h-screen bg-white text-[#154279] font-nunito selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 w-full bg-gradient-to-r from-[#00356B] via-blue-700 to-[#00356B] z-50 px-4 py-3 flex items-center justify-between shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 w-full bg-gradient-to-r from-[#154279] via-blue-700 to-[#154279] z-50 px-4 py-3 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className="text-white p-2 bg-white/10 hover:bg-white/20 hover:text-orange-500 transition-all rounded-lg border border-white/10"
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-white p-2 bg-white/10 hover:bg-white/20 transition-all rounded-lg border border-white/10"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          
+
           <div className="flex items-center gap-2">
-            <span className="text-white font-black tracking-tight font-heading">
-              AYDEN<span className="text-orange-500">HOMES</span>
+            <span className="text-white font-bold tracking-tight text-sm">
+              KENYA REALTORS
             </span>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
             className="relative p-2 bg-white/10 hover:bg-white/20 text-white transition-all rounded-lg border border-white/10"
           >
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-600 text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-white/20">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-white/20">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
-          <button 
+          <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-9 h-9 rounded-lg bg-[#00356B] flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-orange-500"
+            className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-white"
           >
             {initials}
           </button>
         </div>
       </div>
 
-      {/* Sidebar */}
-      <aside className={cn(
-        "fixed top-0 left-0 h-full bg-slate-50 text-slate-600 z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r border-gray-200",
-        sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full",
-        "lg:translate-x-0 lg:w-72"
-      )}>
-        {/* Logo */}
-        <div className="h-20 flex items-center px-6 border-b border-gray-200 bg-slate-50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#00356B] rounded-lg shadow-lg">
-              <Building className="text-white h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="font-extrabold text-2xl tracking-tight text-slate-900">
-                {firstPropertyName.split(' ')[0]}<span className="text-[#00356B]">{firstPropertyName.split(' ').slice(1).join(' ')}</span>
-              </h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider -mt-1">Manager Portal</p>
+      {/* Sidebar - Sleek White Background */}
+      <aside
+        className={cn(
+          "fixed top-0 left-0 h-full bg-white text-[#154279] z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r-2 border-slate-200",
+          sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full",
+          "lg:translate-x-0 lg:w-72"
+        )}
+      >
+        {/* Logo Section */}
+        <div className="h-20 flex items-center px-6 border-b-2 border-slate-200 bg-white">
+          <div className="shrink-0 cursor-pointer flex items-center gap-2 md:gap-3 w-full">
+            <svg
+              viewBox="0 0 200 200"
+              className="h-12 w-auto drop-shadow-sm"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient
+                  id="grad-front-nav"
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#F9F1DC" />
+                  <stop offset="100%" stopColor="#D4AF37" />
+                </linearGradient>
+                <linearGradient
+                  id="grad-side-nav"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#D4AF37" />
+                  <stop offset="100%" stopColor="#AA8C2C" />
+                </linearGradient>
+                <linearGradient
+                  id="grad-dark-nav"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#998A5E" />
+                  <stop offset="100%" stopColor="#5C5035" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M110 90 V170 L160 150 V70 L110 90 Z"
+                fill="url(#grad-front-nav)"
+                stroke="#8A7D55"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M160 70 L180 80 V160 L160 150 Z"
+                fill="url(#grad-dark-nav)"
+                stroke="#8A7D55"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M30 150 V50 L80 20 V120 L30 150 Z"
+                fill="url(#grad-front-nav)"
+                stroke="#8A7D55"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M80 20 L130 40 V140 L80 120 Z"
+                fill="url(#grad-side-nav)"
+                stroke="#8A7D55"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <g fill="#154279">
+                <path d="M85 50 L100 56 V86 L85 80 Z" />
+                <path d="M85 90 L100 96 V126 L85 120 Z" />
+                <path d="M45 60 L55 54 V124 L45 130 Z" />
+                <path d="M120 130 L140 122 V152 L120 160 Z" />
+              </g>
+            </svg>
+
+            <div className="flex flex-col justify-center select-none ml-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.35em] text-[#154279] leading-none ml-0.5">
+                Kenya
+              </span>
+              <div className="flex items-baseline -mt-1 relative">
+                <span className="text-[20px] font-black tracking-tighter text-[#154279]">
+                  REALTOR
+                </span>
+                <span className="text-[20px] font-black tracking-tighter text-[#F96302]">
+                  S
+                </span>
+                <div className="h-1.5 w-1.5 bg-[#F96302] rounded-full ml-1 mb-1.5 shadow-lg shadow-orange-500/50"></div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 overflow-y-auto sidebar-scroll pb-4 mt-6">
-          <div className="mb-6">
-            <div className="px-2 mb-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+        <nav className="flex-1 px-4 overflow-y-auto sidebar-scroll pb-4 mt-4">
+          <div className="mb-2">
+            <div className="px-4 mb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <span>Management</span>
-              <span className="h-px flex-1 bg-slate-200" aria-hidden />
+              <div className="flex-1 h-px bg-gradient-to-r from-slate-300 to-transparent"></div>
             </div>
-            <div className="space-y-1">
-              {navItems.map(item => renderNavItem(item))}
+            <div className="space-y-0.5">
+              {navItems.map((item) => renderNavItem(item))}
             </div>
           </div>
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-200 bg-slate-50">
-          <div className="flex items-center justify-between mb-3">
+        <div className="p-4 border-t-2 border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-[#86bc25] rounded-full animate-pulse ring-2 ring-[#86bc25]/20"></div>
-              <span className="text-[10px] text-[#86bc25] font-black uppercase tracking-wider">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse ring-2 ring-emerald-500/20"></div>
+              <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
                 System Online
               </span>
             </div>
-            <span className="text-[10px] text-slate-900 font-bold">v2.4.0</span>
+            <span className="text-[10px] text-slate-600 font-bold">v2.4.0</span>
           </div>
-          <button 
-            onClick={handleSignOut} 
-            className="w-full flex items-center justify-center gap-2 text-xs text-white transition-colors py-3 bg-[#D85C2C] hover:bg-[#b84520] rounded-lg font-black uppercase tracking-wider border-2 border-[#D85C2C] hover:border-[#b84520] shadow-sm hover:shadow-lg"
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center gap-2 text-xs text-white transition-all py-3 bg-gradient-to-r from-[#154279] to-[#0f325e] hover:from-[#F96302] hover:to-[#ff8c42] rounded-xl font-bold uppercase tracking-wider shadow-md hover:shadow-lg"
           >
-            <LogOut size={14} className="stroke-[3]" />
+            <LogOut size={14} className="stroke-[2.5]" />
             <span>Sign Out</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className={cn(
-        "transition-all duration-300 min-h-screen flex flex-col bg-slate-50",
-        sidebarOpen ? "lg:ml-72" : "lg:ml-0"
-      )}>
+      <main
+        className={cn(
+          "transition-all duration-300 min-h-screen flex flex-col bg-white",
+          sidebarOpen ? "lg:ml-72" : "lg:ml-0"
+        )}
+      >
         {/* Desktop Header */}
-        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-slate-50/80 backdrop-blur-md sticky top-0 z-30 transition-all duration-300">
+        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b-2 border-slate-200 sticky top-0 z-30 transition-all duration-300 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-lg font-black text-[#00356B] tracking-tight uppercase">
+              <h2 className="text-lg font-black text-[#154279] tracking-tight uppercase">
                 {currentPage.title}
               </h2>
-              <div className="text-[11px] text-gray-600 font-semibold uppercase tracking-wide">
+              <div className="text-[11px] text-slate-600 font-semibold uppercase tracking-wide">
                 {currentPage.description}
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-6">
             <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#D85C2C] transition-colors" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search tenants, units, payments..." 
-                className="pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-[#D85C2C] focus:shadow-sm w-80 outline-none placeholder:text-gray-400 transition-all duration-200 font-medium"
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F96302] transition-colors"
+                size={16}
+              />
+              <input
+                type="text"
+                placeholder="Search..."
+                className="pl-11 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-[#F96302] focus:shadow-sm w-72 outline-none placeholder:text-slate-400 transition-all duration-200 font-medium font-nunito"
               />
             </div>
-            
+
             {/* Notifications */}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative p-2.5 text-gray-500 hover:text-[#0056A6] hover:bg-white bg-white/50 border border-transparent hover:border-blue-100 hover:shadow-sm rounded-lg transition-all"
+                className="relative p-2.5 text-slate-600 hover:text-[#154279] hover:bg-slate-100 bg-white border-2 border-slate-200 hover:border-[#F96302] hover:shadow-sm rounded-lg transition-all"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-[#D85C2C] text-[10px] font-bold text-white rounded-full flex items-center justify-center shadow-sm">
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-[#F96302] text-[10px] font-bold text-white rounded-full flex items-center justify-center shadow-sm">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -682,16 +768,16 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
               {notificationsOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50">
-                    <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                  <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50">
+                    <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
                       <div>
-                        <h3 className="font-bold text-gray-900">Notifications</h3>
-                        <p className="text-sm text-gray-500 mt-1">{unreadCount} unread</p>
+                        <h3 className="font-bold text-[#154279]">Notifications</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">{unreadCount} unread</p>
                       </div>
                       {unreadCount > 0 && (
-                        <button 
+                        <button
                           onClick={markAllAsRead}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          className="text-xs text-[#F96302] hover:text-[#d35400] font-bold"
                         >
                           Mark all as read
                         </button>
@@ -700,7 +786,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                     <div className="max-h-80 overflow-y-auto custom-scroll">
                       {loadingNotifications ? (
                         <div className="p-8 flex items-center justify-center">
-                          <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                         </div>
                       ) : notifications.length > 0 ? (
                         notifications.map(n => (
@@ -713,20 +799,20 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                             }}
                             className={`block ${!n.read ? 'bg-blue-50/50' : ''}`}
                           >
-                            <div className="p-4 border-b border-gray-50 hover:bg-gray-50">
+                            <div className="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors">
                               <div className="flex items-start gap-3">
-                                <div className="p-2 bg-gray-100 rounded-lg">
+                                <div className="p-2 bg-slate-100 rounded-lg text-[#154279]">
                                   {getNotificationIcon(n.type)}
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex justify-between items-start">
-                                    <h4 className="font-medium">{n.title}</h4>
+                                    <h4 className="font-bold text-sm text-[#154279]">{n.title}</h4>
                                     {!n.read && (
-                                      <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                      <span className="w-2 h-2 bg-[#F96302] rounded-full"></span>
                                     )}
                                   </div>
-                                  <p className="text-sm text-gray-600">{n.message}</p>
-                                  <p className="text-xs text-gray-400 mt-1">{n.time}</p>
+                                  <p className="text-xs text-slate-600 mt-1">{n.message}</p>
+                                  <p className="text-[10px] text-slate-400 mt-1">{n.time}</p>
                                 </div>
                               </div>
                             </div>
@@ -734,9 +820,8 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                         ))
                       ) : (
                         <div className="p-8 text-center">
-                          <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                          <p className="text-gray-500">No notifications</p>
-                          <p className="text-sm text-gray-400 mt-1">You're all caught up!</p>
+                          <Bell className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                          <p className="text-slate-500 font-medium text-sm">No notifications</p>
                         </div>
                       )}
                     </div>
@@ -747,72 +832,59 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
 
             {/* User Menu */}
             <div className="relative">
-              <button 
+              <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 p-1.5 hover:bg-gray-100 rounded-xl"
+                className="flex items-center gap-3 p-1.5 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-200"
               >
-                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
+                <div className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md">
                   {initials}
                 </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold">{fullName}</p>
-                  <p className="text-xs text-gray-500">Property Manager</p>
+                <div className="text-left hidden md:block">
+                  <p className="text-sm font-bold text-[#154279]">{fullName}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Manager</p>
                 </div>
-                <ChevronDown size={18} className="text-gray-400" />
+                <ChevronDown size={16} className="text-slate-400" />
               </button>
 
               {userMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-50">
-                    <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-[#154279]/5 to-blue-500/5">
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-slate-200 z-50">
+                    <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#154279]/5 to-blue-500/5 rounded-t-xl">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                        <div className="w-10 h-10 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold">
                           {initials}
                         </div>
-                        <div>
-                          <p className="font-bold">{fullName}</p>
-                          <p className="text-sm text-gray-500 truncate">{user?.email}</p>
+                        <div className="overflow-hidden">
+                          <p className="font-bold text-[#154279] truncate">{fullName}</p>
+                          <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                         </div>
                       </div>
                     </div>
                     <div className="p-2">
-                      <Link 
-                        to="/portal/manager/profile" 
+                       <Link
+                        to="/portal/manager/profile"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg w-full"
+                        className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-lg w-full text-slate-700 hover:text-[#154279] transition-colors"
                       >
-                        <Users size={18} className="text-gray-500" />
-                        <span>My Profile</span>
+                        <Users size={16} />
+                        <span className="text-sm font-medium">My Profile</span>
                       </Link>
-                      <Link 
-                        to="/portal/settings" 
+                      <Link
+                        to="/portal/settings"
                         onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg w-full"
+                        className="flex items-center gap-3 p-2.5 hover:bg-slate-50 rounded-lg w-full text-slate-700 hover:text-[#154279] transition-colors"
                       >
-                        <Settings size={18} className="text-gray-500" />
-                        <span>Account Settings</span>
+                        <Settings size={16} />
+                        <span className="text-sm font-medium">Account Settings</span>
                       </Link>
-                      <Link 
-                        to="/portal/manager/messages" 
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg w-full"
-                      >
-                        <Mail size={18} className="text-gray-500" />
-                        <span>Messages</span>
-                        {notifications.filter(n => !n.read && n.type === 'system').length > 0 && (
-                          <span className="ml-auto bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full">
-                            {notifications.filter(n => !n.read && n.type === 'system').length}
-                          </span>
-                        )}
-                      </Link>
-                      <div className="h-px bg-gray-100 my-2"></div>
-                      <button 
+                      <div className="h-px bg-slate-100 my-2"></div>
+                      <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 p-3 text-left hover:bg-red-50 rounded-lg text-red-600"
+                        className="w-full flex items-center gap-3 p-2.5 text-left hover:bg-red-50 rounded-lg text-red-600 transition-colors group"
                       >
-                        <LogOut size={18} />
-                        <span className="font-medium">Sign Out</span>
+                        <LogOut size={16} className="group-hover:translate-x-1 transition-transform" />
+                        <span className="text-sm font-bold">Sign Out</span>
                       </button>
                     </div>
                   </div>
@@ -823,30 +895,18 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-x-hidden custom-scroll">
+        <div className="flex-1 overflow-x-hidden custom-scroll bg-slate-50">
           <div className="p-4 md:p-6 lg:p-8">
             {children}
           </div>
         </div>
-
-        {/* Footer */}
-        <footer className="px-8 py-6 border-t border-gray-200 bg-white hidden lg:block">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">© 2025 Ayden Homes. All rights reserved.</p>
-            <div className="flex gap-6 text-sm text-gray-500">
-              <a href="#" className="hover:text-blue-600 transition-colors">Privacy</a>
-              <a href="#" className="hover:text-blue-600 transition-colors">Terms</a>
-              <a href="#" className="hover:text-blue-600 transition-colors">Support</a>
-            </div>
-          </div>
-        </footer>
       </main>
 
       {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 bg-[#00356B]/80 z-30 backdrop-blur-sm" 
-          onClick={() => setSidebarOpen(false)} 
+        <div
+          className="lg:hidden fixed inset-0 bg-[#154279]/80 z-30 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
         />
       )}
     </div>

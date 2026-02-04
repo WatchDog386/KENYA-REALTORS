@@ -67,6 +67,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
+import PropertyManagerAssignment from "@/components/portal/super-admin/PropertyManagerAssignment";
+import PropertyManagersOverview from "@/components/portal/super-admin/PropertyManagersOverview";
 
 interface DashboardStats {
   totalProperties: number;
@@ -839,6 +841,15 @@ const SuperAdminDashboard = () => {
                     bgGradient: "from-blue-500 via-blue-600 to-blue-700",
                     borderColor: "border-blue-300",
                     iconBg: "bg-blue-400"
+                  },
+                  {
+                    title: "Property Managers",
+                    icon: <Shield className="w-6 h-6 text-white" />,
+                    description: "Assign properties to managers",
+                    route: "/portal/super-admin/managers",
+                    bgGradient: "from-indigo-500 via-indigo-600 to-indigo-700",
+                    borderColor: "border-indigo-300",
+                    iconBg: "bg-indigo-400"
                   },
                   {
                     title: "Properties",
