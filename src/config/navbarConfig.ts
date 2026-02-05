@@ -123,12 +123,12 @@ export const UTILITY_BAR = {
   buttons: [
     {
       label: "Post a Rental",
-      action: "login",
+      action: "applications?type=post",
       size: "text-[10px]",
     },
     {
-      label: "Pay Rent",
-      action: "login",
+      label: "Get a Rental",
+      action: "applications?type=looking",
       size: "text-[10px]",
     },
   ],

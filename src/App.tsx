@@ -24,6 +24,7 @@ import Testimonials from "@/pages/TestimonialsSection";
 import PaymentOptions from "@/pages/PaymentOptionsSection";
 import Faq from "@/pages/FaqSection";
 import Contact from "@/pages/Contact";
+import ApplicationForm from "@/pages/ApplicationForm";
 
 /* ======================
    AUTH PAGES
@@ -61,6 +62,7 @@ import SettingsManagement from "@/pages/portal/SettingsManagement";
 import ProfileManagement from "@/pages/portal/ProfileManagement";
 import RefundStatusPage from "@/pages/portal/RefundStatusPage";
 import Applications from "@/pages/portal/Applications";
+import RentalApplications from "@/components/portal/RentalApplications";
 
 // Tenant portal pages
 import TenantPaymentsPageComponent from "@/pages/portal/tenant/Payments";
@@ -535,6 +537,7 @@ const App = () => {
                   <Route path="/faq" element={<Faq />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/marketplace" element={<ListingsPage />} />
+                  <Route path="/applications" element={<ApplicationForm />} />
                   <Route path="/complete-profile" element={<Profile />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route
@@ -605,10 +608,6 @@ const App = () => {
                   element={<Navigate to="/portal/profile" replace />}
                 />
                 <Route
-                  path="/applications"
-                  element={<Navigate to="/portal/applications" replace />}
-                />
-                <Route
                   path="/properties"
                   element={<Navigate to="/portal/properties" replace />}
                 />
@@ -655,6 +654,7 @@ const App = () => {
                   <Route path="profile" element={<SuperAdminProfilePage />} />
                   <Route path="refunds" element={<RefundStatusPage />} />
                   <Route path="applications" element={<Applications />} />
+                  <Route path="rental-applications" element={<RentalApplications />} />
                   <Route
                     path="create-users"
                     element={<Navigate to="/admin/create-users" replace />}

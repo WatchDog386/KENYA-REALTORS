@@ -221,7 +221,19 @@ const Navbar = () => {
           </div>
           <div className="flex items-center gap-6 font-bold tracking-wide">
             {UTILITY_BAR.buttons.map((btn, idx) => (
-              <button key={idx} onClick={() => navigate(btn.action === 'login' ? '/login' : '/')} className={`text-white hover:text-[#F96302] transition-colors uppercase ${btn.size}`}>
+              <button 
+                key={idx} 
+                onClick={() => {
+                  if (btn.action.startsWith('applications')) {
+                    navigate(`/${btn.action}`);
+                  } else if (btn.action === 'login') {
+                    navigate('/login');
+                  } else {
+                    navigate('/');
+                  }
+                }} 
+                className={`text-white hover:text-[#F96302] transition-colors uppercase ${btn.size}`}
+              >
                 {btn.label}
               </button>
             ))}

@@ -1,0 +1,766 @@
+// © 2025 Jeff. All rights reserved.
+// Unauthorized copying, distribution, or modification of this file is strictly prohibited.
+
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Home,
+  MapPin,
+  DollarSign,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+const ApplicationForm = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<"post" | "looking">("post");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [submissionType, setSubmissionType] = useState<"post" | "looking" | null>(null);
+
+  // Handle query parameter for tab selection
+  useEffect(() => {
+    const type = searchParams.get("type");
+    if (type === "looking") {
+      setActiveTab("looking");
+    } else if (type === "post") {
+      setActiveTab("post");
+    }
+  }, [searchParams]);
+
+  // Post Rental Form State
+  const [postRentalForm, setPostRentalForm] = useState({
+    property_title: "",
+    property_type: "",
+    property_location: "",
+    property_description: "",
+    monthly_rent: "",
+    bedrooms: "",
+    bathrooms: "",
+    amenities: [] as string[],
+    contact_name: "",
+    contact_phone: "",
+    contact_email: "",
+  });
+
+  // Looking for Rental Form State
+  const [lookingForRentalForm, setLookingForRentalForm] = useState({
+    preferred_unit_type: "",
+    budget_min: "",
+    budget_max: "",
+    preferred_locations: [] as string[],
+    occupancy_date: "",
+  });
+
+  const amenitiesList = [
+    "WiFi",
+    "Parking",
+    "Pool",
+    "Gym",
+    "Security",
+    "Laundry",
+    "AC",
+    "Furnished",
+    "Pet Friendly",
+    "Balcony",
+    "Garden",
+    "Elevator",
+  ];
+
+  const unitTypes = ["Studio", "Bed-sitter", "1 Bedroom", "2 Bedroom", "3 Bedroom", "4+ Bedroom"];
+  const locations = [
+    "Westlands",
+    "Kilimani",
+    "Lavington",
+    "Karen",
+    "CBD",
+    "Roysambu",
+    "Ayden Home Towers, Wing A",
+    "Ayden Home Towers, Wing B",
+    "Ayden Home Towers, Wing C",
+  ];
+
+  // Handle Post Rental Form Changes
+  const handlePostRentalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setPostRentalForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePostRentalSelectChange = (name: string, value: string) => {
+    setPostRentalForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const toggleAmenity = (amenity: string) => {
+    setPostRentalForm(prev => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity)
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...prev.amenities, amenity],
+    }));
+  };
+
+  // Handle Looking for Rental Form Changes
+  const handleLookingForRentalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setLookingForRentalForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleLookingForRentalSelectChange = (name: string, value: string) => {
+    setLookingForRentalForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const togglePreferredLocation = (location: string) => {
+    setLookingForRentalForm(prev => ({
+      ...prev,
+      preferred_locations: prev.preferred_locations.includes(location)
+        ? prev.preferred_locations.filter(l => l !== location)
+        : [...prev.preferred_locations, location],
+    }));
+  };
+
+  // Submit Post Rental Application
+  const handleSubmitPostRental = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast.error("Please log in first");
+      navigate("/login");
+      return;
+    }
+
+    // Validate required fields
+    if (
+      !postRentalForm.property_title ||
+      !postRentalForm.property_type ||
+      !postRentalForm.property_location ||
+      !postRentalForm.monthly_rent ||
+      !postRentalForm.contact_name ||
+      !postRentalForm.contact_phone ||
+      !postRentalForm.contact_email
+    ) {
+      toast.error("Please fill in all required fields (*)");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("rental_applications").insert([
+        {
+          user_id: user.id,
+          application_type: "post_rental",
+          property_title: postRentalForm.property_title,
+          property_type: postRentalForm.property_type,
+          property_location: postRentalForm.property_location,
+          property_description: postRentalForm.property_description,
+          monthly_rent: parseFloat(postRentalForm.monthly_rent),
+          bedrooms: postRentalForm.bedrooms ? parseInt(postRentalForm.bedrooms) : null,
+          bathrooms: postRentalForm.bathrooms ? parseInt(postRentalForm.bathrooms) : null,
+          amenities: postRentalForm.amenities,
+          contact_name: postRentalForm.contact_name,
+          contact_phone: postRentalForm.contact_phone,
+          contact_email: postRentalForm.contact_email,
+          status: "pending",
+        },
+      ]);
+
+      if (error) {
+        console.error("Error submitting application:", error);
+        toast.error("Failed to submit application. Please try again.");
+        return;
+      }
+
+      setSubmissionSuccess(true);
+      setSubmissionType("post");
+      setPostRentalForm({
+        property_title: "",
+        property_type: "",
+        property_location: "",
+        property_description: "",
+        monthly_rent: "",
+        bedrooms: "",
+        bathrooms: "",
+        amenities: [],
+        contact_name: "",
+        contact_phone: "",
+        contact_email: "",
+      });
+
+      toast.success("Application submitted successfully! Our team will review it shortly.");
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("An error occurred while submitting your application.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Submit Looking for Rental Application
+  const handleSubmitLookingForRental = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (
+      !lookingForRentalForm.preferred_unit_type ||
+      !lookingForRentalForm.budget_min ||
+      !lookingForRentalForm.budget_max ||
+      lookingForRentalForm.preferred_locations.length === 0 ||
+      !lookingForRentalForm.occupancy_date
+    ) {
+      toast.error("Please fill in all required fields (*)");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // If user is logged in, save application to database
+      if (user) {
+        const { error } = await supabase.from("rental_applications").insert([
+          {
+            user_id: user.id,
+            application_type: "looking_for_rental",
+            preferred_unit_type: lookingForRentalForm.preferred_unit_type,
+            budget_min: parseFloat(lookingForRentalForm.budget_min),
+            budget_max: parseFloat(lookingForRentalForm.budget_max),
+            preferred_locations: lookingForRentalForm.preferred_locations,
+            occupancy_date: lookingForRentalForm.occupancy_date,
+            status: "pending",
+          },
+        ]);
+
+        if (error) {
+          console.error("Error submitting application:", error);
+          toast.error("Failed to submit application. Please try again.");
+          return;
+        }
+      }
+
+      setSubmissionSuccess(true);
+      setSubmissionType("looking");
+      setLookingForRentalForm({
+        preferred_unit_type: "",
+        budget_min: "",
+        budget_max: "",
+        preferred_locations: [],
+        occupancy_date: "",
+      });
+
+      toast.success("Thank you! Your rental request has been submitted. Redirecting to sign up...");
+
+      // Redirect to register page after a delay
+      setTimeout(() => {
+        navigate("/register");
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error:", error);
+      toast.error("An error occurred while submitting your request.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Success Message Component
+  if (submissionSuccess && submissionType === "post") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-6"
+      >
+        <Card className="w-full max-w-md border-2 border-green-200 shadow-xl">
+          <CardHeader className="text-center">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="flex justify-center mb-4"
+            >
+              <CheckCircle className="w-16 h-16 text-green-500" />
+            </motion.div>
+            <CardTitle className="text-2xl text-green-700">Success!</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-gray-800">
+                Your rental property has been submitted
+              </p>
+              <p className="text-gray-600">
+                Thank you for listing your property! Our team will review your application and
+                get back to you within 48 hours.
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Next Steps:</strong> You'll receive an email confirmation shortly. Check
+                your inbox for updates on your application status.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => navigate("/")}
+              >
+                Back to Home
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  setSubmissionSuccess(false);
+                  setSubmissionType(null);
+                  setActiveTab("post");
+                }}
+              >
+                Submit Another
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <Button
+            variant="ghost"
+            className="mb-6"
+            onClick={() => navigate("/")}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+
+          <div className="flex items-center gap-3 mb-4">
+            <Home className="w-8 h-8 text-[#F96302]" />
+            <h1 className="text-4xl font-bold text-gray-900">Rental Applications</h1>
+          </div>
+          <p className="text-lg text-gray-600">
+            Post your property or find your ideal rental home
+          </p>
+        </motion.div>
+
+        {/* Tabs */}
+        <Card className="shadow-lg border-0">
+          <CardHeader>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid grid-cols-2 bg-slate-100 p-1 rounded-lg">
+                <TabsTrigger
+                  value="post"
+                  className="data-[state=active]:bg-white data-[state=active]:text-[#154279] data-[state=active]:shadow-sm"
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  Post a Rental
+                </TabsTrigger>
+                <TabsTrigger
+                  value="looking"
+                  className="data-[state=active]:bg-white data-[state=active]:text-[#154279] data-[state=active]:shadow-sm"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Looking for Rental
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+
+          <CardContent>
+            {/* POST RENTAL TAB */}
+            <TabsContent value="post" className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-800">
+                  Fill in your property details below. All fields marked with * are required.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmitPostRental} className="space-y-6">
+                {/* Basic Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Property Information</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="property_title">Property Title *</Label>
+                      <Input
+                        id="property_title"
+                        name="property_title"
+                        value={postRentalForm.property_title}
+                        onChange={handlePostRentalChange}
+                        placeholder="e.g., Modern 2-Bedroom in Westlands"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="property_type">Property Type *</Label>
+                      <Select
+                        value={postRentalForm.property_type}
+                        onValueChange={(value) =>
+                          handlePostRentalSelectChange("property_type", value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select property type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Studio">Studio</SelectItem>
+                          <SelectItem value="Bedsitter">Bed-sitter</SelectItem>
+                          <SelectItem value="1 Bedroom">1 Bedroom</SelectItem>
+                          <SelectItem value="2 Bedroom">2 Bedroom</SelectItem>
+                          <SelectItem value="3 Bedroom">3 Bedroom</SelectItem>
+                          <SelectItem value="House">House</SelectItem>
+                          <SelectItem value="Apartment">Apartment</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="property_location">Location *</Label>
+                    <Input
+                      id="property_location"
+                      name="property_location"
+                      value={postRentalForm.property_location}
+                      onChange={handlePostRentalChange}
+                      placeholder="e.g., Westlands, Nairobi"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="property_description">Property Description</Label>
+                    <Textarea
+                      id="property_description"
+                      name="property_description"
+                      value={postRentalForm.property_description}
+                      onChange={handlePostRentalChange}
+                      placeholder="Describe your property: condition, features, utilities included, etc."
+                      rows={4}
+                    />
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Property Details</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="monthly_rent">Monthly Rent (KSH) *</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <Input
+                          id="monthly_rent"
+                          name="monthly_rent"
+                          type="number"
+                          value={postRentalForm.monthly_rent}
+                          onChange={handlePostRentalChange}
+                          className="pl-10"
+                          placeholder="45000"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="bedrooms">Bedrooms</Label>
+                      <Select
+                        value={postRentalForm.bedrooms}
+                        onValueChange={(value) =>
+                          handlePostRentalSelectChange("bedrooms", value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="bathrooms">Bathrooms</Label>
+                      <Select
+                        value={postRentalForm.bathrooms}
+                        onValueChange={(value) =>
+                          handlePostRentalSelectChange("bathrooms", value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4].map((num) => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Amenities */}
+                  <div>
+                    <Label className="mb-3 block">Amenities</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {amenitiesList.map((amenity) => (
+                        <div key={amenity} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`amenity-${amenity}`}
+                            checked={postRentalForm.amenities.includes(amenity)}
+                            onCheckedChange={() => toggleAmenity(amenity)}
+                          />
+                          <Label
+                            htmlFor={`amenity-${amenity}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {amenity}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Info */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="contact_name">Contact Name *</Label>
+                      <Input
+                        id="contact_name"
+                        name="contact_name"
+                        value={postRentalForm.contact_name}
+                        onChange={handlePostRentalChange}
+                        placeholder="John Doe"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contact_phone">Contact Phone *</Label>
+                      <Input
+                        id="contact_phone"
+                        name="contact_phone"
+                        value={postRentalForm.contact_phone}
+                        onChange={handlePostRentalChange}
+                        placeholder="+254 711 000 000"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="contact_email">Contact Email *</Label>
+                    <Input
+                      id="contact_email"
+                      name="contact_email"
+                      type="email"
+                      value={postRentalForm.contact_email}
+                      onChange={handlePostRentalChange}
+                      placeholder="john@example.com"
+                      required
+                    />
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-800">
+                      This contact information will be visible to potential tenants.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Post Property Listing"
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+
+            {/* LOOKING FOR RENTAL TAB */}
+            <TabsContent value="looking" className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-800">
+                  Tell us what you're looking for. After submission, you'll be redirected to
+                  create an account. All fields marked with * are required.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmitLookingForRental} className="space-y-6">
+                {/* Unit Type & Budget */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Rental Preferences</h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="preferred_unit_type">Unit Type *</Label>
+                      <Select
+                        value={lookingForRentalForm.preferred_unit_type}
+                        onValueChange={(value) =>
+                          handleLookingForRentalSelectChange("preferred_unit_type", value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unitTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="occupancy_date">Occupancy Date *</Label>
+                      <Input
+                        id="occupancy_date"
+                        name="occupancy_date"
+                        type="date"
+                        value={lookingForRentalForm.occupancy_date}
+                        onChange={handleLookingForRentalChange}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Budget Range */}
+                  <div className="space-y-2">
+                    <Label>Budget Range (KSH) *</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="budget_min" className="text-xs text-gray-600">
+                          Minimum
+                        </Label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <Input
+                            id="budget_min"
+                            name="budget_min"
+                            type="number"
+                            value={lookingForRentalForm.budget_min}
+                            onChange={handleLookingForRentalChange}
+                            className="pl-10"
+                            placeholder="15000"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="budget_max" className="text-xs text-gray-600">
+                          Maximum
+                        </Label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <Input
+                            id="budget_max"
+                            name="budget_max"
+                            type="number"
+                            value={lookingForRentalForm.budget_max}
+                            onChange={handleLookingForRentalChange}
+                            className="pl-10"
+                            placeholder="80000"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preferred Locations */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Preferred Locations *</h3>
+                  <p className="text-sm text-gray-600">Select at least one location</p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {locations.map((location) => (
+                      <div key={location} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`location-${location}`}
+                          checked={lookingForRentalForm.preferred_locations.includes(location)}
+                          onCheckedChange={() => togglePreferredLocation(location)}
+                        />
+                        <Label
+                          htmlFor={`location-${location}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {location}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit & Continue to Sign Up"
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default ApplicationForm;
