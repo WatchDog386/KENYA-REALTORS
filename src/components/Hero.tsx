@@ -43,9 +43,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Keep your existing import
-import NavbarSection from "@/pages/NavbarSection";
-
 // --- GLOBAL STYLES ---
 const GlobalStyles = () => (
     <style>{`
@@ -649,7 +646,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
   };
   
   return (
-    <div className="relative w-full h-[500px] lg:h-[600px] font-nunito overflow-hidden">
+    <div className="relative w-full h-[350px] md:h-[500px] lg:h-[600px] font-nunito overflow-hidden">
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div
           key={page}
@@ -670,28 +667,28 @@ const VacancyCarousel = ({ onCardClick, onSlideChange }: { onCardClick: (slide: 
             <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
             
             {/* Text overlay - positioned at bottom left */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 lg:p-16">
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-10 lg:p-16">
               <div className="max-w-[700px]">
-                <h1 className="text-2xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-white leading-none mb-3 uppercase tracking-tight">
+                <h1 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-white leading-none mb-2 md:mb-3 uppercase tracking-tight">
                   {currentSlide.headline.split("\n")[0]}{" "}
                   <span className="text-[#F96302]">{currentSlide.headline.split("\n")[1]}</span>
                 </h1>
                 
-                <p className="text-xs md:text-sm font-bold text-white/90 mb-4 uppercase tracking-[0.15em]">
+                <p className="text-[10px] md:text-sm font-bold text-white/90 mb-2 md:mb-4 uppercase tracking-[0.15em]">
                   {currentSlide.subhead}
                 </p>
                 
-                <div className="w-12 h-1 bg-[#F96302] mb-4"></div>
+                <div className="w-8 md:w-12 h-1 bg-[#F96302] mb-3 md:mb-4"></div>
                 
-                <p className="text-xs md:text-sm text-white/80 font-medium mb-6 leading-relaxed max-w-[550px] hidden md:block line-clamp-1">
+                <p className="text-xs md:text-sm text-white/80 font-medium mb-4 md:mb-6 leading-relaxed max-w-[550px] hidden md:block line-clamp-1">
                   {currentSlide.description.substring(0, 80)}...
                 </p>
                 
                 <button 
-                  className="bg-[#F96302] text-white font-bold py-3 px-8 hover:bg-[#d85502] transition-all shadow-lg flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em]" 
+                  className="bg-[#F96302] text-white font-bold py-2 px-5 md:py-3 md:px-8 hover:bg-[#d85502] transition-all shadow-lg flex items-center justify-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.2em]" 
                   onClick={() => onCardClick(currentSlide)}
                 >
-                  View This Listing <ChevronRight size={16} />
+                  View This Listing <ChevronRight size={14} className="md:w-4 md:h-4" />
                 </button>
               </div>
             </div>
@@ -810,8 +807,8 @@ const HomePage = () => {
   return (
     <>
       <GlobalStyles />
-      <div className="antialiased min-h-screen bg-[#f7f7f7] text-[#484848] font-nunito">
-        <NavbarSection />
+      <div className="antialiased min-h-0 md:min-h-screen bg-[#f7f7f7] text-[#484848] font-nunito">
+        {/* NavbarSection removed to avoid duplication with MainLayout */}
 
         {/* Hero Carousel - Full width edge to edge */}
         <div className="w-full">
@@ -821,8 +818,11 @@ const HomePage = () => {
           />
         </div>
 
-        <main className="max-w-[1440px] mx-auto px-4 lg:px-8 py-6 font-nunito">
-          {/* Quick Search Section - HowItWorks Inspired Design */}
+        {/* Main Content Area - Hidden on mobile to remove gap */}
+        <main className="max-w-[1440px] mx-auto px-4 lg:px-8 py-0 md:py-6 font-nunito hidden md:block">
+        {/* Quick Search Section - HowItWorks Inspired Design */}
+        {/* Hidden on mobile to remove whitespace gap */}
+        <div className="hidden md:block">
           <div className="mb-8">
             {/* Header with Gradient Background */}
             <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-6 md:px-8 py-5 relative overflow-hidden rounded-t-lg">
@@ -983,6 +983,7 @@ const HomePage = () => {
               )}
             </div>
           </div>
+        </div>
 
           {/* Trending Rentals - Only Show When Filters Are Applied */}
           {(selectedAmenities.length > 0 || selectedBedroom || selectedPrice || selectedLocation) ? (
@@ -1041,7 +1042,7 @@ const HomePage = () => {
               </div>
             </div>
           ) : (
-            <div className="mb-6 text-center py-12 bg-white border border-slate-200 rounded-none shadow-md">
+            <div className="mb-6 text-center py-12 bg-white border border-slate-200 rounded-none shadow-md hidden md:block">
               <div className="flex flex-col items-center gap-4">
                 <MapPin size={40} className="text-red-500" />
                 <div>

@@ -242,11 +242,121 @@ const Navbar = () => {
       </div>
 
       {/* Main Nav Bar */}
-      <div className={`bg-white py-4 relative z-20 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"}`}>
+      <div className={`bg-white relative z-20 transition-all duration-300 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"} py-2 md:py-4 md:rounded-none rounded-b-[2rem] shadow-sm md:shadow-none`}>
         <div className="max-w-[1440px] mx-auto px-4 lg:px-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-8">
             
-            <div className="flex items-center justify-between w-full lg:w-auto">
+            {/* MOBILE ONLY HEADER: CLEAN APP STYLE */}
+            <div className="flex lg:hidden items-center justify-between w-full h-12">
+               {/* 1. Left: Hamburger */}
+               <button 
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-1 hover:bg-slate-100 rounded-lg text-[#154279]"
+               >
+                 <FaBars size={24} />
+               </button>
+
+               {/* 2. Center: Logo Icon Only (App Style) */}
+               <div onClick={handleHomeClick} className="flex items-center justify-center gap-2">
+                  {/* SVG Logo */}
+                  <svg viewBox="0 0 200 200" className="h-10 w-auto drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <linearGradient id="mobile-grad-front" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#F9F1DC" />
+                        <stop offset="100%" stopColor="#D4AF37" />
+                      </linearGradient>
+                      <linearGradient id="mobile-grad-side" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#D4AF37" />
+                        <stop offset="100%" stopColor="#AA8C2C" />
+                      </linearGradient>
+                      <linearGradient id="mobile-grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#998A5E" />
+                        <stop offset="100%" stopColor="#5C5035" />
+                      </linearGradient>
+                      <filter id="mobile-glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    <path d="M110 90 V170 L160 150 V70 L110 90 Z" fill="url(#mobile-grad-front)" stroke="#D4AF37" strokeWidth="2" strokeLinejoin="round"/>
+                    <path d="M160 70 L180 80 V160 L160 150 Z" fill="url(#mobile-grad-dark)" stroke="#D4AF37" strokeWidth="2" strokeLinejoin="round"/>
+                    <path d="M30 150 V50 L80 20 V120 L30 150 Z" fill="url(#mobile-grad-front)" stroke="#D4AF37" strokeWidth="2" strokeLinejoin="round"/>
+                    <path d="M80 20 L130 40 V140 L80 120 Z" fill="url(#mobile-grad-side)" stroke="#D4AF37" strokeWidth="2" strokeLinejoin="round"/>
+                    
+                    <defs>
+                      <linearGradient id="mobile-window-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#154279" />
+                        <stop offset="100%" stopColor="#0F2847" />
+                      </linearGradient>
+                    </defs>
+                    <g fill="url(#mobile-window-grad)" opacity="0.9">
+                      <path d="M85 50 L100 56 V86 L85 80 Z" />
+                      <path d="M85 90 L100 96 V126 L85 120 Z" />
+                      <path d="M45 60 L55 54 V124 L45 130 Z" />
+                      <path d="M120 130 L140 122 V152 L120 160 Z" />
+                    </g>
+                    <circle cx="120" cy="60" r="8" fill="#F96302" opacity="0.7" filter="url(#mobile-glow)"/>
+                  </svg>
+                  
+                  {/* Text Logo */}
+                  <div className="flex flex-col justify-center font-brand -mt-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-[${COLORS.primary}] font-bold text-lg tracking-tight leading-none`}>
+                        Kenya
+                      </span>
+                      <span className="text-slate-900 font-bold text-lg tracking-tight leading-none">
+                        realtors
+                      </span>
+                      <div className={`h-1.5 w-1.5 bg-[${COLORS.secondary}] rounded-none mb-1 shadow-sm`}></div>
+                    </div>
+                    <span className="text-slate-500 font-bold text-[8px] uppercase tracking-[0.2em]">
+                      The Property Hub
+                    </span>
+                  </div>
+               </div>
+
+               {/* 3. Right: User Actions (Account Icon with Dropdown) */}
+               <div className="relative">
+                 <button 
+                    onClick={() => setShowTenantDropdown(!showTenantDropdown)}
+                    className="p-1 hover:bg-slate-100 rounded-lg text-[#154279] relative z-20"
+                 >
+                   <FaUser size={22} />
+                 </button>
+                 
+                 {/* Mobile Account Dropdown */}
+                 {showTenantDropdown && (
+                   <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-slate-100 overflow-hidden z-30 shadow-xl rounded-2xl">
+                      {ACCOUNT_DROPDOWN.items.map((item) => (
+                        <button 
+                          key={item.id}
+                          onClick={() => {
+                            navigate(`/${item.action}`);
+                            setShowTenantDropdown(false);
+                          }}
+                          className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 first:rounded-t-2xl last:rounded-b-2xl"
+                        >
+                          <div className={`${item.bgColor} text-[${item.textColor}] p-2 rounded-full`}>
+                            {item.id === 'signin' ? <FaSignInAlt size={12} /> : <FaUserPlus size={12} />}
+                          </div>
+                          <span className="text-sm font-bold text-slate-700">{item.label}</span>
+                        </button>
+                      ))}
+                   </div>
+                 )}
+                 
+                 {/* Overlay to close dropdown when clicking outside */}
+                 {showTenantDropdown && (
+                   <div className="fixed inset-0 z-10" onClick={() => setShowTenantDropdown(false)}></div>
+                 )}
+               </div>
+            </div>
+
+            {/* DESKTOP HEADER (Hidden on mobile) */}
+            <div className="hidden lg:flex items-center justify-between w-full lg:w-auto">
               <div className="flex items-center gap-3">
                 {/* LOGO AREA */}
                 <div 
@@ -317,132 +427,54 @@ const Navbar = () => {
                 </div>
               </div>
 
-              {/* Navigation Dropdown - Mobile/Tablet on Right */}
-              <div className="lg:hidden relative group h-full py-2">
-                <button className="flex items-center outline-none">
-                  <FaBars size={20} className={`text-[${COLORS.primary}]`} />
-                </button>
-
-                {/* Dropdown Menu */}
-                <div className="absolute top-full right-0 pt-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-0 group-hover:translate-y-0 w-80 z-50 max-h-[500px] overflow-y-auto">
-                  {/* Blue Header Section */}
-                  <div className={`bg-[${COLORS.primary}] p-4 text-white`}>
-                    <div className="flex items-center gap-3 mb-4">
-                      <FaUser className={`text-[${COLORS.secondary}] text-lg`} />
-                      <div>
-                        <h3 className="font-bold text-sm">{MOBILE_HEADER.title}</h3>
-                        <p className="text-xs text-white/85">{MOBILE_HEADER.subtitle}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-none shadow-md border border-slate-200 overflow-hidden">
-                    {/* Account Section */}
-                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                        <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">Account</p>
-                    </div>
-                    
-                    {ACCOUNT_DROPDOWN.items.map((item) => (
-                      <button 
-                        key={item.id}
-                        onClick={() => navigate(`/${item.action}`)}
-                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-none transition-all group/item border-b border-slate-100 last:border-0"
-                      >
-                        <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-none group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
-                          {item.id === 'signin' ? <FaSignInAlt size={14} /> : <FaUserPlus size={14} />}
+              {/* MOBILE MENU SHEET (REPLACES OLD DROPDOWN) */}
+              <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+                 <SheetContent side="left" className="w-[300px] p-0 border-r-4 border-[#F96302]">
+                    <div className="flex flex-col h-full bg-slate-50">
+                        {/* Header */}
+                        <div className="bg-[#154279] p-6 text-white pb-8 relative overflow-hidden">
+                           <div className="relative z-10">
+                              <h2 className="text-xl font-black uppercase tracking-tighter mb-1">REALTORS<span className="text-[#F96302]">.</span></h2>
+                              <p className="text-xs text-white/70 font-medium">Your Trusted Property Partner</p>
+                           </div>
+                           <div className="absolute -right-4 -bottom-8 opacity-10">
+                              <FaCity size={120} />
+                           </div>
                         </div>
-                        <div>
-                            <span className={`block text-sm font-bold text-[${COLORS.primary}] group-hover/item:text-[${COLORS.secondary}] transition-colors`}>{item.label}</span>
-                            <span className="block text-[10px] text-slate-600">{item.description}</span>
+
+                        {/* Menu Items */}
+                        <div className="flex-1 overflow-y-auto py-4">
+                           {NAVIGATION_SECTIONS.map((item) => {
+                             const IconComponent = item.icon;
+                             return (
+                               <button 
+                                 key={item.id}
+                                 onClick={() => handleNavClick(item.id)}
+                                 className="w-full flex items-center gap-4 px-6 py-4 hover:bg-white border-b border-transparent hover:border-l-4 hover:border-l-[#F96302] transition-all group"
+                               >
+                                 <div className="bg-white p-2 text-slate-400 group-hover:text-[#F96302] group-hover:shadow-md transition-all rounded-md">
+                                    <IconComponent size={18} />
+                                 </div>
+                                 <span className="font-bold text-slate-600 group-hover:text-[#154279] uppercase text-xs tracking-wider">{item.name}</span>
+                                 <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-[#F96302]" />
+                               </button>
+                             );
+                           })}
                         </div>
-                      </button>
-                    ))}
-
-                    {/* Navigation Section */}
-                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 mt-2">
-                        <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">Menu</p>
-                    </div>
-                    
-                    {NAVIGATION_SECTIONS.map((item) => {
-                      const IconComponent = item.icon;
-                      const isTenantSupport = item.id === "faq";
-                      const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-                      
-                      return (
-                        <div key={item.id}>
-                          <button 
-                            onClick={() => {
-                              if (isTenantSupport) {
-                                setMobileMenuOpen(!mobileMenuOpen);
-                              } else {
-                                handleNavClick(item.id);
-                              }
-                            }}
-                            className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 rounded-none transition-all border-b border-slate-100 last:border-0"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className={`text-slate-600 bg-slate-100 p-2 rounded-none`}>
-                                <IconComponent size={item.iconSize} />
-                              </span>
-                              <span className={`text-sm font-semibold text-slate-700`}>{item.name}</span>
-                            </div>
-                            {isTenantSupport && (
-                              <FaChevronDown size={12} className={`text-slate-500 transition-transform ${mobileMenuOpen ? "rotate-180" : ""}`} />
-                            )}
-                          </button>
-
-                          {/* Tenant Support Sub-dropdown */}
-                          {isTenantSupport && mobileMenuOpen && (
-                            <div className="bg-slate-50 border-l-[3px] border-[#F96302]">
-                              <button
-                                onClick={() => {
-                                  handleNavClick("faq");
-                                  setMobileMenuOpen(false);
-                                }}
-                                className="w-full px-8 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
-                              >
-                                <span>❓</span>
-                                FAQ Section
-                              </button>
-                              <button
-                                onClick={() => {
-                                  navigate("/contact");
-                                  setMobileMenuOpen(false);
-                                }}
-                                className="w-full px-8 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
-                              >
-                                <span>📧</span>
-                                Contact Us
-                              </button>
-                            </div>
-                          )}
+                        
+                        {/* Footer Actions */}
+                        <div className="p-6 bg-white border-t border-slate-200">
+                           <button 
+                             onClick={() => navigate('/login')}
+                             className="w-full bg-[#154279] text-white py-3 font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-transform flex items-center justify-center gap-2 rounded-none"
+                           >
+                             <FaSignInAlt /> Portal Login
+                           </button>
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Promo Banner */}
-                  <div className={`m-3 p-4 bg-[${COLORS.primary}] rounded-none text-white shadow-md relative overflow-hidden`}>
-                    <div className="absolute -right-4 -bottom-4 text-white/5 text-6xl"><FaCity /></div>
-                    <div className={`absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-[${COLORS.secondary}]/25 to-transparent`}></div>
-                    <div className="relative z-10">
-                      <span className={`bg-[${COLORS.secondary}] text-[10px] font-bold px-2.5 py-1 rounded-none text-white uppercase tracking-wider shadow-md`}>{PROMO_BANNER.badge}</span>
-                      <h3 className="font-bold text-lg mt-2 leading-tight">{PROMO_BANNER.title}</h3>
-                      <p className="text-xs text-white/90 mt-1 mb-3 font-medium">{PROMO_BANNER.description}</p>
-                      <button onClick={() => handleNavClick(PROMO_BANNER.ctaAction)} className={`text-xs font-bold bg-white text-[${COLORS.primary}] px-3 py-1.5 rounded-none hover:bg-[${COLORS.secondary}] hover:text-white transition-colors shadow-md`}>
-                        {PROMO_BANNER.ctaLabel}
-                      </button>
                     </div>
-                  </div>
+                 </SheetContent>
+              </Sheet>
 
-                  {/* Logout Button */}
-                  <div className="p-3 bg-slate-50 border-t border-slate-200">
-                    <button onClick={() => { navigate('/login'); }} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-none transition-all px-4 justify-center`}>
-                      <FaSignOutAlt /> {LOGOUT_BUTTON.label}
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* CHECK VISIBILITY: Sleek Rounded Design - Hidden on tablet/mobile */}
@@ -516,10 +548,10 @@ const Navbar = () => {
                   </span>
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* Dropdown Menu - Rounded & Smooth */}
                   <div className="absolute top-full right-0 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 w-64 z-50">
-                  <div className="bg-white rounded-none shadow-md border border-slate-200 overflow-hidden p-2">
-                    <div className="px-4 py-3 border-b border-slate-200 mb-1">
+                  <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden p-2">
+                    <div className="px-4 py-3 border-b border-slate-100 mb-1">
                         <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">{ACCOUNT_DROPDOWN.title}</p>
                     </div>
                     
@@ -527,9 +559,9 @@ const Navbar = () => {
                       <button 
                         key={item.id}
                         onClick={() => navigate(`/${item.action}`)}
-                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-none transition-all group/item mt-1"
+                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl transition-all group/item mt-1"
                       >
-                        <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-none group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
+                        <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-full group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
                           {item.id === 'signin' ? <FaSignInAlt size={14} /> : <FaUserPlus size={14} />}
                         </div>
                         <div>
@@ -637,37 +669,13 @@ const Navbar = () => {
           
           {/* Mobile Header: Pure Blue background matching navbar */}
           <div className={`bg-[${COLORS.primary}] p-6 text-white relative overflow-hidden`}>
-            <div className="relative z-10 mb-6">
-              <div className="flex items-center gap-3 mb-6">
+            <div className="relative z-10">
+              <div className="flex items-center gap-3">
                 <FaUser className={`text-[${COLORS.secondary}] text-xl`} />
                 <div>
                   <h2 className="font-bold text-xl">{MOBILE_HEADER.title}</h2>
                   <p className="text-xs text-white/85 font-medium">{MOBILE_HEADER.subtitle}</p>
                 </div>
-              </div>
-
-              {/* Search Bar - Mobile Version */}
-              <div className={`w-full flex items-center bg-white/15 border border-white/20 rounded-full pl-1 pr-1 py-1 transition-all duration-300 focus-within:border-white focus-within:ring-1 focus-within:ring-white/50`}>
-                <div className="relative flex-1">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60">
-                    <FaSearch size={14} />
-                  </div>
-                  <input 
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setShowResults(true);
-                    }}
-                    onFocus={() => setShowResults(true)}
-                    onBlur={() => setTimeout(() => setShowResults(false), 200)}
-                    placeholder="Find properties..."
-                    className="w-full h-9 pl-10 pr-3 border-none outline-none text-[13px] placeholder:text-white/50 font-medium bg-transparent text-white"
-                  />
-                </div>
-                <button className={`bg-[${COLORS.secondary}] hover:bg-[${COLORS.primary}] text-white px-4 h-9 font-bold text-xs tracking-wider transition-all rounded-full shadow-md flex items-center`}>
-                  <FaSearch size={12} />
-                </button>
               </div>
             </div>
           </div>
@@ -695,7 +703,7 @@ const Navbar = () => {
                       className={`w-full px-6 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 active:bg-slate-100 transition-colors border-l-[3px] border-transparent hover:border-[${COLORS.secondary}] group`}
                     >
                       <div className={`flex items-center gap-4 text-slate-700 group-hover:text-[${COLORS.primary}]`}>
-                        <span className={`text-slate-600 bg-slate-100 p-2 rounded-none group-hover:bg-[${COLORS.secondary}] group-hover:text-white transition-colors`}>
+                        <span className={`text-slate-600 bg-slate-100 p-2 rounded-xl group-hover:bg-[${COLORS.secondary}] group-hover:text-white transition-colors`}>
                           <IconComponent size={item.iconSize} />
                         </span>
                         <span className="font-semibold text-sm">{item.name}</span>
@@ -737,23 +745,23 @@ const Navbar = () => {
               })}
             </div>
 
-            <div className={`m-4 p-5 bg-[${COLORS.primary}] rounded-none text-white shadow-md relative overflow-hidden`}>
+            <div className={`m-4 p-5 bg-[${COLORS.primary}] rounded-xl text-white shadow-md relative overflow-hidden hidden`}>
                <div className="absolute -right-4 -bottom-4 text-white/5 text-8xl"><FaCity /></div>
                {/* Bright Orange accent */}
                <div className={`absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-[${COLORS.secondary}]/25 to-transparent`}></div>
               <div className="relative z-10">
-                <span className={`bg-[${COLORS.secondary}] text-[10px] font-bold px-2.5 py-1 rounded-none text-white uppercase tracking-wider shadow-md`}>{PROMO_BANNER.badge}</span>
+                <span className={`bg-[${COLORS.secondary}] text-[10px] font-bold px-2.5 py-1 rounded-lg text-white uppercase tracking-wider shadow-md`}>{PROMO_BANNER.badge}</span>
                 <h3 className="font-bold text-xl mt-3 leading-tight">{PROMO_BANNER.title}</h3>
                 <p className="text-xs text-white/90 mt-1 mb-4 font-medium w-2/3">{PROMO_BANNER.description}</p>
-                <button onClick={() => handleNavClick(PROMO_BANNER.ctaAction)} className={`text-xs font-bold bg-white text-[${COLORS.primary}] px-4 py-2 rounded-none hover:bg-[${COLORS.secondary}] hover:text-white transition-colors shadow-md`}>
+                <button onClick={() => handleNavClick(PROMO_BANNER.ctaAction)} className={`text-xs font-bold bg-white text-[${COLORS.primary}] px-4 py-2 rounded-lg hover:bg-[${COLORS.secondary}] hover:text-white transition-colors shadow-md`}>
                   {PROMO_BANNER.ctaLabel}
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 border-t border-slate-200">
-            <button onClick={() => { setMenuOpen(false); navigate('/login'); }} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-none transition-all px-4 justify-center`}>
+          <div className="p-4 bg-slate-50 border-t border-slate-200 hidden">
+            <button onClick={() => { setMenuOpen(false); navigate('/login'); }} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-xl transition-all px-4 justify-center`}>
               <FaSignOutAlt /> {LOGOUT_BUTTON.label}
             </button>
           </div>

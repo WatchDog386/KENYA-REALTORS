@@ -329,28 +329,39 @@ const SEARCH_PRESETS = [
 ];
 
 const FilterSidebar = ({ filters, setFilters }: any) => {
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
+
     const handleChange = (e: any) => {
         const { name, value } = e.target;
         setFilters((prev: any) => ({ ...prev, [name]: value }));
     };
 
     return (
-        <div className="bg-gradient-to-br from-[#f0f4f8] via-white to-[#e8ecf1] p-6 rounded-none shadow-2xl border-2 border-slate-300 font-inter overflow-hidden">
-            <div className="flex items-center gap-2 mb-6 pb-4 border-b-2 border-[#154279]">
-                <Zap size={18} className="text-[#F96302]" />
-                <h3 className="font-bold text-lg text-[#154279] tracking-tight uppercase">
-                    Find Your Unit
-                </h3>
+        <div className="bg-gradient-to-br from-[#f0f4f8] via-white to-[#e8ecf1] p-4 md:p-6 rounded-lg md:rounded-none shadow-lg md:shadow-2xl border-2 border-slate-300 font-inter overflow-hidden mb-4 md:mb-0">
+            <div 
+                className="flex items-center justify-between mb-0 md:mb-6 pb-2 md:pb-4 border-b-0 md:border-b-2 border-[#154279] cursor-pointer md:cursor-default"
+                onClick={() => setIsMobileOpen(!isMobileOpen)}
+            >
+                <div className="flex items-center gap-2">
+                    <Zap size={18} className="text-[#F96302]" />
+                    <h3 className="font-bold text-sm md:text-lg text-[#154279] tracking-tight uppercase">
+                        Find Your Unit
+                    </h3>
+                </div>
+                {/* Mobile Toggle Icon */}
+                <div className="md:hidden bg-slate-200 p-1.5 rounded-full text-[#154279]">
+                   <ChevronRight size={14} className={cn("transition-transform duration-300", isMobileOpen ? "rotate-90" : "")} />
+                </div>
             </div>
             
-            <div className="space-y-5">
+            <div className={cn("mt-4 md:mt-0 space-y-4 md:space-y-5", isMobileOpen ? "block" : "hidden md:block")}>
                 <div>
-                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Popular Searches</label>
+                    <label className="text-[9px] md:text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-1.5 md:mb-2 block">Popular Searches</label>
                     <select 
                         name="keyword"
                         value={filters.keyword}
                         onChange={handleChange}
-                        className="w-full bg-white border-2 border-slate-300 p-3 rounded-none text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
+                        className="w-full bg-white border-2 border-slate-300 p-2.5 md:p-3 rounded-none text-xs md:text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
                     >
                         {SEARCH_PRESETS.map((preset, idx) => (
                             <option key={idx} value={preset.value}>
@@ -361,7 +372,7 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                 </div>
 
                 <div>
-                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Or Search Keyword</label>
+                    <label className="text-[9px] md:text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-1.5 md:mb-2 block">Or Search Keyword</label>
                     <input 
                         type="text" 
                         name="keywordCustom"
@@ -371,17 +382,17 @@ const FilterSidebar = ({ filters, setFilters }: any) => {
                                 setFilters((prev: any) => ({ ...prev, keyword: e.target.value }));
                             }
                         }}
-                        className="w-full bg-white border-2 border-slate-300 p-3 rounded-none text-sm text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none"
+                        className="w-full bg-white border-2 border-slate-300 p-2 text-xs md:p-3 md:text-sm rounded-none text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none"
                     />
                 </div>
 
                 <div>
-                    <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-2 block">Apartment Type</label>
+                    <label className="text-[9px] md:text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-1.5 md:mb-2 block">Apartment Type</label>
                     <select 
                         name="type" 
                         value={filters.type}
                         onChange={handleChange}
-                        className="w-full bg-white border-2 border-slate-300 p-3 rounded-none text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
+                        className="w-full bg-white border-2 border-slate-300 p-2.5 md:p-3 rounded-none text-xs md:text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
                     >
                         <option value="All">All Types</option>
                         <option value="3 Bedroom">3 Bedrooms</option>
@@ -692,7 +703,7 @@ export default function AydenTowersListing() {
                         animate={{ opacity: 1, y: 0 }}
                         className="mb-10 pb-6 border-b border-slate-200/60"
                     >
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-[#154279] leading-tight tracking-tight">
+                        <h1 className="text-xl sm:text-2xl md:text-4xl font-semibold text-[#154279] leading-tight tracking-tight">
                             Ayden Home Towers
                         </h1>
                         <p className="text-slate-500 mt-2 text-sm font-normal">
@@ -716,7 +727,7 @@ export default function AydenTowersListing() {
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-[#154279]/80 via-[#154279]/20 to-transparent"></div>
                             <div className="absolute bottom-6 left-6 text-white z-20">
-                                <div className="text-3xl lg:text-4xl font-semibold leading-tight tracking-tight">AYDEN HOME TOWERS</div>
+                                <div className="text-xl lg:text-4xl font-semibold leading-tight tracking-tight">AYDEN HOME TOWERS</div>
                                 <div className="text-sm font-normal opacity-90 mt-2 flex items-center gap-2">
                                     <MapPin size={14} className="text-[#F96302]" /> Nairobi West, Kenya
                                 </div>
@@ -729,7 +740,7 @@ export default function AydenTowersListing() {
                                 <div className="h-px w-8 bg-[#F96302]"></div>
                                 <span className="text-xs font-medium text-[#F96302]">Signature Living</span>
                             </div>
-                            <h2 className="text-2xl lg:text-3xl font-semibold text-[#154279] leading-tight tracking-tight mb-4">
+                            <h2 className="text-xl lg:text-3xl font-semibold text-[#154279] leading-tight tracking-tight mb-4">
                                 Modern Living<br/>
                                 <span className="text-[#F96302]">Perfected.</span>
                             </h2>

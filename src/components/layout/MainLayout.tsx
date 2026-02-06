@@ -28,7 +28,7 @@ const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
                      location.pathname.includes('/register');
 
   return (
-    <div className="flex flex-col min-h-screen relative">
+    <div className={`flex flex-col min-h-screen relative`}>
       {/* 1. Frontend Navbar for public pages - Only show on non-auth pages */}
       {!isAuthPage && (
         <NavbarSection />
@@ -36,8 +36,10 @@ const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
 
       {/* 2. Main Content 
           Adjust padding based on whether navbar is shown
+          Mobile: Optimized to PT-16 to reduce gap below rounded navbar
+          Desktop: 10.5rem (pt-[10.5rem]) matches Navbar config
       */}
-      <main className={`flex-grow ${!isAuthPage ? 'pt-24 lg:pt-32' : ''}`}>
+      <main className={`flex-grow bg-[#f7f7f7] ${!isAuthPage ? 'pt-16 lg:pt-[10.5rem]' : ''}`}>
         <Outlet />
       </main>
 
@@ -47,7 +49,7 @@ const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
       {/* 4. Footer - Only show on non-auth pages */}
       {!isAuthPage && <Footer />}
 
-      {/* 5. Leasing Module Modal */}
+      {/* 6. Leasing Module Modal */}
       <PolishedLeasingModule 
         isOpen={isLeasingOpen} 
         onClose={() => setIsLeasingOpen(false)} 

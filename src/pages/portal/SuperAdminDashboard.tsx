@@ -67,8 +67,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
-import PropertyManagerAssignment from "@/components/portal/super-admin/PropertyManagerAssignment";
-import PropertyManagersOverview from "@/components/portal/super-admin/PropertyManagersOverview";
 
 interface DashboardStats {
   totalProperties: number;
@@ -217,7 +215,7 @@ const SuperAdminDashboard = () => {
       });
       
       // Calculate estimated monthly rent potential from the units
-       const estimatedMonthlyRent = propertiesData.reduce((sum: number, prop: any) => {
+       const estimatedMonthlyRent = propertiesData.reduce((sum, prop: any) => {
           return sum + (prop.property_unit_types || []).reduce((subSum: number, u: any) => subSum + (u.units_count * u.price_per_unit), 0);
        }, 0);
        // We'll map this to 'totalRevenue' or wherever it was used. 
@@ -261,9 +259,9 @@ const SuperAdminDashboard = () => {
         .eq("status", "completed")
         .gte("created_at", startOfMonth.toISOString());
 
-      const totalRevenue = payments?.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0) || 0;
+      const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
 
-      const totalExpectedRevenue = propertiesData.reduce((sum: number, p: any) => {
+      const totalExpectedRevenue = propertiesData.reduce((sum, p: any) => {
         // Use potential income calculated from unit types
         const potential = (p.property_unit_types || []).reduce((acc: number, u: any) => acc + (u.units_count * u.price_per_unit), 0);
         return sum + potential;
@@ -335,7 +333,7 @@ const SuperAdminDashboard = () => {
         .limit(3);
 
       if (recentUsers) {
-        recentUsers.forEach((userItem: any) => {
+        recentUsers.forEach(userItem => {
           items.push({
             id: userItem.id,
             title: `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim() || userItem.email,
@@ -354,7 +352,7 @@ const SuperAdminDashboard = () => {
         .limit(2);
 
       if (recentPayments) {
-        recentPayments.forEach((payment: any) => {
+        recentPayments.forEach(payment => {
           items.push({
             id: payment.id,
             title: `Payment of ${formatCurrency(payment.amount || 0)}`,
@@ -379,7 +377,7 @@ const SuperAdminDashboard = () => {
         .limit(5);
 
       if (recentApprovals) {
-        recentApprovals.forEach((approval: any) => {
+        recentApprovals.forEach(approval => {
           const titleMap: Record<string, string> = {
             role_assignment: "Role Assignment",
             manager_assignment: "Manager Assignment",
@@ -418,7 +416,7 @@ const SuperAdminDashboard = () => {
         .limit(3);
 
       if (emergencyMaintenance && emergencyMaintenance.length > 0) {
-        emergencyMaintenance.forEach((req: any) => {
+        emergencyMaintenance.forEach(req => {
           alerts.push({
             id: `maintenance-${req.id}`,
             title: `Emergency Maintenance: ${req.title}`,
@@ -841,15 +839,6 @@ const SuperAdminDashboard = () => {
                     bgGradient: "from-blue-500 via-blue-600 to-blue-700",
                     borderColor: "border-blue-300",
                     iconBg: "bg-blue-400"
-                  },
-                  {
-                    title: "Property Managers",
-                    icon: <Shield className="w-6 h-6 text-white" />,
-                    description: "Assign properties to managers",
-                    route: "/portal/super-admin/managers",
-                    bgGradient: "from-indigo-500 via-indigo-600 to-indigo-700",
-                    borderColor: "border-indigo-300",
-                    iconBg: "bg-indigo-400"
                   },
                   {
                     title: "Properties",

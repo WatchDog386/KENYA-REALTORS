@@ -352,7 +352,7 @@ export default function TenantCTABanner() {
       >
         
         {/* COMPACT STRIP CONTAINER */}
-        <div className="bg-[#154279] transition-colors duration-300 flex flex-col md:flex-row h-auto md:h-40 relative overflow-hidden">
+        <div className="bg-[#154279] transition-colors duration-300 flex flex-row h-28 md:h-40 relative overflow-hidden rounded-none md:rounded-none">
           
           {/* Animated Background Effects */}
           <AnimatedBackground />
@@ -360,8 +360,8 @@ export default function TenantCTABanner() {
           {/* Background Texture */}
           <div className="absolute inset-0 bg-texture-stripes opacity-20 pointer-events-none"></div>
 
-          {/* 1. LOGO SECTION (Left) */}
-          <div className="w-full md:w-48 bg-white relative z-10 flex-shrink-0 border-r border-gray-200">
+          {/* 1. LOGO SECTION (Left) - Scaled down on mobile - REMOVED ON MOBILE */}
+          <div className="hidden md:block w-24 md:w-48 bg-white relative z-10 flex-shrink-0 border-r border-gray-200">
              <div className="w-full h-full relative overflow-hidden group-hover:grayscale-0 transition-all duration-500">
                 {/* Logo Image */}
                 <img 
@@ -371,65 +371,65 @@ export default function TenantCTABanner() {
                 />
                 
                 {/* Verified Overlay Badge */}
-                <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm text-white text-[8px] font-black uppercase px-2 py-0.5 flex items-center gap-1">
-                   <ShieldCheck className="w-2.5 h-2.5 text-[#FCD200]" /> Verified
+                <div className="absolute top-1 left-1 md:top-2 md:left-2 bg-black/80 backdrop-blur-sm text-white text-[6px] md:text-[8px] font-black uppercase px-1.5 py-0.5 flex items-center gap-1">
+                   <ShieldCheck className="w-2 h-2 md:w-2.5 md:h-2.5 text-[#FCD200]" /> Verified
                 </div>
              </div>
           </div>
 
-          {/* 2. CONTENT SECTION (Middle) - Compacted */}
-          <div className="flex-1 p-4 md:p-5 flex flex-col justify-center relative z-10">
+          {/* 2. CONTENT SECTION (Middle) - Compacted & Left Aligned */}
+          <div className="flex-1 p-2 md:p-5 flex flex-col justify-center relative z-10 text-left">
              
-             <div className="flex items-center gap-2 mb-1">
-               <span className="bg-[#154279] text-white transition-colors text-[9px] font-black uppercase px-1.5 py-0.5 tracking-widest group-hover:bg-white group-hover:text-[#F96302]">
-                 New Listing
+             <div className="flex items-center justify-start gap-1 md:gap-2 mb-0.5 md:mb-1">
+               <span className="bg-[#154279] border border-white/20 text-white transition-colors text-[7px] md:text-[9px] font-black uppercase px-1 md:px-1.5 py-0.5 tracking-widest group-hover:bg-white group-hover:text-[#F96302]">
+                 New
                </span>
-               <span className="text-[9px] font-bold text-white/80 uppercase tracking-wide group-hover:text-white transition-colors">
-                 Ref: #404-KE
+               <span className="text-[7px] md:text-[9px] font-bold text-white/80 uppercase tracking-wide group-hover:text-white transition-colors">
+                 #404-KE
                </span>
              </div>
 
-             <h2 className="font-condensed font-black text-2xl md:text-3xl text-white uppercase leading-none mb-2 drop-shadow-sm">
-                Modern <span className="text-white/50">Living Spaces</span>
+             <h2 className="font-condensed font-black text-sm md:text-3xl text-white uppercase leading-none mb-1 md:mb-2 drop-shadow-sm">
+                Modern <span className="text-white/50">Living</span>
              </h2>
              
-             <div className="flex flex-wrap gap-x-4 gap-y-1 text-white text-[10px] font-bold uppercase opacity-90">
+             <div className="flex flex-col md:flex-row flex-wrap justify-start gap-0.5 md:gap-x-4 md:gap-y-1 text-white text-[8px] md:text-[10px] font-bold uppercase opacity-90">
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-[#FCD200]" /> High-Speed Fiber
+                  <CheckCircle2 className="w-2 h-2 md:w-3 md:h-3 text-[#FCD200]" /> Fiber Ready
                 </span>
                 <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-[#FCD200]" /> Backup Generator
+                  <CheckCircle2 className="w-2 h-2 md:w-3 md:h-3 text-[#FCD200]" /> Generator
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 hidden md:flex">
                   <CheckCircle2 className="w-3 h-3 text-[#FCD200]" /> CCTV Security
                 </span>
              </div>
           </div>
 
-          {/* 3. ACTION SECTION (Right) - Streamlined */}
-          <div className="w-full md:w-64 bg-white/5 backdrop-blur-sm border-l border-white/10 p-4 flex flex-col justify-center relative z-20">
+          {/* 3. ACTION SECTION (Right) - Streamlined Column */}
+          <div className="w-20 md:w-64 bg-white/5 backdrop-blur-sm border-l border-white/10 p-2 md:p-4 flex flex-col justify-center items-center relative z-20 gap-2 md:gap-3">
              
-             <div className="flex items-end justify-between md:justify-start md:gap-3 mb-3 border-b border-white/20 pb-2">
-                <span className="text-white/60 text-[9px] font-black uppercase mb-1">Rent</span>
-                <div className="text-white font-condensed font-black text-3xl leading-none tracking-tighter">
-                   15K <span className="text-[10px] text-[#FCD200]">KES</span>
+             <div className="flex flex-col md:flex-row items-center md:items-end justify-center md:justify-start md:gap-3 mb-0 md:mb-3 md:border-b border-white/20 md:pb-2 w-full">
+                <span className="text-white/60 text-[9px] font-black uppercase mb-1 hidden md:inline">Rent</span>
+                <div className="text-white font-condensed font-black text-base md:text-3xl leading-none tracking-tighter text-center md:text-left">
+                   15K <span className="text-[8px] md:text-[10px] text-[#FCD200]">KES</span>
                 </div>
              </div>
 
-             <div className="grid grid-cols-2 gap-2">
-               <button className="bg-white text-[#154279] hover:bg-[#F96302] hover:text-white transition-colors h-8 text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm">
-                  <Search className="w-3 h-3" /> View
+             <div className="flex flex-col md:grid md:grid-cols-2 gap-1 md:gap-2 w-full">
+               <button className="bg-white text-[#154279] hover:bg-[#F96302] hover:text-white transition-colors h-6 md:h-8 text-[7px] md:text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 shadow-sm w-full">
+                  <Search className="w-2 h-2 md:w-3 md:h-3" /> <span className="md:inline">View</span>
                </button>
                
                <button 
                  onClick={() => setIsSaved(!isSaved)}
-                 className={`h-8 border text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all
+                 className={`h-6 md:h-8 border text-[7px] md:text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all w-full
                  ${isSaved 
                     ? 'bg-[#F96302] border-[#F96302] text-white' 
                     : 'border-white/30 text-white hover:bg-[#154279]'}`}
                >
-                  <Heart className={`w-3 h-3 ${isSaved ? 'fill-white' : ''}`} />
-                  {isSaved ? 'Saved' : 'Save'}
+                  <Heart className={`w-2 h-2 md:w-3 md:h-3 ${isSaved ? 'fill-white' : ''}`} />
+                  <span className="md:inline">{isSaved ? 'Saved' : 'Save'}</span>
                </button>
              </div>
 

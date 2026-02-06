@@ -125,7 +125,7 @@ const RAW_FAQS = [
 // ==========================================
 // ACCORDION COMPONENT
 // ==========================================
-const FAQItem = ({ item, isOpen, onToggle }) => {
+const FAQItem = ({ item, isOpen, onToggle }: { item: any, isOpen: boolean, onToggle: () => void }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopyCode = () => {
@@ -135,48 +135,89 @@ const FAQItem = ({ item, isOpen, onToggle }) => {
     };
 
     return (
-        <div key={item.id} className="group">
+        <div key={item.id} className="group border-b border-slate-100 last:border-0 relative">
             <div 
                 onClick={onToggle}
                 className={cn(
-                    "table-row-hover grid grid-cols-12 gap-6 px-8 py-5 items-center cursor-pointer",
-                    isOpen ? 'bg-blue-50/40 border-l-cta' : 'bg-white hover:bg-slate-50'
+                    "relative w-full cursor-pointer transition-all duration-200",
+                    isOpen ? 'bg-blue-50/40' : 'bg-white hover:bg-slate-50'
                 )}
             >
-                <div className="col-span-2">
-                    <span className="text-[10px] font-semibold font-mono text-slate-400 group-hover:text-navy bg-slate-100 px-2 py-1 rounded">
-                        {item.id}
-                    </span>
-                </div>
-                <div className="col-span-5">
-                    <div className={cn(
-                        "text-sm font-semibold transition-colors mb-1",
-                        isOpen ? 'text-navy' : 'text-slate-700 group-hover:text-navy'
-                    )}>
-                        {item.question}
+                {/* Desktop Grid Layout */}
+                <div className="hidden md:grid grid-cols-12 gap-6 px-8 py-5 items-center">
+                    <div className="col-span-2">
+                        <span className="text-[10px] font-semibold font-mono text-slate-400 group-hover:text-navy bg-slate-100 px-2 py-1 rounded">
+                            {item.id}
+                        </span>
                     </div>
-                    <p className="text-xs text-slate-500">{item.preview}</p>
+                    <div className="col-span-5">
+                        <div className={cn(
+                            "text-sm font-semibold transition-colors mb-1",
+                            isOpen ? 'text-navy' : 'text-slate-700 group-hover:text-navy'
+                        )}>
+                            {item.question}
+                        </div>
+                        <p className="text-xs text-slate-500 line-clamp-1">{item.preview}</p>
+                    </div>
+                    <div className="col-span-2">
+                        <span className="text-xs font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded">
+                            {item.category}
+                        </span>
+                    </div>
+                    <div className="col-span-1 text-center">
+                        <span className="text-xs font-medium text-slate-600">{item.views}</span>
+                    </div>
+                    <div className="col-span-2 flex justify-end">
+                        <ChevronDown 
+                            size={16} 
+                            className={cn(
+                                "text-slate-400 transition-transform duration-300",
+                                isOpen && "rotate-180"
+                            )}
+                        />
+                    </div>
                 </div>
-                <div className="col-span-2">
-                    <span className="text-xs font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded">
-                        {item.category}
-                    </span>
-                </div>
-                <div className="col-span-1 text-center">
-                    <span className="text-xs font-medium text-slate-600">{item.views}</span>
-                </div>
-                <div className="col-span-1 flex justify-end">
-                    <ChevronDown 
-                        size={16} 
-                        className={cn(
-                            "text-slate-400 transition-transform duration-300",
-                            isOpen && "rotate-180"
+
+                {/* Mobile Stacked Layout */}
+                <div className="md:hidden flex flex-col px-3 py-3 gap-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-semibold font-mono text-slate-500 bg-slate-100/80 px-1.5 py-0.5 rounded">
+                            {item.id}
+                        </span>
+                        <div className="flex items-center gap-2">
+                             <span className="text-[9px] font-medium text-slate-600 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full">
+                                {item.category}
+                            </span>
+                            <ChevronDown 
+                                size={14} 
+                                className={cn(
+                                    "text-slate-400 transition-transform duration-300",
+                                    isOpen && "rotate-180"
+                                )}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div className={cn(
+                            "text-xs font-semibold transition-colors mb-1 pr-2",
+                            isOpen ? 'text-navy' : 'text-slate-700'
+                        )}>
+                            {item.question}
+                        </div>
+                        {!isOpen && (
+                            <p className="text-[10px] text-slate-500 line-clamp-2">{item.preview}</p>
                         )}
-                    />
+                    </div>
                 </div>
+
+                {/* Accent Border on Left when active */}
+                {isOpen && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#F96302]"></div>
+                )}
             </div>
 
-            {/* Expanded Content */}
+            {/* Expanded Content - Shared */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -184,19 +225,19 @@ const FAQItem = ({ item, isOpen, onToggle }) => {
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3 }}
-                        className="overflow-hidden bg-slate-50/50 border-b border-slate-100"
+                        className="overflow-hidden bg-slate-50/50 border-t border-slate-100"
                     >
-                        <div className="px-8 py-6 space-y-4">
+                        <div className="px-3 py-4 md:px-8 md:py-6 space-y-2 md:space-y-4">
                             <div>
-                                <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                                <p className="text-[11px] md:text-sm text-slate-700 leading-relaxed font-medium">
                                     {item.content.answer}
                                 </p>
                             </div>
 
                             {item.content.code && (
                                 <div className="relative">
-                                    <div className="bg-slate-800 text-slate-100 p-4 rounded border border-slate-700 overflow-x-auto">
-                                        <pre className="text-xs font-mono whitespace-pre-wrap break-words">
+                                    <div className="bg-slate-800 text-slate-100 p-3 md:p-4 rounded border border-slate-700 overflow-x-auto">
+                                        <pre className="text-[10px] md:text-xs font-mono whitespace-pre-wrap break-words">
                                             {item.content.code}
                                         </pre>
                                     </div>
@@ -242,12 +283,12 @@ export default function FAQSection() {
     return (
         <>
         <GlobalStyles />
-        <div className="flex h-screen bg-slate-50 overflow-hidden font-brand pt-[5rem] lg:pt-[8rem]">
+        <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-slate-50 md:overflow-hidden font-brand pt-[60px] md:pt-[5rem]">
             
-            {/* --- SIDEBAR --- */}
-            <aside className="w-72 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm h-full">
-                {/* Branding */}
-                <div className="h-24 flex items-center px-8 border-b border-slate-100">
+            {/* --- SIDEBAR (Desktop Fixed / Mobile Horizontal) --- */}
+            <aside className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-sm md:h-full sticky top-[60px] md:static shrink-0">
+                {/* Branding - Hidden on Mobile */}
+                <div className="hidden md:flex h-24 items-center px-8 border-b border-slate-100">
                     <div className="flex flex-col">
                         <h1 className="font-black text-navy text-lg tracking-tight uppercase leading-none">REALTORS<span className="text-cta">.</span></h1>
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Support</span>
@@ -255,46 +296,50 @@ export default function FAQSection() {
                 </div>
 
                 {/* Navigation */}
-                <div className="p-6 flex-1 overflow-y-auto scroll-panel">
-                    <div className="mb-8">
-                        <p className="mb-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Modules</p>
-                        <nav className="space-y-1">
-                            {CATEGORIES.map((cat) => {
-                                const isActive = activeCat === cat.id;
-                                const count = cat.id === "All" ? RAW_FAQS.length : RAW_FAQS.filter(i => i.category === cat.id).length;
-                                
-                                return (
-                                    <button 
-                                        key={cat.id} 
-                                        onClick={() => handleCatClick(cat.id)}
-                                        className={cn(
-                                            "w-full nav-item-hover flex items-center justify-between px-4 py-3 rounded text-[10px] font-semibold uppercase tracking-wide transition-all duration-200 group border",
-                                            isActive 
-                                                ? 'bg-navy text-white border-navy' 
-                                                : 'bg-transparent text-slate-600 border-transparent hover:bg-slate-50 hover:text-navy'
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <cat.icon className={cn(
-                                                "w-4 h-4 transition-colors",
-                                                isActive ? 'text-cta' : 'text-slate-400 group-hover:text-navy'
-                                            )} />
-                                            {cat.label}
-                                        </div>
-                                        <span className={cn(
-                                            "text-[9px] px-2 py-0.5 rounded font-bold",
-                                            isActive ? 'bg-cta text-white' : 'bg-slate-100 text-slate-500'
-                                        )}>
-                                            {count}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </nav>
+                <div className="p-2 md:p-6 overflow-x-auto md:overflow-y-auto scroll-panel w-full">
+                    {/* Mobile Label */}
+                    <div className="md:hidden px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Select Topic
+                    </div>
+
+                    <div className="flex flex-row md:flex-col gap-2 md:gap-0 md:space-y-1 mb-0 md:mb-8 min-w-max md:min-w-0">
+                        <p className="hidden md:block mb-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Modules</p>
+                        {CATEGORIES.map((cat) => {
+                            const isActive = activeCat === cat.id;
+                            const count = cat.id === "All" ? RAW_FAQS.length : RAW_FAQS.filter(i => i.category === cat.id).length;
+                            
+                            return (
+                                <button 
+                                    key={cat.id} 
+                                    onClick={() => handleCatClick(cat.id)}
+                                    className={cn(
+                                        "flex-shrink-0 md:flex-shrink md:w-full nav-item-hover flex items-center justify-between px-3 py-2 md:py-3 rounded-full md:rounded text-[10px] font-semibold uppercase tracking-wide transition-all duration-200 group border whitespace-nowrap",
+                                        isActive 
+                                            ? 'bg-navy text-white border-navy shadow-md md:shadow-none' 
+                                            : 'bg-white md:bg-transparent text-slate-600 border-slate-200 md:border-transparent hover:bg-slate-50 hover:text-navy hover:border-slate-300 md:hover:border-transparent'
+                                    )}
+                                >
+                                    <div className="flex items-center gap-2 md:gap-3">
+                                        <cat.icon className={cn(
+                                            "w-3 h-3 md:w-4 md:h-4 transition-colors",
+                                            isActive ? 'text-cta' : 'text-slate-400 group-hover:text-navy'
+                                        )} />
+                                        {cat.label}
+                                    </div>
+                                    <span className={cn(
+                                        "hidden md:block text-[9px] px-2 py-0.5 rounded font-bold",
+                                        isActive ? 'bg-cta text-white' : 'bg-slate-100 text-slate-500'
+                                    )}>
+                                        {count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-slate-100 bg-white">
+                {/* Footer Button - Desktop Only */}
+                <div className="hidden md:block p-6 border-t border-slate-100 bg-white mt-auto">
                     <button className="w-full flex items-center justify-center gap-2 py-3 bg-navy text-white text-[10px] font-semibold uppercase tracking-wider hover:bg-cta transition-colors rounded shadow-sm">
                         <MessageSquare size={14} /> Contact Agent
                     </button>
@@ -302,20 +347,20 @@ export default function FAQSection() {
             </aside>
 
             {/* --- MAIN CONTENT --- */}
-            <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
+            <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative h-[calc(100vh-130px)] md:h-auto">
 
                 {/* Content Body */}
-                <div className="flex-1 overflow-y-auto p-8 scroll-panel">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-panel pb-24 md:pb-8">
                     
                     {/* FAQ Table */}
                     <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-                        {/* Table Header */}
-                        <div className="grid grid-cols-12 gap-6 px-8 py-4 bg-navy border-b border-navy text-[10px] font-semibold text-white uppercase tracking-wider sticky top-0 z-10">
+                        {/* Table Header - Desktop Only */}
+                        <div className="hidden md:grid grid-cols-12 gap-6 px-8 py-4 bg-navy border-b border-navy text-[10px] font-semibold text-white uppercase tracking-wider sticky top-0 z-10">
                             <div className="col-span-2">Reference ID</div>
                             <div className="col-span-5">Question</div>
                             <div className="col-span-2">Category</div>
                             <div className="col-span-1 text-center">Popularity</div>
-                            <div className="col-span-1 text-right">More</div>
+                            <div className="col-span-2 text-right">More</div>
                         </div>
 
                         {/* Table Body */}
@@ -341,7 +386,7 @@ export default function FAQSection() {
                     </div>
 
                     {/* Pagination */}
-                    <div className="mt-8 flex items-center justify-between">
+                    <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
                         <p className="text-xs text-slate-600 font-medium">
                             Showing {filteredData.length} of {RAW_FAQS.length} results
                         </p>
@@ -355,6 +400,14 @@ export default function FAQSection() {
                         </div>
                     </div>
                 </div>
+
+                {/* Mobile Floating Contact Button */}
+                <div className="md:hidden fixed bottom-6 right-6 z-50">
+                    <button className="flex items-center justify-center w-14 h-14 bg-[#F96302] text-white rounded-full shadow-lg hover:scale-105 transition-transform">
+                        <MessageSquare size={24} />
+                    </button>
+                </div>
+
             </main>
         </div>
         </>

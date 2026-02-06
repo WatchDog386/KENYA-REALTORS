@@ -307,7 +307,7 @@ const ArticleReader = ({ article, onBack, toggleBookmark, isBookmarked }: { arti
       </div>
 
       {/* 3. FOOTER NAVIGATION */}
-      <div className="bg-white border-t border-slate-200 py-10 mt-10">
+      <div className="bg-slate-50 border-t border-transparent py-10 mt-10">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h3 className="text-xl font-bold text-[#154279] mb-6">Done reading?</h3>
           

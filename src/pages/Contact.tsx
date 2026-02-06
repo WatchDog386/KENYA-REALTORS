@@ -198,23 +198,23 @@ export default function Contact() {
   return (
     <>
       <GlobalStyles />
-      <div className="font-nunito w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 min-h-screen pt-32 pb-12">
+      <div className="font-nunito w-full bg-slate-50 min-h-screen pt-24 md:pt-32 pb-12">
         
         {/* HEADER SECTION */}
         <motion.div
-          className="max-w-6xl mx-auto px-6 md:px-12 text-center mb-16"
+          className="max-w-6xl mx-auto px-6 md:px-12 text-center mb-10 md:mb-16"
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 px-4 py-2 rounded-full mb-4">
-            <Mail size={16} className="text-[#F96302]" />
-            <span className="text-sm font-bold text-[#F96302]">Get In Touch</span>
+          <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 px-3 py-1.5 md:px-4 md:py-2 rounded-full mb-3 md:mb-4">
+            <Mail size={14} className="text-[#F96302] w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="text-xs md:text-sm font-bold text-[#F96302]">Get In Touch</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-[#154279] mb-4 leading-tight">
+          <h1 className="text-2xl md:text-5xl font-bold text-[#154279] mb-2 md:mb-4 leading-tight">
             Contact Us
           </h1>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+          <p className="text-sm md:text-xl text-slate-600 max-w-2xl mx-auto font-medium md:font-normal">
             Have questions? Our dedicated team is here to help. Reach out through any channel that works best for you.
           </p>
         </motion.div>
@@ -260,12 +260,12 @@ export default function Contact() {
               transition={{ duration: 0.6, delay: 0.2 }}
             >
               <div className="bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-8 py-8 text-white">
-                  <h2 className="text-2xl font-bold">Send us a Message</h2>
-                  <p className="text-slate-200 mt-1">We'll get back to you as soon as possible</p>
+                <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-5 py-5 md:px-8 md:py-8 text-white">
+                  <h2 className="text-lg md:text-2xl font-bold">Send us a Message</h2>
+                  <p className="text-xs md:text-base text-slate-200 mt-1">We'll get back to you as soon as possible</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                <form onSubmit={handleSubmit} className="p-5 md:p-8 space-y-4 md:space-y-6">
                   {/* Success Message */}
                   <AnimatePresence>
                     {submitted && (
@@ -273,10 +273,10 @@ export default function Contact() {
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3"
+                        className="p-3 md:p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3"
                       >
-                        <CheckCircle size={20} className="text-green-600" />
-                        <span className="text-sm font-semibold text-green-800">
+                        <CheckCircle size={16} className="text-green-600 md:w-5 md:h-5" />
+                        <span className="text-xs md:text-sm font-semibold text-green-800">
                           Thank you! We've received your message and will respond within 2 hours.
                         </span>
                       </motion.div>
@@ -290,49 +290,49 @@ export default function Contact() {
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3"
+                        className="p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3"
                       >
-                        <AlertCircle size={20} className="text-red-600" />
-                        <span className="text-sm font-semibold text-red-800">{error}</span>
+                        <AlertCircle size={16} className="text-red-600 md:w-5 md:h-5" />
+                        <span className="text-xs md:text-sm font-semibold text-red-800">{error}</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   {/* Name */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-800 mb-2">Full Name *</label>
+                    <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Full Name *</label>
                     <input
                       type="text"
                       name="name"
                       value={formData.name}
                       onChange={handleInputChange}
                       placeholder="John Doe"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                      className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
                     />
                   </div>
 
                   {/* Email & Phone */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Email *</label>
+                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Email *</label>
                       <input
                         type="email"
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
                         placeholder="john@example.com"
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Phone</label>
+                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Phone</label>
                       <input
                         type="tel"
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
                         placeholder="+254 700 000 000"
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
@@ -340,12 +340,12 @@ export default function Contact() {
                   {/* Category & Subject */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Category</label>
+                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Category</label>
                       <select
                         name="category"
                         value={formData.category}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
                       >
                         {categories.map((cat) => (
                           <option key={cat.value} value={cat.value}>
@@ -355,37 +355,37 @@ export default function Contact() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-slate-800 mb-2">Subject *</label>
+                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Subject *</label>
                       <input
                         type="text"
                         name="subject"
                         value={formData.subject}
                         onChange={handleInputChange}
                         placeholder="How can we help?"
-                        className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
 
                   {/* Message */}
                   <div>
-                    <label className="block text-sm font-semibold text-slate-800 mb-2">Message *</label>
+                    <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Message *</label>
                     <textarea
                       name="message"
                       value={formData.message}
                       onChange={handleInputChange}
                       placeholder="Tell us more about your inquiry..."
                       rows={5}
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all resize-none"
+                      className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all resize-none"
                     />
-                    <p className="text-xs text-slate-500 mt-1">{formData.message.length} characters</p>
+                    <p className="text-[10px] md:text-xs text-slate-500 mt-1">{formData.message.length} characters</p>
                   </div>
 
                   {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-[#154279] to-[#0f325e] hover:from-[#0f325e] hover:to-[#082050] text-white px-6 py-4 rounded-lg font-semibold transition-all inline-flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-gradient-to-r from-[#154279] to-[#0f325e] hover:from-[#0f325e] hover:to-[#082050] text-white px-5 py-3 md:px-6 md:py-4 rounded-lg text-sm md:text-base font-semibold transition-all inline-flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <>

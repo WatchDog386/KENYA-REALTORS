@@ -149,7 +149,7 @@ export default function TestimonialsSleek() {
           <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#E2E8F0] rounded-full blur-[100px] opacity-40"></div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 relative z-10">
+      <div className="max-w-6xl mx-auto px-4 md:px-8 relative z-10">
         
 
         {/* 2. HEADER: Polished & Scaled */}
@@ -160,7 +160,7 @@ export default function TestimonialsSleek() {
                <span className="text-xs font-bold uppercase tracking-widest text-[#64748B]">System Audit</span>
             </div>
             {/* Font size adjusted to be punchy but not overwhelming */}
-            <h2 className="text-3xl md:text-4xl font-medium text-[#154279] tracking-tight leading-tight">
+            <h2 className="text-2xl md:text-4xl font-medium text-[#154279] tracking-tight leading-tight">
               Verified <span className="font-semibold text-[#0f172a]">Performance</span>
             </h2>
           </div>
@@ -194,10 +194,10 @@ export default function TestimonialsSleek() {
 
              {/* Navigation */}
              <div className="flex gap-2">
-               <button onClick={prevSlide} className="w-10 h-10 flex items-center justify-center rounded border border-gray-200 bg-white text-[#64748B] hover:text-[#154279] hover:border-[#F96302] transition-all">
+               <button onClick={prevSlide} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded border border-gray-200 bg-white text-[#64748B] hover:text-[#154279] hover:border-[#F96302] transition-all">
                     <ChevronLeft className="w-4 h-4" />
                </button>
-               <button onClick={nextSlide} className="w-10 h-10 flex items-center justify-center rounded bg-[#154279] text-white hover:bg-[#0f325e] transition-all shadow-lg">
+               <button onClick={nextSlide} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded bg-[#154279] text-white hover:bg-[#0f325e] transition-all shadow-lg">
                     <ChevronRight className="w-4 h-4" />
                </button>
              </div>
@@ -223,7 +223,7 @@ export default function TestimonialsSleek() {
                             </div>
                             
                              <span className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-4 block">Tap to Rate</span>
-                             <div className="flex justify-center gap-2 mb-6">
+                             <div className="flex justify-center gap-2 mb-4 md:mb-6">
                                 {[1, 2, 3, 4, 5].map((star) => (
                                     <button 
                                         type="button" 
@@ -232,7 +232,7 @@ export default function TestimonialsSleek() {
                                         className={`group transition-all duration-300 ${star <= formData.rating ? 'scale-110' : 'hover:scale-105'}`}
                                     >
                                         <Star 
-                                          className={`w-8 h-8 transition-colors ${
+                                          className={`w-6 h-6 md:w-8 md:h-8 transition-colors ${
                                             star <= formData.rating 
                                             ? "fill-[#F96302] text-[#F96302]" 
                                             : "text-gray-200 fill-gray-50 group-hover:text-orange-200"
@@ -255,7 +255,7 @@ export default function TestimonialsSleek() {
                                       type="text" 
                                       required
                                       value={formData.name}
-                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-sm"
+                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 md:px-4 md:py-3 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-xs md:text-sm"
                                       placeholder="Jane Doe"
                                       onChange={(e) => setFormData({...formData, name: e.target.value})}
                                   />
@@ -266,7 +266,7 @@ export default function TestimonialsSleek() {
                                       type="text" 
                                       required
                                       value={formData.location}
-                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-sm"
+                                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 md:px-4 md:py-3 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-xs md:text-sm"
                                       placeholder="e.g. Kilimani"
                                       onChange={(e) => setFormData({...formData, location: e.target.value})}
                                   />
@@ -279,7 +279,7 @@ export default function TestimonialsSleek() {
                                    type="text" 
                                    required
                                    value={formData.headline}
-                                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-sm"
+                                   className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 md:px-4 md:py-3 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-xs md:text-sm"
                                    placeholder="e.g. Great Experience, Highly Recommended"
                                    onChange={(e) => setFormData({...formData, headline: e.target.value})}
                                />
@@ -291,7 +291,7 @@ export default function TestimonialsSleek() {
                                     rows={3}
                                     required
                                     value={formData.review}
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-sm resize-none"
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 md:p-4 text-[#154279] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] transition-all text-xs md:text-sm resize-none"
                                     placeholder="How has the system helped you?"
                                     onChange={(e) => setFormData({...formData, review: e.target.value})}
                                 />
@@ -324,37 +324,37 @@ export default function TestimonialsSleek() {
                {currentPair.map((item) => (
                  <div 
                     key={item.id} 
-                    className="bg-white p-8 rounded-lg border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.05)] transition-all duration-500 group relative overflow-hidden"
+                    className="bg-white p-5 md:p-8 rounded-lg border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.05)] transition-all duration-500 group relative overflow-hidden"
                  >
                    {/* Top Row */}
-                   <div className="flex justify-between items-start mb-5">
+                   <div className="flex justify-between items-start mb-4 md:mb-5">
                       <div className="flex gap-1">
                           {[...Array(5)].map((_, i) => (
-                             <Star key={i} className={`w-3.5 h-3.5 ${i < item.rating ? "fill-[#F96302] text-[#F96302]" : "text-gray-200 fill-gray-100"}`} />
+                             <Star key={i} className={`w-3 h-3 md:w-3.5 md:h-3.5 ${i < item.rating ? "fill-[#F96302] text-[#F96302]" : "text-gray-200 fill-gray-100"}`} />
                           ))}
                       </div>
-                      <ShieldCheck className="w-5 h-5 text-[#F96302] opacity-50 group-hover:opacity-100 transition-opacity" />
+                      <ShieldCheck className="w-4 h-4 md:w-5 md:h-5 text-[#F96302] opacity-50 group-hover:opacity-100 transition-opacity" />
                    </div>
 
                    {/* Content */}
-                   <div className="mb-8 relative z-10">
-                      <h3 className="text-lg font-semibold text-[#154279] mb-2 group-hover:text-[#F96302] transition-colors">{item.headline}</h3>
-                      <p className="text-[15px] text-[#64748B] leading-relaxed">"{item.quote}"</p>
+                   <div className="mb-6 md:mb-8 relative z-10">
+                      <h3 className="text-base md:text-lg font-semibold text-[#154279] mb-2 group-hover:text-[#F96302] transition-colors">{item.headline}</h3>
+                      <p className="text-sm md:text-[15px] text-[#64748B] leading-relaxed">"{item.quote}"</p>
                    </div>
 
                    {/* Footer */}
-                   <div className="flex items-center justify-between border-t border-gray-100 pt-5">
-                      <div className="flex items-center gap-3">
-                         <div className="w-9 h-9 rounded-full bg-[#154279] flex items-center justify-center text-white text-xs font-bold border border-transparent">
+                   <div className="flex items-center justify-between border-t border-gray-100 pt-4 md:pt-5">
+                      <div className="flex items-center gap-2 md:gap-3">
+                         <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-[#154279] flex items-center justify-center text-white text-[10px] md:text-xs font-bold border border-transparent">
                             {item.name.charAt(0)}
                          </div>
                          <div>
-                            <p className="text-xs font-bold text-[#154279] capitalize tracking-wide">{item.name}</p>
-                            <p className="text-[11px] text-[#94A3B8]">{item.role} • {item.location}</p>
+                            <p className="text-[11px] md:text-xs font-bold text-[#154279] capitalize tracking-wide">{item.name}</p>
+                            <p className="text-[10px] md:text-[11px] text-[#94A3B8]">{item.role} • {item.location}</p>
                          </div>
                       </div>
                       
-                      <div className="px-3 py-1 rounded bg-[#F8F9FB] border border-gray-100 text-[10px] font-bold text-[#64748B] group-hover:border-[#F96302] group-hover:text-[#F96302] transition-colors">
+                      <div className="px-2 py-1 md:px-3 md:py-1 rounded bg-[#F8F9FB] border border-gray-100 text-[9px] md:text-[10px] font-bold text-[#64748B] group-hover:border-[#F96302] group-hover:text-[#F96302] transition-colors">
                         Impact: <span className="text-slate-800 group-hover:text-[#F96302]">{item.impact}%</span>
                       </div>
                    </div>

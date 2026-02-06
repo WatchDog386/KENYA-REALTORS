@@ -82,8 +82,8 @@ const Footer = () => {
     <footer id="contact" className="text-slate-900 bg-slate-50">
       
       {/* MAIN CONTENT AREA */}
-      <div className="pt-20 pb-12 px-6">
-        <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+      <div className="pt-8 pb-8 md:pt-20 md:pb-12 px-4 md:px-6">
+        <div className="max-w-[1440px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
           
           {/* 1. BRAND & SOCIALS */}
           <div className="space-y-6">
@@ -105,14 +105,14 @@ const Footer = () => {
               </div>
             </div>
 
-            <p className="text-[9px] font-semibold leading-relaxed border-l-4 pl-4" style={{ color: COLORS.primary, borderLeftColor: COLORS.secondary }}>
+            <p className="hidden md:block text-[9px] font-semibold leading-relaxed border-l-4 pl-4" style={{ color: COLORS.primary, borderLeftColor: COLORS.secondary }}>
               Kenya's #1 Property Marketplace. <br/>
               <span style={{ color: COLORS.primary }} className="font-bold">Buy, Rent, and Sell with Confidence.</span>
             </p>
           </div>
 
-          {/* 2. DISCOVER */}
-          <div>
+          {/* 2. DISCOVER - Hidden on mobile */}
+          <div className="hidden md:block">
             <h3 className="text-xs font-black uppercase tracking-widest mb-6 pb-2 text-black">
               Discover
             </h3>
@@ -128,8 +128,8 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* 3. RESOURCES */}
-          <div>
+          {/* 3. RESOURCES - Hidden on mobile */}
+          <div className="hidden md:block">
             <h3 className="text-xs font-black uppercase tracking-widest mb-6 pb-2 text-black">
               Resources
             </h3>
@@ -145,8 +145,8 @@ const Footer = () => {
             </ul>
           </div>
 
-          {/* 4. CONTACT BADGES */}
-          <div className="flex flex-col gap-3">
+          {/* 4. CONTACT BADGES - Desktop Version */}
+          <div className="hidden md:flex flex-col gap-3">
             <h3 className="text-xs font-black uppercase tracking-widest mb-3 pb-2 text-black">
               Contact Us
             </h3>
@@ -186,22 +186,38 @@ const Footer = () => {
               </span>
             </a>
           </div>
+
+           {/* 4. CONTACT BADGES - Mobile (Compact Row) */}
+           <div className="md:hidden flex justify-between items-center bg-slate-100 p-2 rounded-lg mt-2 overflow-x-auto">
+             <div className="flex items-center gap-2 pr-4 border-r border-gray-300">
+                <MapPin className="w-4 h-4 text-[#F96302]" />
+                <span className="text-[9px] font-bold uppercase text-slate-700 whitespace-nowrap">Pangani</span>
+             </div>
+             <a href="tel:+254706927062" className="flex items-center gap-2 px-4 border-r border-gray-300">
+                <Phone className="w-4 h-4 text-[#154279]" />
+                <span className="text-[9px] font-bold uppercase text-slate-700 whitespace-nowrap">Call Us</span>
+             </a>
+             <a href="mailto:support@realtor.co.ke" className="flex items-center gap-2 pl-4">
+                <Mail className="w-4 h-4 text-[#154279]" />
+                <span className="text-[9px] font-bold uppercase text-slate-700 whitespace-nowrap">Email</span>
+             </a>
+           </div>
         </div>
       </div>
 
       {/* BOTTOM STRIP - Match to Navbar Top Strip */}
       <div 
-        className="py-8 px-6"
+        className="hidden md:block py-4 px-4 md:py-8 md:px-6"
         style={{
           backgroundImage: `linear-gradient(to right, ${COLORS.primary}, #003A75, ${COLORS.primary})`
         }}
       >
-        <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-[10px] text-white/90 font-bold uppercase tracking-[0.2em]">
+        <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
+          <p className="text-[10px] text-center md:text-left text-white/90 font-bold uppercase tracking-[0.2em]">
             © 2026 KENYA REALTORS <span style={{ color: COLORS.secondary }}>|</span> ALL RIGHTS RESERVED
           </p>
 
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4 md:gap-8">
             <div className="flex items-center gap-2 text-white/80">
               <Smartphone className="w-4 h-4" style={{ color: COLORS.secondary }} />
               <span className="text-[9px] font-bold uppercase tracking-widest">Mobile Friendly</span>

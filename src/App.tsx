@@ -99,10 +99,37 @@ import ManagerLeases from "@/components/portal/manager/ManagerLeases";
 import ManagerProfile from "@/components/portal/manager/ManagerProfile";
 
 // Create a fallback component in case of import issues
+const GlobalLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm transition-all duration-300">
+    <div className="relative flex flex-col items-center">
+      <div className="relative">
+        <div className="w-16 h-16 rounded-full absolute border-4 border-solid border-gray-200 dark:border-gray-700"></div>
+        <div className="w-16 h-16 rounded-full animate-spin absolute border-4 border-solid border-indigo-600 border-t-transparent shadow-[0_0_15px_rgba(79,70,229,0.3)]"></div>
+      </div>
+      <p className="mt-8 text-sm font-medium text-gray-500 dark:text-gray-400 animate-pulse">Loading resources...</p>
+    </div>
+  </div>
+);
+
 const ComponentFallback = ({ title }: { title: string }) => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold mb-6">{title}</h1>
-    <p className="text-gray-600">{title} page will appear here.</p>
+  <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center animate-in fade-in zoom-in duration-500">
+    <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl p-12 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 dark:border-gray-700 max-w-md w-full relative overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+      <div className="relative z-10">
+        <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform duration-500">
+          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        </div>
+        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 mb-4">{title}</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-lg leading-relaxed">The {title} interface is currently under development. Check back soon for updates.</p>
+        <div className="mt-8 flex justify-center space-x-2">
+          <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="w-2 h-2 bg-pink-600 rounded-full animate-bounce"></div>
+        </div>
+      </div>
+    </div>
   </div>
 );
 
@@ -183,11 +210,7 @@ const DevBypassGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, supabaseUser, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   if (!user) {
@@ -207,11 +230,7 @@ const PortalRedirect = () => {
   const { user, supabaseUser, isLoading, getUserRole } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   if (!user) {
@@ -259,11 +278,7 @@ const RoleBasedRoute = ({
   const { user, supabaseUser, isLoading, getUserRole } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <GlobalLoader />;
   }
 
   if (!user) {
@@ -458,26 +473,51 @@ const ManagerReportsPage = () => <ManagerPayments />;
    COMPONENT DEMO PAGE
 ====================== */
 const ComponentsDemoPage = () => (
-  <div className="p-8">
-    <h1 className="text-3xl font-bold mb-6">Components Demo</h1>
-    <div className="space-y-6">
-      <div className="p-4 border rounded-lg">
-        <h2 className="text-xl font-semibold mb-3">
-          Approval Requests Component
-        </h2>
-        <ApprovalRequests />
+  <div className="p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="mb-10">
+      <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 mb-3 drop-shadow-sm">Components Gallery</h1>
+      <p className="text-gray-500 dark:text-gray-400 text-lg">Interactive showcase of system UI components and modules</p>
+    </div>
+    
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-300">
+        <div className="flex items-center mb-6">
+            <div className="w-1.5 h-8 bg-gradient-to-b from-blue-500 to-blue-600 rounded-full mr-4 shadow-lg shadow-blue-500/30"></div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Approval Requests</h2>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+          <ApprovalRequests />
+        </div>
       </div>
-      <div className="p-4 border rounded-lg">
-        <h2 className="text-xl font-semibold mb-3">Deposit Refund Tracker</h2>
-        <DepositRefundTracker refundId="demo-refund-123" />
+      
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-300">
+        <div className="flex items-center mb-6">
+            <div className="w-1.5 h-8 bg-gradient-to-b from-emerald-500 to-emerald-600 rounded-full mr-4 shadow-lg shadow-emerald-500/30"></div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Deposit Refund Tracker</h2>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+          <DepositRefundTracker refundId="demo-refund-123" />
+        </div>
       </div>
-      <div className="p-4 border rounded-lg">
-        <h2 className="text-xl font-semibold mb-3">Manager Assignment</h2>
-        <ManagerAssignment propertyId="demo-property-123" />
+      
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-300">
+        <div className="flex items-center mb-6">
+            <div className="w-1.5 h-8 bg-gradient-to-b from-purple-500 to-purple-600 rounded-full mr-4 shadow-lg shadow-purple-500/30"></div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Manager Assignment</h2>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+            <ManagerAssignment propertyId="demo-property-123" />
+        </div>
       </div>
-      <div className="p-4 border rounded-lg">
-        <h2 className="text-xl font-semibold mb-3">Vacation Notice Form</h2>
-        <VacationNoticeForm leaseId="demo-lease-123" />
+      
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-300">
+        <div className="flex items-center mb-6">
+            <div className="w-1.5 h-8 bg-gradient-to-b from-amber-500 to-amber-600 rounded-full mr-4 shadow-lg shadow-amber-500/30"></div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Vacation Notice Form</h2>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-gray-100 dark:border-gray-800">
+           <VacationNoticeForm leaseId="demo-lease-123" />
+        </div>
       </div>
     </div>
   </div>
@@ -567,15 +607,20 @@ const App = () => {
                 <Route
                   path="/auth/verify"
                   element={
-                    <div className="min-h-screen flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <h1 className="text-2xl font-bold mb-2">
-                          Verifying your email...
-                        </h1>
-                        <p className="text-gray-600">
-                          Please wait while we confirm your email address.
-                        </p>
+                    <div className="min-h-screen flex items-center justify-center bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm">
+                      <div className="text-center animate-in fade-in zoom-in duration-500">
+                        <div className="bg-white/90 dark:bg-gray-800/90 p-10 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 max-w-sm mx-auto backdrop-blur-md">
+                          <div className="relative mx-auto mb-8 w-16 h-16">
+                             <div className="w-16 h-16 rounded-full absolute border-4 border-solid border-gray-200 dark:border-gray-700"></div>
+                             <div className="w-16 h-16 rounded-full animate-spin absolute border-4 border-solid border-indigo-600 border-t-transparent shadow-[0_0_15px_rgba(79,70,229,0.5)]"></div>
+                          </div>
+                          <h1 className="text-2xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                            Verifying Account
+                          </h1>
+                          <p className="text-gray-500 dark:text-gray-400">
+                            We're confirming your email address. This will just take a moment...
+                          </p>
+                        </div>
                       </div>
                     </div>
                   }
@@ -718,16 +763,7 @@ const App = () => {
                   />
                   <Route
                     path="vacation-notices"
-                    element={
-                      <div className="p-8">
-                        <h1 className="text-3xl font-bold mb-6">
-                          Vacation Notices
-                        </h1>
-                        <p className="text-gray-600">
-                          Manage tenant vacation notices.
-                        </p>
-                      </div>
-                    }
+                    element={<ComponentFallback title="Vacation Notices" />}
                   />
                 </Route>
 
@@ -774,65 +810,11 @@ const App = () => {
                 {/* LEGACY ADMIN PORTAL ROUTES */}
                 <Route path="/portal/admin" element={<AdminPortalWrapper />}>
                   <Route index element={<PortalAdminDashboard />} />
-                  <Route
-                    path="analytics"
-                    element={
-                      <div className="p-8">
-                        <h1 className="text-3xl font-bold mb-6">Analytics</h1>
-                        <p className="text-gray-600">
-                          Analytics dashboard will appear here.
-                        </p>
-                      </div>
-                    }
-                  />
-                  <Route
-                    path="database"
-                    element={
-                      <div className="p-8">
-                        <h1 className="text-3xl font-bold mb-6">
-                          Database Management
-                        </h1>
-                        <p className="text-gray-600">
-                          Database management tools will appear here.
-                        </p>
-                      </div>
-                    }
-                  />
-                  <Route
-                    path="admin-tools"
-                    element={
-                      <div className="p-8">
-                        <h1 className="text-3xl font-bold mb-6">Admin Tools</h1>
-                        <p className="text-gray-600">
-                          Administrative tools will appear here.
-                        </p>
-                      </div>
-                    }
-                  />
-                  <Route
-                    path="tenants"
-                    element={
-                      <div className="p-8">
-                        <h1 className="text-3xl font-bold mb-6">
-                          Tenant Management
-                        </h1>
-                        <p className="text-gray-600">
-                          Manage all tenants and their profiles.
-                        </p>
-                      </div>
-                    }
-                  />
-                  <Route
-                    path="reports"
-                    element={
-                      <div className="p-8">
-                        <h1 className="text-3xl font-bold mb-6">Reports</h1>
-                        <p className="text-gray-600">
-                          Generate and view system reports.
-                        </p>
-                      </div>
-                    }
-                  />
+                  <Route path="analytics" element={<ComponentFallback title="Analytics" />} />
+                  <Route path="database" element={<ComponentFallback title="Database Management" />} />
+                  <Route path="admin-tools" element={<ComponentFallback title="Admin Tools" />} />
+                  <Route path="tenants" element={<ComponentFallback title="Tenant Management" />} />
+                  <Route path="reports" element={<ComponentFallback title="Reports" />} />
                 </Route>
 
                 {/* SHARED PORTAL PAGES */}
@@ -954,14 +936,23 @@ const App = () => {
                   path="/profile-recovery"
                   element={
                     <DevBypassGuard>
-                      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4">
-                        <div className="text-center">
-                          <h1 className="text-3xl font-bold mb-4">
-                            Account Setup Required
-                          </h1>
-                          <p className="text-gray-600">
-                            Please complete your profile setup to continue.
-                          </p>
+                      <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+                        <div className="max-w-md w-full mx-auto text-center animate-in fade-in zoom-in duration-500">
+                            <div className="bg-white dark:bg-gray-800 p-10 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-700 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-400 to-red-500"></div>
+                                <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                    <svg className="w-8 h-8 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <h1 className="text-3xl font-bold mb-3 text-gray-900 dark:text-white">Profile Incomplete</h1>
+                                <p className="text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
+                                    Your account requires additional setup before you can proceed. Please complete your profile to access the platform.
+                                </p>
+                                <button onClick={() => window.location.href='/profile'} className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium shadow-lg shadow-indigo-500/25 transition-all transform hover:scale-[1.02]">
+                                    Complete Setup
+                                </button>
+                            </div>
                         </div>
                       </div>
                     </DevBypassGuard>
@@ -975,31 +966,57 @@ const App = () => {
                   path="/admin/database-setup"
                   element={
                     <RoleBasedRoute allowedRoles={["super_admin"]}>
-                      <div className="min-h-screen bg-gray-50 p-8">
-                        <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-8">
-                          <h1 className="text-3xl font-bold mb-6">
-                            Database Setup (Dev Mode)
-                          </h1>
-                          <button
-                            onClick={async () => {
-                              try {
-                                const { setupDatabase } = await import(
-                                  "@/services/databaseSetup"
-                                );
-                                const result = await setupDatabase();
-                                alert(
-                                  `Setup result: ${
-                                    result.success ? "Success ✅" : "Failed ❌"
-                                  }\n${result.error || ""}`
-                                );
-                              } catch (error) {
-                                alert("Failed to load database setup module");
-                              }
-                            }}
-                            className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium"
-                          >
-                            Run Database Setup
-                          </button>
+                       <div className="min-h-screen bg-gray-50/50 dark:bg-gray-900 p-8 flex items-center justify-center">
+                        <div className="max-w-2xl w-full bg-white dark:bg-gray-800 shadow-2xl rounded-3xl p-10 border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in duration-500">
+                          <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6 transform rotate-3 hover:rotate-6 transition-transform">
+                                <svg className="w-10 h-10 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                </svg>
+                            </div>
+                            <h1 className="text-4xl font-extrabold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+                                System Initialization
+                            </h1>
+                            <p className="text-gray-500 dark:text-gray-400 text-lg">
+                                Initialize database schema and seed default data.
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-4">
+                             <div className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30 flex items-start">
+                                <svg className="w-6 h-6 text-amber-500 mt-0.5 mr-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <p className="text-sm text-amber-800 dark:text-amber-200">
+                                    This operation will reset system configurations and may affect existing data. Proceed with caution.
+                                </p>
+                             </div>
+                             
+                             <button
+                                onClick={async () => {
+                                  try {
+                                    const { setupDatabase } = await import(
+                                      "@/services/databaseSetup"
+                                    );
+                                    const result = await setupDatabase();
+                                    alert(
+                                      `Setup result: ${
+                                        result.success ? "success" : "failed"
+                                      }\n${result.error || "Database configured successfully."}`
+                                    );
+                                  } catch (error) {
+                                    alert("Failed to load database setup module");
+                                  }
+                                }}
+                                className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/25 transition-all transform active:scale-95 text-lg flex items-center justify-center"
+                              >
+                                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Execute Setup Sequence
+                              </button>
+                          </div>
                         </div>
                       </div>
                     </RoleBasedRoute>

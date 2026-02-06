@@ -8,7 +8,7 @@
   padding: 0;
   text-align: left; /* SaaS apps align left */
   min-height: 100vh;
-  background-color: var(--background);
+  background-color: var(--white);
 }
 
 /* Optional: Wrapper class if you need a centered content area later */

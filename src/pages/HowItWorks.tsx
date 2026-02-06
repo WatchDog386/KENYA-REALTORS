@@ -510,7 +510,7 @@ export default function HowItWorks() {
     return (
         <>
             <GlobalStyles />
-            <div className="min-h-screen bg-slate-50 font-inter text-slate-800 pb-32" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+            <div className="min-h-screen bg-slate-50 font-inter text-slate-800 pb-20" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
                 {/* Fixed navbar offset - prevents content cutoff */}
                 <div className="pt-8 md:pt-10 lg:pt-12"></div>
 
@@ -553,34 +553,6 @@ export default function HowItWorks() {
                             Master the entire rental process step-by-step with our comprehensive guide
                         </p>
                     </motion.div>
-
-                    {/* FILTER/TAB BAR */}
-                    <div className="sticky top-20 z-30 mb-8 bg-slate-50/95 backdrop-blur-sm py-3 px-1">
-                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                            {[
-                                { id: "all", label: "All Sections", icon: "⭐" },
-                                { id: "preparation", label: "Preparation", icon: "📋" },
-                                { id: "search", label: "Search", icon: "🔍" },
-                                { id: "verification", label: "Verification", icon: "✓" },
-                                { id: "lease", label: "Lease", icon: "📝" },
-                                { id: "costs", label: "Costs", icon: "💰" },
-                                { id: "rights", label: "Rights", icon: "🛡️" }
-                            ].map((filter) => (
-                                <button
-                                    key={filter.id}
-                                    onClick={() => setSelectedFilter(filter.id)}
-                                    className={cn(
-                                        "px-4 py-2 font-medium text-xs rounded-full whitespace-nowrap",
-                                        selectedFilter === filter.id 
-                                            ? 'bg-[#154279] text-white' 
-                                            : 'bg-white text-slate-600 border border-slate-200'
-                                    )}
-                                >
-                                    <span className="mr-1.5">{filter.icon}</span>{filter.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
 
                     <div className="flex flex-col gap-8">
                     

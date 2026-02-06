@@ -218,7 +218,7 @@ const ProductCard = ({ product, onViewPlans }) => {
 
 
       {/* --- MIDDLE: MAIN CONTENT --- */}
-      <div className="flex-grow relative p-8 flex flex-col items-center justify-center">
+      <div className="flex-grow relative p-4 md:p-8 flex flex-col items-center justify-center">
         {/* Gradient background layer */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#154279] to-transparent opacity-10 pointer-events-none group-hover:from-[#F96302] transition-all duration-300" />
         
@@ -226,7 +226,7 @@ const ProductCard = ({ product, onViewPlans }) => {
           whileHover={{ scale: 1.15, rotate: 5 }}
           className="relative z-10"
         >
-          <span style={{ color: "#F96302", filter: "drop-shadow(0 2px 8px rgba(249, 99, 2, 0.3))" }} className="transition-transform duration-300 text-9xl">
+          <span style={{ color: "#F96302", filter: "drop-shadow(0 2px 8px rgba(249, 99, 2, 0.3))" }} className="transition-transform duration-300 text-7xl md:text-9xl">
             {product.icon}
           </span>
         </motion.div>
@@ -237,12 +237,12 @@ const ProductCard = ({ product, onViewPlans }) => {
             animate={{ opacity: 1, y: 0 }}
             className="absolute bottom-4 backdrop-blur px-3 py-1.5 rounded-lg text-[9px] font-bold flex items-center gap-1.5 shadow-lg border z-20 bg-[#f0f4f8]/95 border-[#154279] text-[#154279]"
           >
-            <Settings2 size={12} /> {product.variants.length} Options
+            <Settings2 size={10} className="md:w-3 md:h-3" /> {product.variants.length} Options
           </motion.div>
         )}
         
         <div className="relative z-10 mt-6 text-center w-full px-2">
-          <h3 className="text-[13px] font-bold leading-tight group-hover:scale-105 transition-all cursor-pointer uppercase tracking-tight text-[#154279] group-hover:text-[#F96302]">
+          <h3 className="text-[11px] md:text-[13px] font-bold leading-tight group-hover:scale-105 transition-all cursor-pointer uppercase tracking-tight text-[#154279] group-hover:text-[#F96302]">
             {product.title}
           </h3>
           <div className="mt-4 flex items-center justify-center">
@@ -254,7 +254,7 @@ const ProductCard = ({ product, onViewPlans }) => {
 
 
       {/* --- BOTTOM: PRICE & ACTIONS --- */}
-      <div className="relative z-30 p-6 border-t-3 shadow-lg transition-all bg-gradient-to-r from-[#f0f4f8] via-white to-[#e8ecf1] border-[#154279] group-hover:border-[#F96302]">
+      <div className="relative z-30 p-4 md:p-6 border-t-3 shadow-lg transition-all bg-gradient-to-r from-[#f0f4f8] via-white to-[#e8ecf1] border-[#154279] group-hover:border-[#F96302]">
         {/* Decorative element */}
         <div className="absolute bottom-0 right-0 w-20 h-20 opacity-10 pointer-events-none group-hover:opacity-20 transition-all duration-300">
           {product.icon}
@@ -269,7 +269,7 @@ const ProductCard = ({ product, onViewPlans }) => {
               <span className="text-[10px] font-bold mr-1 text-[#154279]">
                 KES
               </span>
-              <span className="text-2xl font-bold tracking-tight text-[#154279]">
+              <span className="text-lg md:text-2xl font-bold tracking-tight text-[#154279]">
                 {currentVariant.price.toLocaleString()}
               </span>
             </div>
@@ -278,7 +278,7 @@ const ProductCard = ({ product, onViewPlans }) => {
           <motion.button
             whileHover={{ scale: 1.05, y: -2 }}
             onClick={onViewPlans}
-            className="px-4 py-2.5 rounded-lg font-bold text-[10px] uppercase tracking-[0.15em] transition-all flex items-center gap-2 bg-[#154279] hover:bg-[#F96302] text-white shadow-lg hover:shadow-xl"
+            className="px-3 py-2 md:px-4 md:py-2.5 rounded-lg font-bold text-[9px] md:text-[10px] uppercase tracking-[0.15em] transition-all flex items-center gap-2 bg-[#154279] hover:bg-[#F96302] text-white shadow-lg hover:shadow-xl"
           >
             View Plans <ChevronRight size={14} />
           </motion.button>
@@ -308,8 +308,8 @@ const ComparisonMatrix = () => {
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/30">
-        <table className="w-full text-left text-sm">
+      <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/30 overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[600px]">
           <thead>
             <tr className="bg-gradient-to-r from-[#e8ecf1] to-[#f0f4f8] border-b-2 border-[#154279]">
               <th className="p-4 text-[10px] uppercase text-[#154279] font-bold tracking-[0.2em]">Unit Type</th>
@@ -510,7 +510,7 @@ export default function PricingPage() {
   return (
     <>
     <GlobalStyles />
-    <div className="min-h-screen bg-slate-50 font-nunito text-slate-900 pb-32">
+    <div className="min-h-screen bg-slate-50 font-nunito text-slate-900 pb-20">
       
       {/* Fixed navbar offset - prevents content cutoff */}
       <div className="pt-8 md:pt-10 lg:pt-12"></div>
@@ -521,16 +521,16 @@ export default function PricingPage() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12 pb-8 border-b border-slate-200"
+          className="mb-8 md:mb-12 pb-6 md:pb-8 border-b border-slate-200"
         >
-          <div className="flex items-baseline gap-2 mb-4">
-            <div className="h-[2px] w-12 bg-[#F96302]"></div>
+          <div className="flex items-baseline gap-2 mb-2 md:mb-4">
+            <div className="h-[2px] w-8 md:w-12 bg-[#F96302]"></div>
             <h2 className="text-[9px] font-bold text-[#F96302] uppercase tracking-[0.3em]">Ayden Homes</h2>
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-[#154279] leading-tight tracking-tight">
+          <h1 className="text-xl sm:text-4xl md:text-5xl font-bold text-[#154279] leading-tight tracking-tight">
             Available Unit Prices
           </h1>
-          <p className="text-slate-600 mt-3 text-[11px] sm:text-xs font-bold uppercase tracking-widest">
+          <p className="text-slate-600 mt-2 md:mt-3 text-[10px] sm:text-xs font-bold uppercase tracking-widest leading-relaxed">
             Explore our diverse range of residential and commercial units
           </p>
         </motion.div>

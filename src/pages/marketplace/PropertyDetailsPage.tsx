@@ -55,7 +55,7 @@ const PropertyDetailsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-24 pb-16">
+    <div className="min-h-screen bg-slate-50 pt-24 pb-16">
       <div className="container mx-auto px-4">
         {/* Back Button */}
         <button
