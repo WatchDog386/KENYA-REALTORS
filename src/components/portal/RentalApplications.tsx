@@ -371,7 +371,7 @@ const RentalApplications = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <Card className="hover:shadow-lg transition-shadow">
+              <Card className="hover:shadow-xl transition-all duration-300 hover:-translate-y-1 rounded-xl border-slate-100">
                 <CardHeader className="pb-3">
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="flex-1">

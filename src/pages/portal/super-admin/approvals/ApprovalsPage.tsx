@@ -270,18 +270,18 @@ const ApprovalsPage: React.FC = () => {
                 </p>
               </div>
               <div className="md:w-1/2 w-full mt-6 md:mt-0 flex justify-end">
-                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-white max-w-xs w-full">
+                <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-white max-w-xs w-full shadow-2xl">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-white/20 rounded-lg"><FileText className="w-6 h-6 text-white" /></div>
+                    <div className="p-3 bg-white/20 rounded-xl"><FileText className="w-6 h-6 text-white" /></div>
                     <div>
-                      <div className="text-xs font-medium text-blue-100 uppercase tracking-wider">Pending Requests</div>
-                      <div className="text-xl font-bold">{pendingCount} Pending</div>
+                      <div className="text-xs font-semibold text-blue-100 uppercase tracking-wider">Pending Requests</div>
+                      <div className="text-2xl font-bold">{pendingCount} Pending</div>
                     </div>
                   </div>
-                  <div className="h-1 w-full bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#F96302]" style={{ width: `${(pendingCount / mockApprovals.length) * 100}%` }}></div>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-2">
+                    <div className="h-full bg-[#F96302] rounded-full transition-all duration-1000" style={{ width: `${(pendingCount / (mockApprovals.length || 1)) * 100}%` }}></div>
                   </div>
-                  <div className="flex justify-between mt-2 text-xs text-blue-100">
+                  <div className="flex justify-between mt-2 text-xs text-blue-100 font-medium">
                     <span>{pendingCount} Pending</span>
                     <span>{approvedCount} Approved</span>
                   </div>

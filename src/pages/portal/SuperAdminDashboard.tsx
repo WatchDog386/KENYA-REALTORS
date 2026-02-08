@@ -614,7 +614,7 @@ const SuperAdminDashboard = () => {
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="md:w-1/2 w-full"
             >
-              <div className="bg-white rounded-2xl shadow-xl border-2 border-slate-200 p-8 hover:shadow-2xl hover:border-[#F96302] transition-all duration-300">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-slate-200 p-8 hover:shadow-2xl hover:border-[#F96302] transition-all duration-300 transform hover:-translate-y-1">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-[#154279]/10 rounded-xl">

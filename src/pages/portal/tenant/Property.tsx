@@ -297,7 +297,7 @@ const PropertyPage: React.FC = () => {
                animate={{ opacity: 1, y: 0 }}
                transition={{ delay: 0.1 }}
             >
-              <Card className="border-none shadow-sm overflow-hidden">
+              <Card className="border-none shadow-lg rounded-2xl overflow-hidden hover:shadow-xl transition-shadow duration-300">
                 <div className="h-48 bg-gray-100 relative">
                   {property.image_url ? (
                     <img 

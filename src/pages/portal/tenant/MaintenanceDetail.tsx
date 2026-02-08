@@ -245,14 +245,14 @@ const MaintenanceDetailPage: React.FC = () => {
         
         {/* Left: Details */}
         <div className="space-y-6 md:col-span-1">
-           <Card>
-             <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-base font-semibold">Details</CardTitle>
+           <Card className="shadow-md rounded-xl border-slate-100 overflow-hidden">
+             <CardHeader className="pb-4 border-b bg-slate-50/50">
+                <CardTitle className="text-base font-bold text-slate-800">Request Details</CardTitle>
              </CardHeader>
-             <CardContent className="pt-4 space-y-4">
+             <CardContent className="pt-6 space-y-5">
                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase">Description</label>
-                    <p className="text-sm text-gray-700 mt-1 leading-relaxed">{request.description}</p>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Description</label>
+                    <p className="text-sm text-slate-700 leading-relaxed">{request.description}</p>
                  </div>
                  
                  <div className="grid grid-cols-2 gap-4">

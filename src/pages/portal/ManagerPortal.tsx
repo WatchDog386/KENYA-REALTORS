@@ -295,8 +295,9 @@ const ManagerPortal = () => {
   return (
     <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg">
-        <div className="max-w-[1400px] mx-auto px-6">
+      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg relative">
+        <div className="absolute inset-0 bg-[#F96302]/5"></div>
+        <div className="max-w-[1400px] mx-auto px-6 relative z-10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-10">
             <div className="md:w-1/2">
               <div className="flex items-center gap-3 mb-4">

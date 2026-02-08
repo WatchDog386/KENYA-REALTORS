@@ -246,54 +246,54 @@ const ManagerTenants = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
+        <Card className="hover:shadow-md transition-shadow rounded-xl border-slate-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Tenants</CardTitle>
             <Users className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-gray-500">All tenants</p>
+            <div className="text-2xl font-bold text-slate-800">{stats.total}</div>
+            <p className="text-xs text-slate-500">All tenants</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow rounded-xl border-slate-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.active}</div>
-            <p className="text-xs text-gray-500">Currently active</p>
+            <div className="text-2xl font-bold text-slate-800">{stats.active}</div>
+            <p className="text-xs text-slate-500">Currently active</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow rounded-xl border-slate-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Overdue</CardTitle>
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.overdue}</div>
-            <p className="text-xs text-gray-500">Late payments</p>
+            <div className="text-2xl font-bold text-slate-800">{stats.overdue}</div>
+            <p className="text-xs text-slate-500">Late payments</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow rounded-xl border-slate-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Monthly Rent</CardTitle>
             <DollarSign className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalRent)}</div>
-            <p className="text-xs text-gray-500">Total monthly</p>
+            <div className="text-2xl font-bold text-slate-800">{formatCurrency(stats.totalRent)}</div>
+            <p className="text-xs text-slate-500">Total monthly</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow rounded-xl border-slate-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Applications</CardTitle>
             <FileText className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
-            <p className="text-xs text-gray-500">Pending review</p>
+            <div className="text-2xl font-bold text-slate-800">{stats.pending}</div>
+            <p className="text-xs text-slate-500">Pending review</p>
           </CardContent>
         </Card>
       </div>
