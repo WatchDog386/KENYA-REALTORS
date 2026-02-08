@@ -104,8 +104,8 @@ UNION ALL
 SELECT 'maintenance_requests', COUNT(*) > 0
 FROM information_schema.tables WHERE table_name = 'maintenance_requests'
 UNION ALL
-SELECT 'approval_queue', COUNT(*) > 0
-FROM information_schema.tables WHERE table_name = 'approval_queue'
+SELECT 'approvals', COUNT(*) > 0
+FROM information_schema.tables WHERE table_name = 'approvals'
 UNION ALL
 SELECT 'approval_requests', COUNT(*) > 0
 FROM information_schema.tables WHERE table_name = 'approval_requests';

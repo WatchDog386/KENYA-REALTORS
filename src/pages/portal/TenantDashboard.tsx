@@ -211,6 +211,8 @@ const TenantDashboard: React.FC = () => {
     try {
       if (!user?.id) return false;
 
+      console.log("🔍 Fetching tenant info for user:", user.id);
+      
       const { data, error } = await supabase
         .from("tenants")
         .select(`
@@ -223,24 +225,67 @@ const TenantDashboard: React.FC = () => {
         `)
         .eq("user_id", user.id)
         .eq("status", "active")
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      if (error || !data) {
-        console.warn("Tenant record not found:", error?.message);
+      if (error) {
+        console.warn("❌ Error fetching tenant record:", error.message);
+        // Don't return false yet, try fallback
+      }
+      
+      let tenantData: any = data;
+
+      // Fallback: Check tenant_leases if no direct tenant record
+      if (!tenantData) {
+        console.warn("⚠️ No active tenant record found. Checking active leases...");
+        const { data: leaseData, error: leaseError } = await supabase
+          .from("tenant_leases")
+          .select("id, unit_id, start_date")
+          .eq("tenant_id", user.id)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (leaseData) {
+           console.log("✅ Found active lease! Fetching unit details...", leaseData);
+           
+           // Fetch property_id from unit
+           const { data: unitData } = await supabase
+             .from("units")
+             .select("property_id")
+             .eq("id", leaseData.unit_id)
+             .maybeSingle();
+
+           tenantData = {
+               id: "lease-derived-" + leaseData.id,
+               user_id: user.id,
+               property_id: unitData?.property_id,
+               unit_id: leaseData.unit_id,
+               status: "active",
+               move_in_date: leaseData.start_date
+           };
+        }
+      }
+
+      if (!tenantData) {
+        console.warn("❌ No tenant record OR active lease found.");
         return false;
       }
 
-      setTenantInfo(data as any);
+      console.log("✅ Tenant info loaded:", tenantData);
+      setTenantInfo(tenantData);
 
       // Fetch property details
-      if (data.property_id) {
+      if (tenantData.property_id) {
         const { data: propertyData } = await supabase
           .from("properties")
           .select("id, name, location, address, city, status")
-          .eq("id", data.property_id)
+          .eq("id", tenantData.property_id)
           .single();
 
         if (propertyData) {
+          console.log("✅ Property data loaded:", propertyData);
           setPropertyData({
             id: propertyData.id,
             name: propertyData.name,
@@ -253,24 +298,41 @@ const TenantDashboard: React.FC = () => {
       }
 
       // Fetch unit details if unit_id exists
-      if (data.unit_id) {
+      if (tenantData.unit_id) {
         const { data: unitData } = await supabase
-          .from("property_unit_types")
-          .select("id, name")
-          .eq("id", data.unit_id)
+          .from("units")
+          .select("id, unit_number")
+          .eq("id", tenantData.unit_id)
           .single();
 
+        // If not in units table (fallback to property_unit_types query for legacy reasons or different schema)
         if (unitData) {
-          setPropertyData((prev) => ({
-            ...prev,
-            unit_number: unitData.name,
-          } as Property));
+             setPropertyData((prev) => ({
+                ...prev,
+                unit_number: unitData.unit_number,
+              } as Property));
+        } else {
+             // Try fetching from property_unit_types as per original code logic if needed
+            const { data: typeData } = await supabase
+              .from("property_unit_types")
+              .select("id, name")
+              .eq("id", tenantData.unit_id) // This assumes tenantData.unit_id matches unit_types ID, which was odd in original code. 
+                                            // The original code queried 'property_unit_types' with 'unit_id'. 
+                                            // Ideally 'unit_id' references 'units' table. I'll stick to 'units' table query above which is more correct.
+              .maybeSingle();
+            
+            if (typeData) {
+               setPropertyData((prev) => ({
+                ...prev,
+                unit_number: typeData.name,
+              } as Property));
+            }
         }
       }
 
       return true;
     } catch (err) {
-      console.error("Error fetching tenant info:", err);
+      console.error("❌ Error fetching tenant info:", err);
       return false;
     }
   };
@@ -584,6 +646,15 @@ const TenantDashboard: React.FC = () => {
                 Welcome, {userProfile?.first_name || "Tenant"}
               </h1>
               <p className="text-gray-500 mt-2">Your dashboard is being set up. You'll see your property and lease details here soon.</p>
+              <div className="mt-4">
+                <button
+                  onClick={handleRefresh}
+                  className="group flex items-center gap-2 bg-[#154279] text-white px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-[#0f305a] transition-all duration-300 rounded-lg"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", refreshing ? "animate-spin" : "")} />
+                  <span>{refreshing ? "Refreshing..." : "Refresh Now"}</span>
+                </button>
+              </div>
             </motion.div>
 
             <motion.div 

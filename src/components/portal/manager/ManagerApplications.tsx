@@ -1,30 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardCheck, Search, Loader2, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { ClipboardCheck, Search, Loader2, CheckCircle, Clock, XCircle, Home, MapPin, DollarSign } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-interface Application {
+interface RentalApplication {
   id: string;
-  applicant_id: string;
-  property_id: string;
-  unit_id?: string;
+  user_id: string;
+  application_type: string;
+  property_title?: string;
+  property_type?: string;
+  property_location?: string;
+  monthly_rent?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  contact_name?: string;
+  contact_phone?: string;
+  contact_email?: string;
+  preferred_unit_type?: string;
+  budget_min?: number;
+  budget_max?: number;
+  preferred_locations?: string[];
+  occupancy_date?: string;
   status: 'pending' | 'approved' | 'rejected' | 'under_review';
-  application_date: string;
-  notes?: string;
-  applicant?: any;
-  unit?: any;
+  created_at: string;
+  profiles?: {
+    email: string;
+    first_name?: string;
+    last_name?: string;
+  };
 }
 
 const ManagerApplications = () => {
   const { user } = useAuth();
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [applications, setApplications] = useState<RentalApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
   const [propertyId, setPropertyId] = useState<string>('');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadApplications();
@@ -39,86 +65,97 @@ const ManagerApplications = () => {
         .from('property_manager_assignments')
         .select('property_id')
         .eq('property_manager_id', user.id)
+        .limit(1)
         .single();
 
       if (assignError || !assignments) {
         toast.error('No property assigned to you');
+        setApplications([]);
         return;
       }
 
       setPropertyId(assignments.property_id);
 
-      // Fetch lease applications for this property
+      // Fetch rental applications - looking for rental type that match this property's locations
+      const { data: propertyData } = await supabase
+        .from('properties')
+        .select('name, location')
+        .eq('id', assignments.property_id)
+        .single();
+
       const { data, error } = await supabase
-        .from('lease_applications')
-        .select('*, applicant:profiles(*), unit:property_unit_types(*)')
-        .eq('property_id', assignments.property_id)
-        .order('application_date', { ascending: false });
+        .from('rental_applications')
+        .select(`
+          *,
+          profiles:user_id (
+            email,
+            first_name,
+            last_name
+          )
+        `)
+        .eq('application_type', 'looking_for_rental')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setApplications(data || []);
+
+      // Filter applications that prefer this location
+      const filtered = (data || []).filter((app: RentalApplication) => {
+        if (!app.preferred_locations || app.preferred_locations.length === 0) return false;
+        return app.preferred_locations.some(loc => 
+          propertyData?.name?.toLowerCase().includes(loc.toLowerCase()) ||
+          propertyData?.location?.toLowerCase().includes(loc.toLowerCase())
+        );
+      });
+
+      setApplications(filtered);
     } catch (err) {
       console.error('Error loading applications:', err);
       toast.error('Failed to load applications');
+      setApplications([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = async (applicationId: string) => {
+  const handleStatusChange = async (applicationId: string, newStatus: string) => {
+    setUpdatingId(applicationId);
     try {
       const { error } = await supabase
-        .from('lease_applications')
-        .update({ status: 'approved' })
+        .from('rental_applications')
+        .update({ status: newStatus })
         .eq('id', applicationId);
 
       if (error) throw error;
-      toast.success('Application approved');
-      loadApplications();
+
+      setApplications(
+        applications.map((app) =>
+          app.id === applicationId 
+            ? { ...app, status: newStatus as 'pending' | 'approved' | 'rejected' | 'under_review' } 
+            : app
+        )
+      );
+
+      toast.success('Application status updated');
     } catch (err) {
-      console.error('Error approving application:', err);
-      toast.error('Failed to approve application');
+      console.error('Error updating status:', err);
+      toast.error('Failed to update application status');
+    } finally {
+      setUpdatingId(null);
     }
   };
-
-  const handleReject = async (applicationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('lease_applications')
-        .update({ status: 'rejected' })
-        .eq('id', applicationId);
-
-      if (error) throw error;
-      toast.success('Application rejected');
-      loadApplications();
-    } catch (err) {
-      console.error('Error rejecting application:', err);
-      toast.error('Failed to reject application');
-    }
-  };
-
-  const filteredApplications = applications.filter(app => {
-    const matchesSearch = !searchTerm || 
-      app.applicant?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.applicant?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.applicant?.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filterStatus === 'all' || app.status === filterStatus;
-    
-    return matchesSearch && matchesFilter;
-  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'rejected':
-        return <XCircle className="w-5 h-5 text-red-600" />;
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'pending':
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'rejected':
+        return <XCircle className="w-4 h-4 text-red-500" />;
       case 'under_review':
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Clock className="w-4 h-4 text-blue-500" />;
       default:
-        return null;
+        return <Clock className="w-4 h-4 text-gray-500" />;
     }
   };
 
@@ -126,146 +163,193 @@ const ManagerApplications = () => {
     switch (status) {
       case 'approved':
         return 'bg-green-100 text-green-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
       case 'rejected':
         return 'bg-red-100 text-red-800';
-      case 'pending':
       case 'under_review':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-blue-100 text-blue-800';
       default:
-        return 'bg-slate-100 text-slate-800';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
+  const filteredApplications = applications.filter(app => {
+    const searchMatch = 
+      app.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.profiles?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.profiles?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const statusMatch = filterStatus === 'all' || app.status === filterStatus;
+    const typeMatch = filterType === 'all' || app.application_type === filterType;
+
+    return searchMatch && statusMatch && typeMatch;
+  });
+
   const stats = {
     total: applications.length,
-    pending: applications.filter(a => a.status === 'pending' || a.status === 'under_review').length,
+    pending: applications.filter(a => a.status === 'pending').length,
     approved: applications.filter(a => a.status === 'approved').length,
-    rejected: applications.filter(a => a.status === 'rejected').length
+    rejected: applications.filter(a => a.status === 'rejected').length,
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <ClipboardCheck className="w-8 h-8 text-blue-600" />
-            <h1 className="text-4xl font-bold text-slate-900">Lease Applications</h1>
-          </div>
-          <p className="text-slate-600">Review and manage tenant lease applications</p>
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Applications', value: stats.total, color: 'from-blue-500 to-blue-600' },
+          { label: 'Pending', value: stats.pending, color: 'from-yellow-500 to-yellow-600' },
+          { label: 'Approved', value: stats.approved, color: 'from-green-500 to-green-600' },
+          { label: 'Rejected', value: stats.rejected, color: 'from-red-500 to-red-600' },
+        ].map((stat, idx) => (
+          <Card key={idx} className={`bg-gradient-to-br ${stat.color} text-white`}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search by applicant..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <p className="text-sm text-slate-600 mb-2">Total Applications</p>
-            <p className="text-3xl font-bold text-slate-900">{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <p className="text-sm text-slate-600 mb-2">Pending Review</p>
-            <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <p className="text-sm text-slate-600 mb-2">Approved</p>
-            <p className="text-3xl font-bold text-green-600">{stats.approved}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <p className="text-sm text-slate-600 mb-2">Rejected</p>
-            <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
-          </div>
-        </div>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="under_review">Under Review</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-        {/* Search and Filter */}
-        <div className="mb-6 flex gap-4">
-          <div className="flex-1">
-            <Input
-              placeholder="Search by applicant name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              prefix={<Search size={16} className="text-slate-400" />}
-            />
-          </div>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="under_review">Under Review</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-
-        {/* Applications List */}
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          </div>
-        ) : filteredApplications.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <ClipboardCheck className="w-16 h-16 mx-auto mb-4 opacity-30 text-slate-400" />
-            <p className="text-slate-600 text-lg">No applications found</p>
-          </div>
+      {/* Applications List */}
+      <div className="space-y-4">
+        {filteredApplications.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <ClipboardCheck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No applications found</p>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="space-y-4">
-            {filteredApplications.map(app => (
-              <div key={app.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6">
-                <div className="flex items-start justify-between mb-4">
+          filteredApplications.map((app) => (
+            <Card key={app.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">
-                        {app.applicant?.first_name} {app.applicant?.last_name}
-                      </h3>
-                      {getStatusIcon(app.status)}
+                      <MapPin className="w-5 h-5 text-blue-500" />
+                      <Badge variant="outline">Looking for Rental</Badge>
                     </div>
-                    <p className="text-sm text-slate-600">{app.applicant?.email}</p>
+                    <CardTitle className="text-lg">
+                      {app.profiles?.first_name} {app.profiles?.last_name}
+                    </CardTitle>
+                    <CardDescription>
+                      {app.profiles?.email} • Applied {new Date(app.created_at).toLocaleDateString()}
+                    </CardDescription>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(app.status)}`}>
-                    {app.status}
-                  </span>
+                  <Badge className={getStatusColor(app.status)}>
+                    {getStatusIcon(app.status)}
+                    <span className="ml-1">{app.status.replace('_', ' ')}</span>
+                  </Badge>
                 </div>
+              </CardHeader>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 py-4 border-y border-slate-200">
-                  <div>
-                    <p className="text-xs text-slate-600">Application Date</p>
-                    <p className="font-semibold text-slate-900">
-                      {new Date(app.application_date).toLocaleDateString()}
-                    </p>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Application Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {app.budget_min && app.budget_max && (
+                      <div className="flex items-start gap-2">
+                        <DollarSign className="w-4 h-4 text-green-500 mt-1 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-600">Budget Range</p>
+                          <p className="font-medium">
+                            KSH {app.budget_min.toLocaleString()} - {app.budget_max.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {app.preferred_unit_type && (
+                      <div className="flex items-start gap-2">
+                        <Home className="w-4 h-4 text-orange-500 mt-1 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-600">Unit Type</p>
+                          <p className="font-medium">{app.preferred_unit_type}</p>
+                        </div>
+                      </div>
+                    )}
+                    {app.occupancy_date && (
+                      <div className="text-sm">
+                        <p className="text-xs text-gray-600">Occupancy Date</p>
+                        <p className="font-medium">{new Date(app.occupancy_date).toLocaleDateString()}</p>
+                      </div>
+                    )}
+                    {app.preferred_locations && app.preferred_locations.length > 0 && (
+                      <div className="text-sm">
+                        <p className="text-xs text-gray-600">Preferred Locations</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {app.preferred_locations.map((loc) => (
+                            <Badge key={loc} variant="outline" className="text-xs">
+                              {loc}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-600">Unit</p>
-                    <p className="font-semibold text-slate-900">
-                      {app.unit?.unit_number || 'Any Available'}
-                    </p>
+
+                  {/* Status Update */}
+                  <div className="border-t pt-4">
+                    <p className="text-xs font-medium text-gray-600 uppercase mb-2">Update Status</p>
+                    <Select
+                      value={app.status}
+                      onValueChange={(value) => handleStatusChange(app.id, value)}
+                      disabled={updatingId === app.id}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="under_review">Under Review</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {app.notes && (
-                    <div className="col-span-2">
-                      <p className="text-xs text-slate-600">Notes</p>
-                      <p className="text-sm text-slate-900">{app.notes}</p>
-                    </div>
-                  )}
                 </div>
-
-                {app.status === 'pending' || app.status === 'under_review' ? (
-                  <div className="flex gap-2">
-                    <Button onClick={() => handleApprove(app.id)} className="bg-green-600 hover:bg-green-700">
-                      <CheckCircle size={16} className="mr-2" />
-                      Approve
-                    </Button>
-                    <Button onClick={() => handleReject(app.id)} variant="destructive">
-                      <XCircle size={16} className="mr-2" />
-                      Reject
-                    </Button>
-                  </div>
-                ) : (
-                  <Button variant="outline" disabled>
-                    {app.status === 'approved' ? 'Approved' : 'Rejected'}
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
+              </CardContent>
+            </Card>
+          ))
         )}
       </div>
     </div>

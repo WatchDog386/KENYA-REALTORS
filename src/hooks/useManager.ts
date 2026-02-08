@@ -12,6 +12,8 @@ export interface ManagerStats {
   properties: Array<{
     id: string;
     name: string;
+    address?: string;
+    location?: string;
     tenants: number;
     occupancy: number;
     revenue: number;
@@ -112,9 +114,13 @@ export const useManager = (managerId?: string) => {
         .select("property_id")
         .eq("property_manager_id", userId);
 
-      if (assignmentError) throw assignmentError;
+      if (assignmentError) {
+        console.error("Assignment fetch error:", assignmentError);
+        throw assignmentError;
+      }
 
       if (!assignments || assignments.length === 0) {
+        console.log("No property assignments found for user:", userId);
         return {
           managedProperties: 0,
           activeTenants: 0,
@@ -126,54 +132,108 @@ export const useManager = (managerId?: string) => {
         };
       }
 
-      const propertyIds = assignments.map((a: any) => a.property_id);
+      const propertyIds = assignments.map((a: any) => a.property_id).filter(Boolean);
+      
+      console.log("Found property IDs from assignments:", propertyIds);
 
-      // Get properties and their tenants
+      // If no properties, return empty stats
+      if (propertyIds.length === 0) {
+        console.warn("No valid property IDs in assignments");
+        return {
+          managedProperties: 0,
+          activeTenants: 0,
+          pendingRent: 0,
+          maintenanceCount: 0,
+          totalRevenue: 0,
+          occupancyRate: 0,
+          properties: [],
+        };
+      }
+
+      // FETCH DATA IN SEPARATE QUERIES TO AVOID JOIN FAILURES
+      
+      // 1. Get properties basic info
       const { data: properties, error: propsError } = await supabase
         .from("properties")
-        .select(`
-          id,
-          name,
-          total_units,
-          status,
-          property_unit_types(
-            price_per_unit,
-            units_count
-          ),
-          tenants(
-            id,
-            status
-          )
-        `)
+        .select("id, name, location")
         .in("id", propertyIds);
 
-      if (propsError) throw propsError;
+      if (propsError) {
+        console.error("Properties query error:", propsError);
+        throw propsError;
+      }
 
-      // Calculate stats
-      const managedProperties = properties?.length || 0;
-      const activeTenants = properties?.reduce((sum, p) => sum + ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0), 0) || 0;
-      const totalRevenue = properties?.reduce((sum, p) => {
-        const avgPrice = ((p.property_unit_types as any[])?.reduce((s, u: any) => s + (u.price_per_unit || 0), 0) || 0) / Math.max(1, (p.property_unit_types as any[])?.length || 1);
-        return sum + (avgPrice * ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0));
-      }, 0) || 0;
-      const occupancyRate = managedProperties > 0 ? (activeTenants / (managedProperties * 10)) * 100 : 0; // Assume avg 10 units per property
+      // 2. Get active active tenants count & info
+      // We use a separate query because RLS or join issues might fail the main query
+      const { data: activeTenantsList, error: tenantsError } = await supabase
+        .from("tenants")
+        .select("id, property_id, status")
+        .in("property_id", propertyIds)
+        .eq("status", "active");
+        
+      if (tenantsError) {
+        console.warn("Error fetching tenants:", tenantsError);
+      }
+
+      // 3. Get unit types for revenue calculation
+      const { data: unitTypes, error: unitTypesError } = await supabase
+        .from("property_unit_types")
+        .select("property_id, price_per_unit, units_count")
+        .in("property_id", propertyIds);
+
+      if (unitTypesError) {
+         console.warn("Error fetching unit types:", unitTypesError);
+      }
+
+      console.log("Fetched properties:", properties);
+
+      // Construct property objects with manual joins
+      const enrichedProperties = properties?.map(p => {
+         const pTenants = activeTenantsList?.filter(t => t.property_id === p.id) || [];
+         const pUnits = unitTypes?.filter(u => u.property_id === p.id) || [];
+         
+         // Calculate theoretical revenue
+         // If we don't know which tenant is in which unit type, we approximate average price
+         const totalUnitCount = pUnits.reduce((sum, u) => sum + (u.units_count || 0), 0);
+         const totalPotentialRevenue = pUnits.reduce((sum, u) => sum + ((u.price_per_unit || 0) * (u.units_count || 0)), 0);
+         const avgPrice = totalUnitCount > 0 ? totalPotentialRevenue / totalUnitCount : 0;
+         
+         const estimatedRevenue = pTenants.length * avgPrice;
+         const finalTotalUnits = totalUnitCount || 0;
+         
+         return {
+            id: p.id,
+            name: p.name,
+            address: p.location,
+            location: p.location,
+            total_units: finalTotalUnits,
+            status: "active",
+            tenants: pTenants.length, // Count of active tenants
+            occupancy: (finalTotalUnits > 0) ? (pTenants.length / finalTotalUnits) * 100 : 0,
+            revenue: estimatedRevenue,
+            property_unit_types: pUnits
+         };
+      }) || [];
+
+      // Calculate aggregate stats
+      const managedProperties = enrichedProperties.length;
+      const totalActiveTenants = enrichedProperties.reduce((sum, p) => sum + p.tenants, 0);
+      const totalRevenue = enrichedProperties.reduce((sum, p) => sum + p.revenue, 0);
+      
+      const totalUnits = enrichedProperties.reduce((sum, p) => sum + p.total_units, 0);
+      const occupancyRate = totalUnits > 0 ? (totalActiveTenants / totalUnits) * 100 : 0;
 
       return {
         managedProperties,
-        activeTenants,
-        pendingRent: 0,
+        activeTenants: totalActiveTenants,
+        pendingRent: 0, // Need separate query for this if needed
         maintenanceCount: 0,
         totalRevenue,
         occupancyRate,
-        properties: (properties || []).map((p: any) => ({
-          id: p.id,
-          name: p.name,
-          tenants: ((p.tenants as any[])?.filter((t: any) => t.status === 'active').length || 0),
-          occupancy: 0,
-          revenue: 0,
-          total_units: p.total_units || 0,
-          status: p.status || 'available',
-          property_unit_types: p.property_unit_types,
+        properties: enrichedProperties.map(p => ({
+            ...p,
+            tenants: p.tenants, // keep as number for the interface
+            property_unit_types: p.property_unit_types
         })),
       };
     } catch (err) {
@@ -194,30 +254,42 @@ export const useManager = (managerId?: string) => {
     try {
       const tasks: PendingTask[] = [];
 
-      // Fetch pending maintenance requests
+      // Fetch pending maintenance requests (fetch property_id only to avoid join errors)
       const { data: maintenance, error: maintenanceError } = await supabase
         .from("maintenance_requests")
-        .select(
-          `
-          id,
-          title,
-          priority,
-          property:properties!maintenance_requests_property_id_fkey (
-            name
-          )
-        `
-        )
+        .select("id, title, priority, property_id")
         .eq("assigned_to", userId)
         .in("status", ["pending", "assigned"])
         .order("created_at", { ascending: false })
         .limit(5);
 
-      if (!maintenanceError && maintenance) {
+      if (maintenanceError) {
+        console.error("Maintenance requests query error:", maintenanceError);
+      }
+
+      if (maintenance && maintenance.length > 0) {
+        // Fetch property names manually
+        const propertyIds = [...new Set(maintenance.map(m => m.property_id).filter(Boolean))];
+        
+        let propertyMap: Record<string, string> = {};
+        if (propertyIds.length > 0) {
+            const { data: props } = await supabase
+                .from("properties")
+                .select("id, name")
+                .in("id", propertyIds);
+            
+            if (props) {
+                props.forEach(p => {
+                    propertyMap[p.id] = p.name;
+                });
+            }
+        }
+
         maintenance.forEach((mr) => {
           tasks.push({
             id: mr.id,
             task: mr.title,
-            property: mr.property?.name || "Unknown Property",
+            property: propertyMap[mr.property_id] || "Unknown Property",
             due: "ASAP",
             priority: mr.priority as any,
             type: "maintenance",
@@ -242,28 +314,36 @@ export const useManager = (managerId?: string) => {
       // Add scheduled inspections (from maintenance requests)
       const { data: inspections, error: inspectionsError } = await supabase
         .from("maintenance_requests")
-        .select(
-          `
-          id,
-          title,
-          scheduled_date,
-          property:properties!maintenance_requests_property_id_fkey (
-            name
-          )
-        `
-        )
+        .select("id, title, scheduled_date, property_id")
         .eq("assigned_to", userId)
         .gte("scheduled_date", new Date().toISOString())
         .order("scheduled_date", { ascending: true })
         .limit(3);
 
-      if (!inspectionsError && inspections) {
+      if (!inspectionsError && inspections && inspections.length > 0) {
+        // Fetch property names manually
+        const propertyIds = [...new Set(inspections.map(i => i.property_id).filter(Boolean))];
+        let propertyMap: Record<string, string> = {};
+        
+        if (propertyIds.length > 0) {
+            const { data: props } = await supabase
+                .from("properties")
+                .select("id, name")
+                .in("id", propertyIds);
+            
+            if (props) {
+                props.forEach(p => {
+                    propertyMap[p.id] = p.name;
+                });
+            }
+        }
+
         inspections.forEach((inspection) => {
           const date = new Date(inspection.scheduled_date);
           events.push({
             id: inspection.id,
             title: `Inspection: ${inspection.title}`,
-            description: `${inspection.property?.name}`,
+            description: propertyMap[inspection.property_id] || "Unknown Property",
             date: date.toLocaleDateString("en-KE"),
             time: date.toLocaleTimeString("en-KE", {
               hour: "2-digit",
@@ -348,7 +428,12 @@ export const useManager = (managerId?: string) => {
         return [];
       }
 
-      const propertyIds = assignments.map(a => a.property_id);
+      const propertyIds = assignments.map(a => a.property_id).filter(Boolean);
+      
+      // If no valid property IDs, return empty
+      if (propertyIds.length === 0) {
+        return [];
+      }
 
       // Then fetch the property details
       const { data, error } = await supabase
@@ -370,10 +455,12 @@ export const useManager = (managerId?: string) => {
         `
         )
         .in("id", propertyIds)
-        .eq("status", "Active")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching properties:", error);
+        throw error;
+      }
       return data || [];
     } catch (err) {
       console.error("Error fetching assigned properties:", err);
@@ -448,12 +535,30 @@ export const useManager = (managerId?: string) => {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
+      // First, fetch property IDs assigned to this manager
+      const { data: propertyAssignments, error: propError } = await supabase
+        .from("property_manager_assignments")
+        .select("property_id")
+        .eq("property_manager_id", user.id);
+
+      if (propError) {
+        console.error("Error fetching property IDs:", propError);
+        return [];
+      }
+
+      const propertyIds = propertyAssignments?.map(p => p.property_id).filter(Boolean) || [];
+      
+      // If no properties assigned, return empty
+      if (propertyIds.length === 0) {
+        return [];
+      }
+
       let query = supabase
         .from("maintenance_requests")
         .select(
           `
           *,
-          property:properties!maintenance_requests_property_id_fkey (
+          property:properties (
             id,
             name,
             address
@@ -466,13 +571,7 @@ export const useManager = (managerId?: string) => {
           )
         `
         )
-        .in(
-          "property_id",
-          (await supabase
-            .from("properties")
-            .select("id")
-            .eq("property_manager_id", user.id)).data?.map(p => p.id) || []
-        )
+        .in("property_id", propertyIds)
         .order("created_at", { ascending: false });
 
       if (filters?.status) {
@@ -487,7 +586,10 @@ export const useManager = (managerId?: string) => {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching maintenance requests:", error);
+        throw error;
+      }
       return data || [];
     } catch (err) {
       console.error("Error fetching maintenance requests:", err);

@@ -15,46 +15,179 @@ interface Assignment {
   assigned_at: string;
 }
 
-const AssignmentStatus: React.FC = () => {
+interface AssignmentStatusProps {
+  properties?: Array<{
+    id: string;
+    name: string;
+    location?: string;
+    address?: string;
+    total_units?: number;
+    status: string;
+  }>;
+  loading?: boolean;
+}
+
+const AssignmentStatus: React.FC<AssignmentStatusProps> = ({ properties: parentProperties, loading: parentLoading }) => {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Use parent properties immediately if available
   useEffect(() => {
-    if (user?.id) {
+    if (parentProperties && parentProperties.length > 0) {
+      console.log("Using parent properties:", parentProperties);
+      const formattedAssignments: Assignment[] = parentProperties.map((prop: any) => ({
+        id: prop.id,
+        property_id: prop.id,
+        property_name: prop.name,
+        property_address: prop.location || prop.address || "Unknown Address",
+        assigned_at: new Date().toISOString(),
+      }));
+      setAssignments(formattedAssignments);
+      setLoading(false);
+    } else if (parentLoading === false && (!parentProperties || parentProperties.length === 0)) {
+      // Parent finished loading and found nothing, so we should try fetching ourselves
+      // just in case parent data was incomplete
       loadAssignments();
     }
-  }, [user?.id]);
+  }, [parentProperties, parentLoading]);
 
-  const loadAssignments = async () => {
+  useEffect(() => {
+    const setupRealtimeParams = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser?.id) return;
+
+      // Initial load
+      if (!parentProperties || parentProperties.length === 0) {
+        loadAssignments(currentUser.id);
+      }
+      
+      // Set up real-time subscription
+      const subscription = supabase
+        .channel(`property_assignments_${currentUser.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "property_manager_assignments",
+            filter: `property_manager_id=eq.${currentUser.id}`,
+          },
+          (payload) => {
+            console.log("Assignment change detected:", payload);
+            loadAssignments(currentUser.id);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    };
+
+    setupRealtimeParams();
+  }, []);
+
+  const loadAssignments = async (userId?: string) => {
     try {
+      // If we already have parent properties, don't overwrite with empty DB call results unless necessary
+      if (parentProperties && parentProperties.length > 0) return;
+
+      const targetUserId = userId || user?.id || (await supabase.auth.getUser()).data.user?.id;
+      if (!targetUserId) {
+        console.warn("No user ID available for loading assignments");
+        return;
+      }
+      
       setLoading(true);
       
-      // Fetch all property assignments for this manager
-      const { data, error } = await supabase
+      // 1. First get the assignments
+      const { data: assignmentData, error: assignmentError } = await supabase
         .from("property_manager_assignments")
-        .select(`
-          id,
-          property_id,
-          assigned_at,
-          properties(id, name, address)
-        `)
-        .eq("property_manager_id", user?.id)
+        .select("id, property_id, assigned_at")
+        .eq("property_manager_id", targetUserId)
         .order("assigned_at", { ascending: false });
 
-      if (error) throw error;
+      if (assignmentError) {
+        console.error("Assignment fetch error:", assignmentError);
+        throw assignmentError;
+      }
 
-      const formattedAssignments: Assignment[] = (data || []).map((a: any) => ({
-        id: a.id,
-        property_id: a.property_id,
-        property_name: a.properties?.name || "Unknown Property",
-        property_address: a.properties?.address || "Unknown Address",
-        assigned_at: a.assigned_at,
-      }));
+      if (!assignmentData || assignmentData.length === 0) {
+        console.log("No assignments found for user:", targetUserId);
+        // Only clear assignments if we don't have parent properties
+        if (!parentProperties || parentProperties.length === 0) {
+           setAssignments([]);
+        }
+        setLoading(false);
+        return;
+      }
+
+      console.log("Found assignments:", assignmentData);
+
+      // 2. Then get the property details
+      const propertyIds = assignmentData.map(a => a.property_id).filter(Boolean);
+      
+      console.log("Property IDs to fetch:", propertyIds);
+      
+      // If no valid property IDs, return early
+      if (propertyIds.length === 0) {
+        console.warn("No valid property IDs in assignments");
+        setAssignments([]);
+        setLoading(false);
+        return;
+      }
+      
+      const { data: propertiesData, error: propertiesError } = await supabase
+        .from("properties")
+        .select("id, name, location")
+        .in("id", propertyIds);
+
+      if (propertiesError) {
+        console.error("Properties query error:", propertiesError);
+        console.error("Property IDs:", propertyIds);
+        
+        // Error handling fallback: show assignments even if details can't be fetched
+        const placeholderAssignments = assignmentData.map((a: any) => ({
+             id: a.id,
+             property_id: a.property_id,
+             property_name: "Property Details Unavailable",
+             property_address: "Error fetching details (RLS)",
+             assigned_at: a.assigned_at
+        }));
+        setAssignments(placeholderAssignments);
+        setLoading(false);
+        return; 
+      }
+
+      console.log("Fetched properties:", propertiesData);
+
+      // 3. Combine the data
+      const formattedAssignments: Assignment[] = assignmentData.map((a: any) => {
+        const prop = propertiesData?.find(p => p.id === a.property_id);
+        return {
+          id: a.id,
+          property_id: a.property_id,
+          property_name: prop?.name || "Unknown Property",
+          property_address: prop?.location || prop?.address || "Unknown Address",
+          assigned_at: a.assigned_at,
+        };
+      });
 
       setAssignments(formattedAssignments);
     } catch (err) {
       console.error("Error loading assignments:", err);
+      // Fallback to parent properties if query fails and we have them
+      if (parentProperties && parentProperties.length > 0) {
+         const formatted: Assignment[] = parentProperties.map((prop: any) => ({
+          id: prop.id,
+          property_id: prop.id,
+          property_name: prop.name,
+          property_address: prop.location || prop.address || "Unknown Address",
+          assigned_at: new Date().toISOString(),
+        }));
+        setAssignments(formatted);
+      }
     } finally {
       setLoading(false);
     }

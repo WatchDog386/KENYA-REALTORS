@@ -1,5 +1,5 @@
 ﻿// src/pages/portal/super-admin/approvals/ApprovalsPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, AlertCircle, Search, Filter, Check, X, Clock, FileText } from 'lucide-react';
@@ -9,28 +9,197 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { HeroBackground } from '@/components/ui/HeroBackground';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+interface Approval {
+  id: string;
+  user_id: string;
+  approval_type: string;
+  action_type?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  property_id?: string;
+  tenant_id?: string;
+  unit_id?: string;
+  notes?: string;
+  metadata?: any;
+  created_at: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+  // Join data
+  profiles?: { first_name: string; last_name: string; email: string };
+  tenants?: { user_id: string };
+  properties?: { name: string };
+  units?: { unit_number: string };
+}
 
 const ApprovalsPage: React.FC = () => {
   const { hasPermission, loading: isLoading } = useSuperAdmin();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [approvalLoading, setApprovalLoading] = useState<string | null>(null);
 
-  const mockApprovals = [
-    { id: 1, type: 'Property', title: 'Ayden Home Towers Registration', applicant: 'John Doe', status: 'pending', date: '2024-02-20' },
-    { id: 2, type: 'User', title: 'New Property Manager Approval', applicant: 'Sarah Williams', status: 'pending', date: '2024-02-19' },
-    { id: 3, type: 'Lease', title: 'Lease Agreement - Unit 204', applicant: 'Mike Johnson', status: 'approved', date: '2024-02-18' },
-    { id: 4, type: 'Payment', title: 'Payment Method Update', applicant: 'Jane Smith', status: 'pending', date: '2024-02-17' },
-  ];
+  useEffect(() => {
+    if (!isLoading && hasPermission('manage_approvals')) {
+      fetchApprovals();
+    }
+  }, [isLoading, hasPermission]);
 
-  const filteredApprovals = mockApprovals.filter(approval => {
-    const matchesSearch = approval.title.toLowerCase().includes(searchQuery.toLowerCase()) || approval.applicant.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'all' || approval.type.toLowerCase() === filterType.toLowerCase();
+  const fetchApprovals = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('approvals')
+        .select(`
+          id,
+          user_id,
+          approval_type,
+          action_type,
+          status,
+          property_id,
+          tenant_id,
+          unit_id,
+          notes,
+          metadata,
+          created_at,
+          reviewed_by,
+          reviewed_at,
+          rejection_reason,
+          profiles:user_id (first_name, last_name, email),
+          properties:property_id (name),
+          units:unit_id (unit_number),
+          tenants:tenant_id (user_id)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      setApprovals(data || []);
+    } catch (err) {
+      console.error('Error fetching approvals:', err);
+      toast.error('Failed to load approvals');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveApproval = async (approvalId: string, actionType?: string) => {
+    setApprovalLoading(approvalId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Update approval status
+      const { error: updateError } = await supabase
+        .from('approvals')
+        .update({
+          status: 'approved',
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', approvalId);
+
+      if (updateError) throw updateError;
+
+      // If it's a tenant action, update the tenant record
+      const approval = approvals.find(a => a.id === approvalId);
+      if (approval && approval.action_type?.startsWith('tenant_')) {
+        if (approval.action_type === 'tenant_remove' && approval.tenant_id) {
+          await supabase
+            .from('tenants')
+            .update({ status: 'terminated', move_out_date: new Date().toISOString() })
+            .eq('id', approval.tenant_id);
+        } else if (approval.action_type === 'tenant_suspend' && approval.tenant_id) {
+          await supabase
+            .from('tenants')
+            .update({ status: 'suspended' })
+            .eq('id', approval.tenant_id);
+        }
+      }
+
+      toast.success('Approval processed successfully');
+      fetchApprovals();
+    } catch (err) {
+      console.error('Error approving:', err);
+      toast.error('Failed to process approval');
+    } finally {
+      setApprovalLoading(null);
+    }
+  };
+
+  const handleRejectApproval = async (approvalId: string, reason: string) => {
+    setApprovalLoading(approvalId);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('approvals')
+        .update({
+          status: 'rejected',
+          reviewed_by: user.id,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: reason
+        })
+        .eq('id', approvalId);
+
+      if (error) throw error;
+
+      toast.success('Approval rejected');
+      fetchApprovals();
+    } catch (err) {
+      console.error('Error rejecting:', err);
+      toast.error('Failed to reject approval');
+    } finally {
+      setApprovalLoading(null);
+    }
+  };
+
+  const getApprovalTitle = (approval: Approval): string => {
+    if (approval.action_type === 'tenant_remove') {
+      return `Remove Tenant Request`;
+    }
+    if (approval.action_type === 'tenant_suspend') {
+      return `Suspend Tenant Request`;
+    }
+    if (approval.action_type === 'tenant_add') {
+      return `Tenant Assignment`;
+    }
+    return `${approval.approval_type || 'Unknown'} Approval`;
+  };
+
+  const getApprovalDescription = (approval: Approval): string => {
+    const metadata = approval.metadata || {};
+    if (approval.action_type?.startsWith('tenant_')) {
+      return metadata.tenant_name || 'Tenant Action';
+    }
+    return approval.properties?.name || 'Unknown';
+  };
+
+  const getApprovalType = (approval: Approval): string => {
+    if (approval.action_type?.startsWith('tenant_')) {
+      return 'Tenant';
+    }
+    return approval.approval_type || 'Unknown';
+  };
+
+  const filteredApprovals = approvals.filter(approval => {
+    const type = getApprovalType(approval).toLowerCase();
+    const title = getApprovalTitle(approval).toLowerCase();
+    const applicant = `${approval.profiles?.first_name || ''} ${approval.profiles?.last_name || ''}`.toLowerCase();
+    
+    const matchesSearch = title.includes(searchQuery.toLowerCase()) || applicant.includes(searchQuery.toLowerCase());
+    const matchesType = filterType === 'all' || type === filterType.toLowerCase();
     return matchesSearch && matchesType;
   });
 
-  const pendingCount = mockApprovals.filter(a => a.status === 'pending').length;
-  const approvedCount = mockApprovals.filter(a => a.status === 'approved').length;
+  const pendingCount = approvals.filter(a => a.status === 'pending').length;
+  const approvedCount = approvals.filter(a => a.status === 'approved').length;
 
   if (isLoading) {
     return (
@@ -61,10 +230,11 @@ const ApprovalsPage: React.FC = () => {
   }
 
   const getTypeBadgeColor = (type: string) => {
-    switch (type) {
-      case 'Property': return 'bg-blue-100 text-[#154279]';
-      case 'User': return 'bg-purple-100 text-purple-700';
-      case 'Lease': return 'bg-emerald-100 text-emerald-700';
+    switch (type.toLowerCase()) {
+      case 'property': return 'bg-blue-100 text-[#154279]';
+      case 'user': return 'bg-purple-100 text-purple-700';
+      case 'lease': return 'bg-emerald-100 text-emerald-700';
+      case 'tenant': return 'bg-amber-100 text-amber-700';
       default: return 'bg-orange-100 text-[#F96302]';
     }
   };
@@ -163,6 +333,7 @@ const ApprovalsPage: React.FC = () => {
                     <option value="user">User</option>
                     <option value="lease">Lease</option>
                     <option value="payment">Payment</option>
+                    <option value="tenant">Tenant</option>
                   </select>
                 </div>
               </div>
@@ -171,37 +342,102 @@ const ApprovalsPage: React.FC = () => {
 
           {/* Approvals List */}
           <div className="space-y-4">
-            {filteredApprovals.map((approval, idx) => (
-              <motion.div key={approval.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.05 }}>
-                <Card className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge className={getTypeBadgeColor(approval.type)}>{approval.type}</Badge>
-                          <Badge className={approval.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}>{approval.status}</Badge>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }}>
+                  <Loader2 className="w-8 h-8 text-[#154279]" />
+                </motion.div>
+              </div>
+            ) : filteredApprovals.length > 0 ? (
+              filteredApprovals.map((approval, idx) => {
+                const applicant = approval.profiles ? `${approval.profiles.first_name} ${approval.profiles.last_name}` : 'Unknown';
+                const type = getApprovalType(approval);
+                const title = getApprovalTitle(approval);
+                const description = getApprovalDescription(approval);
+                
+                return (
+                  <motion.div key={approval.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + idx * 0.05 }}>
+                    <Card className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between flex-wrap gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Badge className={getTypeBadgeColor(type)}>{type}</Badge>
+                              <Badge className={approval.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}>{approval.status}</Badge>
+                            </div>
+                            <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+                            <div className="space-y-1">
+                              <div className="text-sm text-slate-600">
+                                By: <strong>{applicant}</strong>
+                              </div>
+                              {description && (
+                                <div className="text-sm text-slate-600">
+                                  {description}
+                                </div>
+                              )}
+                              {approval.notes && (
+                                <div className="text-sm text-slate-600 mt-2 p-2 bg-slate-50 rounded italic border-l-2 border-slate-300">
+                                  Reason: {approval.notes}
+                                </div>
+                              )}
+                              <div className="text-xs text-slate-500">
+                                {new Date(approval.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          {approval.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <Button 
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl"
+                                onClick={() => handleApproveApproval(approval.id, approval.action_type)}
+                                disabled={approvalLoading === approval.id}
+                              >
+                                {approvalLoading === approval.id ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-4 h-4 mr-2" /> Approve
+                                  </>
+                                )}
+                              </Button>
+                              <Button 
+                                className="bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl"
+                                onClick={() => handleRejectApproval(approval.id, 'Rejected by super admin')}
+                                disabled={approvalLoading === approval.id}
+                              >
+                                {approvalLoading === approval.id ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <X className="w-4 h-4 mr-2" /> Reject
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-2">{approval.title}</h3>
-                        <div className="flex items-center gap-4 text-sm text-slate-600">
-                          <span>By: <strong>{approval.applicant}</strong></span>
-                          <span>Date: <strong>{approval.date}</strong></span>
-                        </div>
-                      </div>
-                      {approval.status === 'pending' && (
-                        <div className="flex gap-2">
-                          <Button className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl">
-                            <Check className="w-4 h-4 mr-2" /> Approve
-                          </Button>
-                          <Button className="bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl">
-                            <X className="w-4 h-4 mr-2" /> Reject
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })
+            ) : (
+              <Card className="border-dashed">
+                <CardContent className="p-12 text-center">
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No approvals found</h3>
+                  <p className="text-gray-500">
+                    {searchQuery || filterType !== 'all' ? 'Try adjusting your filters' : 'All approvals are up to date!'}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>

@@ -104,15 +104,35 @@ const ManagerPortal = () => {
       const propertyIds = stats.properties.map(p => p.id);
       
       // Query payments for tenants in assigned properties only
-      const { data: payments, error } = await supabase
-        .from("payments")
-        .select("*, tenant:sender_id(first_name, last_name, email), property:property_id(name)")
+      const { data: paymentsData, error } = await supabase
+        .from("rent_payments")
+        .select("*, property:property_id(name)")
         .in("property_id", propertyIds)
         .order("created_at", { ascending: false })
         .limit(5);
-      
+
       if (error) throw error;
-      setRecentPayments(payments || []);
+      
+      // Manually fetch tenant profiles since no direct FK to profiles exists yet
+      let payments = [];
+      if (paymentsData) {
+          const tenantIds = [...new Set(paymentsData.map((p: any) => p.tenant_id).filter(Boolean))];
+          const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', tenantIds);
+          
+          payments = paymentsData.map((p: any) => {
+              const tenant = profiles?.find(prof => prof.id === p.tenant_id);
+              return {
+                  ...p,
+                  tenant: tenant ? {
+                      first_name: tenant.first_name,
+                      last_name: tenant.last_name,
+                      email: tenant.email
+                  } : { first_name: 'Unknown', last_name: 'Tenant', email: '' }
+              };
+          });
+      }
+      
+      setRecentPayments(payments);
     } catch (err) {
       console.error("Error fetching payments:", err);
       // Don't clear payments on error to avoid flash, just log
@@ -454,7 +474,7 @@ const ManagerPortal = () => {
       {/* ASSIGNMENT STATUS SECTION */}
       <section className="bg-white border-b border-slate-200 py-12">
         <div className="max-w-[1400px] mx-auto px-6">
-          <AssignmentStatus />
+          <AssignmentStatus properties={properties} loading={loading} />
         </div>
       </section>
 

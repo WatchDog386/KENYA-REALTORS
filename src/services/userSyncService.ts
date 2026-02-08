@@ -71,7 +71,7 @@ export const userSyncService = {
   async getAllUsers() {
     try {
       const { data, error } = await supabase
-        .from("all_users_with_profile")
+        .from("profiles")
         .select("*");
 
       if (error) {

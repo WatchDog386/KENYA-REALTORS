@@ -4,6 +4,8 @@ export interface PropertyUnitType {
   id?: string;
   property_id?: string;
   name: string;
+  unit_type_name?: string; // @deprecated use name
+  unit_category?: string;
   units_count: number;
   price_per_unit: number;
 }
@@ -16,6 +18,7 @@ export interface Property {
   type?: string;
   description?: string;
   amenities?: string;
+  number_of_floors?: number;
   property_unit_types?: PropertyUnitType[];
   // Computed on frontend
   total_units?: number;
@@ -30,6 +33,7 @@ export interface CreatePropertyDTO {
   type?: string;
   description?: string;
   amenities?: string;
+  number_of_floors?: number;
   units: {
     name: string;
     units_count: number;
@@ -97,7 +101,8 @@ export const propertyService = {
         image_url: property.image_url,
         type: property.type,
         description: property.description,
-        amenities: property.amenities
+        amenities: property.amenities,
+        number_of_floors: property.number_of_floors || 1
       })
       .select()
       .single();

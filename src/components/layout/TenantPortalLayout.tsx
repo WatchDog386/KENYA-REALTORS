@@ -45,15 +45,81 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-
-  // Mock notifications
-  const notifications = [
-    { id: 1, title: 'Payment Reminder', message: 'Rent due soon', time: '2h ago', read: false, type: 'payment' },
-    { id: 2, title: 'Maintenance Update', message: 'Request received', time: '1d ago', read: true, type: 'maintenance' },
-  ];
+  
+  // Real notifications state
+  const [notifications, setNotifications] = useState<any[]>([]);
+  
   const unreadCount = notifications.filter(n => !n.read).length;
 
   // Initial data fetch
+  useEffect(() => {
+    if (user?.id) {
+        fetchNotifications();
+        
+        // Subscribe to real-time notifications
+        const channel = supabase
+            .channel('public:notifications')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `recipient_id=eq.${user.id}`
+                },
+                (payload) => {
+                    setNotifications(prev => [payload.new, ...prev]);
+                    toast.info(payload.new.title || 'New Notification');
+                }
+            )
+            .subscribe();
+            
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }
+  }, [user?.id]);
+  
+  const fetchNotifications = async () => {
+      try {
+          const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('recipient_id', user!.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+            
+          if (error) throw error;
+          setNotifications(data || []);
+      } catch (error) {
+          console.error("Error fetching notifications", error);
+      }
+  };
+
+  const markAsRead = async (notifId: string) => {
+      try {
+          await supabase.from('notifications').update({ read: true }).eq('id', notifId);
+          setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, read: true } : n));
+      } catch(e) {
+          console.error(e);
+      }
+  };
+  
+  const handleNotificationClick = (notif: any) => {
+      markAsRead(notif.id);
+      setNotificationsOpen(false);
+      
+      // Navigate based on type/entity
+      if (notif.related_entity_type === 'vacancy_notice' || notif.title?.includes('Vacancy') || notif.title?.includes('Inspection')) {
+          navigate('/portal/tenant/vacation-notice');
+      } else if (notif.type === 'payment') {
+          navigate('/portal/tenant/payments');
+      } else if (notif.type === 'maintenance') {
+          navigate('/portal/tenant/maintenance');
+      }
+  };
+
+  // Initial data fetch & Font setup
   useEffect(() => {
     // Add Nunito font
     const link = document.createElement("link");
@@ -161,6 +227,12 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/tenant/calendar',
       icon: <Calendar size={20} />,
       description: 'Events & Deadlines'
+    },
+    {
+      title: 'Notice to Vacate',
+      href: '/portal/tenant/vacation-notice',
+      icon: <LogOut size={20} />,
+      description: 'End Lease Request'
     },
   ];
 

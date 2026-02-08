@@ -69,7 +69,7 @@ class SuperAdminService {
 
         // Pending approvals
         supabase
-          .from("approval_queue")
+          .from("approvals")
           .select("id", { count: "exact" })
           .eq("status", "pending"),
 
@@ -162,7 +162,7 @@ class SuperAdminService {
 
       // Check for pending approvals
       const { count: pendingApprovals } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending");
 

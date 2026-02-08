@@ -61,33 +61,57 @@ const ManagerTenants: React.FC = () => {
         return;
       }
 
-      // Get tenants for this property
-      const { data: tenantData, error: tenantError } = await supabase
-        .from('tenants')
-        .select(
-          `
+      // Get tenants via leases (Source of Truth for Occupancy)
+      // This ensures consistency with ManagerUnits which shows occupied units
+      const { data: activeLeases, error: leasesError } = await supabase
+        .from('tenant_leases')
+        .select(`
           id,
-          user_id,
-          property_id,
-          move_in_date,
-          profiles(first_name, last_name, email, phone),
-          property_unit_types(name)
-        `
-        )
-        .eq('property_id', assignment.property_id)
-        .eq('status', 'active');
+          tenant_id,
+          start_date,
+          units!inner (
+            id,
+            unit_number,
+            property_id
+          )
+        `)
+        .eq('status', 'active')
+        .eq('units.property_id', assignment.property_id);
 
-      if (tenantError) throw tenantError;
+      if (leasesError) throw leasesError;
 
-      const formattedTenants: Tenant[] = (tenantData || []).map((t: any) => ({
-        id: t.id,
-        first_name: t.profiles?.first_name || '',
-        last_name: t.profiles?.last_name || '',
-        email: t.profiles?.email || '',
-        phone: t.profiles?.phone,
-        unit_name: t.property_unit_types?.name,
-        move_in_date: t.move_in_date,
-      }));
+      if (!activeLeases || activeLeases.length === 0) {
+        setTenants([]);
+        return;
+      }
+
+      // Extract User IDs to fetch profiles
+      const userIds = activeLeases.map((l: any) => l.tenant_id).filter(Boolean);
+      
+      // Fetch Profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, phone')
+        .in('id', userIds);
+        
+      if (profilesError) throw profilesError;
+
+      const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+      const formattedTenants: Tenant[] = activeLeases.map((lease: any) => {
+        const profile = profilesMap.get(lease.tenant_id) || {};
+        const unit = lease.units || {};
+        
+        return {
+          id: lease.tenant_id, // Use user_id as ID for list
+          first_name: profile.first_name || '',
+          last_name: profile.last_name || '',
+          email: profile.email || '',
+          phone: profile.phone,
+          unit_name: unit.unit_number || 'Unassigned',
+          move_in_date: lease.start_date,
+        };
+      });
 
       setTenants(formattedTenants);
     } catch (error) {

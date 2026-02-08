@@ -16,7 +16,8 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  Ban
+  Ban,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,11 +36,15 @@ import { useManager } from '@/hooks/useManager';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AddTenantDialog } from '@/components/dialogs/AddTenantDialog';
+import { TenantActionRequestDialog } from '@/components/dialogs/TenantActionRequestDialog';
 
 const ManagerTenants = () => {
   const [tenants, setTenants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [managerId, setManagerId] = useState('');
+  const [propertyId, setPropertyId] = useState('');
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -47,28 +52,100 @@ const ManagerTenants = () => {
     overdue: 0,
     totalRent: 0
   });
+  // Dialog states
+  const [addTenantDialogOpen, setAddTenantDialogOpen] = useState(false);
+  const [tenantActionDialogOpen, setTenantActionDialogOpen] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<any>(null);
 
   useEffect(() => {
-    fetchTenants();
+    fetchManagerAndProperty();
   }, []);
+
+  useEffect(() => {
+    if (propertyId) {
+      fetchTenants();
+    }
+  }, [propertyId]);
+
+  const fetchManagerAndProperty = async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Could not get current user');
+      
+      setManagerId(user.id);
+
+      // Get manager's assigned property
+      const { data: assignments, error: assignError } = await supabase
+        .from('property_manager_assignments')
+        .select('property_id')
+        .eq('property_manager_id', user.id)
+        .limit(1)
+        .single();
+
+      if (!assignError && assignments) {
+        setPropertyId(assignments.property_id);
+      }
+    } catch (err) {
+      console.error('Error fetching manager info:', err);
+    }
+  };
 
   const fetchTenants = async () => {
     try {
       setLoading(true);
-      // Tenant management tables not available in current schema
-      // Setting empty state
-      setTenants([]);
+      
+      if (!propertyId) {
+        setTenants([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('tenants')
+        .select(`
+          id,
+          user_id,
+          property_id,
+          unit_id,
+          status,
+          move_in_date,
+          move_out_date,
+          profiles:user_id (id, email, first_name, last_name),
+          units:unit_id (unit_number)
+        `)
+        .eq('property_id', propertyId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedTenants = (data || []).map((tenant: any) => ({
+        id: tenant.id,
+        name: `${tenant.profiles?.first_name || ''} ${tenant.profiles?.last_name || ''}`.trim(),
+        email: tenant.profiles?.email,
+        propertyId: tenant.property_id,
+        unitId: tenant.unit_id,
+        unit: tenant.units?.unit_number,
+        status: tenant.status,
+        moveInDate: tenant.move_in_date,
+        moveOutDate: tenant.move_out_date,
+        isActive: tenant.status === 'active',
+        rent: 15000 // Mock value - should come from unit pricing
+      }));
+
+      setTenants(formattedTenants);
+
+      // Update stats
+      const activeCount = formattedTenants.filter(t => t.isActive).length;
       setStats({
-        total: 0,
-        active: 0,
+        total: formattedTenants.length,
+        active: activeCount,
         pending: 0,
         overdue: 0,
-        totalRent: 0
+        totalRent: activeCount * 15000
       });
-      console.warn('Tenant data not available - required tables do not exist');
     } catch (err) {
       console.error('Error fetching tenants:', err);
       toast.error('Failed to load tenants');
+      setTenants([]);
     } finally {
       setLoading(false);
     }
@@ -161,20 +238,10 @@ const ManagerTenants = () => {
           <h1 className="text-3xl font-bold tracking-tight">Tenants</h1>
           <p className="text-gray-600">Manage your property tenants</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" asChild>
-            <Link to="/portal/manager/tenants/applications">
-              <FileText className="w-4 h-4 mr-2" />
-              View Applications
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link to="/portal/manager/tenants/new">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Add Tenant
-            </Link>
-          </Button>
-        </div>
+        <Button onClick={() => setAddTenantDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+          <UserPlus className="w-4 h-4 mr-2" />
+          Assign Tenant
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -348,26 +415,27 @@ const ManagerTenants = () => {
                                   View Details
                                 </Link>
                               </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link to={`/portal/manager/tenants/${tenant.id}/edit`}>
-                                  Edit Tenant
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link to={`/portal/manager/tenants/${tenant.id}/payments`}>
-                                  View Payments
-                                </Link>
-                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              {tenant.leaseId && (
-                                <DropdownMenuItem 
-                                  onClick={() => terminateLease(tenant.leaseId, tenant.name)}
-                                  className="text-red-600"
-                                >
-                                  <Ban className="w-4 h-4 mr-2" />
-                                  Terminate Lease
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setSelectedTenant(tenant);
+                                  setTenantActionDialogOpen(true);
+                                }}
+                                className="text-yellow-600"
+                              >
+                                <Ban className="w-4 h-4 mr-2" />
+                                Suspend Tenant
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setSelectedTenant({ ...tenant, action: 'remove' });
+                                  setTenantActionDialogOpen(true);
+                                }}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Remove Tenant
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -394,6 +462,31 @@ const ManagerTenants = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Tenant Dialog */}
+      <AddTenantDialog
+        open={addTenantDialogOpen}
+        onOpenChange={setAddTenantDialogOpen}
+        propertyId={propertyId}
+        managerId={managerId}
+        onSuccess={() => fetchTenants()}
+      />
+
+      {/* Tenant Action Request Dialog */}
+      {selectedTenant && (
+        <TenantActionRequestDialog
+          open={tenantActionDialogOpen}
+          onOpenChange={setTenantActionDialogOpen}
+          tenantId={selectedTenant.id}
+          tenantName={selectedTenant.name}
+          propertyId={propertyId}
+          managerId={managerId}
+          onSuccess={() => {
+            fetchTenants();
+            setSelectedTenant(null);
+          }}
+        />
+      )}
     </div>
   );
 };

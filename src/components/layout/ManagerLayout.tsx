@@ -43,7 +43,8 @@ interface Notification {
   message: string;
   time: string;
   read: boolean;
-  type: 'maintenance' | 'payment' | 'tenant' | 'system' | 'approval';
+  type: 'maintenance' | 'payment' | 'tenant' | 'system' | 'approval' | 'vacancy_update';
+  related_entity_type?: string;
   related_entity_id?: string;
   created_at: string;
 }
@@ -285,6 +286,8 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         return '/portal/manager/tenants';
       case 'approval':
         return '/portal/manager/approval-requests';
+      case 'vacancy_update':
+        return '/portal/manager/vacation-notices';
       default:
         return '#';
     }
@@ -345,6 +348,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         { title: 'All Tenants', href: '/portal/manager/tenants', icon: <Users size={18} />, description: 'Tenant Directory' },
         { title: 'Applications', href: '/portal/manager/tenants/applications', icon: <ClipboardCheck size={18} />, description: 'New Lease Requests' },
         { title: 'Leases', href: '/portal/manager/leases', icon: <FileText size={18} />, description: 'Active Agreements' },
+        { title: 'Vacancy Notices', href: '/portal/manager/vacation-notices', icon: <LogOut size={18} />, description: 'Move-Out Requests' },
       ]
     },
     {

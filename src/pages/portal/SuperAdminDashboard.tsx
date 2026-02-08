@@ -196,23 +196,19 @@ const SuperAdminDashboard = () => {
         .from("property_unit_types")
         .select("property_id, units_count, price_per_unit");
 
+      // Fetch actual units with their status
+      const { data: units = [] } = await supabase
+        .from("units")
+        .select("id, status");
+
       const propertiesData = properties || [];
       const unitsData = unitTypes || [];
       
-      let totalUnits = 0;
-      // Note: occupied_units support is pending lease implementation.
-      const occupiedUnits = 0; 
-
-      propertiesData.forEach((prop: any) => {
-        const units = unitsData.filter((u: any) => u.property_id === prop.id);
-        units.forEach((u: any) => {
-             totalUnits += (u.units_count || 0);
-             // Assuming totalRevenue estimate for dashboard usage if needed, 
-             // though this variable 'totalRevenue' isn't defined in this scope in original code snippet, 'totalRevenue' is used in setDashboardStats.
-             // We need to see where totalRevenue comes from. 
-             // Ah, the original code didn't calculate totalRevenue here, it just had monthly_rent in the select.
-        });
-      });
+      // Calculate occupied units from actual unit records
+      const occupiedUnits = units.filter((u: any) => u.status?.toLowerCase() === 'occupied').length; 
+      
+      // Calculate total units from actual units table
+      const totalUnits = units.length;
       
       // Calculate estimated monthly rent potential from the units
        const estimatedMonthlyRent = propertiesData.reduce((sum, prop: any) => {
@@ -230,7 +226,7 @@ const SuperAdminDashboard = () => {
         .eq("status", "active");
 
       const { count: pendingApprovalsCount } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending");
 
@@ -270,7 +266,7 @@ const SuperAdminDashboard = () => {
       const collectionRate = totalExpectedRevenue > 0 ? (totalRevenue / totalExpectedRevenue) * 100 : 0;
 
       const { count: pendingRequestsCount } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending");
 
@@ -365,10 +361,10 @@ const SuperAdminDashboard = () => {
       }
 
       const { data: recentApprovals } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .select(`
           id,
-          request_type,
+          approval_type,
           status,
           created_at
         `)
@@ -379,7 +375,7 @@ const SuperAdminDashboard = () => {
       if (recentApprovals) {
         recentApprovals.forEach(approval => {
           const titleMap: Record<string, string> = {
-            role_assignment: "Role Assignment",
+            role_change: "Role Assignment",
             manager_assignment: "Manager Assignment",
             tenant_addition: "Tenant Addition",
             tenant_removal: "Tenant Removal",
@@ -387,8 +383,8 @@ const SuperAdminDashboard = () => {
           
           items.push({
             id: approval.id,
-            title: `Approval: ${titleMap[approval.request_type] || approval.request_type}`,
-            subtitle: `${approval.request_type} • Pending Review`,
+            title: `Approval: ${titleMap[approval.approval_type] || approval.approval_type}`,
+            subtitle: `${approval.approval_type} • Pending Review`,
             type: 'approval',
             time: formatTimeAgo(approval.created_at),
             action: `/portal/super-admin/approvals`,

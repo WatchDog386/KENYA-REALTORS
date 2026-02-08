@@ -1,6 +1,7 @@
 // src/components/portal/manager/ManagerDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -23,6 +24,8 @@ interface Property {
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [assignedProperty, setAssignedProperty] = useState<Property | null>(null);
   const [stats, setStats] = useState({
@@ -42,19 +45,27 @@ const ManagerDashboard: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get the property assigned to this manager
-      const { data: assignment, error: assignmentError } = await supabase
-        .from('property_manager_assignments')
-        .select('property_id')
-        .eq('property_manager_id', user.id)
-        .single();
+      let propertyId = id;
 
-      if (assignmentError && assignmentError.code !== 'PGRST116') { // PGRST116 = no rows
-        throw assignmentError;
+      // If no ID in URL, get the first assigned property
+      if (!propertyId) {
+        const { data: assignment, error: assignmentError } = await supabase
+          .from('property_manager_assignments')
+          .select('property_id')
+          .eq('property_manager_id', user.id)
+          .single();
+
+        if (assignmentError && assignmentError.code !== 'PGRST116') {
+          throw assignmentError;
+        }
+
+        if (assignment) {
+          propertyId = assignment.property_id;
+        }
       }
 
-      if (!assignment) {
-        toast.info('No property assigned to you yet');
+      if (!propertyId) {
+        toast.info('No property assigned or selected');
         setLoading(false);
         return;
       }
@@ -63,33 +74,23 @@ const ManagerDashboard: React.FC = () => {
       const { data: property, error: propertyError } = await supabase
         .from('properties')
         .select('id, name, location')
-        .eq('id', assignment.property_id)
+        .eq('id', propertyId)
         .single();
 
       if (propertyError) throw propertyError;
       setAssignedProperty(property);
 
-      // Get property units
+      // Get property units from units table for accurate stats
       const { data: units, error: unitsError } = await supabase
-        .from('property_unit_types')
-        .select('*')
-        .eq('property_id', assignment.property_id);
+        .from('units')
+        .select('id, status')
+        .eq('property_id', propertyId);
 
       if (unitsError) throw unitsError;
 
-      const totalUnits = units?.reduce((sum, unit) => sum + (unit.units_count || 0), 0) || 0;
-
-      // Get occupied units
-      const { data: tenants, error: tenantsError } = await supabase
-        .from('tenants')
-        .select('*', { count: 'exact' })
-        .eq('property_id', assignment.property_id)
-        .eq('status', 'active');
-
-      if (tenantsError) throw tenantsError;
-
-      const occupiedUnits = tenants?.length || 0;
-      const vacantUnits = totalUnits - occupiedUnits;
+      const totalUnits = units?.length || 0;
+      const occupiedUnits = units?.filter(u => u.status?.toLowerCase() === 'occupied').length || 0;
+      const vacantUnits = units?.filter(u => u.status?.toLowerCase() === 'vacant').length || 0;
 
       setStats({
         units: totalUnits,
@@ -211,13 +212,20 @@ const ManagerDashboard: React.FC = () => {
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/portal/manager/properties/units')}>
+            <Building className="mr-2 h-4 w-4" />
+            Manage Units
+          </Button>
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/portal/manager/tenants')}>
+            <Users className="mr-2 h-4 w-4" />
             View All Tenants
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/portal/manager/maintenance')}>
+            <TrendingUp className="mr-2 h-4 w-4" />
             Maintenance Requests
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/portal/manager/payments')}>
+            <DollarSign className="mr-2 h-4 w-4" />
             Payment Records
           </Button>
         </CardContent>

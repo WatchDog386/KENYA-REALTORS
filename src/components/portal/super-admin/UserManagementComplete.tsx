@@ -17,6 +17,9 @@ import {
   Edit2,
   RefreshCw,
   Building2,
+  Plus,
+  Play,
+  Ban
 } from "lucide-react";
 import {
   Dialog,
@@ -87,8 +90,12 @@ const UserManagementComplete: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
-  const [actionType, setActionType] = useState<"approve" | "suspend" | "delete">("approve");
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<"approve" | "suspend" | "delete" | "activate">("approve");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Form state for new user
+  const [newUser, setNewUser] = useState({ email: '', firstName: '', lastName: '', password: '', role: 'tenant' });
 
   useEffect(() => {
     loadUsers();
@@ -162,6 +169,41 @@ const UserManagementComplete: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddUser = async () => {
+      if(!newUser.email || !newUser.password || !newUser.firstName || !newUser.lastName) {
+          toast.error("Please fill in all fields");
+          return;
+      }
+      
+      try {
+          setIsProcessing(true);
+          const { data, error } = await supabase.auth.signUp({
+              email: newUser.email,
+              password: newUser.password,
+              options: {
+                  data: {
+                      first_name: newUser.firstName,
+                      last_name: newUser.lastName,
+                      role: newUser.role,
+                      status: 'active'
+                  }
+              }
+          });
+
+          if(error) throw error;
+          
+          toast.success("User created successfully");
+          setIsAddUserDialogOpen(false);
+          setNewUser({ email: '', firstName: '', lastName: '', password: '', role: 'tenant' });
+          loadUsers();
+      } catch (err: any) {
+          console.error("Error creating user:", err);
+          toast.error(err.message);
+      } finally {
+          setIsProcessing(false);
+      }
   };
 
   const handleApproveUser = async (userId: string) => {
@@ -239,7 +281,7 @@ const UserManagementComplete: React.FC = () => {
       setSelectedUser(null);
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast.error(`Failed to delete user: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(`Failed to del || actionType === "activate"ete user: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsProcessing(false);
     }
@@ -409,6 +451,59 @@ const UserManagementComplete: React.FC = () => {
             >
               <RefreshCw className="w-4 h-4 mr-2" /> Refresh
             </Button>
+            
+            <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl">
+                        <Plus className="w-4 h-4 mr-2" /> Add User
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Add New User</DialogTitle>
+                        <DialogDescription>Create a new user account.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">First Name</label>
+                                <Input value={newUser.firstName} onChange={e => setNewUser({...newUser, firstName: e.target.value})} />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Last Name</label>
+                                <Input value={newUser.lastName} onChange={e => setNewUser({...newUser, lastName: e.target.value})} />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Email</label>
+                            <Input type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Password</label>
+                            <Input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Role</label>
+                            <Select value={newUser.role} onValueChange={val => setNewUser({...newUser, role: val})}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="tenant">Tenant</SelectItem>
+                                    <SelectItem value="property_manager">Property Manager</SelectItem>
+                                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsAddUserDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddUser} disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="animate-spin w-4 h-4" /> : "Create User"}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
           </div>
         </CardContent>
       </Card>
@@ -524,6 +619,56 @@ const UserManagementComplete: React.FC = () => {
                                   >
                                     {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                                     {isProcessing ? "Approving..." : "Approve User"}
+                                  </Button>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+
+                        {(user.status === "suspended" || user.status === "inactive") && (
+                          <Dialog open={isActionDialogOpen && selectedUser?.id === user.id} onOpenChange={setIsActionDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setActionType("activate");
+                                }}
+                              >
+                                <Play className="w-4 h-4 mr-1" /> Activate
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="border-slate-200">
+                              <DialogHeader>
+                                <DialogTitle>Activate User</DialogTitle>
+                                <DialogDescription>
+                                  This will reactivate {user.first_name} {user.last_name}.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <Alert>
+                                  <CheckCircle className="h-4 w-4" />
+                                  <AlertDescription>
+                                    User will be set to <strong>ACTIVE</strong> status.
+                                  </AlertDescription>
+                                </Alert>
+                                <div className="flex gap-3 justify-end">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => setIsActionDialogOpen(false)}
+                                    disabled={isProcessing}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
+                                    onClick={handleAction}
+                                    disabled={isProcessing}
+                                  >
+                                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                    Activate User
                                   </Button>
                                 </div>
                               </div>

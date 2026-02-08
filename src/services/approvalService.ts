@@ -89,25 +89,8 @@ class ApprovalService {
       } = filters;
 
       let query = supabase
-        .from("approval_queue")
-        .select(
-          `
-          *,
-          requested_by_user:profiles!approval_queue_requested_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            role
-          ),
-          reviewed_by_user:profiles!approval_queue_reviewed_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email
-          )
-        `
-        )
+        .from("approvals")
+        .select("*")
         .order("created_at", { ascending: false });
 
       // Apply filters
@@ -116,7 +99,7 @@ class ApprovalService {
       }
 
       if (request_type !== "all") {
-        query = query.eq("request_type", request_type);
+        query = query.eq("approval_type", request_type);
       }
 
       if (date_from) {
@@ -143,14 +126,39 @@ class ApprovalService {
 
       if (error) throw error;
 
-      // Fetch request-specific data for each request
+      // Fetch request-specific data and profiles for each request
       const enhancedRequests = await Promise.all(
         (data || []).map(async (request) => {
+          // Fetch profiles manually
+          const { data: requesterProfile } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email, role')
+            .eq('id', request.user_id)
+            .single();
+
+          let reviewerProfile = null;
+          if (request.reviewed_by) {
+            const { data: revProfile } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email')
+              .eq('id', request.reviewed_by)
+              .single();
+            reviewerProfile = revProfile;
+          }
+
           const requestData = await this.fetchRequestData(
-            request.request_type,
+            request.approval_type,
             request.request_id
           );
-          return { ...request, request_data: requestData };
+
+          return {
+             ...request, 
+             request_type: request.approval_type,
+             requested_by: request.user_id,
+             requested_by_user: requesterProfile,
+             reviewed_by_user: reviewerProfile,
+             request_data: requestData 
+          } as ApprovalRequest;
         })
       );
 
@@ -166,36 +174,44 @@ class ApprovalService {
   async getApprovalRequestById(id: string): Promise<ApprovalRequest | null> {
     try {
       const { data, error } = await supabase
-        .from("approval_queue")
-        .select(
-          `
-          *,
-          requested_by_user:profiles!approval_queue_requested_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            role
-          ),
-          reviewed_by_user:profiles!approval_queue_reviewed_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email
-          )
-        `
-        )
+        .from("approvals")
+        .select("*")
         .eq("id", id)
         .single();
 
       if (error) throw error;
 
       if (data) {
+        // Fetch profiles manually
+        const { data: requesterProfile } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, role')
+          .eq('id', data.user_id)
+          .single();
+
+        let reviewerProfile = null;
+        if (data.reviewed_by) {
+          const { data: revProfile } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', data.reviewed_by)
+            .single();
+          reviewerProfile = revProfile;
+        }
+
         const requestData = await this.fetchRequestData(
-          data.request_type,
+          data.approval_type,
           data.request_id
         );
-        return { ...data, request_data: requestData };
+        
+        return { 
+          ...data, 
+          request_type: data.approval_type,
+          requested_by: data.user_id,
+          requested_by_user: requesterProfile,
+          reviewed_by_user: reviewerProfile,
+          request_data: requestData 
+        } as ApprovalRequest;
       }
 
       return null;
@@ -221,11 +237,11 @@ class ApprovalService {
 
       const [allRequests, todayRequests, weekRequests] = await Promise.all([
         // All requests
-        supabase.from("approval_queue").select("status, request_type"),
+        supabase.from("approvals").select("status, approval_type"),
 
         // Today's pending requests
         supabase
-          .from("approval_queue")
+          .from("approvals")
           .select("id", { count: "exact", head: true })
           .eq("status", "pending")
           .gte("created_at", today.toISOString())
@@ -233,7 +249,7 @@ class ApprovalService {
 
         // This week's pending requests
         supabase
-          .from("approval_queue")
+          .from("approvals")
           .select("id", { count: "exact", head: true })
           .eq("status", "pending")
           .gte("created_at", weekStart.toISOString()),
@@ -261,10 +277,12 @@ class ApprovalService {
         if (request.status === "cancelled") stats.cancelled++;
 
         // Count by type
-        if (!stats.by_type[request.request_type]) {
-          stats.by_type[request.request_type] = 0;
+        // Map approval_type back to request_type key if needed, or use as is
+        const type = request.approval_type;
+        if (!stats.by_type[type]) {
+          stats.by_type[type] = 0;
         }
-        stats.by_type[request.request_type]++;
+        stats.by_type[type]++;
       });
 
       return stats;
@@ -297,16 +315,16 @@ class ApprovalService {
       // Get user profile ID
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, first_name, last_name, email, role")
         .eq("user_id", user.id)
         .single();
 
       if (!profile) throw new Error("User profile not found");
 
       const approvalData = {
-        request_type: input.request_type,
+        approval_type: input.request_type,
         request_id: input.request_id,
-        requested_by: profile.id,
+        user_id: profile.id, // Using profile.id which is same as user.id usually
         status: "pending",
         metadata: input.metadata || {},
         notes: input.notes,
@@ -315,20 +333,9 @@ class ApprovalService {
       };
 
       const { data, error } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .insert([approvalData])
-        .select(
-          `
-          *,
-          requested_by_user:profiles!approval_queue_requested_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            role
-          )
-        `
-        )
+        .select("*")
         .single();
 
       if (error) throw error;
@@ -337,7 +344,15 @@ class ApprovalService {
       await this.notifyAdmins(data.id, input.request_type);
 
       toast.success("Approval request created successfully");
-      return data;
+      
+      // Adapt response to interface
+      return {
+          ...data,
+          request_type: data.approval_type,
+          requested_by: data.user_id,
+          requested_by_user: profile,
+          request_data: null // Can't fetch right away easily without another call
+      } as ApprovalRequest;
     } catch (error: any) {
       console.error("Error creating approval request:", error);
       toast.error(`Failed to create approval request: ${error.message}`);
@@ -359,13 +374,13 @@ class ApprovalService {
       // Get user profile ID
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, first_name, last_name, email, role")
         .eq("user_id", user.id)
         .single();
 
       if (!profile) throw new Error("User profile not found");
 
-      // Get the request first
+      // Get the request first (using the new method)
       const request = await this.getApprovalRequestById(input.approvalId);
       if (!request) throw new Error("Approval request not found");
 
@@ -375,7 +390,7 @@ class ApprovalService {
 
       // Update approval status
       const { data, error } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .update({
           status: input.status,
           reviewed_by: profile.id,
@@ -384,24 +399,7 @@ class ApprovalService {
           updated_at: new Date().toISOString(),
         })
         .eq("id", input.approvalId)
-        .select(
-          `
-          *,
-          requested_by_user:profiles!approval_queue_requested_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            role
-          ),
-          reviewed_by_user:profiles!approval_queue_reviewed_by_fkey(
-            id,
-            first_name,
-            last_name,
-            email
-          )
-        `
-        )
+        .select("*")
         .single();
 
       if (error) throw error;
@@ -422,7 +420,13 @@ class ApprovalService {
       );
 
       toast.success(`Request ${input.status} successfully`);
-      return data;
+      
+      // Return adapted data
+      // We need to fetch the requester profile again or use what we had from getApprovalRequestById
+      // For simplicity, we'll re-use the adapter logic we used in getApprovalRequestById by calling it
+      // But we just updated the DB, so we can fetch it again.
+      return await this.getApprovalRequestById(input.approvalId);
+      
     } catch (error: any) {
       console.error("Error processing approval request:", error);
       toast.error(`Failed to process approval request: ${error.message}`);
@@ -452,9 +456,12 @@ class ApprovalService {
 
       if (!profile) throw new Error("User profile not found");
 
-      // Get all requests first
+      // Get all requests first - we need their details for processing logic
+      // Since we changed table names and columns, we need to adapt this
+      // We'll use getApprovalRequests filter by ID ideally, but the API doesn't support IDs filter easily.
+      // So we'll query directly and map.
       const { data: requests, error: fetchError } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .select("*")
         .in("id", approvalIds)
         .eq("status", "pending");
@@ -467,7 +474,7 @@ class ApprovalService {
 
       // Update all requests
       const { error: updateError } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .update({
           status: status,
           reviewed_by: profile.id,
@@ -484,7 +491,7 @@ class ApprovalService {
       await Promise.all(
         requests.map((request) =>
           this.processRequestAction(
-            request.request_type,
+            request.approval_type, // Map from DB
             request.request_id,
             status,
             request.metadata
@@ -493,7 +500,7 @@ class ApprovalService {
       );
 
       // Notify all requesters
-      const requesterIds = [...new Set(requests.map((r) => r.requested_by))];
+      const requesterIds = [...new Set(requests.map((r) => r.user_id))]; // Map from user_id
       await Promise.all(
         requesterIds.map((requesterId) =>
           this.notifyRequester(requesterId, "bulk", status)
@@ -530,7 +537,7 @@ class ApprovalService {
 
       if (!profile) throw new Error("User profile not found");
 
-      // Check permissions
+      // Check permissions (using mapped properties from getApprovalRequestById)
       const isRequester = request.requested_by === profile.id;
       const isAdmin = profile.role === "super_admin";
 
@@ -543,7 +550,7 @@ class ApprovalService {
       }
 
       const { error } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .update({
           status: "cancelled",
           updated_at: new Date().toISOString(),
@@ -565,7 +572,7 @@ class ApprovalService {
   async getPendingApprovalCount(): Promise<number> {
     try {
       const { count, error } = await supabase
-        .from("approval_queue")
+        .from("approvals")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending");
 
@@ -700,6 +707,21 @@ class ApprovalService {
             .eq("id", requestId)
             .single();
           return maintenanceData;
+        
+        case "role_assignment":
+          return { request_id: requestId }; // User ID
+
+        case "tenant_addition":
+          // Return metadata mostly
+          return {};
+
+        case "tenant_removal":
+          const { data: tenantData } = await supabase
+            .from("tenants")
+            .select("*, profiles!inner(first_name, last_name, email)")
+            .eq("user_id", requestId)
+            .maybeSingle(); // Might not exist if already removed
+          return tenantData;
 
         default:
           return null;
@@ -739,6 +761,16 @@ class ApprovalService {
                   updated_at: new Date().toISOString(),
                 })
                 .eq("id", property_id);
+                
+              // Also update manager_assignments table if it exists
+              const { error: assignError } = await supabase
+                .from("property_manager_assignments")
+                .insert({
+                   property_id,
+                   property_manager_id: manager_id,
+                   status: 'active'
+                });
+              // Ignore unique constraint errors
             }
           }
           break;
@@ -786,6 +818,66 @@ class ApprovalService {
               .eq("id", requestId);
           }
           break;
+          
+        case "role_assignment":
+          if (status === "approved" && metadata?.requested_role) {
+            await supabase
+              .from("profiles")
+              .update({
+                role: metadata.requested_role,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", requestId);
+          }
+          break;
+          
+        case "tenant_addition":
+          if (status === "approved") {
+             const tenantMetadata = metadata || {};
+             // Check if tenant exists
+             const { data: existingTenant } = await supabase
+              .from("tenants")
+              .select("id")
+              .eq("user_id", tenantMetadata.user_id)
+              .maybeSingle();
+
+             if (existingTenant) {
+               await supabase
+                .from("tenants")
+                .update({
+                  status: "active",
+                  updated_at: new Date().toISOString()
+                })
+                .eq("id", existingTenant.id);
+             } else {
+               await supabase.from("tenants").insert({
+                 user_id: tenantMetadata.user_id,
+                 property_id: tenantMetadata.property_id,
+                 unit_id: tenantMetadata.unit_id,
+                 status: "active",
+                 move_in_date: tenantMetadata.move_in_date,
+                 // lease_start_date: tenantMetadata.lease_start_date // if column exists
+               });
+             }
+          }
+          break;
+          
+        case "tenant_removal":
+           if (status === "approved") {
+             // Mark tenant inactive
+             // requestId here is typically the user_id or tenant_id. 
+             // Logic in hook used metadata.user_id, here request_id is usually the entity id.
+             // If request_id IS user_id:
+             await supabase
+               .from("tenants")
+               .update({
+                 status: "inactive",
+                 move_out_date: new Date().toISOString(),
+                 updated_at: new Date().toISOString()
+               })
+               .eq("user_id", requestId); // Assuming requestId is user_id for this type
+           }
+           break;
       }
     } catch (error) {
       console.error(

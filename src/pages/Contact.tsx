@@ -10,12 +10,11 @@ import {
   Facebook,
   Twitter,
   Linkedin,
-  X,
-  ChevronDown,
   Send,
   AlertCircle,
   CheckCircle,
-  Loader
+  Loader,
+  ArrowRight
 } from "lucide-react";
 
 // --- GLOBAL STYLES ---
@@ -24,10 +23,27 @@ const GlobalStyles = () => (
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
     .font-nunito { font-family: 'Nunito', sans-serif; }
     
-    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
     .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #ccc; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #154279; }
     .custom-scroll::-webkit-scrollbar-thumb:hover { background: #F96302; }
+
+    /* Sharp layout utilities */
+    .sharp-card {
+      border-radius: 0px;
+      transition: all 0.3s ease;
+    }
+    .sharp-input {
+      border-radius: 0px;
+    }
+    
+    /* Subtle Texture for backgrounds */
+    .bg-grid-pattern {
+      background-image: 
+        linear-gradient(rgba(21, 66, 121, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(21, 66, 121, 0.03) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
   `}</style>
 );
 
@@ -44,35 +60,34 @@ export default function Contact() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
 
   const contactChannels = [
     {
       id: "phone",
       icon: Phone,
-      title: "Phone Support",
+      title: "Call Us",
       description: "Speak directly with our team",
       contact: "+254 (0) 123 456 789",
+      actionLabel: null,
       details: "Available 24/7",
-      color: "from-blue-500 to-blue-600"
-    },
-    {
-      id: "email",
-      icon: Mail,
-      title: "Email Support",
-      description: "Send us a detailed message",
-      contact: "support@realtors-leasers.com",
-      details: "Response within 2 hours",
-      color: "from-orange-500 to-orange-600"
     },
     {
       id: "chat",
       icon: MessageSquare,
-      title: "Live Chat",
-      description: "Instant support online",
+      title: "Chat Live",
+      description: "We're available Sun 7:00pm EST - Friday 7:00pm EST",
       contact: "Chat Widget",
+      actionLabel: "Chat Now",
       details: "Available now",
-      color: "from-green-500 to-green-600"
+    },
+    {
+      id: "email",
+      icon: Mail,
+      title: "Ask a Question",
+      description: "Fill out our form and we'll get back to you in 24 hours.",
+      contact: "support@realtors.com",
+      actionLabel: "Get Started",
+      details: "Response within 2 hours",
     },
     {
       id: "location",
@@ -80,8 +95,8 @@ export default function Contact() {
       title: "Visit Us",
       description: "Come see us in person",
       contact: "Nairobi, Kenya",
+      actionLabel: "Get Directions",
       details: "Westlands Office",
-      color: "from-purple-500 to-purple-600"
     }
   ];
 
@@ -91,61 +106,6 @@ export default function Contact() {
     { value: "feedback", label: "Feedback" },
     { value: "partnership", label: "Partnership" },
     { value: "complaint", label: "Complaint" }
-  ];
-
-  const faqData = [
-    {
-      id: "faq-1",
-      question: "What are your business hours?",
-      answer: "We operate 24/7 to serve you better. Our customer support team is available round the clock via phone, email, and live chat. During peak hours (8 AM - 6 PM EAT), you'll get faster responses."
-    },
-    {
-      id: "faq-2",
-      question: "How quickly will I receive a response?",
-      answer: "Email inquiries are answered within 2 hours. Phone calls are answered immediately during business hours. Live chat responses are instant. Critical issues get priority response."
-    },
-    {
-      id: "faq-3",
-      question: "Do you offer emergency support?",
-      answer: "Yes! We have a dedicated emergency hotline for urgent property issues. Use the emergency option in the chat or call our 24/7 support line for immediate assistance."
-    },
-    {
-      id: "faq-4",
-      question: "Can I schedule a meeting with management?",
-      answer: "Absolutely. You can request a meeting through the contact form by selecting 'Partnership' or 'General Inquiry'. We'll get back to you within 24 hours to schedule."
-    },
-    {
-      id: "faq-5",
-      question: "How do I report a maintenance issue?",
-      answer: "Tenants can report maintenance through the tenant portal or call our maintenance hotline. Property managers should use the admin dashboard. Emergency issues should be reported immediately by phone."
-    }
-  ];
-
-  const officeLocations = [
-    {
-      city: "Nairobi",
-      country: "Kenya",
-      address: "Westlands, Nairobi",
-      phone: "+254 (0) 123 456 789",
-      email: "nairobi@realtors-leasers.com",
-      hours: "Mon - Fri: 8 AM - 6 PM\nSat - Sun: 10 AM - 4 PM"
-    },
-    {
-      city: "Kampala",
-      country: "Uganda",
-      address: "Kampala City Center",
-      phone: "+256 (0) 123 456 789",
-      email: "kampala@realtors-leasers.com",
-      hours: "Mon - Fri: 8 AM - 6 PM\nSat - Sun: 10 AM - 4 PM"
-    },
-    {
-      city: "Dar es Salaam",
-      country: "Tanzania",
-      address: "Dar es Salaam Business District",
-      phone: "+255 (0) 123 456 789",
-      email: "dar@realtors-leasers.com",
-      hours: "Mon - Fri: 8 AM - 6 PM\nSat - Sun: 10 AM - 4 PM"
-    }
   ];
 
   const handleInputChange = (
@@ -198,87 +158,121 @@ export default function Contact() {
   return (
     <>
       <GlobalStyles />
-      <div className="font-nunito w-full bg-slate-50 min-h-screen pt-24 md:pt-32 pb-12">
+      <div className="font-nunito w-full bg-white min-h-screen pt-24 md:pt-32 pb-12">
         
-        {/* HEADER SECTION */}
+        {/* HEADER SECTION - Sharp & Sleek */}
         <motion.div
-          className="max-w-6xl mx-auto px-6 md:px-12 text-center mb-10 md:mb-16"
-          initial={{ opacity: 0, y: -30 }}
+          className="max-w-6xl mx-auto px-6 md:px-12 mb-12"
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5 }}
         >
-          <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 px-3 py-1.5 md:px-4 md:py-2 rounded-full mb-3 md:mb-4">
-            <Mail size={14} className="text-[#F96302] w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="text-xs md:text-sm font-bold text-[#F96302]">Get In Touch</span>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-300 pb-8">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 mb-3">
+                <div className="h-[2px] w-8 bg-[#F96302]"></div>
+                <span className="text-xs font-bold uppercase tracking-widest text-[#F96302]">Contact Us</span>
+              </div>
+              <h1 className="text-3xl md:text-5xl font-extrabold text-[#154279] leading-tight">
+                Let's Start a Conversation.
+              </h1>
+            </div>
+            <p className="text-sm md:text-base text-slate-600 max-w-md font-medium text-right md:text-right">
+              Our team is ready to assist you. Choose a channel below or send us a message directly.
+            </p>
           </div>
-          <h1 className="text-2xl md:text-5xl font-bold text-[#154279] mb-2 md:mb-4 leading-tight">
-            Contact Us
-          </h1>
-          <p className="text-sm md:text-xl text-slate-600 max-w-2xl mx-auto font-medium md:font-normal">
-            Have questions? Our dedicated team is here to help. Reach out through any channel that works best for you.
-          </p>
         </motion.div>
 
         <div className="max-w-6xl mx-auto px-6 md:px-12">
-          {/* CONTACT CHANNELS */}
+          {/* CONTACT CHANNELS - Sharp Cards */}
           <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16 mt-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
           >
             {contactChannels.map((channel) => {
               const Icon = channel.icon;
               return (
                 <motion.div
                   key={channel.id}
-                  className="group relative"
-                  whileHover={{ y: -8 }}
+                  className="relative pt-8 group"
+                  whileHover={{ y: -5 }}
                 >
-                  <div className={`absolute inset-0 bg-gradient-to-br ${channel.color} rounded-lg blur opacity-0 group-hover:opacity-40 transition-opacity`} />
-                  <div className="relative bg-white rounded-lg p-6 border border-slate-200 shadow-md hover:shadow-lg transition-shadow h-full">
-                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${channel.color} flex items-center justify-center text-white mb-4`}>
-                      <Icon size={24} />
-                    </div>
-                    <h3 className="font-bold text-slate-800 mb-1">{channel.title}</h3>
-                    <p className="text-xs text-slate-500 mb-3">{channel.description}</p>
-                    <p className="text-sm font-semibold text-[#154279] mb-1">{channel.contact}</p>
-                    <p className="text-xs text-slate-600">{channel.details}</p>
+                  <div className="bg-slate-100 p-6 pt-12 pb-8 text-center h-full flex flex-col items-center justify-between rounded-sm relative z-0">
+                      
+                      {/* Floating Icon */}
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#154279] text-white p-4 rounded-full border-4 border-white shadow-md z-10 group-hover:bg-[#F96302] transition-colors duration-300">
+                        <Icon size={28} strokeWidth={1.5} />
+                      </div>
+                      
+                      <div className="mt-4 w-full">
+                        <h3 className="font-bold text-[#154279] text-xl mb-3">{channel.title}</h3>
+                        
+                        {channel.id === 'phone' ? (
+                          <div className="mb-4">
+                            <p className="text-[#154279] font-bold text-lg hover:text-[#F96302] cursor-pointer transition-colors">
+                              {channel.contact}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mb-6 px-2">
+                             <p className="text-slate-600 text-sm leading-relaxed">{channel.description}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {channel.actionLabel && (
+                        <button className="bg-[#154279] text-white px-6 py-2.5 rounded font-bold text-sm hover:bg-[#F96302] transition-colors w-full md:w-auto mt-auto">
+                            {channel.actionLabel}
+                        </button>
+                      )}
+                      
+                      {channel.id === 'phone' && (
+                         <p className="text-sm text-slate-500 mt-auto">{channel.details}</p>
+                      )}
+
                   </div>
                 </motion.div>
               );
             })}
           </motion.div>
 
-          {/* MAIN LAYOUT - Form & Info */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
-            {/* CONTACT FORM */}
+          {/* MAIN LAYOUT - Sharp Form & Info */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
+            
+            {/* CONTACT FORM - 8 Columns */}
             <motion.div
-              className="lg:col-span-2"
+              className="lg:col-span-8"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <div className="bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-5 py-5 md:px-8 md:py-8 text-white">
-                  <h2 className="text-lg md:text-2xl font-bold">Send us a Message</h2>
-                  <p className="text-xs md:text-base text-slate-200 mt-1">We'll get back to you as soon as possible</p>
+              <div className="bg-white border border-gray-200 shadow-xl rounded-xl h-full flex flex-col overflow-hidden">
+                <div className="bg-[#154279] px-6 py-6 md:px-8 md:py-8 text-white flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold uppercase tracking-tight">Send a Message</h2>
+                    <p className="text-xs md:text-sm text-slate-300 mt-1 opacity-80">We typically respond within 24 hours.</p>
+                  </div>
+                  <Mail className="text-white/20 w-12 h-12" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-5 md:p-8 space-y-4 md:space-y-6">
+                <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 flex-grow">
                   {/* Success Message */}
                   <AnimatePresence>
                     {submitted && (
                       <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="p-3 md:p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded-r-md"
                       >
-                        <CheckCircle size={16} className="text-green-600 md:w-5 md:h-5" />
-                        <span className="text-xs md:text-sm font-semibold text-green-800">
-                          Thank you! We've received your message and will respond within 2 hours.
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <CheckCircle size={18} className="text-green-600" />
+                          <span className="text-sm font-bold text-green-800 uppercase tracking-wide">
+                            Message Sent Successfully
+                          </span>
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -287,286 +281,183 @@ export default function Contact() {
                   <AnimatePresence>
                     {error && (
                       <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-r-md"
                       >
-                        <AlertCircle size={16} className="text-red-600 md:w-5 md:h-5" />
-                        <span className="text-xs md:text-sm font-semibold text-red-800">{error}</span>
+                         <div className="flex items-center gap-3">
+                          <AlertCircle size={18} className="text-red-600" />
+                          <span className="text-sm font-bold text-red-800 uppercase tracking-wide">{error}</span>
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
-                  {/* Name */}
-                  <div>
-                    <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Full Name *</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="John Doe"
-                      className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
-                    />
-                  </div>
-
-                  {/* Email & Phone */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Email *</label>
+                  {/* Grid Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-gray-700 font-medium text-sm">Full Name <span className="text-[#F96302]">*</span></label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        placeholder="John Doe"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all placeholder:text-gray-400"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-gray-700 font-medium text-sm">Email Address <span className="text-[#F96302]">*</span></label>
                       <input
                         type="email"
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
                         placeholder="john@example.com"
-                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all placeholder:text-gray-400"
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Phone</label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-gray-700 font-medium text-sm">Phone Number</label>
                       <input
                         type="tel"
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
                         placeholder="+254 700 000 000"
-                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
+                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all placeholder:text-gray-400"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-gray-700 font-medium text-sm">Inquiry Type</label>
+                      <div className="relative">
+                        <select
+                          name="category"
+                          value={formData.category}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all appearance-none cursor-pointer"
+                        >
+                          {categories.map((cat) => (
+                            <option key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Category & Subject */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Category</label>
-                      <select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
-                      >
-                        {categories.map((cat) => (
-                          <option key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Subject *</label>
-                      <input
-                        type="text"
-                        name="subject"
-                        value={formData.subject}
-                        onChange={handleInputChange}
-                        placeholder="How can we help?"
-                        className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all"
-                      />
-                    </div>
+                  {/* Subject */}
+                  <div className="space-y-2">
+                    <label className="block text-gray-700 font-medium text-sm">Subject <span className="text-[#F96302]">*</span></label>
+                    <input
+                      type="text"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleInputChange}
+                      placeholder="Briefly describe your inquiry"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all placeholder:text-gray-400"
+                    />
                   </div>
 
                   {/* Message */}
-                  <div>
-                    <label className="block text-xs md:text-sm font-semibold text-slate-800 mb-1.5 md:mb-2">Message *</label>
+                  <div className="space-y-2">
+                    <label className="block text-gray-700 font-medium text-sm">Message <span className="text-[#F96302]">*</span></label>
                     <textarea
                       name="message"
                       value={formData.message}
                       onChange={handleInputChange}
-                      placeholder="Tell us more about your inquiry..."
+                      placeholder="Write your message here..."
                       rows={5}
-                      className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#154279] focus:border-transparent transition-all resize-none"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all resize-none placeholder:text-gray-400"
                     />
-                    <p className="text-[10px] md:text-xs text-slate-500 mt-1">{formData.message.length} characters</p>
                   </div>
 
                   {/* Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-[#154279] to-[#0f325e] hover:from-[#0f325e] hover:to-[#082050] text-white px-5 py-3 md:px-6 md:py-4 rounded-lg text-sm md:text-base font-semibold transition-all inline-flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader size={16} className="animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send size={16} />
-                        Send Message
-                      </>
-                    )}
-                  </button>
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="group w-full bg-[#154279] hover:bg-[#0f3260] text-white h-12 text-lg font-semibold shadow-lg shadow-blue-900/20 rounded-lg transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-[0.98]"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader size={20} className="animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Send Message
+                          <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </form>
               </div>
             </motion.div>
 
-            {/* QUICK INFO */}
+            {/* QUICK INFO PANEL - 4 Columns */}
             <motion.div
-              className="space-y-6"
+              className="lg:col-span-4 space-y-6"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
             >
-              {/* Response Time */}
-              <div className="bg-white rounded-lg shadow-lg border border-slate-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <Clock size={20} className="text-[#154279]" />
+              {/* Info Card 1 */}
+              <div className="bg-white border-l-4 border-[#154279] p-6 shadow-sm sharp-card">
+                <div className="flex items-start gap-4">
+                  <div className="bg-blue-50 p-3 sharp-card">
+                    <Clock size={24} className="text-[#154279]" />
                   </div>
-                  <h3 className="font-bold text-slate-800">Response Time</h3>
+                  <div>
+                    <h3 className="font-bold text-[#154279] text-base uppercase mb-1">Response Time</h3>
+                    <p className="text-xs text-slate-500 mb-3">Average waiting times</p>
+                    <ul className="space-y-2">
+                       <li className="flex justify-between items-center text-sm border-b border-dashed border-slate-200 pb-1">
+                         <span className="text-slate-600">Email</span>
+                         <span className="font-bold text-[#F96302]">~ 2 Hours</span>
+                       </li>
+                       <li className="flex justify-between items-center text-sm border-b border-dashed border-slate-200 pb-1">
+                         <span className="text-slate-600">Phone</span>
+                         <span className="font-bold text-green-600">Immediate</span>
+                       </li>
+                       <li className="flex justify-between items-center text-sm">
+                         <span className="text-slate-600">Chat</span>
+                         <span className="font-bold text-green-600">Instant</span>
+                       </li>
+                    </ul>
+                  </div>
                 </div>
-                <ul className="space-y-2 text-sm text-slate-700">
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#F96302]" />
-                    <span>Email: 2 hours</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#F96302]" />
-                    <span>Phone: Immediate</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#F96302]" />
-                    <span>Chat: Instant</span>
-                  </li>
-                </ul>
               </div>
 
-              {/* Availability */}
-              <div className="bg-white rounded-lg shadow-lg border border-slate-200 p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                    <Globe size={20} className="text-green-600" />
-                  </div>
-                  <h3 className="font-bold text-slate-800">Availability</h3>
+             {/* Info Card 2 */}
+              <div className="bg-[#154279] text-white p-6 shadow-sm sharp-card relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                   <Globe size={100} />
                 </div>
-                <p className="text-sm text-slate-700">
-                  We're available <strong>24/7</strong> to assist you with any questions or concerns. Our team is always ready to help!
-                </p>
+                <div className="relative z-10">
+                  <h3 className="font-bold text-white text-base uppercase mb-2">Global Reach</h3>
+                  <p className="text-sm text-slate-300 leading-relaxed mb-4">
+                    Our digital platforms are available 24/7. Whether you are browsing properties or managing listings, we are always open.
+                  </p>
+                  <div className="inline-block border border-white/30 px-3 py-1 text-xs font-mono text-[#FCD200]">
+                    STATUS: SYSTEMS OPERATIONAL
+                  </div>
+                </div>
               </div>
 
-              {/* Social Media */}
-              <div className="bg-white rounded-lg shadow-lg border border-slate-200 p-6">
-                <h3 className="font-bold text-slate-800 mb-4">Follow Us</h3>
-                <div className="flex gap-3">
-                  {[
-                    { icon: Facebook, color: "from-blue-600 to-blue-700" },
-                    { icon: Twitter, color: "from-blue-400 to-blue-500" },
-                    { icon: Linkedin, color: "from-blue-600 to-blue-700" }
-                  ].map((social, idx) => {
-                    const Icon = social.icon;
-                    return (
-                      <a
-                        key={idx}
-                        href="#"
-                        className={`w-10 h-10 rounded-lg bg-gradient-to-br ${social.color} text-white flex items-center justify-center hover:scale-110 transition-transform`}
-                      >
-                        <Icon size={16} />
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Social Media removed as requested - replaced by global floating WhatsApp button */}
             </motion.div>
           </div>
 
-          {/* OFFICE LOCATIONS */}
-          <motion.div
-            className="mb-16"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-          >
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-[#154279] mb-2">Our Offices</h2>
-              <p className="text-slate-600">Visit us at any of our regional offices</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {officeLocations.map((office, idx) => (
-                <motion.div
-                  key={idx}
-                  className="bg-white rounded-lg shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-shadow"
-                  whileHover={{ y: -4 }}
-                >
-                  <h3 className="text-lg font-bold text-[#154279] mb-1">{office.city}</h3>
-                  <p className="text-sm text-slate-600 mb-4">{office.country}</p>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <MapPin size={16} className="text-[#F96302] mt-0.5 shrink-0" />
-                      <p className="text-sm text-slate-700">{office.address}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Phone size={16} className="text-[#F96302] shrink-0" />
-                      <p className="text-sm text-slate-700">{office.phone}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Mail size={16} className="text-[#F96302] shrink-0" />
-                      <p className="text-sm text-slate-700">{office.email}</p>
-                    </div>
-                    <div className="flex items-start gap-3 pt-3 border-t border-slate-100">
-                      <Clock size={16} className="text-[#F96302] mt-0.5 shrink-0" />
-                      <p className="text-xs text-slate-600 whitespace-pre-line">{office.hours}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* FAQ SECTION */}
-          <motion.div
-            className="bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-          >
-            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-8 py-8 text-white">
-              <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>
-              <p className="text-slate-200 mt-1">Quick answers to common questions</p>
-            </div>
-
-            <div className="divide-y divide-slate-200">
-              {faqData.map((faq) => (
-                <motion.div
-                  key={faq.id}
-                  className="border-l-4 border-l-transparent hover:border-l-[#F96302] transition-all"
-                >
-                  <button
-                    onClick={() => setExpandedFaq(expandedFaq === faq.id ? null : faq.id)}
-                    className="w-full text-left px-8 py-5 hover:bg-slate-50 transition-colors flex justify-between items-center"
-                  >
-                    <div>
-                      <h3 className="font-semibold text-slate-800">{faq.question}</h3>
-                    </div>
-                    <ChevronDown
-                      size={20}
-                      className={`text-slate-600 transition-transform ${
-                        expandedFaq === faq.id ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-                  <AnimatePresence>
-                    {expandedFaq === faq.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-8 py-5 bg-slate-50 text-slate-700 text-sm">
-                          {faq.answer}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
         </div>
       </div>
     </>

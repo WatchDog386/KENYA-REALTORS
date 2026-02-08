@@ -26,6 +26,10 @@
    Base theme variables
    ========================================================= */
 @layer base {
+  html {
+    font-size: 87.5%; /* Reduces base font size to ~14px */
+  }
+
   :root {
     /* Brand palette (user-specified) */
     --navy: #00356B; /* headings, badges, accents */
@@ -81,11 +85,11 @@
 
   /* Utility helpers tuned to the design spec */
   .btn-primary {
-    @apply bg-cta text-white uppercase tracking-wider text-[10px] font-black rounded-md px-4 py-2 shadow-sm hover:bg-cta/90 transition-colors;
+    @apply bg-cta text-white uppercase tracking-wider text-[9px] font-black rounded-md px-4 py-2 shadow-sm hover:bg-cta/90 transition-colors;
   }
 
   .badge-navy {
-    @apply bg-navy text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight;
+    @apply bg-navy text-white px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-tight;
   }
 
   .ai-status {
@@ -97,14 +101,14 @@
   }
 
   /* Typography helpers */
-  .hero-title { @apply text-xl md:text-3xl lg:text-4xl font-light tracking-tight text-[28px]; }
+  .hero-title { @apply text-xl md:text-3xl lg:text-4xl font-light tracking-tight text-[24px]; }
   .section-title { @apply text-2xl font-semibold tracking-tight; }
-  .card-title { @apply text-[15px] font-semibold; }
-  .body-text { @apply text-[13px] text-midgray; }
-  .small-label { @apply text-[10px] text-midgray uppercase tracking-wider; }
+  .card-title { @apply text-[13px] font-semibold; }
+  .body-text { @apply text-[12px] text-midgray; }
+  .small-label { @apply text-[9px] text-midgray uppercase tracking-wider; }
 
   /* Monospace for technical labels */
-  .mono-label { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace; font-size: 12px; }
+  .mono-label { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace; font-size: 11px; }
 
   /* Who-style background and font helpers */
   .who-section-bg { background: linear-gradient(to bottom, #ffffff, #f8f9fa); }

@@ -50,7 +50,6 @@ import PropertyDetailsPage from "@/pages/marketplace/PropertyDetailsPage";
 /* ======================
    PORTAL PAGES
 ====================== */
-import PortalAdminDashboard from "@/pages/portal/AdminDashboard";
 import SuperAdminDashboard from "@/pages/portal/SuperAdminDashboard";
 import SuperAdminProfilePage from "@/pages/portal/SuperAdminProfilePage";
 import ManagerPortal from "@/pages/portal/ManagerPortal";
@@ -80,6 +79,7 @@ import TenantSettingsPageComponent from "@/pages/portal/tenant/Settings";
 import TenantSafetyPageComponent from "@/pages/portal/tenant/Safety";
 import TenantHelpPageComponent from "@/pages/portal/tenant/Help";
 import TenantRefundStatusPageComponent from "@/pages/portal/tenant/RefundStatus";
+import TenantVacancyNoticePageComponent from "@/pages/portal/tenant/VacancyNotice";
 
 // Import Super Admin Context
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
@@ -89,6 +89,7 @@ import ManagerDashboard from "@/components/portal/manager/ManagerDashboard";
 import ManagerTenants from "@/components/portal/manager/ManagerTenants";
 import ManagerMaintenance from "@/components/portal/manager/ManagerMaintenance";
 import ManagerPayments from "@/components/portal/manager/ManagerPayments";
+import ManagerVacancyNotices from "@/components/portal/manager/ManagerVacancyNotices";
 import ManagerSettings from "@/components/portal/manager/ManagerSettings";
 import ManagerMessages from "@/components/portal/manager/ManagerMessages";
 import ManagerUnits from "@/components/portal/manager/ManagerUnits";
@@ -421,22 +422,6 @@ const TenantPortalWrapper = () => {
 /* ======================
    LEGACY ADMIN PORTAL WRAPPER
 ====================== */
-const AdminPortalWrapper = () => {
-  const { isAdmin } = useAuth();
-
-  if (!isAdmin()) {
-    return <Navigate to="/portal/tenant" replace />;
-  }
-
-  return (
-    <DevBypassGuard>
-      <PortalLayout>
-        <Outlet />
-      </PortalLayout>
-    </DevBypassGuard>
-  );
-};
-
 /* ======================
    USER CREATION WRAPPER (Only for Super Admins)
 ====================== */
@@ -744,6 +729,10 @@ const App = () => {
                     path="properties"
                     element={<ManagerPropertiesPage />}
                   />
+                  <Route
+                    path="properties/:id"
+                    element={<ManagerPropertiesPage />}
+                  />
                   <Route path="properties/units" element={<ManagerUnits />} />
                   <Route path="tenants" element={<ManagerTenantsPage />} />
                   <Route path="tenants/applications" element={<ManagerApplications />} />
@@ -763,7 +752,7 @@ const App = () => {
                   />
                   <Route
                     path="vacation-notices"
-                    element={<ComponentFallback title="Vacation Notices" />}
+                    element={<ManagerVacancyNotices />}
                   />
                 </Route>
 
@@ -803,18 +792,8 @@ const App = () => {
                   />
                   <Route
                     path="vacation-notice"
-                    element={<VacationNoticeForm leaseId="current" />}
+                    element={<TenantVacancyNoticePageComponent />}
                   />
-                </Route>
-
-                {/* LEGACY ADMIN PORTAL ROUTES */}
-                <Route path="/portal/admin" element={<AdminPortalWrapper />}>
-                  <Route index element={<PortalAdminDashboard />} />
-                  <Route path="analytics" element={<ComponentFallback title="Analytics" />} />
-                  <Route path="database" element={<ComponentFallback title="Database Management" />} />
-                  <Route path="admin-tools" element={<ComponentFallback title="Admin Tools" />} />
-                  <Route path="tenants" element={<ComponentFallback title="Tenant Management" />} />
-                  <Route path="reports" element={<ComponentFallback title="Reports" />} />
                 </Route>
 
                 {/* SHARED PORTAL PAGES */}

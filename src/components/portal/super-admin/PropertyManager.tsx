@@ -16,7 +16,10 @@ import {
   BarChart3,
   MapPin,
   Calculator,
-  ImageIcon
+  ImageIcon,
+  UserPlus,
+  LayoutGrid,
+  Users
 } from "lucide-react";
 import {
   Dialog,
@@ -52,6 +55,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { propertyService, Property, CreatePropertyDTO } from '@/services/propertyService';
+import { PropertyUnitManager } from "./properties/PropertyUnitManager";
 
 const PropertyManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -62,7 +66,14 @@ const PropertyManager: React.FC = () => {
   const [showViewProperty, setShowViewProperty] = useState(false);
   const [showEditProperty, setShowEditProperty] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [propertyForUnits, setPropertyForUnits] = useState<Property | null>(null);
   const [assignedManagers, setAssignedManagers] = useState<Record<string, string>>({});
+  const [occupiedUnitsCount, setOccupiedUnitsCount] = useState(0);
+  
+  // New state for assignment
+  const [showAssignManagerDialog, setShowAssignManagerDialog] = useState(false);
+  const [availableManagers, setAvailableManagers] = useState<any[]>([]);
+  const [selectedManagerId, setSelectedManagerId] = useState<string>("");
 
   // Form State
   const [formData, setFormData] = useState<CreatePropertyDTO>({
@@ -72,29 +83,97 @@ const PropertyManager: React.FC = () => {
     type: 'Apartment',
     description: '',
     amenities: '',
+    number_of_floors: 1,
     units: [{ name: '', units_count: 0, price_per_unit: 0 }]
   });
 
   useEffect(() => {
     fetchProperties();
     fetchAssignedManagers();
+    fetchAvailableManagers();
   }, []);
+
+  const fetchAvailableManagers = async () => {
+      try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('role', 'property_manager');
+            
+          if(error) throw error;
+          setAvailableManagers(data || []);
+      } catch (err) {
+          console.error("Error fetching managers", err);
+      }
+  };
+
+  const handleAssignManager = async () => {
+     if (!selectedProperty || !selectedManagerId) {
+         toast.error("Please select a manager");
+         return;
+     }
+
+     try {
+         // Upsert assignment
+         const { error } = await supabase
+            .from('property_manager_assignments')
+            .upsert(
+                { 
+                    property_id: selectedProperty.id, 
+                    property_manager_id: selectedManagerId,
+                    status: 'active'
+                },
+                { onConflict: 'property_id' }
+            );
+
+         if (error) throw error;
+
+         toast.success("Manager assigned successfully");
+         
+         // Wait for assignments to refresh before closing dialog
+         await fetchAssignedManagers();
+         
+         setShowAssignManagerDialog(false);
+     } catch (err: any) {
+         console.error("Error assigning manager:", err);
+         toast.error(err.message || "Failed to assign manager");
+     }
+  };
 
   const fetchAssignedManagers = async () => {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch all assignments
+      const { data: assignments, error: assignError } = await supabase
         .from('property_manager_assignments')
-        .select('property_id, property_manager_id, profiles(first_name, last_name, email)');
+        .select('property_id, property_manager_id');
 
-      if (error) throw error;
+      if (assignError) throw assignError;
 
+      if (!assignments || assignments.length === 0) {
+        setAssignedManagers({});
+        return;
+      }
+
+      // 2. Get all manager IDs
+      const managerIds = assignments.map((a: any) => a.property_manager_id);
+
+      // 3. Fetch profiles for these managers
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', managerIds);
+
+      if (profileError) throw profileError;
+
+      // 4. Create map of property_id -> manager_name
       const managers: Record<string, string> = {};
-      data?.forEach((assignment: any) => {
-        const profile = assignment.profiles;
+      assignments.forEach((assignment: any) => {
+        const profile = profiles?.find((p: any) => p.id === assignment.property_manager_id);
         if (profile) {
           managers[assignment.property_id] = `${profile.first_name} ${profile.last_name}`;
         }
       });
+
       setAssignedManagers(managers);
     } catch (error) {
       console.error("Error fetching assigned managers:", error);
@@ -106,6 +185,14 @@ const PropertyManager: React.FC = () => {
       setLoading(true);
       const data = await propertyService.fetchProperties();
       setProperties(data);
+      
+      // Fetch occupied units count
+      const { data: units = [] } = await supabase
+        .from('units')
+        .select('id, status');
+      
+      const occupied = units.filter((u: any) => u.status?.toLowerCase() === 'occupied').length;
+      setOccupiedUnitsCount(occupied);
     } catch (error) {
       console.error("Error fetching properties:", error);
       toast.error("Failed to load properties");
@@ -192,6 +279,7 @@ const PropertyManager: React.FC = () => {
       type: property.type || 'Apartment',
       description: property.description || '',
       amenities: property.amenities || '',
+      number_of_floors: property.number_of_floors || 1,
       units: property.property_unit_types?.map((u: any) => ({
         name: u.name,
         units_count: u.units_count,
@@ -218,6 +306,7 @@ const PropertyManager: React.FC = () => {
           type: formData.type,
           description: formData.description,
           amenities: formData.amenities,
+          number_of_floors: formData.number_of_floors || 1,
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedProperty.id);
@@ -256,7 +345,17 @@ const PropertyManager: React.FC = () => {
         body { font-family: 'Nunito', sans-serif; }
       `}</style>
       
-      {/* HERO SECTION */}
+      {/* UNIT MANAGER VIEW */}
+      {propertyForUnits && (
+        <PropertyUnitManager 
+          property={propertyForUnits} 
+          onBack={() => setPropertyForUnits(null)}
+        />
+      )}
+
+      {/* MAIN PROPERTY MANAGER VIEW */}
+      {!propertyForUnits && (
+      <>
       <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-10 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
         <HeroBackground />
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
@@ -339,6 +438,18 @@ const PropertyManager: React.FC = () => {
                                         className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-slate-700 font-semibold text-sm">Floors</Label>
+                                <Input 
+                                    type="number"
+                                    min="1"
+                                    value={formData.number_of_floors} 
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, number_of_floors: Number(e.target.value)})}
+                                    placeholder="Number of floors"
+                                    className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -745,6 +856,42 @@ const PropertyManager: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* ASSIGN MANAGER DIALOG */}
+      <Dialog open={showAssignManagerDialog} onOpenChange={setShowAssignManagerDialog}>
+        <DialogContent className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200">
+            <DialogHeader>
+                <DialogTitle className="text-[#154279] font-bold">Assign Property Manager</DialogTitle>
+                <DialogDescription>
+                    Assign a manager to <span className="font-semibold text-slate-900">{selectedProperty?.name}</span>.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label>Select Manager</Label>
+                    <Select value={selectedManagerId} onValueChange={setSelectedManagerId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a manager..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {availableManagers.map(mgr => (
+                                <SelectItem key={mgr.id} value={mgr.id}>
+                                    {mgr.first_name} {mgr.last_name} ({mgr.email})
+                                </SelectItem>
+                            ))}
+                            {availableManagers.length === 0 && (
+                                <div className="p-2 text-sm text-slate-500 text-center">No active managers found</div>
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAssignManagerDialog(false)}>Cancel</Button>
+                <Button onClick={handleAssignManager} className="bg-[#154279] text-white">Assign Manager</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
       
       {/* Stats Cards */}
@@ -752,8 +899,8 @@ const PropertyManager: React.FC = () => {
         {[
           { label: "Total Properties", value: totalProperties, icon: Building, color: "blue", subtext: "Active Listings" },
           { label: "Total Units", value: totalUnits, icon: Home, color: "green", subtext: `Across ${totalProperties} Properties` },
-          { label: "Monthly Income", value: `KES ${(totalIncome / 1000).toFixed(0)}K`, icon: DollarSign, color: "purple", subtext: "Projected" },
-          { label: "Avg Rent/Unit", value: `KES ${totalUnits > 0 ? ((totalIncome/totalUnits)/1000).toFixed(1) : 0}K`, icon: BarChart3, color: "orange", subtext: "Estimated" },
+          { label: "Occupied Units", value: occupiedUnitsCount, icon: Users, color: "purple", subtext: `${totalUnits > 0 ? ((occupiedUnitsCount/totalUnits)*100).toFixed(1) : 0}% Occupancy` },
+          { label: "Monthly Income", value: `KES ${(totalIncome / 1000).toFixed(0)}K`, icon: DollarSign, color: "orange", subtext: "Projected" },
         ].map((stat, idx) => {
           const IconComponent = stat.icon;
           const colorMap: any = { 
@@ -885,11 +1032,33 @@ const PropertyManager: React.FC = () => {
                                    </Button>
                                    <Button 
                                        variant="outline" 
+                                       size="sm"
+                                       onClick={() => setPropertyForUnits(property)}
+                                       className="h-8 text-slate-600 hover:text-purple-600 hover:bg-purple-50 border-slate-200 rounded-lg"
+                                       title="Manage Units"
+                                   >
+                                       <LayoutGrid className="w-4 h-4 mr-1" /> Units
+                                   </Button>
+                                   <Button 
+                                       variant="outline" 
                                        size="sm" 
                                        onClick={() => handleEditProperty(property)}
                                        className="h-8 text-slate-600 hover:text-orange-600 hover:bg-orange-50 border-slate-200 rounded-lg"
                                    >
                                        Edit
+                                   </Button>
+                                   <Button 
+                                       variant="outline" 
+                                       size="sm" 
+                                       onClick={() => {
+                                           setSelectedProperty(property);
+                                           setSelectedManagerId(""); // reset selection
+                                           setShowAssignManagerDialog(true);
+                                       }}
+                                       className="h-8 text-slate-600 hover:text-green-600 hover:bg-green-50 border-slate-200 rounded-lg"
+                                       title="Assign Manager"
+                                   >
+                                       <UserPlus className="w-4 h-4" />
                                    </Button>
                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteProperty(property.id)} className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                                        <Trash2 className="w-4 h-4" />
@@ -905,7 +1074,9 @@ const PropertyManager: React.FC = () => {
           </CardContent>
         </Card>
       </motion.div>
-    </div>
+      </div>
+      </>
+      )}
     </div>
   );
 };

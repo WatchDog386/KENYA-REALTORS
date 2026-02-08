@@ -343,12 +343,12 @@ export default function TenantCTABanner() {
   return (
     <>
     <GlobalStyles />
-    <section className="w-full bg-slate-50 py-4 px-4 text-[#484848]">
+    <section className="w-full bg-slate-50 py-0 px-4 md:px-6 text-[#484848]">
       <motion.div 
         initial={{ opacity: 0, y: 5 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="max-w-7xl mx-auto shadow-lg group"
+        className="max-w-7xl mx-auto group"
       >
         
         {/* COMPACT STRIP CONTAINER */}

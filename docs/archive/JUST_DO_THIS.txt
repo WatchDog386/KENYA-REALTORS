@@ -1,0 +1,68 @@
+====================================================================================
+DEPLOYMENT QUICK START - JUST DO THIS
+====================================================================================
+
+STEP 1: RUN ONE OF THESE COMMANDS
+====================================================================================
+
+Windows PowerShell:
+  .\Deploy-Schema-Fix.ps1
+
+Windows Batch:
+  deploy-schema-fix.bat
+
+Linux/macOS:
+  ./deploy-schema-fix.sh
+
+The script will guide you through everything. Just follow its instructions.
+
+
+STEP 2: WHEN SCRIPT ASKS FOR MANUAL ACTIONS
+====================================================================================
+
+1. CREATE BACKUP
+   Supabase → Database → Backups → Create a backup
+   Wait 2-5 minutes
+
+2. RUN MIGRATION
+   Supabase → SQL Editor → New Query
+   Paste: supabase/migrations/20260215_002_fix_mismatches.sql
+   Click Run
+   Wait for green "Query executed successfully"
+
+3. RUN TESTS  
+   Supabase → SQL Editor → New Query
+   Copy each test from: TEST_SCHEMA_FIXES.sql
+   Paste and click Run
+   Verify results match expected values (8 tests total)
+
+
+STEP 3: BUILD & TEST LOCALLY
+====================================================================================
+
+npm run build        # Verify no errors
+npm run dev          # Start development server
+                     # Test each dashboard manually
+
+
+STEP 4: DEPLOY
+====================================================================================
+
+npm run build        # Build for production
+                     # Deploy dist folder to your hosting
+
+
+DONE! 
+====================================================================================
+
+If you need more detail:
+  → Read COMPLETE_DEPLOYMENT_GUIDE.md
+  → Or START_HERE.md for options
+
+If something breaks:
+  → Restore backup: Supabase → Database → Backups → Restore
+  → Read DEPLOYMENT_STEPS.md for troubleshooting
+
+All code changes are ALREADY APPLIED.
+No manual TypeScript editing needed.
+Ready to deploy!

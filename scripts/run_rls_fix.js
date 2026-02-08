@@ -15,7 +15,7 @@ const supabase = createClient(
 async function applyFix() {
   try {
     console.log("📦 Reading RLS fix migration file...");
-    const migrationPath = path.join(__dirname, "../supabase/migrations/20260211_fix_tenant_rls.sql");
+    const migrationPath = path.join(__dirname, "../database/FIX_TENANT_RLS_ASSIGNMENT.sql");
     const migrationSQL = fs.readFileSync(migrationPath, "utf-8");
 
     console.log("🚀 Executing SQL fix...");

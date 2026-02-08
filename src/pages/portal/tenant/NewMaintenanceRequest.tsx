@@ -25,7 +25,7 @@ const NewMaintenanceRequestPage: React.FC = () => {
     try {
       const { data: tenant } = await supabase
         .from("tenants")
-        .select("id, property_id")
+        .select("id, property_id, unit_id")
         .eq("user_id", user.id)
         .single();
 
@@ -41,7 +41,8 @@ const NewMaintenanceRequestPage: React.FC = () => {
           priority,
           status: "pending",
           property_id: tenant.property_id,
-          user_id: user.id,
+          unit_id: tenant.unit_id,
+          tenant_id: user.id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },

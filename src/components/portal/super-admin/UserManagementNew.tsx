@@ -18,6 +18,9 @@ import {
   Phone,
   Building,
   Home,
+  Power,
+  Ban,
+  Play
 } from "lucide-react";
 import {
   Dialog,
@@ -130,7 +133,7 @@ const UserManagementNew: React.FC = () => {
       console.log("🔄 Sync status:", JSON.stringify(syncStatus, null, 2));
 
       const { data: allUsers, error: fetchError } = await supabase
-        .from("all_users_with_profile")
+        .from("profiles")
         .select("*");
       if (fetchError) throw fetchError;
 
@@ -685,13 +688,32 @@ const UserManagementNew: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                             {/* Activate / Suspend Buttons */}
+                             {user.status === 'active' ? (
+                                <button
+                                  onClick={() => handleStatusChange(user.id, 'inactive')}
+                                  className="p-2 hover:bg-amber-100 rounded-lg transition-colors text-amber-600 hover:text-amber-700"
+                                  title="Suspend User"
+                                >
+                                  <Ban size={16} />
+                                </button>
+                             ) : (
+                                <button
+                                  onClick={() => handleStatusChange(user.id, 'active')}
+                                  className="p-2 hover:bg-emerald-100 rounded-lg transition-colors text-emerald-600 hover:text-emerald-700"
+                                  title="Activate User"
+                                >
+                                  <Play size={16} />
+                                </button>
+                             )}
+
                             <button
                               onClick={() => {
                                 setSelectedUser(user);
                                 setIsAssignDialogOpen(true);
                               }}
                               className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600 hover:text-blue-700"
-                              title="Assign Role"
+                              title="Edit / Assign Role"
                             >
                               <Edit2 size={16} />
                             </button>

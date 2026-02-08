@@ -21,6 +21,7 @@ import {
   Home,
   MapPin,
   DollarSign,
+  UserPlus,
 } from "lucide-react";
 import {
   Select,
@@ -29,6 +30,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface RentalApplicationData {
   id: string;
@@ -57,12 +66,24 @@ interface RentalApplicationData {
   } | null;
 }
 
+interface AvailableUnit {
+  id: string;
+  unit_number: string;
+  property_id: string;
+  properties: { name: string };
+}
+
 const RentalApplications = () => {
   const [applications, setApplications] = useState<RentalApplicationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<RentalApplicationData | null>(null);
+  const [availableUnits, setAvailableUnits] = useState<AvailableUnit[]>([]);
+  const [selectedUnit, setSelectedUnit] = useState<string>("");
+  const [assigningTenant, setAssigningTenant] = useState(false);
 
   useEffect(() => {
     loadApplications();
@@ -126,6 +147,90 @@ const RentalApplications = () => {
       toast.error("An error occurred while updating status");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const openAssignDialog = async (application: RentalApplicationData) => {
+    setSelectedApplication(application);
+    setSelectedUnit("");
+    
+    try {
+      // Fetch available units matching preferred locations and budget
+      let query = supabase
+        .from("units")
+        .select(
+          `
+          id,
+          unit_number,
+          property_id,
+          properties:property_id (name)
+        `
+        )
+        .eq("status", "available");
+
+      // If application has preferred locations, filter by those
+      if (application.preferred_locations && application.preferred_locations.length > 0) {
+        query = query.in("properties.name", application.preferred_locations);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setAvailableUnits(data || []);
+      setAssignDialogOpen(true);
+    } catch (err) {
+      console.error("Error fetching available units:", err);
+      toast.error("Failed to load available units");
+    }
+  };
+
+  const handleAssignTenant = async () => {
+    if (!selectedApplication || !selectedUnit) {
+      toast.error("Please select a unit");
+      return;
+    }
+
+    setAssigningTenant(true);
+    try {
+      // Create tenant record
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .insert({
+          user_id: selectedApplication.user_id,
+          property_id: availableUnits.find(u => u.id === selectedUnit)?.property_id,
+          unit_id: selectedUnit,
+          status: "active",
+          move_in_date: selectedApplication.occupancy_date || new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (tenantError) throw tenantError;
+
+      // Update unit status to occupied
+      const { error: unitError } = await supabase
+        .from("units")
+        .update({ status: "occupied" })
+        .eq("id", selectedUnit);
+
+      if (unitError) throw unitError;
+
+      // Update application status to approved
+      const { error: appError } = await supabase
+        .from("rental_applications")
+        .update({ status: "approved" })
+        .eq("id", selectedApplication.id);
+
+      if (appError) throw appError;
+
+      toast.success("Tenant assigned successfully!");
+      setAssignDialogOpen(false);
+      loadApplications();
+    } catch (err) {
+      console.error("Error assigning tenant:", err);
+      toast.error("Failed to assign tenant");
+    } finally {
+      setAssigningTenant(false);
     }
   };
 
@@ -425,8 +530,8 @@ const RentalApplications = () => {
                     )}
 
                     {/* Actions */}
-                    <div className="border-t pt-4 flex flex-col md:flex-row gap-3">
-                      <div className="flex-1">
+                    <div className="border-t pt-4 flex flex-col gap-3">
+                      <div className="w-full">
                         <p className="text-xs font-medium text-gray-600 uppercase mb-2">
                           Update Status
                         </p>
@@ -448,14 +553,26 @@ const RentalApplications = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="md:w-auto mt-auto"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Details
-                      </Button>
+                      <div className="flex flex-col md:flex-row gap-2">
+                        {app.application_type === "looking_for_rental" && app.status === "pending" && (
+                          <Button
+                            onClick={() => openAssignDialog(app)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            size="sm"
+                          >
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Assign Tenant
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="md:w-auto"
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          Details
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -464,6 +581,88 @@ const RentalApplications = () => {
           ))
         )}
       </div>
+
+      {/* Assign Tenant Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Assign Tenant to Unit</DialogTitle>
+            <DialogDescription>
+              Assign {selectedApplication?.profiles?.first_name} {selectedApplication?.profiles?.last_name} to an available unit
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {selectedApplication && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p className="text-sm text-gray-600 mb-1">Applicant Budget: </p>
+                <p className="text-lg font-bold text-blue-700">
+                  KSH {selectedApplication.budget_min?.toLocaleString()} - {selectedApplication.budget_max?.toLocaleString()}
+                </p>
+                {selectedApplication.preferred_locations && selectedApplication.preferred_locations.length > 0 && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    Preferred Locations: {selectedApplication.preferred_locations.join(", ")}
+                  </p>
+                )}
+                {selectedApplication.occupancy_date && (
+                  <p className="text-sm text-gray-600">
+                    Occupancy Date: {new Date(selectedApplication.occupancy_date).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Unit</label>
+              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an available unit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUnits.length > 0 ? (
+                    availableUnits.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.unit_number} - {unit.properties?.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>
+                      No available units found
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAssignDialogOpen(false)}
+              disabled={assigningTenant}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignTenant}
+              disabled={assigningTenant || !selectedUnit}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {assigningTenant ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Assign Tenant
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
