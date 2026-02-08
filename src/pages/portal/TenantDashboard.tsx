@@ -765,7 +765,7 @@ const TenantDashboard: React.FC = () => {
                   <span className="text-xs font-bold uppercase tracking-wider">Lease</span>
                 </div>
                 <div className="text-2xl font-black text-white tracking-tight">
-                  {stats.leaseMonthsLeft} <span className="text-sm font-bold text-blue-200">Months</span>
+                  {stats.leaseMonthsLeft} <span className="text-sm font-bold text-blue-200">{stats.leaseMonthsLeft === 1 ? 'Month' : 'Months'}</span>
                 </div>
                 <div className="text-[10px] text-blue-200 font-semibold mt-1">
                   Remaining Term
@@ -791,8 +791,10 @@ const TenantDashboard: React.FC = () => {
                    <div className="p-3 bg-blue-50 rounded-xl">
                      <DollarSign className="w-6 h-6 text-[#154279]" />
                    </div>
-                   {stats.currentBalance > 0 && (
+                   {stats.currentBalance > 0 ? (
                      <Badge className="bg-red-50 text-red-600 hover:bg-red-100 border-red-100 uppercase text-[10px] tracking-wider">Action Needed</Badge>
+                   ) : (
+                     <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border-emerald-100 uppercase text-[10px] tracking-wider">On Track</Badge>
                    )}
                  </div>
                  <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Current Balance</h3>
@@ -871,11 +873,11 @@ const TenantDashboard: React.FC = () => {
                    </div>
                  </div>
                  <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">My Unit</h3>
-                 <div className="text-xl font-black text-slate-800 mb-2 truncate" title={propertyData?.unit_number || "Loading..."}>
-                    {propertyData?.unit_number || "..."}
+                 <div className="text-xl font-black text-slate-800 mb-2 truncate" title={propertyData?.unit_number || "Unit Details"}>
+                    {propertyData?.unit_number || "No Unit"}
                  </div>
                  <div className="flex items-center text-xs font-semibold text-slate-400 truncate" title={propertyData?.name}>
-                   {propertyData?.name || "Loading property..."}
+                   {propertyData?.name || "Property details unavailable"}
                  </div>
                </CardContent>
              </Card>
