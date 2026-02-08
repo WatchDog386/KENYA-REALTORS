@@ -239,6 +239,14 @@ const ApprovalsPage: React.FC = () => {
     }
   };
 
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'rejected': return 'bg-red-100 text-red-700 border-red-200';
+      default: return 'bg-amber-100 text-amber-700 border-amber-200';
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -350,7 +358,9 @@ const ApprovalsPage: React.FC = () => {
               </div>
             ) : filteredApprovals.length > 0 ? (
               filteredApprovals.map((approval, idx) => {
-                const applicant = approval.profiles ? `${approval.profiles.first_name} ${approval.profiles.last_name}` : 'Unknown';
+                const applicant = approval.profiles 
+                  ? `${approval.profiles.first_name || ''} ${approval.profiles.last_name || ''}`.trim() || 'Unknown' 
+                  : 'Unknown';
                 const type = getApprovalType(approval);
                 const title = getApprovalTitle(approval);
                 const description = getApprovalDescription(approval);
@@ -363,7 +373,7 @@ const ApprovalsPage: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-2">
                               <Badge className={getTypeBadgeColor(type)}>{type}</Badge>
-                              <Badge className={approval.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}>{approval.status}</Badge>
+                              <Badge className={getStatusBadgeColor(approval.status)}>{approval.status.charAt(0).toUpperCase() + approval.status.slice(1)}</Badge>
                             </div>
                             <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
                             <div className="space-y-1">
