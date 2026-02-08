@@ -279,7 +279,7 @@ const ApprovalsPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-[#F96302] rounded-full transition-all duration-1000" style={{ width: `${(pendingCount / (mockApprovals.length || 1)) * 100}%` }}></div>
+                    <div className="h-full bg-[#F96302] rounded-full transition-all duration-1000" style={{ width: `${(pendingCount / (approvals.length || 1)) * 100}%` }}></div>
                   </div>
                   <div className="flex justify-between mt-2 text-xs text-blue-100 font-medium">
                     <span>{pendingCount} Pending</span>
@@ -297,7 +297,7 @@ const ApprovalsPage: React.FC = () => {
             {[
               { label: 'Pending', value: pendingCount.toString(), icon: Clock, color: 'bg-amber-500' },
               { label: 'Approved', value: approvedCount.toString(), icon: CheckCircle, color: 'bg-emerald-500' },
-              { label: 'Total', value: mockApprovals.length.toString(), icon: FileText, color: 'bg-[#154279]' },
+              { label: 'Total', value: approvals.length.toString(), icon: FileText, color: 'bg-[#154279]' },
             ].map((stat, idx) => {
               const Icon = stat.icon;
               return (
