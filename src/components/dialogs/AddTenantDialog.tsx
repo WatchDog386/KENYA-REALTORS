@@ -257,7 +257,7 @@ export const AddTenantDialog: React.FC<AddTenantDialogProps> = ({
           <Button
             onClick={handleAddTenant}
             disabled={loading || !selectedUnit || !selectedUser || !moveInDate}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-[#154279] hover:bg-[#0f325e] text-white"
           >
             {loading ? (
               <>

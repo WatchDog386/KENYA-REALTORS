@@ -78,7 +78,7 @@ export const TenantActionRequestDialog: React.FC<TenantActionRequestDialogProps>
         <DialogHeader>
           <DialogTitle>Request Tenant Action</DialogTitle>
           <DialogDescription>
-            Request approval from super admin to {'{'}remove or suspend{'}'} {tenantName}
+            Request approval from super admin to {actionType === 'tenant_remove' ? 'remove' : 'suspend'} <span className="font-semibold text-slate-900">{tenantName}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -130,7 +130,7 @@ export const TenantActionRequestDialog: React.FC<TenantActionRequestDialogProps>
           <Button
             onClick={handleSubmit}
             disabled={loading || !reason.trim()}
-            className={actionType === 'tenant_remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-600 hover:bg-yellow-700'}
+            className={actionType === 'tenant_remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'}
           >
             {loading ? (
               <>
