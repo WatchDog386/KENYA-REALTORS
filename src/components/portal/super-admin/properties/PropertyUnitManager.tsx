@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { read, utils } from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, PropertyUnitType } from "@/services/propertyService";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,8 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
     features: "" // Comma separated
   });
   const [isGenerating, setIsGenerating] = useState(false);
+  // Excel Import State
+  const [isImporting, setIsImporting] = useState(false);
 
   // Unit Types Management State
   const [isManageTypesOpen, setIsManageTypesOpen] = useState(false);
@@ -231,6 +234,106 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       toast.error("Failed to generate units");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        toast.error("Excel sheet is empty");
+        return;
+      }
+
+      let importedCount = 0;
+      
+      // Refresh types to ensure we have latest
+      const { data: currentTypes } = await supabase
+        .from('property_unit_types')
+        .select('*')
+        .eq('property_id', property.id);
+      
+      const localTypes = currentTypes ? [...currentTypes] : [];
+
+      for (const row of jsonData) {
+        // Expected columns: Unit Number, Floor, Type, Price (optional)
+        const unitNumber = row['Unit Number'] || row['unit_number'] || row['Unit'] || row['unit'];
+        const floorNumber = row['Floor'] || row['floor_number'] || row['Floor Number'] || 1;
+        const typeName = row['Type'] || row['Unit Type'] || row['unit_type'] || 'Standard';
+        const price = row['Price'] || row['price'] || null;
+        let status = (row['Status'] || row['status'] || 'available').toLowerCase();
+        if (status === 'vacant') status = 'available';
+        
+        const description = row['Description'] || row['description'] || null;
+        const features = row['Features'] || row['features'] ? (String(row['Features'] || row['features'])).split(',').map((f: string) => f.trim()) : [];
+
+        if (!unitNumber) continue;
+
+        // Find or create Unit Type
+        let typeId = "";
+        const existingType = localTypes.find(t => t.name.toLowerCase() === String(typeName).toLowerCase());
+        
+        if (existingType) {
+          typeId = existingType.id!;
+        } else {
+            console.log("Creating new type:", typeName);
+            const { data: newType, error: typeError } = await supabase
+              .from('property_unit_types')
+              .insert({
+                property_id: property.id,
+                name: String(typeName),
+                price_per_unit: Number(price) || 0
+              })
+              .select()
+              .single();
+            
+            if (typeError) {
+                console.error("Error creating type", typeError);
+                continue; 
+            }
+            typeId = newType.id;
+            localTypes.push(newType); 
+        }
+
+        const { error: insertError } = await supabase
+            .from('units')
+            .insert({
+                property_id: property.id,
+                unit_number: String(unitNumber),
+                floor_number: Number(floorNumber),
+                unit_type_id: typeId,
+                price: price ? Number(price) : null,
+                status: status,
+                description: description,
+                features: features
+            });
+
+        if (insertError) {
+            // If duplicate unit number, ignore or log
+             console.error("Error inserting unit", insertError);
+        } else {
+            importedCount++;
+        }
+      }
+
+      toast.success(`Successfully imported ${importedCount} units`);
+      fetchUnits();
+      fetchUnitTypes();
+
+    } catch (error) {
+      console.error("Import error:", error);
+      toast.error("Failed to process Excel file");
+    } finally {
+      setIsImporting(false);
+      e.target.value = '';
     }
   };
 
@@ -763,6 +866,70 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                         {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MdApartment className="w-4 h-4" />}
                         Generate Units
                     </motion.button>
+                </div>
+            </motion.div>
+
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className={cn(
+                    "relative border-2 rounded-2xl transition-all duration-300 overflow-hidden bg-white",
+                    "border-emerald-600 shadow-2xl shadow-emerald-600/10"
+                )}
+            >
+                 <div className="bg-gradient-to-br from-emerald-600 via-emerald-600 to-emerald-800 p-6 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none" />
+                    <div className="relative z-10">
+                        <div className="flex items-center gap-3 mb-2">
+                             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                                <Upload size={24} className="text-emerald-300" />
+                             </div>
+                             <h2 className="text-lg font-bold uppercase tracking-wide">Import Details</h2>
+                        </div>
+                        <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-widest pl-1">Upload Excel Sheet</p>
+                    </div>
+                </div>
+
+                 <div className="p-6 space-y-5 bg-gradient-to-b from-white to-slate-50">
+                    <div className="text-xs text-slate-500 mb-4">
+                        Upload an Excel file (.xlsx, .xls) with columns: <br/>
+                        <span className="font-mono bg-slate-100 px-1 rounded">Unit Number, Floor, Type, Price, Status, Description, Features</span>
+                    </div>
+
+                    <div className="relative">
+                        <input
+                            type="file"
+                            accept=".xlsx, .xls"
+                            onChange={handleFileUpload}
+                            disabled={isImporting}
+                            className="hidden"
+                            id="excel-upload"
+                        />
+                        <label 
+                            htmlFor="excel-upload"
+                            className={cn(
+                                "w-full cursor-pointer flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all",
+                                "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50",
+                                isImporting ? "opacity-50 pointer-events-none" : ""
+                            )}
+                        >
+                             {isImporting ? (
+                                <>
+                                    <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-2" />
+                                    <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Importing...</span>
+                                </>
+                             ) : (
+                                <>
+                                    <div className="p-3 bg-emerald-100 text-emerald-600 rounded-full mb-3">
+                                        <Upload size={20} />
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Click to Upload</span>
+                                    <span className="text-[10px] text-slate-400 mt-1">Metrics & Details</span>
+                                </>
+                             )}
+                        </label>
+                    </div>
                 </div>
             </motion.div>
         </div>
