@@ -201,6 +201,19 @@ const ApprovalsPage: React.FC = () => {
     return `Request from ${applicant}`;
   };
 
+  const getApprovalType = (approval: Approval): string => {
+    if (!approval.approval_type) return 'Unknown';
+    if (approval.approval_type === 'permission_request') {
+      return 'permission_request';
+    }
+    // Return the raw type so badges can style it, or a formatted one if needed.
+    // Given the badge function expects specific keys, we might want to return the raw key 
+    // or map it intelligently. 
+    // The previous implementation of getTypeBadgeColor expects keys like 'property', 'user'. 
+    // Let's assume approval.approval_type matches those keys or similar.
+    return approval.approval_type;
+  };
+
   const filteredApprovals = approvals.filter(approval => {
     const type = (approval.approval_type || '').toLowerCase();
     const title = getApprovalTitle(approval).toLowerCase();
