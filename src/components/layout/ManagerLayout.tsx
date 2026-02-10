@@ -333,10 +333,6 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/manager/properties',
       icon: <Building size={20} />,
       description: 'Managed Buildings & Units',
-      children: [
-        { title: 'Property Overview', href: '/portal/manager/properties', icon: <Home size={18} />, description: 'All Managed Properties' },
-        { title: 'Units', href: '/portal/manager/properties/units', icon: <Building size={18} />, description: 'Unit-Level Details' },
-      ]
     },
     {
       title: 'Tenants',
@@ -347,7 +343,6 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       children: [
         { title: 'All Tenants', href: '/portal/manager/tenants', icon: <Users size={18} />, description: 'Tenant Directory' },
         { title: 'Applications', href: '/portal/manager/tenants/applications', icon: <ClipboardCheck size={18} />, description: 'New Lease Requests' },
-        { title: 'Leases', href: '/portal/manager/leases', icon: <FileText size={18} />, description: 'Active Agreements' },
         { title: 'Vacancy Notices', href: '/portal/manager/vacation-notices', icon: <LogOut size={18} />, description: 'Move-Out Requests' },
       ]
     },
@@ -356,11 +351,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/manager/payments',
       icon: <DollarSign size={20} />,
       badge: pendingTasks.payments,
-      description: 'Financial Operations',
-      children: [
-        { title: 'Rent Collection', href: '/portal/manager/payments', icon: <DollarSign size={18} />, description: 'Track & Collect Rent' },
-        { title: 'Deposits', href: '/portal/manager/payments/deposits', icon: <FileText size={18} />, description: 'Security Deposits' },
-      ]
+      description: 'Financial Operations'
     },
     {
       title: 'Maintenance',
@@ -375,18 +366,6 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       icon: <AlertTriangle size={20} />,
       badge: pendingTasks.approvals,
       description: 'Pending Manager Actions'
-    },
-    {
-      title: 'Vacation Notices',
-      href: '/portal/manager/vacation-notices',
-      icon: <Calendar size={20} />,
-      description: 'Tenant Absence Reports'
-    },
-    {
-      title: 'Reports',
-      href: '/portal/manager/reports',
-      icon: <FileText size={20} />,
-      description: 'Operational Summaries'
     },
     {
       title: 'Messages',

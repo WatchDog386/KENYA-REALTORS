@@ -38,7 +38,7 @@ const MessagesPage: React.FC = () => {
       const { data, error } = await supabase
         .from("messages")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("recipient_id", user.id) // Fixed: use recipient_id instead of user_id
         .order("created_at", { ascending: false });
 
       if (error) {

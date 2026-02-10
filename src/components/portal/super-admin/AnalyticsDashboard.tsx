@@ -133,11 +133,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     maintenanceFees: analytics.totalRevenue * 0.15,
     otherIncome: analytics.totalRevenue * 0.15,
     netIncome: analytics.totalRevenue * 0.6,
-    paymentStatus: {
-      onTime: 75,
-      late: 15,
-      overdue: 10
-    }
+    paymentStatus: analytics.paymentStatus || { onTime: 0, late: 0, overdue: 0 }
   };
   const occupancyMetrics = {
     activeProperties: analytics.propertiesByStatus.rented,
@@ -166,24 +162,20 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     availableProperties: analytics.propertiesByStatus.active,
     occupiedProperties: analytics.propertiesByStatus.rented,
     statusDistribution: [
-      { status: 'Active', value: analytics.propertiesByStatus.active },
-      { status: 'Rented', value: analytics.propertiesByStatus.rented },
-      { status: 'Pending', value: analytics.propertiesByStatus.pending },
-      { status: 'Maintenance', value: analytics.propertiesByStatus.maintenance },
-      { status: 'Sold', value: analytics.propertiesByStatus.sold }
+      { status: 'Active', value: analytics.propertiesByStatus.active, percentage: analytics.totalProperties > 0 ? Math.round((analytics.propertiesByStatus.active / analytics.totalProperties) * 100) : 0 },
+      { status: 'Rented', value: analytics.propertiesByStatus.rented, percentage: analytics.totalProperties > 0 ? Math.round((analytics.propertiesByStatus.rented / analytics.totalProperties) * 100) : 0 },
+      { status: 'Pending', value: analytics.propertiesByStatus.pending, percentage: analytics.totalProperties > 0 ? Math.round((analytics.propertiesByStatus.pending / analytics.totalProperties) * 100) : 0 },
+      { status: 'Maintenance', value: analytics.propertiesByStatus.maintenance, percentage: analytics.totalProperties > 0 ? Math.round((analytics.propertiesByStatus.maintenance / analytics.totalProperties) * 100) : 0 },
+      { status: 'Sold', value: analytics.propertiesByStatus.sold, percentage: analytics.totalProperties > 0 ? Math.round((analytics.propertiesByStatus.sold / analytics.totalProperties) * 100) : 0 }
     ],
-    topProperties: [
-      { id: 1, name: 'Luxury Apartment Complex', revenue: 45000, occupancy: 95 },
-      { id: 2, name: 'Downtown Office Suite', revenue: 38000, occupancy: 88 },
-      { id: 3, name: 'Suburban Family Homes', revenue: 32000, occupancy: 92 }
-    ]
+    topProperties: analytics.topProperties || []
   };
 
   // Chart data
   const revenueData = analytics.monthlyRevenue || [];
-  const occupancyData = [];
+  const occupancyData = analytics.occupancyData || [];
   const propertyTypeData = analytics.propertyTypes || [];
-  const userGrowthData = [];
+  const userGrowthData = analytics.userGrowthData || [];
 
   // Colors for charts
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
@@ -408,6 +400,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="text-xs text-gray-600 font-medium">
                 {propertyMetrics.availableProperties} available, {propertyMetrics.occupiedProperties} occupied
               </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {analytics.totalUnits} total units
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -494,12 +489,12 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) =>
-                        `${name}: ${(percent * 100)?.toFixed(0)}%`
+                      label={(entry: any) =>
+                        `${entry.type}: ${((entry.count / propertyTypeData.reduce((sum, p) => sum + p.count, 0)) * 100)?.toFixed(0)}%`
                       }
                       outerRadius={80}
                       fill="#8884d8"
-                      dataKey="value"
+                      dataKey="count"
                     >
                       {propertyTypeData.map((entry, index) => (
                         <Cell
@@ -700,33 +695,39 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {propertyMetrics.topProperties?.map(
-                  (property: any, index: number) => (
-                    <div
-                      key={property.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                          <Home className="h-5 w-5 text-blue-600" />
+                {propertyMetrics.topProperties && propertyMetrics.topProperties.length > 0 ? (
+                  propertyMetrics.topProperties.map(
+                    (property: any, index: number) => (
+                      <div
+                        key={property.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <Home className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{property.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {property.unitCount} units
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium">{property.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {property.type}
+                        <div className="text-right">
+                          <div className="font-bold">
+                            {formatCurrency(property.revenue)}
+                          </div>
+                          <div className="text-sm text-green-600">
+                            +{property.occupancyRate}% occupancy
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold">
-                          {formatCurrency(property.revenue)}
-                        </div>
-                        <div className="text-sm text-green-600">
-                          +{property.occupancyRate}% occupancy
-                        </div>
-                      </div>
-                    </div>
+                    )
                   )
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    No properties with revenue data yet
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -755,7 +756,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       }
                       outerRadius={80}
                       fill="#8884d8"
-                      dataKey="count"
+                      dataKey="value"
                     >
                       {userMetrics.roleDistribution?.map((entry, index) => (
                         <Cell

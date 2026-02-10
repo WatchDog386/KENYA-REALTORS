@@ -51,14 +51,45 @@ const ManagerDeposits = () => {
       setPropertyId(assignments.property_id);
 
       // Fetch security deposits for this property
-      const { data, error } = await supabase
+      const { data: depositsData, error } = await supabase
         .from('security_deposits')
-        .select('*, tenant:profiles(*)')
+        .select('*')
         .eq('property_id', assignments.property_id)
         .order('deposit_date', { ascending: false });
 
       if (error) throw error;
-      setDeposits(data || []);
+
+      // Manually fetch tenant profiles to avoid join errors
+      let enrichedDeposits = [];
+      if (depositsData) {
+          const tenantIds = [...new Set(depositsData.map((d: any) => d.tenant_id).filter(Boolean))];
+          
+          // Try to fetch from profiles directly (if tenant_id is user_id)
+          const { data: profiles } = await supabase.from('profiles').select('*').in('id', tenantIds);
+          
+          // Also try to fetch from tenants table (if tenant_id is tenant record id)
+          const { data: tenants } = await supabase.from('tenants').select('id, user_id, profiles:user_id(first_name, last_name, email)').in('id', tenantIds);
+
+          enrichedDeposits = depositsData.map((d: any) => {
+              // Try finding in profiles (direct link)
+              let tenantProfile = profiles?.find(p => p.id === d.tenant_id);
+              
+              // If not found, check via tenants table
+              if (!tenantProfile) {
+                  const tenantRecord = tenants?.find(t => t.id === d.tenant_id);
+                  if (tenantRecord && tenantRecord.profiles) {
+                      tenantProfile = tenantRecord.profiles;
+                  }
+              }
+
+              return {
+                  ...d,
+                  tenant: tenantProfile
+              };
+          });
+      }
+
+      setDeposits(enrichedDeposits);
     } catch (err) {
       console.error('Error loading deposits:', err);
       toast.error('Failed to load security deposits');
@@ -132,7 +163,7 @@ const ManagerDeposits = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6">
             <p className="text-sm text-slate-600 mb-2">Total Held</p>
-            <p className="text-3xl font-bold text-blue-600">${stats.totalHeld.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-blue-600">KSh {stats.totalHeld.toLocaleString()}</p>
             <p className="text-xs text-slate-500 mt-2">{deposits.filter(d => d.status === 'held').length} deposits</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -141,7 +172,7 @@ const ManagerDeposits = () => {
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
             <p className="text-sm text-slate-600 mb-2">Deducted</p>
-            <p className="text-3xl font-bold text-red-600">${stats.totalDeductions.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-red-600">KSh {stats.totalDeductions.toLocaleString()}</p>
             <p className="text-xs text-slate-500 mt-2">{stats.deducted} deductions</p>
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -152,12 +183,13 @@ const ManagerDeposits = () => {
 
         {/* Search and Filter */}
         <div className="mb-6 flex gap-4">
-          <div className="flex-1">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
             <Input
               placeholder="Search by tenant name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              prefix={<Search size={16} className="text-slate-400" />}
+              className="pl-10"
             />
           </div>
           <select
@@ -209,7 +241,7 @@ const ManagerDeposits = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-slate-900">
-                        ${deposit.amount?.toLocaleString()}
+                        KSh {deposit.amount?.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {new Date(deposit.deposit_date).toLocaleDateString()}
@@ -222,7 +254,7 @@ const ManagerDeposits = () => {
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {deposit.status === 'deducted' && (
                           <div>
-                            <p className="text-xs font-semibold">Deduction: ${deposit.deduction_amount?.toLocaleString()}</p>
+                            <p className="text-xs font-semibold">Deduction: KSh {deposit.deduction_amount?.toLocaleString()}</p>
                             <p className="text-xs text-slate-500">{deposit.deduction_reason}</p>
                           </div>
                         )}

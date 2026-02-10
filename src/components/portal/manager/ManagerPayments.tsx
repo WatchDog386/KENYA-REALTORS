@@ -103,7 +103,7 @@ const ManagerPayments: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalDue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">KSh {totalDue.toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -115,7 +115,7 @@ const ManagerPayments: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${totalPaid.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-green-600">KSh {totalPaid.toLocaleString()}</div>
           </CardContent>
         </Card>
 
@@ -160,7 +160,7 @@ const ManagerPayments: React.FC = () => {
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
                       <TableCell>{payment.tenant_name || '-'}</TableCell>
-                      <TableCell>${payment.amount.toLocaleString()}</TableCell>
+                      <TableCell>KSh {payment.amount.toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge variant={payment.status === 'paid' ? 'default' : 'secondary'}>
                           {payment.status}

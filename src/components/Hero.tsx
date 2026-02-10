@@ -42,6 +42,8 @@ import {
   ChefHat
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 // --- GLOBAL STYLES ---
 const GlobalStyles = () => (
@@ -387,6 +389,58 @@ const LISTINGS_DATA = [
 // ==========================================
 const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
   if (!item) return null;
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+       const { data: { user } } = await supabase.auth.getUser();
+       // Uses "John Kamau" ID if not logged in (fallback for demo)
+       const applicantId = user?.id || 'f5b2f858-9319-4bd4-9e9d-8cd421ba1829';
+       
+       // Ayden Home Towers ID for Property (Demo)
+       const propertyId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+       // Unit A2 ID (Demo)
+       const unitId = 'de7b8d75-8292-4fee-9f4e-ff6d20fd1560';
+
+       const { error } = await supabase
+         .from('lease_applications')
+         .insert({
+           applicant_id: applicantId,
+           property_id: propertyId,
+           unit_id: unitId,
+           status: 'pending',
+           notes: `WEB APPLICATION\nProperty: ${item.title}\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\nMessage: ${formData.message}`
+         });
+
+       if (error) throw error;
+       
+       toast.success('Application submitted successfully!');
+       setFormData({ name: '', email: '', phone: '', message: '' });
+       onClose();
+       
+    } catch (error: any) {
+      console.error('Submission error:', error);
+      toast.error('Failed to submit application: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -520,15 +574,50 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
                   <div className="text-xs text-gray-200 font-bold uppercase">AYDEN HOMES</div>
                 </div>
               </div>
-              <form className="space-y-3">
-                <input type="text" placeholder="Your Name" className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium" />
-                <input type="email" placeholder="Your Email" className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium" />
-                <input type="tel" placeholder="Your Phone" className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium" />
-                <textarea rows={3} placeholder="I am interested in this property..." className="w-full bg-white border border-gray-200 rounded-none px-3 py-3 text-sm focus:border-[#F96302] outline-none font-medium"></textarea>
-                <button className="w-full bg-[#F96302] text-white font-bold py-3 rounded-none hover:bg-[#d85502] transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider">
-                  Submit Request
+              <form className="space-y-3" onSubmit={handleSubmit}>
+                <input 
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  type="text" 
+                  placeholder="Your Name" 
+                  className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium"
+                  required
+                />
+                <input 
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  type="email" 
+                  placeholder="Your Email" 
+                  className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium"
+                  required
+                />
+                <input 
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  type="tel" 
+                  placeholder="Your Phone" 
+                  className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium"
+                  required
+                />
+                <textarea 
+                  name="message"
+                  value={formData.message}
+                  onChange={handleInputChange}
+                  rows={3} 
+                  placeholder="I am interested in this property..." 
+                  className="w-full bg-white border border-gray-200 rounded-none px-3 py-3 text-sm focus:border-[#F96302] outline-none font-medium"
+                ></textarea>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full bg-[#F96302] text-white font-bold py-3 rounded-none hover:bg-[#d85502] transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-75 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
                 </button>
-                <button className="w-full border-2 border-white text-white font-bold py-3 rounded-none hover:bg-white hover:text-[#154279] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+                <button type="button" className="w-full border-2 border-white text-white font-bold py-3 rounded-none hover:bg-white hover:text-[#154279] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
                   <Phone size={16} /> Call Us
                 </button>
               </form>

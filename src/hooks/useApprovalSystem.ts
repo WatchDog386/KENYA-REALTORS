@@ -76,13 +76,13 @@ export const useApprovalSystem = () => {
 
   // Approve request
   const approveRequest = useCallback(
-    async (requestId: string, notes?: string) => {
+    async (requestId: string, adminResponse?: string) => {
       try {
         setLoading(true);
         const result = await approvalService.processApprovalRequest({
             approvalId: requestId,
             status: "approved",
-            notes
+            adminResponse
         });
 
         if (result) {

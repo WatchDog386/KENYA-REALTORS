@@ -500,27 +500,31 @@ const PropertyPage: React.FC = () => {
                    
                    <div className="space-y-3">
                       {property.manager_phone && (
-                        <Button variant="outline" className="w-full justify-start h-auto py-3" asChild>
-                          <a href={`tel:${property.manager_phone}`}>
-                            <Phone className="mr-3 h-4 w-4 text-[#F96302]" />
-                            <div className="flex flex-col items-start">
-                              <span className="text-xs text-gray-500 font-normal">Phone</span>
-                              <span className="text-sm font-semibold text-gray-900">{property.manager_phone}</span>
+                        <div className="w-full p-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors flex items-center shadow-sm">
+                          <a href={`tel:${property.manager_phone}`} className="flex items-center w-full">
+                            <div className="h-10 w-10 rounded-full bg-orange-50 flex items-center justify-center mr-3 shrink-0">
+                               <Phone className="h-5 w-5 text-[#F96302]" />
+                            </div>
+                            <div className="flex flex-col items-start overflow-hidden">
+                              <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Phone</span>
+                              <span className="text-sm font-bold text-[#154279] truncate">{property.manager_phone}</span>
                             </div>
                           </a>
-                        </Button>
+                        </div>
                       )}
                       
                       {property.manager_email && (
-                        <Button variant="outline" className="w-full justify-start h-auto py-3" asChild>
-                           <a href={`mailto:${property.manager_email}`}>
-                            <Mail className="mr-3 h-4 w-4 text-[#154279]" />
-                            <div className="flex flex-col items-start">
-                              <span className="text-xs text-gray-500 font-normal">Email</span>
-                              <span className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{property.manager_email}</span>
+                        <div className="w-full p-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors flex items-center shadow-sm">
+                           <a href={`mailto:${property.manager_email}`} className="flex items-center w-full">
+                            <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center mr-3 shrink-0">
+                               <Mail className="h-5 w-5 text-[#154279]" />
+                            </div>
+                            <div className="flex flex-col items-start overflow-hidden">
+                              <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">Email</span>
+                              <span className="text-sm font-bold text-[#154279] truncate max-w-[180px]">{property.manager_email}</span>
                             </div>
                           </a>
-                        </Button>
+                        </div>
                       )}
                    </div>
                 </CardContent>

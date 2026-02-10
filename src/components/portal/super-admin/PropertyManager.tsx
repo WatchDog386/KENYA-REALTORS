@@ -19,7 +19,9 @@ import {
   ImageIcon,
   UserPlus,
   LayoutGrid,
-  Users
+  Users,
+  Eye,
+  Pencil
 } from "lucide-react";
 import {
   Dialog,
@@ -339,7 +341,7 @@ const PropertyManager: React.FC = () => {
   ];
 
   return (
-    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="bg-[#F5F8FA] min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
         body { font-family: 'Nunito', sans-serif; }
@@ -349,16 +351,20 @@ const PropertyManager: React.FC = () => {
       {propertyForUnits && (
         <PropertyUnitManager 
           property={propertyForUnits} 
-          onBack={() => setPropertyForUnits(null)}
+          onBack={() => {
+            setPropertyForUnits(null);
+            fetchProperties();
+          }}
         />
       )}
 
       {/* MAIN PROPERTY MANAGER VIEW */}
       {!propertyForUnits && (
       <>
-      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-10 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+      <section className="relative overflow-hidden bg-[#154279] rounded-b-[2.5rem] shadow-xl mb-12 min-h-[40vh] flex items-center">
         <HeroBackground />
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#154279] via-[#154279]/95 to-blue-900/80" />
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto px-6 w-full pt-16">
           <div className="space-y-1">
              <div className="flex items-center gap-3 mb-2">
                  <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
@@ -366,11 +372,11 @@ const PropertyManager: React.FC = () => {
                  </div>
                  <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Management</span>
              </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight text-white">
               Property <span className="text-[#F96302]">Management</span>
             </h1>
-            <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
-              Manage your real estate portfolio, units, and income projections.
+            <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl leading-relaxed">
+              Manage your real estate portfolio, units, and income projections efficiently from one dashboard.
             </p>
           </div>
               
@@ -378,7 +384,7 @@ const PropertyManager: React.FC = () => {
             <Button
                 variant="ghost"
                 onClick={() => { fetchProperties(); toast.info("Refreshing..."); }}
-                className="bg-white/10 hover:bg-white/20 text-white border-none"
+                className="bg-white/10 hover:bg-white/20 text-white border-none rounded-xl"
             >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -386,9 +392,9 @@ const PropertyManager: React.FC = () => {
             
             <Dialog open={showAddPropertyForm} onOpenChange={setShowAddPropertyForm}>
                 <DialogTrigger asChild>
-                <Button className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl shadow-lg border-none">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Property
+                <Button className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl shadow-lg border-none px-6 py-6 text-sm uppercase tracking-wider">
+                    <Plus className="w-5 h-5 mr-2" />
+                    New Property
                 </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 gap-0 overflow-hidden bg-white shadow-xl rounded-xl border border-slate-200">
@@ -400,10 +406,10 @@ const PropertyManager: React.FC = () => {
                             <Building className="w-5 h-5 text-slate-700" />
                         </div>
                         <div>
-                            <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">Add New Property</DialogTitle>
-                            <p className="text-slate-500 text-sm font-medium">
+                            <DialogTitle className="text-xl font-bold text-[#154279] tracking-tight">Add New Property</DialogTitle>
+                            <DialogDescription className="text-slate-500 text-sm font-medium">
                             Enter property details and unit breakdown below.
-                            </p>
+                            </DialogDescription>
                         </div>
                         </div>
                     </DialogHeader>
@@ -493,7 +499,7 @@ const PropertyManager: React.FC = () => {
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
                                 Unit Configuration
                                 </h3>
-                                <Button size="sm" variant="outline" onClick={handleAddUnit} className="h-8 border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg gap-1.5 text-xs font-bold transition-all">
+                                <Button size="sm" variant="outline" onClick={handleAddUnit} className="h-8 border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-[#154279] rounded-lg gap-1.5 text-xs font-bold transition-all">
                                 <Plus className="w-3.5 h-3.5" /> Add Unit Type
                                 </Button>
                             </div>
@@ -585,7 +591,7 @@ const PropertyManager: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">Projected Monthly Income</p>
-                                    <p className="text-2xl font-bold text-slate-900 tracking-tight">
+                                    <p className="text-2xl font-bold text-[#154279] tracking-tight">
                                     <span className="text-sm text-slate-500 mr-1 font-medium">KES</span>
                                     {formExpectedIncome.toLocaleString()}
                                     </p>
@@ -595,11 +601,11 @@ const PropertyManager: React.FC = () => {
                                 <div className="flex gap-6 text-sm">
                                     <div className="px-4 py-2 bg-white rounded-lg border border-slate-100 shadow-sm">
                                         <span className="text-slate-500 text-xs font-semibold uppercase mr-2">Units:</span>
-                                        <span className="font-bold text-slate-900">{formTotalUnits}</span>
+                                        <span className="font-bold text-[#154279]">{formTotalUnits}</span>
                                     </div>
                                     <div className="px-4 py-2 bg-white rounded-lg border border-slate-100 shadow-sm">
                                         <span className="text-slate-500 text-xs font-semibold uppercase mr-2">Types:</span>
-                                        <span className="font-bold text-slate-900">{formData.units.length}</span>
+                                        <span className="font-bold text-[#154279]">{formData.units.length}</span>
                                     </div>
                                 </div>
                             </div>
@@ -607,13 +613,13 @@ const PropertyManager: React.FC = () => {
                     </div>
 
                     <DialogFooter className="p-4 border-t border-slate-100 bg-white">
-                    <Button variant="ghost" onClick={() => setShowAddPropertyForm(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg">
+                    <Button variant="ghost" onClick={() => setShowAddPropertyForm(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-[#154279] rounded-lg">
                         Cancel
                     </Button>
                     <Button 
                         onClick={handleSaveProperty} 
                         disabled={savingProperty || !formData.name || formTotalUnits === 0} 
-                        className="bg-slate-900 hover:bg-slate-800 text-white px-6 font-bold rounded-lg shadow-sm"
+                        className="bg-[#154279] hover:bg-[#0f325e] text-white px-6 font-bold rounded-lg shadow-sm"
                     >
                         {savingProperty ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                         Create Property
@@ -628,6 +634,8 @@ const PropertyManager: React.FC = () => {
       {/* VIEW PROPERTY DIALOG */}
       <Dialog open={showViewProperty} onOpenChange={setShowViewProperty}>
         <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto p-0 gap-0 bg-white rounded-2xl shadow-2xl">
+          <DialogTitle className="sr-only">Property Details</DialogTitle>
+          <DialogDescription className="sr-only">Full details of the selected property</DialogDescription>
           {selectedProperty && (
             <>
               {/* Header with Image */}
@@ -657,7 +665,7 @@ const PropertyManager: React.FC = () => {
               {/* Content */}
               <div className="p-8 space-y-6">
                 <div>
-                  <h2 className="text-3xl font-bold text-slate-900 mb-2">{selectedProperty.name}</h2>
+                  <h2 className="text-3xl font-bold text-[#154279] mb-2">{selectedProperty.name}</h2>
                   <div className="flex items-center gap-2 text-slate-600">
                     <MapPin className="w-5 h-5" />
                     <span className="font-medium">{selectedProperty.location}</span>
@@ -733,10 +741,10 @@ const PropertyManager: React.FC = () => {
                   <Building className="w-5 h-5 text-slate-700" />
                 </div>
                 <div>
-                  <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">Edit Property</DialogTitle>
-                  <p className="text-slate-500 text-sm font-medium">
+                  <DialogTitle className="text-xl font-bold text-[#154279] tracking-tight">Edit Property</DialogTitle>
+                  <DialogDescription className="text-slate-500 text-sm font-medium">
                     Update property details and unit information.
-                  </p>
+                  </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
@@ -842,13 +850,13 @@ const PropertyManager: React.FC = () => {
           </div>
 
           <DialogFooter className="p-4 border-t border-slate-100 bg-white">
-            <Button variant="ghost" onClick={() => setShowEditProperty(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg">
+            <Button variant="ghost" onClick={() => setShowEditProperty(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-[#154279] rounded-lg">
               Cancel
             </Button>
             <Button 
               onClick={handleUpdateProperty} 
               disabled={savingProperty || !formData.name} 
-              className="bg-slate-900 hover:bg-slate-800 text-white px-6 font-bold rounded-lg shadow-sm"
+              className="bg-[#154279] hover:bg-[#0f325e] text-white px-6 font-bold rounded-lg shadow-sm"
             >
               {savingProperty ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <span>Update Property</span>}
             </Button>
@@ -862,7 +870,7 @@ const PropertyManager: React.FC = () => {
             <DialogHeader>
                 <DialogTitle className="text-[#154279] font-bold">Assign Property Manager</DialogTitle>
                 <DialogDescription>
-                    Assign a manager to <span className="font-semibold text-slate-900">{selectedProperty?.name}</span>.
+                    Assign a manager to <span className="font-semibold text-[#154279]">{selectedProperty?.name}</span>.
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -904,10 +912,10 @@ const PropertyManager: React.FC = () => {
         ].map((stat, idx) => {
           const IconComponent = stat.icon;
           const colorMap: any = { 
-            blue: "text-blue-600 bg-blue-50 border-blue-100", 
-            green: "text-green-600 bg-green-50 border-green-100", 
-            purple: "text-purple-600 bg-purple-50 border-purple-100", 
-            orange: "text-orange-600 bg-orange-50 border-orange-100" 
+            blue: "from-[#154279] to-[#205a9e]", 
+            green: "from-emerald-600 to-emerald-500", 
+            purple: "from-purple-600 to-purple-500", 
+            orange: "from-[#F96302] to-[#ff8c42]" 
           };
 
           return (
@@ -917,16 +925,19 @@ const PropertyManager: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: idx * 0.05 }}
             >
-              <Card className="border-2 border-slate-200 hover:border-[#F96302] transition-all duration-300 hover:shadow-xl hover:-translate-y-1 rounded-2xl h-full">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-bold text-slate-700 uppercase tracking-wider">{stat.label}</CardTitle>
-                  <div className={`p-2 rounded-lg ${colorMap[stat.color]}`}>
-                    <IconComponent className="h-4 w-4" />
+              <Card className={`bg-gradient-to-br ${colorMap[stat.color]} text-white border-none shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-2xl h-full overflow-hidden relative`}>
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <IconComponent className="w-24 h-24 -mr-6 -mt-6" />
+                </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+                  <CardTitle className="text-sm font-bold text-blue-100 uppercase tracking-wider">{stat.label}</CardTitle>
+                  <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
+                    <IconComponent className="h-4 w-4 text-white" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-black text-[#154279] mt-2">{stat.value}</div>
-                  <p className="text-xs text-slate-500 font-semibold mt-1">{stat.subtext}</p>
+                <CardContent className="relative z-10">
+                  <div className="text-2xl font-black text-white mt-1">{stat.value}</div>
+                  <p className="text-xs text-blue-100 font-semibold mt-1 bg-black/10 px-2 py-1 rounded inline-block">{stat.subtext}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -940,8 +951,8 @@ const PropertyManager: React.FC = () => {
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <Card className="border-2 border-slate-200 rounded-2xl shadow-lg border-t-4 border-t-[#154279]">
-          <CardHeader className="border-b-2 border-slate-100 bg-white rounded-t-2xl py-6">
+        <Card className="border-none shadow-xl rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="border-b border-slate-100 bg-white py-6">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <CardTitle className="text-[#154279] font-black text-xl flex items-center gap-2">
@@ -968,7 +979,7 @@ const PropertyManager: React.FC = () => {
               </div>
             </div>
 
-            {/* Properties Table */}
+            {/* Properties List - Card View */}
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
@@ -985,91 +996,106 @@ const PropertyManager: React.FC = () => {
                 <p className="text-slate-500 mt-1 max-w-xs mx-auto">Create your first property to get started.</p>
               </div>
             ) : (
-              <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                        <TableHead className="font-bold text-[#154279]">Property Name</TableHead>
-                        <TableHead className="font-bold text-[#154279]">Location</TableHead>
-                        <TableHead className="font-bold text-[#154279]">Assigned Manager</TableHead>
-                        <TableHead className="font-bold text-[#154279] text-center">Total Units</TableHead>
-                        <TableHead className="font-bold text-[#154279] text-right">Proj. Income</TableHead>
-                        <TableHead className="font-bold text-[#154279] text-center">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                   {properties.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase())).map((property) => (
-                       <TableRow key={property.id} className="hover:bg-slate-50">
-                           <TableCell className="font-medium text-slate-800">
-                              {property.name}
-                              <div className="text-xs text-slate-400 font-normal">{property.type || 'Apartment'}</div>
-                           </TableCell>
-                           <TableCell className="text-slate-600">
-                               <div className="flex items-center gap-1">
-                                   <MapPin className="w-3 h-3" /> {property.location}
-                               </div>
-                           </TableCell>
-                           <TableCell className="font-medium text-slate-700">
-                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                   {assignedManagers[property.id] || 'Unassigned'}
-                               </Badge>
-                           </TableCell>
-                           <TableCell className="text-center font-bold text-slate-700">
-                               {property.total_units}
-                           </TableCell>
-                           <TableCell className="text-right font-bold text-emerald-600">
-                               KES {(property.expected_income || 0).toLocaleString()}
-                           </TableCell>
-                           <TableCell className="text-center">
-                               <div className="flex items-center justify-center gap-2">
-                                   <Button 
-                                       variant="outline" 
-                                       size="sm" 
-                                       onClick={() => handleViewProperty(property)}
-                                       className="h-8 text-slate-600 hover:text-blue-600 hover:bg-blue-50 border-slate-200 rounded-lg"
-                                   >
-                                       View
-                                   </Button>
-                                   <Button 
-                                       variant="outline" 
-                                       size="sm"
-                                       onClick={() => setPropertyForUnits(property)}
-                                       className="h-8 text-slate-600 hover:text-purple-600 hover:bg-purple-50 border-slate-200 rounded-lg"
-                                       title="Manage Units"
-                                   >
-                                       <LayoutGrid className="w-4 h-4 mr-1" /> Units
-                                   </Button>
-                                   <Button 
-                                       variant="outline" 
-                                       size="sm" 
-                                       onClick={() => handleEditProperty(property)}
-                                       className="h-8 text-slate-600 hover:text-orange-600 hover:bg-orange-50 border-slate-200 rounded-lg"
-                                   >
-                                       Edit
-                                   </Button>
-                                   <Button 
-                                       variant="outline" 
-                                       size="sm" 
-                                       onClick={() => {
-                                           setSelectedProperty(property);
-                                           setSelectedManagerId(""); // reset selection
-                                           setShowAssignManagerDialog(true);
-                                       }}
-                                       className="h-8 text-slate-600 hover:text-green-600 hover:bg-green-50 border-slate-200 rounded-lg"
-                                       title="Assign Manager"
-                                   >
-                                       <UserPlus className="w-4 h-4" />
-                                   </Button>
-                                   <Button variant="ghost" size="icon" onClick={() => handleDeleteProperty(property.id)} className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                                       <Trash2 className="w-4 h-4" />
-                                   </Button>
-                               </div>
-                           </TableCell>
-                       </TableRow>
-                   ))}
-                  </TableBody>
-                </Table>
-              </div>
+                <div className="space-y-6">
+                    {properties.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase())).map((property) => (
+                        <Card key={property.id} className="hover:shadow-lg transition-shadow border border-slate-200">
+                            <CardHeader className="pb-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <CardTitle className="text-lg text-[#154279]">{property.name}</CardTitle>
+                                        <CardDescription className="flex items-center gap-1 mt-1">
+                                            <MapPin className="w-3.5 h-3.5 text-[#F96302]" /> 
+                                            {property.location} • <span className="text-slate-500">{property.type || 'Apartment'}</span>
+                                        </CardDescription>
+                                    </div>
+                                    <Badge variant="outline" className={`capitalize flex items-center gap-1 ${assignedManagers[property.id] ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                        <UserPlus className="w-3 h-3" />
+                                        {assignedManagers[property.id] || 'Unassigned'}
+                                    </Badge>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap gap-2">
+                                         <Badge variant="outline" className="flex items-center gap-1 bg-slate-50">
+                                            <Home className="w-3 h-3 text-slate-500" />
+                                            {property.total_units} Total Units
+                                         </Badge>
+                                         <Badge variant="outline" className="flex items-center gap-1 bg-slate-50">
+                                            <DollarSign className="w-3 h-3 text-emerald-600" />
+                                            Proj. Income: KES {(property.expected_income || 0).toLocaleString()}
+                                         </Badge>
+                                         <Badge variant="outline" className="flex items-center gap-1 bg-slate-50">
+                                            <Building className="w-3 h-3 text-blue-500" />
+                                            {property.number_of_floors || 1} Floors
+                                         </Badge>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                                        <div>
+                                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Status</p>
+                                            <p className="font-bold text-[#154279] text-sm">Active Listing</p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 justify-end">
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleViewProperty(property)}
+                                                className="bg-[#154279] hover:bg-[#0f325e] text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <Eye className="w-4 h-4 mr-2" />
+                                                View Details
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={() => setPropertyForUnits(property)}
+                                                className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <LayoutGrid className="w-4 h-4 mr-2" />
+                                                Manage Units
+                                            </Button>
+                                            
+                                            <div className="flex gap-2">
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => handleEditProperty(property)}
+                                                    className="h-9 w-9 text-slate-400 hover:text-[#154279] hover:bg-blue-50 rounded-xl"
+                                                    title="Edit Property"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => {
+                                                        setSelectedProperty(property);
+                                                        setSelectedManagerId(""); // reset selection
+                                                        setShowAssignManagerDialog(true);
+                                                    }}
+                                                    className="h-9 w-9 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl"
+                                                    title="Assign Manager"
+                                                >
+                                                    <UserPlus className="w-4 h-4" />
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => handleDeleteProperty(property.id)} 
+                                                    className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl"
+                                                    title="Delete Property"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
             )}
           </CardContent>
         </Card>

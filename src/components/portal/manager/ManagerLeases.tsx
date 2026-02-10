@@ -142,7 +142,7 @@ const ManagerLeases = () => {
           </div>
           <div className="bg-white rounded-lg shadow-md p-6">
             <p className="text-sm text-slate-600 mb-2">Monthly Rent</p>
-            <p className="text-3xl font-bold text-blue-600">${stats.totalRent.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-blue-600">KSh {stats.totalRent.toLocaleString()}</p>
           </div>
         </div>
 
@@ -209,7 +209,7 @@ const ManagerLeases = () => {
                         {lease.unit?.unit_number || '—'}
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-slate-900">
-                        ${lease.monthly_rent?.toLocaleString()}
+                        KSh {lease.monthly_rent?.toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {new Date(lease.start_date).toLocaleDateString()}

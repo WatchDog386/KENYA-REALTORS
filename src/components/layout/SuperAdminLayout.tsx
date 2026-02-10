@@ -322,43 +322,15 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
     }
 
     // Add additional system items for super admin
-    const systemItems: NavItem[] = [
-      {
-        title: "System Settings",
-        href: "/portal/super-admin/settings",
-        icon: <Settings size={20} />,
-        description: "Global Configuration",
-        permission: "manage_system_settings",
-        children: [
-          {
-            title: "General Settings",
-            href: "/portal/super-admin/settings#general",
-            icon: <Globe size={18} />,
-            description: "Basic system configuration",
-          },
-          {
-            title: "Security Settings",
-            href: "/portal/super-admin/settings#security",
-            icon: <Key size={18} />,
-            description: "Authentication & security",
-          },
-          {
-            title: "Payment Settings",
-            href: "/portal/super-admin/settings#payment",
-            icon: <DollarSign size={18} />,
-            description: "Payment gateway configuration",
-          },
-        ],
-      },
-    ];
+    const systemItems: NavItem[] = [];
 
     // Add missing routes from App.tsx
     const additionalRoutes: NavItem[] = [
       {
-        title: "Leases",
+        title: "Tenants",
         href: "/portal/super-admin/leases",
-        icon: <FileText size={20} />,
-        description: "Manage lease agreements",
+        icon: <Users size={20} />,
+        description: "Manage tenants & leases",
         permission: "manage_properties",
         badge: safeStats.totalLeases?.toString(),
       },
@@ -368,14 +340,6 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
         icon: <DollarSign size={20} />,
         description: "Payment processing",
         permission: "manage_finances",
-      },
-      {
-        title: "Applications",
-        href: "/portal/super-admin/applications",
-        icon: <ClipboardList size={20} />,
-        description: "Tenant applications",
-        permission: "manage_approvals",
-        badge: safeStats.pendingApplications?.toString(),
       },
     ];
 

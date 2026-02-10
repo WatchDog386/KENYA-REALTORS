@@ -84,6 +84,45 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  if (isSuccess) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white font-nunito">
+        <GlobalStyles />
+        
+        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-700">
+          
+          {/* Clean Animated Icon */}
+          <div className="mb-6 relative">
+            <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-30"></div>
+            <div className="relative bg-green-50 rounded-full p-4">
+              <CheckCircle size={42} className="text-[#86bc25]" strokeWidth={2.5} />
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">
+            Login Successful
+          </h2>
+          
+          <p className="text-slate-500 text-sm font-medium mb-12">
+            Redirecting to dashboard...
+          </p>
+
+          {/* Minimalist Loading Bar */}
+          <div className="w-32 h-1 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-[#00356B] animate-[loading_1.5s_ease-in-out_infinite]" style={{ width: '50%' }}></div>
+          </div>
+          
+          <style>{`
+            @keyframes loading {
+              0% { transform: translateX(-150%); }
+              100% { transform: translateX(250%); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <GlobalStyles />

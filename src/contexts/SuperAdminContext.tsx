@@ -71,7 +71,7 @@ export const SuperAdminProvider: React.FC<SuperAdminProviderProps> = ({
 
       // Get pending approvals
       const { count: approvalsCount } = await supabase
-        .from("approval_requests")
+        .from("approvals")
         .select("*", { count: "exact", head: true })
         .eq("status", "pending");
 

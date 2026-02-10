@@ -20,6 +20,8 @@ import {
   Mail,
   Phone,
   MapPin,
+  MessageCircle,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,10 +68,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
 import { useApprovalSystem } from "@/hooks/useApprovalSystem";
 import { toast } from "sonner";
 import { formatDate } from "@/utils/dateHelpers";
-import { formatCurrency } from "@/utils/formatCurrency";
 
 interface ApprovalQueueProps {
   onApprovalUpdate?: (approvalId: string, status: string) => void;
@@ -84,6 +86,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [selectedApprovalData, setSelectedApprovalData] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [adminReply, setAdminReply] = useState(""); // Add admin reply state
 
   const {
     requests: approvals,
@@ -99,35 +102,65 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
   useEffect(() => {
     fetchApprovalRequests();
     fetchApprovalStats();
-  }, []);
+  }, [fetchApprovalRequests, fetchApprovalStats]); // Add dependencies
 
   // Handle search
   const handleSearch = async () => {
     if (searchQuery.trim()) {
-      // Filter locally based on search query
-      // Or fetch with filters if backend supports it
       await fetchApprovalRequests();
     } else {
       await fetchApprovalRequests();
     }
   };
 
+  // Helper filter for status including in_progress as pending
+  const normalizeStatus = (status: string) => {
+    if (status === 'in_progress') return 'pending';
+    return status;
+  }
+
   // Filter approvals
   const filteredApprovals = approvals?.filter((approval) => {
-    if (typeFilter !== "all" && (approval as any).request_type !== typeFilter) return false;
-    if (statusFilter !== "all" && approval.status !== statusFilter)
-      return false;
+    // Search filter
+    const searchLower = searchQuery.toLowerCase();
+    const type = (approval as any).approval_type || (approval as any).request_type; // handle inconsistent naming
+    const requesterName = approval.requested_by_user ? `${approval.requested_by_user.first_name} ${approval.requested_by_user.last_name}` : '';
+    // Use metadata action_title if available for search
+    const actionTitle = approval.metadata?.action_title || '';
+    
+    if (searchQuery && !type?.toLowerCase().includes(searchLower) && 
+        !requesterName.toLowerCase().includes(searchLower) &&
+        !actionTitle.toLowerCase().includes(searchLower)) {
+       return false;
+    }
+    
+    // Type filter
+    if (typeFilter !== "all" && type !== typeFilter) return false;
+
+    // Status filter
+    if (statusFilter !== "all") {
+       const effectiveStatus = normalizeStatus(approval.status);
+       const filterStatus = normalizeStatus(statusFilter);
+       if (effectiveStatus !== filterStatus) return false;
+    }
+      
     return true;
   });
 
-  // Handle approve
-  const handleApprove = async (approvalId: string) => {
+  // Handle approve - updated to take ID optional or use state
+  const handleApprove = async (id?: string) => {
+    // If id passed, use it, otherwise use state
+    const targetId = id || selectedApprovalData?.id;
+    if (!targetId) return;
+    
     try {
-      await approveRequest(approvalId);
+      await approveRequest(targetId, adminReply || "");
       toast.success("Request approved successfully");
+      setIsViewDialogOpen(false);
+      setAdminReply("");
 
       if (onApprovalUpdate) {
-        onApprovalUpdate(approvalId, "approved");
+        onApprovalUpdate(targetId, "approved");
       }
     } catch (error) {
       toast.error("Failed to approve request");
@@ -156,25 +189,76 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
     }
   };
 
+  // Handle reply only
+  const handleReply = async () => {
+    if (!selectedApprovalData || !adminReply.trim()) {
+      toast.error("Please enter a reply message");
+      return;
+    }
+
+    try {
+      // Use "in_progress" to indicate a dialog has started but decision isn't final
+      // or keep current status
+      const currentStatus = selectedApprovalData.status === 'pending' ? 'in_progress' : selectedApprovalData.status;
+      
+      // We need to call the service manually or extend the hook, 
+      // but here we can just update via supabase directly or use a tailored service call if available.
+      // Since useApprovalSystem exposes specific methods, let's try to reuse or just do direct update here for 'reply only'
+      
+      const { error } = await supabase
+        .from('approvals')
+        .update({
+           admin_response: adminReply,
+           status: currentStatus, // Keep status or move to in_progress
+           updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedApprovalData.id);
+
+      if (error) throw error;
+
+      toast.success("Reply sent successfully");
+      setIsViewDialogOpen(false);
+      setAdminReply("");
+      
+      // Refresh
+      fetchApprovalRequests();
+      fetchApprovalStats();
+
+    } catch (error) {
+      console.error("Error sending reply:", error);
+      toast.error("Failed to send reply");
+    }
+  };
+
   // View approval details
   const viewApprovalDetails = (approval: any) => {
     setSelectedApprovalData(approval);
+    setAdminReply(approval.admin_response || ""); // Pre-fill with existing reply if any
     setIsViewDialogOpen(true);
   };
 
   // Get approval type badge color
   const getTypeColor = (type: string) => {
     switch (type) {
+      case "property_addition":
       case "property_listing":
         return "bg-blue-100 text-blue-800";
+      case "tenant_addition":
       case "tenant_application":
         return "bg-green-100 text-green-800";
+      case "maintenance_approval":
       case "maintenance_request":
         return "bg-orange-100 text-orange-800";
+      case "deposit_refund":
       case "payment_verification":
         return "bg-purple-100 text-purple-800";
+      case "lease_termination":
       case "contract_renewal":
         return "bg-indigo-100 text-indigo-800";
+      case "permission_request":
+        return "bg-cyan-100 text-cyan-800";
+      case "manager_assignment":
+        return "bg-teal-100 text-teal-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -190,6 +274,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
       case "rejected":
         return "bg-red-100 text-red-800";
       case "under_review":
+      case "in_progress":
         return "bg-blue-100 text-blue-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -366,20 +451,35 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="property_listing">
-                    Property Listing
+                  <SelectItem value="permission_request">
+                    Permission Request
                   </SelectItem>
-                  <SelectItem value="tenant_application">
-                    Tenant Application
+                  <SelectItem value="manager_assignment">
+                    Manager Assignment
                   </SelectItem>
-                  <SelectItem value="maintenance_request">
-                    Maintenance Request
+                  <SelectItem value="deposit_refund">
+                    Deposit Refund
                   </SelectItem>
-                  <SelectItem value="payment_verification">
-                    Payment Verification
+                  <SelectItem value="property_addition">
+                    Property Addition
                   </SelectItem>
-                  <SelectItem value="contract_renewal">
-                    Contract Renewal
+                  <SelectItem value="user_creation">
+                    User Creation
+                  </SelectItem>
+                   <SelectItem value="lease_termination">
+                    Lease Termination
+                  </SelectItem>
+                   <SelectItem value="maintenance_approval">
+                    Maintenance Approval
+                  </SelectItem>
+                   <SelectItem value="role_assignment">
+                    Role Assignment
+                  </SelectItem>
+                  <SelectItem value="tenant_addition">
+                    Tenant Addition
+                  </SelectItem>
+                   <SelectItem value="tenant_removal">
+                    Tenant Removal
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -519,7 +619,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                           variant="outline"
                           className={getStatusColor(approval.status)}
                         >
-                          {approval.status.replace("_", " ")}
+                          {approval.status === 'in_progress' ? 'Under Review' : approval.status.replace("_", " ")}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -707,13 +807,29 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
 
               {/* Request Notes */}
               <div className="space-y-3">
-                <h4 className="font-semibold">Notes</h4>
+                <h4 className="font-semibold">Notes / Reason</h4>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm whitespace-pre-wrap">
                     {selectedApprovalData.notes || "No notes provided"}
                   </p>
                 </div>
               </div>
+              
+              {/* Admin Reply Input */}
+               {selectedApprovalData.status === "pending" || selectedApprovalData.status === "in_progress" ? (
+                <div className="space-y-3">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-blue-600" /> Administrative Reply (Optional)
+                  </h4>
+                  <Textarea
+                    placeholder="Enter a message back to the manager (e.g. Approved, please proceed)"
+                    value={adminReply}
+                    onChange={(e) => setAdminReply(e.target.value)}
+                    className="bg-white border-blue-100 focus:border-blue-400"
+                    rows={3}
+                  />
+                </div>
+               ) : null}
 
               {/* Attachments */}
               {selectedApprovalData.attachments &&
@@ -742,30 +858,41 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                 )}
 
               {/* Action Buttons */}
-              {selectedApprovalData.status === "pending" && (
+              {(selectedApprovalData.status === "pending" || selectedApprovalData.status === "in_progress") && (
                 <>
                   <Separator />
-                  <div className="flex justify-end gap-3">
+                  <div className="flex justify-end gap-3 flex-wrap sm:flex-nowrap">
+                   <Button
+                      variant="outline"
+                      onClick={() => {
+                         // Send reply only
+                         handleReply();
+                      }}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      disabled={!adminReply.trim()}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Reply & Review
+                    </Button>
+                    <div className="hidden sm:block h-6 w-px bg-slate-200 mx-2"></div>
                     <Button
                       variant="outline"
                       onClick={() => {
+                        if (adminReply.trim()) setRejectionReason(adminReply);
                         setIsRejectDialogOpen(true);
                         setIsViewDialogOpen(false);
                       }}
                       className="text-red-600 border-red-200 hover:bg-red-50"
                     >
                       <X className="h-4 w-4 mr-2" />
-                      Reject
+                      {adminReply.trim() ? "Reply & Reject" : "Reject"}
                     </Button>
                     <Button
-                      onClick={() => {
-                        handleApprove(selectedApprovalData.id);
-                        setIsViewDialogOpen(false);
-                      }}
-                      className="text-white bg-electric hover:bg-electric/90"
+                      onClick={() => handleApprove()}
+                      className="text-white bg-emerald-600 hover:bg-emerald-700"
                     >
                       <Check className="h-4 w-4 mr-2" />
-                      Approve
+                      {adminReply.trim() ? "Reply & Approve" : "Approve"}
                     </Button>
                   </div>
                 </>

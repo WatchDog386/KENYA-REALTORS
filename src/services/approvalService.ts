@@ -10,7 +10,8 @@ export interface ApprovalRequest {
     | "user_creation"
     | "lease_termination"
     | "maintenance_approval"
-    | "payment_exception";
+    | "payment_exception"
+    | "permission_request";
   request_id: string;
   requested_by: string;
   requested_by_user?: {
@@ -20,7 +21,7 @@ export interface ApprovalRequest {
     email: string;
     role: string;
   };
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  status: "pending" | "in_progress" | "approved" | "rejected" | "cancelled";
   reviewed_by?: string;
   reviewed_by_user?: {
     id: string;
@@ -30,6 +31,7 @@ export interface ApprovalRequest {
   };
   reviewed_at?: string;
   notes?: string;
+  admin_response?: string;
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -59,7 +61,8 @@ export interface CreateApprovalInput {
 export interface ProcessApprovalInput {
   approvalId: string;
   status: "approved" | "rejected";
-  notes?: string;
+  notes?: string; // Reason for rejection or admin notes
+  adminResponse?: string; // Admin response to display to user
 }
 
 export interface ApprovalFilter {
@@ -148,12 +151,13 @@ class ApprovalService {
 
           const requestData = await this.fetchRequestData(
             request.approval_type,
-            request.request_id
+            request.metadata?.request_id || request.id
           );
 
           return {
              ...request, 
              request_type: request.approval_type,
+             request_id: request.metadata?.request_id || request.id,
              requested_by: request.user_id,
              requested_by_user: requesterProfile,
              reviewed_by_user: reviewerProfile,
@@ -201,12 +205,13 @@ class ApprovalService {
 
         const requestData = await this.fetchRequestData(
           data.approval_type,
-          data.request_id
+          data.metadata?.request_id || data.id
         );
         
         return { 
           ...data, 
           request_type: data.approval_type,
+          request_id: data.metadata?.request_id || data.id,
           requested_by: data.user_id,
           requested_by_user: requesterProfile,
           reviewed_by_user: reviewerProfile,
@@ -316,20 +321,20 @@ class ApprovalService {
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, email, role")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .single();
 
       if (!profile) throw new Error("User profile not found");
 
       const approvalData = {
         approval_type: input.request_type,
-        request_id: input.request_id,
         user_id: profile.id, // Using profile.id which is same as user.id usually
-        status: "pending",
-        metadata: input.metadata || {},
+        status: "in_progress", // Changed from "pending" - when created, it's already sent/in progress
+        metadata: {
+          ...input.metadata, 
+          request_id: input.request_id  // Store request_id in metadata
+        },
         notes: input.notes,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
 
       const { data, error } = await supabase
@@ -349,6 +354,7 @@ class ApprovalService {
       return {
           ...data,
           request_type: data.approval_type,
+          request_id: data.metadata?.request_id || data.id,
           requested_by: data.user_id,
           requested_by_user: profile,
           request_data: null // Can't fetch right away easily without another call
@@ -375,7 +381,7 @@ class ApprovalService {
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, email, role")
-        .eq("user_id", user.id)
+        .eq("id", user.id) // Fixed user_id to id
         .single();
 
       if (!profile) throw new Error("User profile not found");
@@ -384,20 +390,29 @@ class ApprovalService {
       const request = await this.getApprovalRequestById(input.approvalId);
       if (!request) throw new Error("Approval request not found");
 
-      if (request.status !== "pending") {
+      if (request.status !== "pending" && request.status !== "in_progress") {
         throw new Error("This request has already been processed");
       }
 
       // Update approval status
+      const updateData: any = {
+        status: input.status,
+        reviewed_by: profile.id,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (input.status === 'rejected') {
+        updateData.rejection_reason = input.notes || input.adminResponse;
+      } else if (input.status === 'approved') {
+        updateData.admin_response = input.adminResponse;
+        // Optionally update notes if specifically provided and distinct from request reason
+        // But preventing overwrite of original request notes is safer
+      }
+
       const { data, error } = await supabase
         .from("approvals")
-        .update({
-          status: input.status,
-          reviewed_by: profile.id,
-          reviewed_at: new Date().toISOString(),
-          notes: input.notes,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq("id", input.approvalId)
         .select("*")
         .single();
@@ -451,7 +466,7 @@ class ApprovalService {
       const { data: profile } = await supabase
         .from("profiles")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .single();
 
       if (!profile) throw new Error("User profile not found");
@@ -492,7 +507,7 @@ class ApprovalService {
         requests.map((request) =>
           this.processRequestAction(
             request.approval_type, // Map from DB
-            request.request_id,
+            request.metadata?.request_id || request.id,
             status,
             request.metadata
           )
@@ -532,7 +547,7 @@ class ApprovalService {
       const { data: profile } = await supabase
         .from("profiles")
         .select("id, role")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .single();
 
       if (!profile) throw new Error("User profile not found");

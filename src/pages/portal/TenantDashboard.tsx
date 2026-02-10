@@ -280,7 +280,7 @@ const TenantDashboard: React.FC = () => {
       if (tenantData.property_id) {
         const { data: propertyData } = await supabase
           .from("properties")
-          .select("id, name, location, address, city, status")
+          .select("id, name, location, status")
           .eq("id", tenantData.property_id)
           .single();
 
@@ -289,8 +289,8 @@ const TenantDashboard: React.FC = () => {
           setPropertyData({
             id: propertyData.id,
             name: propertyData.name,
-            address: propertyData.location || propertyData.address,
-            city: propertyData.city,
+            address: propertyData.location,
+            city: "", // City is not a separate column in DB schema
             state: "",
             zip_code: "",
           } as Property);

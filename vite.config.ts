@@ -5,8 +5,8 @@ import path from "path";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::", // Listen on all IPv6 and IPv4 addresses
-    port: 8081,
-    strictPort: false, // Try other ports if 8081 is taken
+    port: 8082,
+    strictPort: false, // Try other ports if 8082 is taken
     cors: {
       origin: "*", // Allow all origins during development
       credentials: true, // Allow cookies/auth headers

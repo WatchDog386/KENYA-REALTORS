@@ -64,6 +64,11 @@ export const propertyService = {
     const { data: unitTypes, error: unitsError } = await supabase
       .from('property_unit_types')
       .select('*');
+      
+    // Fetch actual units separately (lightweight) for correct income calculation
+    const { data: realUnits, error: realUnitsError } = await supabase
+      .from('units')
+      .select('property_id, price');
 
     if (unitsError) {
       console.error('Error fetching unit types:', unitsError);
@@ -78,15 +83,25 @@ export const propertyService = {
 
     // Manually join unit types to properties
     return (properties || []).map((prop: any) => {
+      // 1. Calculate based on definitions (Configured)
       const propUnitTypes = (unitTypes || []).filter((unit: any) => unit.property_id === prop.id);
-      const totalUnits = propUnitTypes.reduce((sum: number, unit: any) => sum + (unit.units_count || 0), 0);
-      const expectedIncome = propUnitTypes.reduce((sum: number, unit: any) => sum + (Number(unit.units_count || 0) * Number(unit.price_per_unit || 0)), 0);
+      const definedTotalUnits = propUnitTypes.reduce((sum: number, unit: any) => sum + (unit.units_count || 0), 0);
+      const definedExpectedIncome = propUnitTypes.reduce((sum: number, unit: any) => sum + (Number(unit.units_count || 0) * Number(unit.price_per_unit || 0)), 0);
+
+      // 2. Calculate based on actual units (Real)
+      const propRealUnits = (realUnits || []).filter((u: any) => u.property_id === prop.id);
+      const realTotalUnits = propRealUnits.length;
+      const realExpectedIncome = propRealUnits.reduce((sum: number, u: any) => sum + (Number(u.price) || 0), 0);
+      
+      // 3. Decide which to use. If actual units exist, they are the source of truth for calculations.
+      // This ensures that when user updates unit prices, the income reflects that.
+      const useReal = realTotalUnits > 0;
 
       return {
         ...prop,
         property_unit_types: propUnitTypes,
-        total_units: totalUnits,
-        expected_income: expectedIncome
+        total_units: useReal ? realTotalUnits : definedTotalUnits,
+        expected_income: useReal ? realExpectedIncome : definedExpectedIncome
       };
     });
   },

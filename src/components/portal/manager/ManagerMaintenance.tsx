@@ -86,26 +86,38 @@ const ManagerMaintenance: React.FC = () => {
       setLoading(true);
       
       // Get all requests for properties managed by this user
-      // Note: We use existing RLS or manual filter if RLS is not set up perfectly yet.
-      // But assuming RLS is set up by the script:
       const { data, error } = await supabase
         .from('maintenance_requests')
-        .select(`
-            *,
-            properties:properties!fk_maintenance_properties (name),
-            units:units!fk_maintenance_units (unit_number),
-            profiles:profiles!fk_maintenance_tenant_profile (first_name, last_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
-          // If table doesn't exist yet, handle gracefully
-          console.warn("Error loading requests (table might be missing):", error);
+          console.warn("Error loading requests:", error);
           setRequests([]);
           return;
       }
 
-      setRequests(data || []);
+      if (data) {
+          // Manually enrich data to avoid 400 errors from missing relationships
+          const propertyIds = [...new Set(data.map(r => r.property_id).filter(Boolean))];
+          const unitIds = [...new Set(data.map(r => r.unit_id).filter(Boolean))];
+          const userIds = [...new Set(data.map(r => r.user_id).filter(Boolean))];
+
+          const { data: properties } = await supabase.from('properties').select('id, name').in('id', propertyIds);
+          const { data: units } = await supabase.from('units').select('id, unit_number').in('id', unitIds);
+          const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds);
+
+          const enrichedData = data.map(r => ({
+              ...r,
+              properties: properties?.find(p => p.id === r.property_id) || { name: 'Unknown' },
+              units: units?.find(u => u.id === r.unit_id) || { unit_number: 'N/A' },
+              profiles: profiles?.find(p => p.id === r.user_id) || { first_name: 'Unknown', last_name: '', email: '' }
+          }));
+          
+          setRequests(enrichedData);
+      } else {
+          setRequests([]);
+      }
     } catch (error) {
       console.error('Error loading maintenance requests:', error);
     } finally {

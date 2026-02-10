@@ -127,7 +127,7 @@ export const useSuperAdmin = () => {
 
         // All approval requests
         supabase
-          .from("approval_requests")
+          .from("approvals")
           .select("*")
           .order("created_at", { ascending: false }),
 
@@ -180,7 +180,7 @@ export const useSuperAdmin = () => {
       ).length;
 
       const pendingApprovals = (approvalsData.data || []).filter(
-        (approval) => approval.status === "pending"
+        (approval) => approval.status === "pending" || approval.status === "in_progress"
       ).length;
 
       const vacantUnits = (propertiesData.data || []).reduce(
@@ -677,7 +677,7 @@ export const useSuperAdmin = () => {
         {
           event: "*",
           schema: "public",
-          table: "approval_requests",
+          table: "approvals",
         },
         () => {
           fetchDashboardData();

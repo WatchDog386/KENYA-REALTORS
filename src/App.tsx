@@ -98,6 +98,7 @@ import ManagerApplications from "@/components/portal/manager/ManagerApplications
 import ManagerDeposits from "@/components/portal/manager/ManagerDeposits";
 import ManagerLeases from "@/components/portal/manager/ManagerLeases";
 import ManagerProfile from "@/components/portal/manager/ManagerProfile";
+import ManagerApprovalRequests from "@/pages/portal/manager/ApprovalRequests";
 
 // Create a fallback component in case of import issues
 const GlobalLoader = () => (
@@ -449,10 +450,9 @@ const UserCreationWrapper = () => {
 /* ======================
    MANAGER PAGES
 ====================== */
-const ManagerPropertiesPage = () => <ManagerDashboard />;
 const ManagerTenantsPage = () => <ManagerTenants />;
 const ManagerMaintenancePage = () => <ManagerMaintenance />;
-const ManagerReportsPage = () => <ManagerPayments />;
+
 
 /* ======================
    COMPONENT DEMO PAGE
@@ -727,11 +727,11 @@ const App = () => {
                   <Route index element={<ManagerPortal />} />
                   <Route
                     path="properties"
-                    element={<ManagerPropertiesPage />}
+                    element={<ManagerUnits />}
                   />
                   <Route
                     path="properties/:id"
-                    element={<ManagerPropertiesPage />}
+                    element={<ManagerUnits />}
                   />
                   <Route path="properties/units" element={<ManagerUnits />} />
                   <Route path="tenants" element={<ManagerTenantsPage />} />
@@ -740,7 +740,6 @@ const App = () => {
                     path="maintenance"
                     element={<ManagerMaintenancePage />}
                   />
-                  <Route path="reports" element={<ManagerReportsPage />} />
                   <Route path="payments" element={<ManagerRentCollection />} />
                   <Route path="payments/deposits" element={<ManagerDeposits />} />
                   <Route path="leases" element={<ManagerLeases />} />
@@ -748,7 +747,7 @@ const App = () => {
                   <Route path="profile" element={<ManagerProfile />} />
                   <Route
                     path="approval-requests"
-                    element={<ApprovalRequests />}
+                    element={<ManagerApprovalRequests />}
                   />
                   <Route
                     path="vacation-notices"

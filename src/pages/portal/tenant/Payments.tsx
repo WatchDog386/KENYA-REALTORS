@@ -12,7 +12,9 @@ import {
   CheckCircle,
   Clock,
   Download,
-  Filter
+  Filter,
+  Droplets,
+  Shield
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,38 +23,96 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Payment {
   id: string;
-  amount: number;
-  payment_date: string;
+  amount: number; // For bills: Total amount
+  amount_paid?: number; // For bills & rent: Amount paid so far
+  payment_date?: string;
   due_date: string;
-  status: "pending" | "completed" | "overdue" | "failed";
-  payment_method: string;
+  status: "pending" | "paid" | "overdue" | "partial" | "completed" | "open";
+  payment_method?: string;
   created_at: string;
+  bill_type?: string; // For distinguish
+  remarks?: string;
 }
 
 const PaymentsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [rentPayments, setRentPayments] = useState<Payment[]>([]);
+  const [utilityBills, setUtilityBills] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
 
   useEffect(() => {
-    fetchPayments();
+    fetchData();
   }, [user?.id]);
 
-  const fetchPayments = async () => {
+  const fetchData = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
+
+      // 1. Get Tenant Unit Info
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('unit_id, property_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+      
+      const unitId = tenantData?.unit_id;
+      const propertyId = tenantData?.property_id;
+
+      // 2. Fetch Rent Payments
+      const { data: rentData, error: rentError } = await supabase
         .from("rent_payments")
         .select("*")
-        .order("created_at", { ascending: false });
+        .eq("tenant_id", user.id)
+        .order("due_date", { ascending: false });
 
-      if (error) throw error;
-      setPayments(data || []);
+      if (rentError) throw rentError;
+      setRentPayments(rentData || []);
+
+      // 3. Fetch Bills (Using Unit ID)
+      if (unitId) {
+          const { data: billData, error: billError } = await supabase
+            .from("bills_and_utilities")
+            .select("*")
+            .eq("unit_id", unitId)
+            .order("bill_period_start", { ascending: false });
+
+          if (billError) throw billError;
+          // Map to common interface
+          const formattedBills = (billData || []).map((b: any) => ({
+             id: b.id,
+             amount: b.amount,
+             amount_paid: b.paid_amount,
+             due_date: b.due_date || b.bill_period_end || b.created_at,
+             status: b.status,
+             created_at: b.created_at,
+             bill_type: b.bill_type || "utility", // Fallback for safety
+             remarks: b.remarks
+          }));
+          setUtilityBills(formattedBills);
+      }
+
     } catch (err) {
       console.error("Error fetching payments:", err);
       toast.error("Failed to load payments");
@@ -64,8 +124,8 @@ const PaymentsPage: React.FC = () => {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
+      currency: "KES",
+      minimumFractionDigits: 0,
     }).format(amount);
 
   const formatDate = (date: string) =>
@@ -77,50 +137,51 @@ const PaymentsPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "paid":
       case "completed":
         return "bg-green-100 text-green-800 border-green-200";
       case "pending":
+      case "open":
         return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "overdue":
         return "bg-red-100 text-red-800 border-red-200";
-      case "failed":
-        return "bg-gray-100 text-gray-800 border-gray-200";
+      case "partial":
+        return "bg-orange-100 text-orange-800 border-orange-200";
       default:
         return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
-  const getPaymentMethodIcon = (method: string) => {
-    // You can expand this logic if you have different icons for different methods
-    return <CreditCard className="text-[#154279]" size={20} />;
+  const getPaymentMethodBadge = (paymentMethod?: string) => {
+    if (paymentMethod === 'paystack') {
+      return <Badge className="bg-green-100 text-green-800 border-green-200">Paystack</Badge>;
+    }
+    return <Badge variant="secondary">Pending</Badge>;
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <img
-          src="/lovable-uploads/27116824-00d0-4ce0-8d5f-30a840902c33.png"
-          alt="Loading..."
-          className="w-16 h-16 animate-spin opacity-20"
-        />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
       </div>
     );
   }
 
-  const totalPaid = payments
-    .filter((p) => p.status === "completed")
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Calculate Totals
+  const rentDue = rentPayments.reduce((sum, p) => {
+      if (p.status === 'paid') return sum;
+      return sum + (p.amount - (p.amount_paid || 0));
+  }, 0);
 
-  const pendingAmount = payments
-    .filter((p) => p.status === "pending")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const utilitiesDue = utilityBills.reduce((sum, p) => {
+     if (p.status === 'paid') return sum;
+     return sum + (p.amount - (p.amount_paid || 0));
+  }, 0);
 
-  const overdueAmount = payments
-    .filter((p) => p.status === "overdue")
-    .reduce((sum, p) => sum + p.amount, 0);
+  const totalArrears = rentDue + utilitiesDue;
 
   return (
-    <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50">
+    <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50 pb-20">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -137,9 +198,9 @@ const PaymentsPage: React.FC = () => {
           </Button>
           <div>
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#154279] to-[#F96302]">
-              Payments
+              My Payments
             </h1>
-            <p className="text-sm text-gray-500">Manage your rent and viewing history</p>
+            <p className="text-sm text-gray-500">Manage rent and all utility bills</p>
           </div>
         </div>
         <Button
@@ -151,141 +212,198 @@ const PaymentsPage: React.FC = () => {
         </Button>
       </motion.div>
 
+      {/* Paystack Payment Info Banner */}
+      <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+        <Shield className="h-4 w-4 text-green-600" />
+        <AlertDescription className="text-green-800">
+          <strong>Secure Payments:</strong> All rent and utility payments are processed securely through Paystack. Your payment information is never stored on our servers.
+        </AlertDescription>
+      </Alert>
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: 0.1 }}
-        >
-          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-all h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total Paid
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#154279]">
-                {formatCurrency(totalPaid)}
-              </div>
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <CheckCircle size={12} className="mr-1" /> Lifetime contribution
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: 0.2 }}
-        >
-          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-all h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Pending
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-[#F96302]">
-                {formatCurrency(pendingAmount)}
-              </div>
-              <p className="text-xs text-yellow-600 mt-1 flex items-center">
-                <Clock size={12} className="mr-1" /> Due soon
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: 0.3 }}
-        >
-          <Card className="border-none shadow-sm bg-white hover:shadow-md transition-all h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Overdue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(overdueAmount)}
-              </div>
-              {overdueAmount > 0 && (
-                <p className="text-xs text-red-500 mt-1 flex items-center font-medium">
-                  <AlertTriangle size={12} className="mr-1" /> Action Required
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <Card className="border-none shadow-sm overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between bg-gray-50/50 border-b border-gray-100">
-            <div>
-              <CardTitle className="text-xl text-[#154279]">Payment History</CardTitle>
-              <CardDescription>A complete log of your rent payments</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" className="hidden sm:flex">
-                <Filter size={16} className="mr-2" /> Filter
-            </Button>
+        <Card className={cn("border-l-4 shadow-sm transition-all hover:shadow-md", totalArrears > 0 ? "border-l-red-500 bg-red-50/50" : "border-l-green-500 bg-green-50/50")}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center justify-between">
+              Total Outstanding
+              <AlertTriangle className={cn("w-4 h-4", totalArrears > 0 ? "text-red-500" : "text-green-500")} />
+            </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-gray-100">
-              {payments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                  <div className="bg-gray-100 p-3 rounded-full mb-3">
-                    <CreditCard className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <p>No payments found</p>
-                </div>
-              ) : (
-                payments.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between p-4 sm:p-6 hover:bg-slate-50 transition-colors group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="bg-blue-50 p-2.5 rounded-full text-[#154279] group-hover:bg-[#154279] group-hover:text-white transition-colors">
-                        {getPaymentMethodIcon(payment.payment_method)}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {payment.description || "Monthly Rent"}
-                        </p>
-                        <p className="text-xs text-gray-500 flex items-center mt-0.5">
-                          {formatDate(payment.created_at)}
-                          <span className="mx-1.5">•</span>
-                          {payment.payment_method || "Online"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900 mb-1">
-                        {formatCurrency(payment.amount)}
-                      </p>
-                      <Badge 
-                        variant="outline" 
-                        className={cn("capitalize font-normal", getStatusColor(payment.status))}
-                      >
-                        {payment.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))
-              )}
+          <CardContent>
+            <div className={cn("text-2xl font-bold", totalArrears > 0 ? "text-red-700" : "text-green-700")}>
+              {formatCurrency(totalArrears)}
             </div>
+            <p className="text-xs text-gray-500 mt-1">Rent + All Utilities Arrears</p>
           </CardContent>
         </Card>
-      </motion.div>
+
+        <Card className="border-l-4 border-l-blue-500 shadow-sm transition-all hover:shadow-md bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center justify-between">
+              Rent Arrears
+              <DollarSign className="w-4 h-4 text-blue-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-800">
+              {formatCurrency(rentDue)}
+            </div>
+             <p className="text-xs text-gray-500 mt-1">{rentPayments.filter(p => p.status !== 'paid').length} payments pending</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-cyan-500 shadow-sm transition-all hover:shadow-md bg-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500 flex items-center justify-between">
+              Utility Bills
+              <Droplets className="w-4 h-4 text-cyan-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-800">
+              {formatCurrency(utilitiesDue)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{utilityBills.filter(p => p.status !== 'paid').length} bills pending</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
+        <div className="flex items-center justify-between mb-4">
+           <TabsList>
+             <TabsTrigger value="all">All Transactions</TabsTrigger>
+             <TabsTrigger value="rent">Rent</TabsTrigger>
+             <TabsTrigger value="utilities">Utilities & Other Bills</TabsTrigger>
+           </TabsList>
+        </div>
+
+
+        <TabsContent value="all" className="space-y-4">
+           <PaymentsTable 
+              data={[...rentPayments, ...utilityBills].sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+              getStatusColor={getStatusColor}
+              navigate={navigate}
+           />
+        </TabsContent>
+        
+        <TabsContent value="rent" className="space-y-4">
+           <PaymentsTable 
+              data={rentPayments}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+              getStatusColor={getStatusColor}
+              navigate={navigate}
+           />
+        </TabsContent>
+
+        <TabsContent value="utilities" className="space-y-4">
+           <PaymentsTable 
+              data={utilityBills}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+              getStatusColor={getStatusColor}
+              navigate={navigate}
+           />
+        </TabsContent>
+      </Tabs>
+      
     </div>
   );
 };
+
+const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navigate }: any) => {
+  if (data.length === 0) return <EmptyState />;
+
+  return (
+    <div className="rounded-md border bg-white overflow-hidden shadow-sm">
+      <Table>
+        <TableHeader className="bg-slate-50">
+          <TableRow>
+            <TableHead>Payment For</TableHead>
+            <TableHead>Due Date</TableHead>
+            <TableHead>Amount Due</TableHead>
+            <TableHead>Paid</TableHead>
+            <TableHead>Balance</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Remarks</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.map((item: any) => {
+             // Determine if it is utility based on property presence or passed type
+             // rentPayments usually don't have bill_type but we can infer or rely on the item structure
+             const isUtilityItem = item.bill_type && item.bill_type !== 'rent';
+             
+             const typeLabel = isUtilityItem 
+                ? (item.bill_type ? item.bill_type.charAt(0).toUpperCase() + item.bill_type.slice(1) + ' Bill' : 'Utility Bill')
+                : 'Rent Payment';
+             
+             const isPaid = item.status === 'paid' || item.status === 'completed';
+             const remainingAmount = Math.max(0, item.amount - (item.amount_paid || 0));
+             
+             const handlePay = () => {
+                const type = isUtilityItem ? 'water' : 'rent';
+                navigate(`/portal/tenant/payments/make?type=${type}&id=${item.id}&amount=${remainingAmount}`);
+             };
+
+             return (
+               <TableRow key={item.id} className="hover:bg-slate-50/50">
+                 <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                        {isUtilityItem ? (
+                            <div className="p-1.5 rounded-full bg-cyan-100 text-cyan-600"><Droplets size={14}/></div>
+                        ) : (
+                            <div className="p-1.5 rounded-full bg-blue-100 text-blue-600"><DollarSign size={14}/></div>
+                        )}
+                        <span className="text-slate-700">{typeLabel}</span>
+                    </div>
+                 </TableCell>
+                 <TableCell className="text-slate-500">{formatDate(item.due_date)}</TableCell>
+                 <TableCell className="font-medium text-slate-900">{formatCurrency(item.amount)}</TableCell>
+                 <TableCell className="text-green-600 font-medium">{formatCurrency(item.amount_paid || 0)}</TableCell>
+                 <TableCell className={cn("font-bold", remainingAmount > 0 ? "text-red-600" : "text-slate-400")}>
+                    {formatCurrency(remainingAmount)}
+                 </TableCell>
+                 <TableCell>
+                    <Badge variant="outline" className={cn("text-[10px] uppercase tracking-wider font-bold", getStatusColor(item.status))}>
+                        {item.status}
+                    </Badge>
+                 </TableCell>
+                 <TableCell className="text-gray-500 italic text-sm max-w-[150px] truncate" title={item.remarks}>
+                    {item.remarks || '-'}
+                 </TableCell>
+                 <TableCell className="text-right">
+                    {!isPaid && (
+                        <Button 
+                            size="sm" 
+                            onClick={handlePay} 
+                            className={cn(
+                                "h-8 px-3 text-xs font-bold uppercase tracking-wider shadow-sm", 
+                                isUtilityItem 
+                                    ? "bg-cyan-600 hover:bg-cyan-700" 
+                                    : "bg-blue-600 hover:bg-blue-700"
+                            )}
+                        >
+                            Pay
+                        </Button>
+                    )}
+                 </TableCell>
+               </TableRow>
+             );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
+const EmptyState = () => (
+    <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
+        <p className="text-gray-500">No records found</p>
+    </div>
+);
 
 export default PaymentsPage;

@@ -569,25 +569,18 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   );
 
   const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'occupied':
-        return 'bg-green-100 text-green-800';
-      case 'booked':
-        return 'bg-purple-100 text-purple-800';
-      case 'vacant':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'maintenance':
-        return 'bg-red-100 text-red-800';
-      case 'available': // Fallback for old data
-        return 'bg-yellow-100 text-yellow-800'; // Make it look like vacant
-      default:
-        return 'bg-slate-100 text-slate-800';
-    }
+    const s = status?.toLowerCase();
+    if (s === 'occupied') return 'bg-green-100 text-green-800';
+    if (s === 'booked') return 'bg-purple-100 text-purple-800';
+    if (s === 'vacant') return 'bg-yellow-100 text-yellow-800';
+    if (s === 'maintenance') return 'bg-red-100 text-red-800';
+    if (s === 'available') return 'bg-yellow-100 text-yellow-800';
+    return 'bg-slate-100 text-slate-800';
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="max-w-6xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-50/50">
+      <div className="w-full h-full p-4 md:p-6 lg:p-8 space-y-6">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -1000,88 +993,156 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             <p className="text-slate-600 text-lg">No units found</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
             {filteredUnits.map(unit => {
               const unitType = unitTypes.find(t => t.id === unit.unit_type_id);
-              const displayStatus = unit.active_lease ? 'occupied' : unit.status;
+              const displayStatus = (unit.active_lease ? 'occupied' : unit.status)?.toLowerCase() || 'vacant';
               
+              // Status Styling logic for card header
+              const isOccupied = displayStatus === 'occupied';
+              const isVacant = displayStatus === 'vacant' || displayStatus === 'available';
+              const isMaintenance = displayStatus === 'maintenance';
+
+              let headerGradient = 'from-slate-400 to-slate-500';
+              let statusBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+              let cardBorderClass = 'border-slate-100';
+              
+              if (isOccupied) {
+                headerGradient = 'from-emerald-500 to-teal-600';
+                statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                cardBorderClass = 'border-emerald-100/50';
+              } else if (isVacant) {
+                headerGradient = 'from-blue-500 to-indigo-600';
+                statusBadgeClass = 'bg-blue-50 text-blue-700 border-blue-100';
+                cardBorderClass = 'border-blue-100/50';
+              } else if (isMaintenance) {
+                headerGradient = 'from-amber-500 to-orange-600';
+                statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-100';
+                cardBorderClass = 'border-amber-100/50';
+              } else if (displayStatus === 'booked') {
+                 headerGradient = 'from-purple-500 to-violet-600';
+                 statusBadgeClass = 'bg-purple-50 text-purple-700 border-purple-100';
+              }
+
               return (
-              <div key={unit.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden flex flex-col h-full">
-                <div className="h-48 bg-slate-200 relative">
+              <div key={unit.id} className={`group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border ${cardBorderClass} overflow-hidden flex flex-col h-full`}>
+                
+                {/* Visual Header Area */}
+                <div className="relative h-32 overflow-hidden">
                      {unit.image_url ? (
-                         <img src={unit.image_url} alt={`Unit ${unit.unit_number}`} className="w-full h-full object-cover" />
+                         <>
+                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />
+                           <img 
+                              src={unit.image_url} 
+                              alt={`Unit ${unit.unit_number}`} 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                           />
+                         </>
                      ) : (
-                         <div className="w-full h-full flex items-center justify-center text-slate-400">
-                             <ImageIcon className="w-12 h-12 opacity-50" />
+                         <div className={`w-full h-full bg-gradient-to-r ${headerGradient} relative overflow-hidden`}>
+                             <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white to-transparent" />
+                             <div className="absolute -right-4 -top-8 text-white/10 rotate-12 transform scale-150">
+                                <Building size={120} />
+                             </div>
                          </div>
                      )}
-                     <div className="absolute top-4 right-4">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold shadow-sm ${getStatusColor(displayStatus)}`}>
-                            {displayStatus === 'available' ? 'Vacant' : (displayStatus === 'occupied' ? 'Occupied' : displayStatus) || 'Vacant'}
-                        </span>
+                     
+                     <div className="absolute bottom-3 left-4 z-20">
+                        <h3 className={`text-2xl font-bold ${unit.image_url ? 'text-white' : 'text-white'} shadow-sm`}>{unit.unit_number}</h3>
+                        {!unit.image_url && <p className="text-white/90 text-xs font-medium">{unitType?.name}</p>}
                      </div>
                 </div>
                 
-                <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex items-start justify-between mb-2">
-                        <div>
-                            <h3 className="text-xl font-bold text-slate-900">Unit {unit.unit_number}</h3>
-                            {(unit.floor_number !== undefined && unit.floor_number !== null) && (
-                            <p className="text-sm text-slate-600">Floor {unit.floor_number}</p>
-                            )}
+                {/* Card Body */}
+                <div className="p-4 flex-1 flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${statusBadgeClass}`}>
+                             {isVacant ? 'Vacant' : displayStatus}
+                        </span>
+                        {/* More visual indicator for rent */}
+                        <div className="text-right">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Rent</p>
+                            <p className="font-bold text-slate-700 text-sm">
+                              {(unit.price || unitType?.price_per_unit || 0) > 0 
+                                ? `KES ${(unit.price || unitType?.price_per_unit || 0).toLocaleString()}` 
+                                : '-'}
+                            </p>
                         </div>
                     </div>
 
-                    <div className="space-y-2 text-sm text-slate-600 mb-4 flex-1">
-                        {unitType?.name && (
-                            <p><span className="font-semibold">Type:</span> {unitType.name}</p>
-                        )}
+                    {/* Features & Details Grid */}
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm mt-1">
+                        <div className="flex items-center gap-2 text-slate-600">
+                             <div className="p-1.5 rounded-md bg-slate-50 text-slate-400"><Building size={12} /></div>
+                             <span className="font-medium text-xs truncate max-w-[100px]">{unitType?.name || 'Standard'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600">
+                            <div className="p-1.5 rounded-md bg-slate-50 text-slate-400"><Users size={12} /></div>
+                             <span className="font-medium text-xs">{unit.active_lease ? 'Occupied' : 'No Tenant'}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-600">
+                            <div className="p-1.5 rounded-md bg-slate-50 text-slate-400"><ImageIcon size={12} /></div>
+                             <span className="font-medium text-xs">{unit.floor_number !== undefined ? `Floor ${unit.floor_number}` : 'GF'}</span>
+                        </div>
                         {unit.features && unit.features.length > 0 && (
-                            <p className="line-clamp-1"><span className="font-semibold">Features:</span> {unit.features.join(', ')}</p>
-                        )}
-                        {unit.active_lease && (
-                            <p className="text-green-600"><span className="font-semibold">Tenant:</span> {unit.active_lease.tenant_name}</p>
-                        )}
-                        {(unit.price || unitType?.price_per_unit) && (
-                            <p><span className="font-semibold">Rent:</span> KES {(unit.price || unitType?.price_per_unit || 0).toLocaleString()}</p>
+                             <div className="flex items-center gap-2 text-slate-600 col-span-2">
+                                <span className="text-xs text-slate-400 truncate w-full">
+                                    {unit.features.join(' • ')}
+                                </span>
+                             </div>
                         )}
                     </div>
-                
-                    <div className="flex gap-2 mt-auto">
-                        <Button variant="outline" className="flex-1" onClick={() => openDetails(unit)}>
-                        Details
-                        </Button>
+
+                    {/* Tenant Pill (if occupied) */}
+                    {unit.active_lease && (
+                        <div className="mt-2 text-xs bg-slate-50 p-2 rounded-md border border-slate-100 flex items-center justify-between group-hover:border-slate-200 transition-colors">
+                             <span className="text-slate-500">Tenant</span>
+                             <span className="font-semibold text-slate-700 truncate max-w-[120px]">{unit.active_lease.tenant_name}</span>
+                        </div>
+                    )}
+                    
+                    {/* Action Bar */}
+                    <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-50">
                         <Button 
-                             variant="outline"
-                             className="flex-1 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
-                             onClick={() => openEditUnit(unit)}
+                             onClick={() => openDetails(unit)}
+                             variant="ghost" 
+                             className="flex-1 h-9 text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 shadow-sm"
                         >
-                             <Edit size={16} className="mr-1" /> Edit
+                             Details
                         </Button>
-                        {!unit.active_lease ? (
-                            <Button 
-                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                onClick={() => {
+                        
+                        <Button 
+                            variant="outline"
+                            className={`flex-1 h-9 text-xs font-semibold shadow-sm transition-all duration-200 border
+                                ${unit.active_lease 
+                                    ? "bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800" 
+                                    : "bg-orange-500 border-orange-600 text-white hover:bg-orange-600 hover:border-orange-700 hover:text-white"
+                                }`}
+                            onClick={() => {
+                                if (unit.active_lease) {
+                                    openDetails(unit); // Or lease details
+                                } else {
                                     setSelectedUnit(unit);
                                     setSelectedTenant('');
                                     setIsAssignOpen(true);
-                                }}
-                            >
-                            <Users size={16} className="mr-1" /> Assign
-                            </Button>
-                        ) : (
-                            <Button 
-                                variant="outline"
-                                className="flex-1 border-green-200 text-green-700 hover:bg-green-50"
-                                onClick={() => {
-                                    setSelectedUnit(unit);
-                                    setSelectedTenant(unit.active_lease!.tenant_id);
-                                    setIsAssignOpen(true);
-                                }}
-                            >
-                             <Check size={16} className="mr-1" /> Lease
-                            </Button>
-                        )}
+                                }
+                            }}
+                        >
+                            {unit.active_lease ? (
+                                <span className="flex items-center gap-1.5"><FileText size={12} /> Lease</span>
+                            ) : (
+                                <span className="flex items-center gap-1.5"><Plus size={12} /> Assign</span>
+                            )}
+                        </Button>
+
+                         <Button 
+                            size="icon"
+                            variant="ghost" 
+                            className="h-9 w-9 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md" 
+                            onClick={() => openEditUnit(unit)}
+                        >
+                             <Edit size={14} />
+                        </Button>
                     </div>
                 </div>
               </div>
