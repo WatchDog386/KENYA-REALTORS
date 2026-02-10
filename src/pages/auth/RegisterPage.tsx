@@ -149,24 +149,9 @@ export default function RegisterPage() {
         const profileId = profileData.id;
         console.log("✅ Profile confirmed:", profileId);
 
-        // Mark user as pending approval by super admin
-        console.log("🔄 Marking user as pending approval...");
-        
-        // Create a single pending approval record
-        const { error: approvalError } = await supabase
-          .from("profiles")
-          .update({
-            status: "pending",
-            user_type: formData.accountType, // Store what they registered as
-            // role remains NULL until super admin assigns
-          })
-          .eq("id", profileId);
-
-        if (approvalError) {
-          console.warn("⚠️ Profile update warning:", approvalError.message);
-        } else {
-          console.log("✅ User marked as pending approval");
-        }
+        // The profile is already created and approved by the trigger
+        // Just log confirmation
+        console.log("✅ User account is now active and ready to use");
 
         // Notify super admins about new registration
         try {
@@ -197,7 +182,7 @@ export default function RegisterPage() {
         }
 
         toast.success("✅ Registration successful!");
-        toast.info("📧 Awaiting administrator approval. You'll be assigned and activated soon.", { duration: 5000 });
+        toast.info("🎉 Your account is active! You can now log in and start using the platform.", { duration: 5000 });
         setTimeout(() => navigate("/login"), 2000);
       }
     } catch (error: any) {
@@ -218,7 +203,8 @@ export default function RegisterPage() {
         toast.error("Too many registration attempts. Please try again in a few minutes.");
       } else if (errorCode === "500" || errorMessage.includes("Internal Server") || errorMessage.includes("Database error")) {
         console.error("🔥 CRITICAL REGISTRATION ERROR: The database trigger likely failed or RLS policies are blocking creation.");
-        toast.error("Database error. PLEASE RUN '20260204_comprehensive_registration_fix.sql' in your Supabase SQL Editor.", { duration: 15000 });
+        toast.error("Database error. PLEASE RUN 'URGENT_FIX_REGISTRATION_v2.sql' in your Supabase SQL Editor. See console for link.", { duration: 15000 });
+        console.info("🔗 OPEN THIS IN BROWSER TO FIX DATABASE: https://supabase.com/dashboard/project/rcxmrtqgppayncelonls/sql/new");
       } else {
         toast.error(errorMessage || "Registration failed. Please try again.");
       }
@@ -397,9 +383,9 @@ export default function RegisterPage() {
               </div>
 
               {/* Info Box for signup message */}
-              <div className="p-4 border rounded-none bg-blue-50 border-blue-200">
+              <div className="p-4 border rounded-none bg-emerald-50 border-emerald-200">
                 <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                  💡 Sign up with your basic information. A super admin will review your registration, assign roles and properties, then activate your account.
+                  ✨ Register instantly and start using the platform! Super admins can later assign additional properties and permissions as needed.
                 </p>
               </div>
 
