@@ -253,6 +253,23 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         return;
       }
 
+       // Clear existing units before import
+      const { error: deleteError } = await supabase
+        .from('units')
+        .delete()
+        .eq('property_id', property.id);
+
+      if (deleteError) {
+          console.error("Delete error:", deleteError);
+          // Check for foreign key constraint error usually 23503
+          if (deleteError.code === '23503') {
+             toast.error("Cannot overwrite units: Some units are linked to existing records (leases/tenants).");
+             return; 
+          }
+          toast.error("Failed to clear existing units");
+          return;
+      }
+
       let importedCount = 0;
       
       // Refresh types to ensure we have latest
