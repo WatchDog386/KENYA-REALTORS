@@ -16,7 +16,7 @@ export interface User {
   metadata?: Record<string, any>;
 }
 
-export type UserRole = 'super_admin' | 'admin' | 'property_manager' | 'tenant' | 'guest';
+export type UserRole = 'super_admin' | 'property_manager' | 'tenant' | 'technician' | 'proprietor' | 'caretaker' | 'accountant';
 export type UserStatus = 'active' | 'suspended' | 'pending' | 'inactive';
 
 // Property Types

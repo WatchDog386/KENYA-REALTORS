@@ -8,6 +8,7 @@ import { useEffect } from "react";
 
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/types/user.types";
 import { ApprovalProvider } from "@/contexts/ApprovalContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
@@ -152,6 +153,10 @@ import SuperAdminLayout from "@/components/layout/SuperAdminLayout";
 import ManagerLayout from "@/components/layout/ManagerLayout";
 import TenantPortalLayout from "@/components/layout/TenantPortalLayout";
 import MainLayout from "@/components/layout/MainLayout";
+import AccountantLayout from "@/components/layout/AccountantLayout";
+import ProprietorLayout from "@/components/layout/ProprietorLayout";
+import CaretakerLayout from "@/components/layout/CaretakerLayout";
+import TechnicianLayout from "@/components/layout/TechnicianLayout";
 
 /* ======================
    SUPER ADMIN PAGES
@@ -162,6 +167,32 @@ import PropertyManager from "@/components/portal/super-admin/PropertyManager";
 import UserManagementNew from "@/components/portal/super-admin/UserManagementNew";
 import SystemSettings from "@/components/portal/super-admin/SystemSettings";
 import Reports from "@/components/portal/super-admin/Reports"; // Fixed import name
+
+/* ======================
+   NEW ROLE DASHBOARDS
+====================== */
+import AccountingDashboard from "@/components/portal/accountant/AccountingDashboard";
+import AccountantTenants from "@/pages/portal/accountant/AccountantTenants";
+import AccountantInvoices from "@/pages/portal/accountant/AccountantInvoices";
+import AccountantReceipts from "@/pages/portal/accountant/AccountantReceipts";
+import AccountantPayments from "@/pages/portal/accountant/AccountantPayments";
+import TechnicianDashboard from "@/components/portal/technician/TechnicianDashboard";
+import TechnicianJobs from "@/components/portal/technician/TechnicianJobs";
+import TechnicianSchedule from "@/components/portal/technician/TechnicianSchedule";
+import TechnicianEarnings from "@/components/portal/technician/TechnicianEarnings";
+import TechnicianProfile from "@/components/portal/technician/TechnicianProfile";
+
+import ProprietorDashboard from "@/components/portal/proprietor/ProprietorDashboard";
+import CaretakerDashboard from "@/components/portal/caretaker/CaretakerDashboard";
+import CaretakerMaintenance from "@/components/portal/caretaker/CaretakerMaintenance";
+import CaretakerProperty from "@/components/portal/caretaker/CaretakerProperty";
+import CaretakerReports from "@/components/portal/caretaker/CaretakerReports";
+import CaretakerMessages from "@/components/portal/caretaker/CaretakerMessages";
+
+import ProprietorProperties from "@/pages/portal/proprietor/ProprietorProperties";
+import ProprietorReports from "@/pages/portal/proprietor/ProprietorReports";
+import ProprietorMessages from "@/pages/portal/proprietor/ProprietorMessages";
+import ProprietorDocuments from "@/pages/portal/proprietor/ProprietorDocuments";
 
 /* ======================
    SYSTEM
@@ -261,6 +292,18 @@ const PortalRedirect = () => {
     case "owner":
       console.log("Redirecting to owner portal");
       return <Navigate to="/portal/owner" replace />;
+    case "accountant":
+      console.log("Redirecting to accountant portal");
+      return <Navigate to="/portal/accountant" replace />;
+    case "technician":
+      console.log("Redirecting to technician portal");
+      return <Navigate to="/portal/technician" replace />;
+    case "proprietor":
+      console.log("Redirecting to proprietor portal");
+      return <Navigate to="/portal/proprietor" replace />;
+    case "caretaker":
+      console.log("Redirecting to caretaker portal");
+      return <Navigate to="/portal/caretaker" replace />;
     default:
       console.log("No role match, redirecting to role selection");
       return <Navigate to="/auth/role-selection" replace />;
@@ -275,7 +318,7 @@ const RoleBasedRoute = ({
   allowedRoles,
 }: {
   children: React.ReactNode;
-  allowedRoles: ("super_admin" | "property_manager" | "tenant" | "owner")[];
+  allowedRoles: UserRole[];
 }) => {
   const { user, supabaseUser, isLoading, getUserRole } = useAuth();
 
@@ -305,6 +348,14 @@ const RoleBasedRoute = ({
         return <Navigate to="/portal/tenant" replace />;
       case "owner":
         return <Navigate to="/portal/owner" replace />;
+      case "accountant":
+        return <Navigate to="/portal/accountant" replace />;
+      case "technician":
+        return <Navigate to="/portal/technician" replace />;
+      case "proprietor":
+        return <Navigate to="/portal/proprietor" replace />;
+      case "caretaker":
+        return <Navigate to="/portal/caretaker" replace />;
       default:
         return <Navigate to="/auth/role-selection" replace />;
     }
@@ -321,6 +372,11 @@ const RoleBasedRoute = ({
         return <TenantPortalLayout>{children}</TenantPortalLayout>;
       case "owner":
         return <MainLayout>{children}</MainLayout>;
+      case "accountant":
+      case "proprietor":
+      case "technician":
+      case "caretaker":
+        return <>{children}</>;
       default:
         return <MainLayout>{children}</MainLayout>;
     }
@@ -793,6 +849,64 @@ const App = () => {
                     path="vacation-notice"
                     element={<TenantVacancyNoticePageComponent />}
                   />
+                </Route>
+
+                {/* NEW ROLE PORTALS */}
+                <Route
+                  path="/portal/accountant"
+                  element={
+                    <RoleBasedRoute allowedRoles={["accountant", "super_admin"]}>
+                       <AccountantLayout />
+                    </RoleBasedRoute>
+                  }
+                >
+                  <Route index element={<AccountingDashboard />} />
+                  <Route path="tenants" element={<AccountantTenants />} />
+                  <Route path="invoices" element={<AccountantInvoices />} />
+                  <Route path="receipts" element={<AccountantReceipts />} />
+                  <Route path="payments" element={<AccountantPayments />} />
+                </Route>
+                <Route
+                  path="/portal/technician"
+                  element={
+                    <RoleBasedRoute allowedRoles={["technician", "super_admin"]}>
+                       <TechnicianLayout />
+                    </RoleBasedRoute>
+                  }
+                >
+                  <Route index element={<TechnicianDashboard />} />
+                  <Route path="jobs" element={<TechnicianJobs />} />
+                  <Route path="schedule" element={<TechnicianSchedule />} />
+                  <Route path="earnings" element={<TechnicianEarnings />} />
+                  <Route path="profile" element={<TechnicianProfile />} />
+                </Route>
+                <Route
+                  path="/portal/proprietor"
+                  element={
+                    <RoleBasedRoute allowedRoles={["proprietor", "super_admin"]}>
+                       <ProprietorLayout />
+                    </RoleBasedRoute>
+                  }
+                >
+                  <Route index element={<ProprietorDashboard />} />
+                  <Route path="properties" element={<ProprietorProperties />} />
+                  <Route path="reports" element={<ProprietorReports />} />
+                  <Route path="messages" element={<ProprietorMessages />} />
+                  <Route path="documents" element={<ProprietorDocuments />} />
+                </Route>
+                <Route
+                  path="/portal/caretaker"
+                  element={
+                    <RoleBasedRoute allowedRoles={["caretaker", "super_admin"]}>
+                       <CaretakerLayout />
+                    </RoleBasedRoute>
+                  }
+                >
+                  <Route index element={<CaretakerDashboard />} />
+                  <Route path="maintenance" element={<CaretakerMaintenance />} />
+                  <Route path="property" element={<CaretakerProperty />} />
+                  <Route path="reports" element={<CaretakerReports />} />
+                  <Route path="messages" element={<CaretakerMessages />} />
                 </Route>
 
                 {/* SHARED PORTAL PAGES */}

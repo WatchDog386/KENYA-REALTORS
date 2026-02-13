@@ -19,7 +19,9 @@ import {
   BarChart3,
   Wrench,
   CheckCircle,
-  XCircle
+  XCircle,
+  Briefcase,
+  Hammer
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +40,11 @@ import { useManager } from '@/hooks/useManager';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  ProprietorAssignmentDialog,
+  TechnicianAssignmentDialog,
+  CaretakerAssignmentDialog
+} from '@/components/PropertyAssignments';
 
 const ManagerProperties = () => {
   const [properties, setProperties] = useState<any[]>([]);
@@ -51,6 +58,11 @@ const ManagerProperties = () => {
     occupancyRate: 0,
     maintenanceCount: 0
   });
+
+  // Assignment dialog states
+  const [selectedPropertyForProprietor, setSelectedPropertyForProprietor] = useState<string | null>(null);
+  const [selectedPropertyForTechnician, setSelectedPropertyForTechnician] = useState<string | null>(null);
+  const [selectedPropertyForCaretaker, setSelectedPropertyForCaretaker] = useState<string | null>(null);
 
   const { getAssignedProperties, getMaintenanceRequests } = useManager();
 
@@ -392,6 +404,26 @@ const ManagerProperties = () => {
                                 </Link>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-xs">Assign Staff</DropdownMenuLabel>
+                              <DropdownMenuItem 
+                                onClick={() => setSelectedPropertyForProprietor(property.id)}
+                              >
+                                <Briefcase className="w-4 h-4 mr-2" />
+                                Assign Proprietor
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => setSelectedPropertyForTechnician(property.id)}
+                              >
+                                <Wrench className="w-4 h-4 mr-2" />
+                                Assign Technician
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => setSelectedPropertyForCaretaker(property.id)}
+                              >
+                                <Hammer className="w-4 h-4 mr-2" />
+                                Assign Caretaker
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               {property.is_active ? (
                                 <DropdownMenuItem 
                                   onClick={() => deleteProperty(property.id)}
@@ -433,6 +465,49 @@ const ManagerProperties = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Assignment Dialogs */}
+      {selectedPropertyForProprietor !== null && (
+        <ProprietorAssignmentDialog
+          propertyId={selectedPropertyForProprietor}
+          open={selectedPropertyForProprietor !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPropertyForProprietor(null);
+          }}
+          onAssignmentChanged={() => {
+            setSelectedPropertyForProprietor(null);
+            fetchProperties();
+          }}
+        />
+      )}
+
+      {selectedPropertyForTechnician !== null && (
+        <TechnicianAssignmentDialog
+          propertyId={selectedPropertyForTechnician}
+          open={selectedPropertyForTechnician !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPropertyForTechnician(null);
+          }}
+          onAssignmentChanged={() => {
+            setSelectedPropertyForTechnician(null);
+            fetchProperties();
+          }}
+        />
+      )}
+
+      {selectedPropertyForCaretaker !== null && (
+        <CaretakerAssignmentDialog
+          propertyId={selectedPropertyForCaretaker}
+          open={selectedPropertyForCaretaker !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPropertyForCaretaker(null);
+          }}
+          onAssignmentChanged={() => {
+            setSelectedPropertyForCaretaker(null);
+            fetchProperties();
+          }}
+        />
+      )}
     </div>
   );
 };

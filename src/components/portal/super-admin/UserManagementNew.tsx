@@ -20,7 +20,11 @@ import {
   Home,
   Power,
   Ban,
-  Play
+  Play,
+  Briefcase,
+  Wrench,
+  Settings,
+  DollarSign
 } from "lucide-react";
 import {
   Dialog,
@@ -76,6 +80,10 @@ interface UserStats {
   superAdmins: number;
   propertyManagers: number;
   tenants: number;
+  accountants: number;
+  technicians: number;
+  proprietors: number;
+  caretakers: number;
 }
 
 const UserManagementNew: React.FC = () => {
@@ -89,6 +97,10 @@ const UserManagementNew: React.FC = () => {
     superAdmins: 0,
     propertyManagers: 0,
     tenants: 0,
+    accountants: 0,
+    technicians: 0,
+    proprietors: 0,
+    caretakers: 0,
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -130,7 +142,10 @@ const UserManagementNew: React.FC = () => {
       setLoading(true);
 
       const syncStatus = await userSyncService.verifySync();
-      console.log("🔄 Sync status:", JSON.stringify(syncStatus, null, 2));
+      // Only log sync issues if they exist
+      if (syncStatus.error || !syncStatus.synced) {
+        console.warn("⚠️ Sync status check:", syncStatus);
+      }
 
       const { data: allUsers, error: fetchError } = await supabase
         .from("profiles")
@@ -156,6 +171,10 @@ const UserManagementNew: React.FC = () => {
       const superAdminCount = typedUsers.filter((u) => u.role === "super_admin").length;
       const propertyManagerCount = typedUsers.filter((u) => u.role === "property_manager").length;
       const tenantCount = typedUsers.filter((u) => u.role === "tenant").length;
+      const accountantCount = typedUsers.filter((u) => u.role === "accountant").length;
+      const technicianCount = typedUsers.filter((u) => u.role === "technician").length;
+      const proprietorCount = typedUsers.filter((u) => u.role === "proprietor").length;
+      const caretakerCount = typedUsers.filter((u) => u.role === "caretaker").length;
       const noRoleCount = typedUsers.filter((u) => !u.role).length;
 
       setStats({
@@ -165,6 +184,10 @@ const UserManagementNew: React.FC = () => {
         superAdmins: superAdminCount,
         propertyManagers: propertyManagerCount,
         tenants: tenantCount,
+        accountants: accountantCount,
+        technicians: technicianCount,
+        proprietors: proprietorCount,
+        caretakers: caretakerCount,
       });
     } catch (error) {
       console.error("Error loading users:", error);
@@ -273,10 +296,83 @@ const UserManagementNew: React.FC = () => {
         is_active: updatedProfile.is_active,
       });
 
+      // Step 3: Create role-specific records in respective tables
+      const currentUserId = currentUser.data.user?.id;
+      if (currentUserId) {
+        try {
+          switch (newRole) {
+            case "accountant":
+              // Create accountant record
+              const { error: acctError } = await supabase
+                .from("accountants")
+                .insert({
+                  user_id: userId,
+                  assigned_by: currentUserId,
+                  status: 'active',
+                  transactions_processed: 0,
+                });
+              if (acctError && !acctError.message.includes("duplicate")) {
+                console.warn("Warning creating accountant record:", acctError.message);
+              }
+              console.log("✅ Accountant record created");
+              break;
+
+            case "technician":
+              // Create technician record
+              const { error: techError } = await supabase
+                .from("technicians")
+                .insert({
+                  user_id: userId,
+                  status: 'active',
+                  is_available: true,
+                  total_jobs_completed: 0,
+                });
+              if (techError && !techError.message.includes("duplicate")) {
+                console.warn("Warning creating technician record:", techError.message);
+              }
+              console.log("✅ Technician record created");
+              break;
+
+            case "proprietor":
+              // Create proprietor record
+              const { error: propError } = await supabase
+                .from("proprietors")
+                .insert({
+                  user_id: userId,
+                  status: 'active',
+                });
+              if (propError && !propError.message.includes("duplicate")) {
+                console.warn("Warning creating proprietor record:", propError.message);
+              }
+              console.log("✅ Proprietor record created");
+              break;
+
+            case "caretaker":
+              // Create caretaker record
+              const { error: careError } = await supabase
+                .from("caretakers")
+                .insert({
+                  user_id: userId,
+                  assigned_by: currentUserId,
+                  status: 'active',
+                  is_available: true,
+                });
+              if (careError && !careError.message.includes("duplicate")) {
+                console.warn("Warning creating caretaker record:", careError.message);
+              }
+              console.log("✅ Caretaker record created");
+              break;
+          }
+        } catch (error: any) {
+          console.warn("Warning creating role-specific record:", error.message);
+          // Don't throw - role update was successful, this is just supplementary data
+        }
+      }
+
       // NOTE: Property manager assignments are handled in PropertyManagerAssignment component
       // NOTE: Tenant assignments should be handled in Leases/Properties section
       
-      // Step 5: Send approval notification
+      // Step 4: Send approval notification
       const user = users.find(u => u.id === userId);
       if (user) {
          // Pass undefined for property/unit as assignment is separate
@@ -419,6 +515,12 @@ const UserManagementNew: React.FC = () => {
         return "bg-purple-100 text-purple-800 border-purple-300";
       case "accountant":
         return "bg-blue-100 text-blue-800 border-blue-300";
+      case "technician":
+        return "bg-pink-100 text-pink-800 border-pink-300";
+      case "proprietor":
+        return "bg-orange-100 text-orange-800 border-orange-300";
+      case "caretaker":
+        return "bg-indigo-100 text-indigo-800 border-indigo-300";
       default:
         return "bg-slate-100 text-slate-800 border-slate-300";
     }
@@ -556,6 +658,42 @@ const UserManagementNew: React.FC = () => {
             accentColor: "from-cyan-50 via-cyan-50/30 to-white",
             borderHover: "hover:border-cyan-400 hover:shadow-cyan-500/20"
           },
+          { 
+            label: "Accountants", 
+            value: stats.accountants, 
+            icon: DollarSign, 
+            primaryColor: "#3b82f6",
+            secondaryColor: "#1d4ed8",
+            accentColor: "from-blue-50 via-blue-50/30 to-white",
+            borderHover: "hover:border-blue-400 hover:shadow-blue-500/20"
+          },
+          { 
+            label: "Technicians", 
+            value: stats.technicians, 
+            icon: Wrench, 
+            primaryColor: "#ec4899",
+            secondaryColor: "#be185d",
+            accentColor: "from-pink-50 via-pink-50/30 to-white",
+            borderHover: "hover:border-pink-400 hover:shadow-pink-500/20"
+          },
+          { 
+            label: "Proprietors", 
+            value: stats.proprietors, 
+            icon: Briefcase, 
+            primaryColor: "#f97316",
+            secondaryColor: "#c2410c",
+            accentColor: "from-orange-50 via-orange-50/30 to-white",
+            borderHover: "hover:border-orange-400 hover:shadow-orange-500/20"
+          },
+          { 
+            label: "Caretakers", 
+            value: stats.caretakers, 
+            icon: Settings, 
+            primaryColor: "#6366f1",
+            secondaryColor: "#4f46e5",
+            accentColor: "from-indigo-50 via-indigo-50/30 to-white",
+            borderHover: "hover:border-indigo-400 hover:shadow-indigo-500/20"
+          },
         ].map((stat, idx) => {
           const IconComponent = stat.icon;
 
@@ -630,11 +768,15 @@ const UserManagementNew: React.FC = () => {
                 <SelectTrigger className="border-2 border-slate-200 rounded-xl w-full sm:w-48 bg-white">
                   <SelectValue placeholder="Filter by role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white">
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="property_manager">Property Manager</SelectItem>
                   <SelectItem value="tenant">Tenant</SelectItem>
+                  <SelectItem value="technician">Technician</SelectItem>
+                  <SelectItem value="proprietor">Proprietor</SelectItem>
+                  <SelectItem value="caretaker">Caretaker</SelectItem>
+                  <SelectItem value="accountant">Accountant</SelectItem>
                   <SelectItem value="no-role">No Role Assigned</SelectItem>
                   <SelectItem value="pending-approval">Pending Approval</SelectItem>
                 </SelectContent>
@@ -813,14 +955,20 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
       });
 
       if (authError) throw authError;
-      if (!authData.user) throw new Error("Failed to create user");
+      if (!authData.user) throw new Error("Failed to create user (No user data returned)");
 
       toast.success("User created successfully");
       onSuccess();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("Error creating user:", errorMessage);
-      toast.error(`Failed to create user: ${errorMessage}`);
+      console.error("❌ Error creating user:", { error, formData });
+      
+      // Values checking for the specific database error
+      if (errorMessage.includes("Database error")) {
+         toast.error(`Database Constraint Error: Please run 'FIX_USER_CREATION_ERROR.sql' in Supabase.`);
+      } else {
+         toast.error(`Failed to create user: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -905,10 +1053,14 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
           <SelectTrigger className="border-2 border-slate-200 rounded-xl mt-1 bg-white">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white">
             <SelectItem value="tenant">Tenant</SelectItem>
             <SelectItem value="property_manager">Property Manager</SelectItem>
             <SelectItem value="super_admin">Super Admin</SelectItem>
+            <SelectItem value="proprietor">Proprietor</SelectItem>
+            <SelectItem value="caretaker">Caretaker</SelectItem>
+            <SelectItem value="technician">Technician</SelectItem>
+            <SelectItem value="accountant">Accountant</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -976,10 +1128,14 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
           <SelectTrigger className="border-2 border-slate-200 rounded-xl mt-1 bg-white">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white">
             <SelectItem value="tenant">Tenant</SelectItem>
             <SelectItem value="property_manager">Property Manager</SelectItem>
             <SelectItem value="super_admin">Super Admin</SelectItem>
+            <SelectItem value="proprietor">Proprietor</SelectItem>
+            <SelectItem value="caretaker">Caretaker</SelectItem>
+            <SelectItem value="technician">Technician</SelectItem>
+            <SelectItem value="accountant">Accountant</SelectItem>
           </SelectContent>
         </Select>
          <p className="text-xs text-slate-500 mt-2">

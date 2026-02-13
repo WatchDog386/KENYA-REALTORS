@@ -1,6 +1,5 @@
-// src/pages/portal/components/ManagerAssignment.tsx
 import React, { useState, useEffect } from 'react';
-import { useApprovalContext } from '@/contexts/ApprovalContext'; // Changed from useApproval to useApprovalContext
+import { useApprovalContext } from '@/contexts/ApprovalContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +16,10 @@ import {
   Clock, 
   Building, 
   UserPlus,
-  AlertCircle
+  AlertCircle,
+  Briefcase,
+  Wrench,
+  UserCheck
 } from 'lucide-react';
 import { formatDate } from '@/utils/dateHelpers';
 
@@ -26,47 +28,78 @@ interface ManagerAssignmentProps {
   showForm?: boolean;
 }
 
+type AssignmentType = 'property_manager' | 'technician' | 'proprietor' | 'caretaker';
+
 const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({ 
   propertyId, 
   showForm = false 
 }) => {
-  const { pendingApprovals, approveRequest, rejectRequest } = useApprovalContext(); // Changed from useApproval to useApprovalContext
+  const { pendingApprovals, approveRequest, rejectRequest } = useApprovalContext();
   
-  const [managers, setManagers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [properties, setProperties] = useState<any[]>([]);
-  const [selectedManager, setSelectedManager] = useState('');
+  const [technicianCategories, setTechnicianCategories] = useState<any[]>([]);
+  
+  const [assignmentType, setAssignmentType] = useState<AssignmentType>('property_manager');
+  const [selectedUser, setSelectedUser] = useState('');
   const [selectedProperty, setSelectedProperty] = useState(propertyId || '');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [assignmentReason, setAssignmentReason] = useState('');
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAssignmentForm, setShowAssignmentForm] = useState(showForm);
 
-  // Load managers and properties
+  // Load properties and initial users
   useEffect(() => {
-    const loadData = async () => {
+    const loadProperties = async () => {
       try {
-        // Load property managers
-        const { data: managersData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('role', 'property_manager')
-          .eq('status', 'active');
-
-        // Load properties
         const { data: propertiesData } = await supabase
           .from('properties')
           .select('*')
           .order('name');
-
-        setManagers(managersData || []);
         setProperties(propertiesData || []);
       } catch (error) {
-        console.error('Error loading data:', error);
-        toast.error('Failed to load data');
+        console.error('Error loading properties:', error);
       }
     };
 
-    loadData();
+    const loadTechnicianCategories = async () => {
+      try {
+        const { data } = await supabase
+          .from('technician_categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('name');
+        setTechnicianCategories(data || []);
+      } catch (error) {
+        console.error('Error loading technician categories:', error);
+      }
+    };
+
+    loadProperties();
+    loadTechnicianCategories();
   }, []);
+
+  // Load users when assignment type changes
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const { data: usersData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', assignmentType) // Filter by the selected assignment type
+          .eq('status', 'active');
+
+        setUsers(usersData || []);
+        setSelectedUser(''); // Reset selection when type changes
+      } catch (error) {
+        console.error('Error loading users:', error);
+        toast.error('Failed to load users');
+      }
+    };
+
+    loadUsers();
+  }, [assignmentType]);
 
   // Get pending manager assignment requests
   const managerAssignmentRequests = pendingApprovals.filter(
@@ -76,26 +109,158 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
   const handleSubmitAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedProperty || !selectedManager || !assignmentReason.trim()) {
-      toast.error('Please fill in all fields');
+    if (!selectedProperty || !selectedUser) {
+      toast.error('Please select both a property and a user');
+      return;
+    }
+
+    if (assignmentType === 'technician' && !selectedCategory) {
+      toast.error('Please select a technician category');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // In a real app, you would create an approval request here
-      // For now, simulate creating a request
-      const mockRequestId = `req_${Date.now()}`;
-      
-      toast.success('Manager assignment request submitted for approval');
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('Not authenticated');
+
+      if (assignmentType === 'property_manager') {
+        const { error } = await supabase
+          .from('property_manager_assignments')
+          .insert({
+            property_manager_id: selectedUser,
+            property_id: selectedProperty,
+            status: 'active'
+          });
+        if (error) throw error;
+        toast.success('Property Manager assigned successfully');
+
+      } else if (assignmentType === 'technician') {
+        // 1. Ensure technician record exists/update category
+        // Start by checking if technician record exists
+        const { data: existingTechnician } = await supabase
+            .from('technicians')
+            .select('id')
+            .eq('user_id', selectedUser)
+            .maybeSingle();
+
+        let technicianId = existingTechnician?.id;
+
+        if (existingTechnician) {
+            // Update category
+            const { error: updateError } = await supabase
+                .from('technicians')
+                .update({ category_id: selectedCategory })
+                .eq('id', existingTechnician.id);
+            if (updateError) throw updateError;
+        } else {
+            // Create technician record
+            const { data: newTechnician, error: createError } = await supabase
+                .from('technicians')
+                .insert({
+                    user_id: selectedUser,
+                    category_id: selectedCategory,
+                    status: 'active'
+                })
+                .select()
+                .single();
+            if (createError) throw createError;
+            technicianId = newTechnician.id;
+        }
+
+        // 2. Assign to property
+        const { error: assignError } = await supabase
+          .from('technician_property_assignments')
+          .insert({
+            technician_id: technicianId,
+            property_id: selectedProperty,
+            assigned_by: currentUser.id
+          });
+        
+        if (assignError) {
+            // Check for specific unique constraint violation message
+             if (assignError.code === '23505') { // unique_violation
+                 toast.error('Technician is already assigned to this property');
+                 return;
+             }
+             throw assignError;
+        }
+        
+        toast.success('Technician assigned successfully');
+
+      } else if (assignmentType === 'proprietor') {
+        // 1. Ensure proprietor record exists
+        const { data: existingProprietor } = await supabase
+             .from('proprietors')
+             .select('id')
+             .eq('user_id', selectedUser)
+             .maybeSingle();
+
+        let proprietorId = existingProprietor?.id;
+
+        if (!existingProprietor) {
+            const { data: newProprietor, error: createError } = await supabase
+                .from('proprietors')
+                .insert({
+                    user_id: selectedUser,
+                    status: 'active'
+                })
+                .select()
+                .single();
+            if (createError) throw createError;
+            proprietorId = newProprietor.id;
+        }
+
+        // 2. Assign to property
+        const { error } = await supabase
+          .from('proprietor_properties')
+          .insert({
+            proprietor_id: proprietorId,
+            property_id: selectedProperty,
+            assigned_by: currentUser.id
+          });
+        
+        if (error) {
+             if (error.code === '23505') {
+                 toast.error('Proprietor is already assigned to this property');
+                 return;
+             }
+             throw error;
+        }
+
+        toast.success('Proprietor assigned successfully');
+
+      } else if (assignmentType === 'caretaker') {
+        // Caretakers table links user directly to property
+        // Check if caretaker record exists for this user. 
+        // Note: Caretakers table has unique constraint on user_id, so a user can only be caretaker for one property at a time based on schema.
+        
+        // We need to upsert or insert.
+        // Also need property_manager_id. Defaulting to current user (Super Admin) as requested.
+        
+        const { error } = await supabase
+          .from('caretakers')
+          .upsert({
+            user_id: selectedUser,
+            property_id: selectedProperty,
+            property_manager_id: currentUser.id, // Assigning current user as manager
+            assigned_by: currentUser.id,
+            status: 'active',
+            assignment_date: new Date().toISOString()
+          }, { onConflict: 'user_id' }); // Update if exists
+
+        if (error) throw error;
+        toast.success('Caretaker assigned successfully');
+      }
       
       // Reset form
-      setSelectedManager('');
+      setSelectedUser('');
       setAssignmentReason('');
+      setSelectedCategory('');
       setShowAssignmentForm(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting assignment:', error);
-      toast.error('Failed to submit assignment request');
+      toast.error(error.message || 'Failed to submit assignment');
     } finally {
       setIsSubmitting(false);
     }
@@ -138,10 +303,28 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
     }
   };
 
+  const getAssignmentIcon = () => {
+    switch (assignmentType) {
+      case 'technician': return <Wrench className="h-5 w-5 text-blue-600" />;
+      case 'proprietor': return <Building className="h-5 w-5 text-blue-600" />;
+      case 'caretaker': return <UserCheck className="h-5 w-5 text-blue-600" />;
+      default: return <UserPlus className="h-5 w-5 text-blue-600" />;
+    }
+  };
+
+  const getAssignmentLabel = () => {
+    switch (assignmentType) {
+      case 'technician': return 'Assign Technician';
+      case 'proprietor': return 'Assign Proprietor';
+      case 'caretaker': return 'Assign Caretaker';
+      default: return 'Assign Property Manager';
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Pending Assignment Requests */}
-      {managerAssignmentRequests.length > 0 && (
+      {/* Pending Assignment Requests - Show only for property managers for now as approval system is for them */}
+      {managerAssignmentRequests.length > 0 && assignmentType === 'property_manager' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -216,15 +399,54 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-blue-600" />
-            Assign Manager to Property
+            {getAssignmentIcon()}
+            {getAssignmentLabel()}
           </CardTitle>
           <CardDescription>
-            Select a property and assign a manager. This will create an approval request.
+            Select a property and assign a {assignmentType.replace('_', ' ')}.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmitAssignment} className="space-y-4">
+            
+            <div className="space-y-2">
+                <Label>Assignment Type</Label>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant={assignmentType === 'property_manager' ? 'default' : 'outline'}
+                        onClick={() => setAssignmentType('property_manager')}
+                        className="flex items-center gap-2"
+                    >
+                        <UserPlus className="h-4 w-4" /> Manager
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={assignmentType === 'technician' ? 'default' : 'outline'}
+                        onClick={() => setAssignmentType('technician')}
+                        className="flex items-center gap-2"
+                    >
+                        <Wrench className="h-4 w-4" /> Technician
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={assignmentType === 'proprietor' ? 'default' : 'outline'}
+                        onClick={() => setAssignmentType('proprietor')}
+                        className="flex items-center gap-2"
+                    >
+                        <Building className="h-4 w-4" /> Proprietor
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={assignmentType === 'caretaker' ? 'default' : 'outline'}
+                        onClick={() => setAssignmentType('caretaker')}
+                        className="flex items-center gap-2"
+                    >
+                        <UserCheck className="h-4 w-4" /> Caretaker
+                    </Button>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="property">Select Property</Label>
@@ -246,33 +468,58 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="manager">Select Manager</Label>
-                <Select value={selectedManager} onValueChange={setSelectedManager}>
+                <Label htmlFor="user">Select {assignmentType.replace('_', ' ')}</Label>
+                <Select value={selectedUser} onValueChange={setSelectedUser}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Choose a manager" />
+                    <SelectValue placeholder={`Choose a ${assignmentType.replace('_', ' ')}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {managers.map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          {manager.first_name} {manager.last_name}
-                          <Badge variant="outline" className="ml-2 text-xs">
-                            {manager.properties?.length || 0} properties
-                          </Badge>
+                    {users.length === 0 ? (
+                        <div className="p-2 text-sm text-gray-500 text-center">
+                          {assignmentType === 'property_manager' ? 'No active property managers found' :
+                           assignmentType === 'technician' ? 'No active technicians found' :
+                           assignmentType === 'proprietor' ? 'No active proprietors found' :
+                           'No active caretakers found'}
                         </div>
-                      </SelectItem>
-                    ))}
+                    ) : (
+                        users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4" />
+                            {user.first_name} {user.last_name}
+                            </div>
+                        </SelectItem>
+                        ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
+
+              {assignmentType === 'technician' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="category">Technician Category</Label>
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {technicianCategories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">Specify the category for this technician assignment.</p>
+                  </div>
+              )}
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="reason">Assignment Reason</Label>
+              <Label htmlFor="reason">Assignment Note (Optional)</Label>
               <Textarea
                 id="reason"
-                placeholder="Explain why this manager should be assigned to this property..."
+                placeholder="Add any notes about this assignment..."
                 value={assignmentReason}
                 onChange={(e) => setAssignmentReason(e.target.value)}
                 rows={3}
@@ -281,104 +528,10 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
             
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={() => setShowAssignmentForm(!showAssignmentForm)}
-              >
-                {showAssignmentForm ? 'Cancel' : 'New Assignment'}
+                {isSubmitting ? 'Assigning...' : `Assign ${assignmentType.replace('_', ' ')}`}
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      {/* Available Managers */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Available Property Managers</CardTitle>
-          <CardDescription>
-            {managers.length} managers available for assignment
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {managers.map((manager) => (
-              <div key={manager.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span className="text-lg font-bold text-blue-600">
-                        {manager.first_name[0]}{manager.last_name[0]}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold">
-                        {manager.first_name} {manager.last_name}
-                      </h4>
-                      <p className="text-sm text-gray-500">{manager.email}</p>
-                      <p className="text-sm text-gray-500">{manager.phone}</p>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="bg-green-50 text-green-700">
-                    Available
-                  </Badge>
-                </div>
-                
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-gray-500">Experience:</span>
-                    <span className="ml-2 font-medium">3+ years</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Assigned:</span>
-                    <span className="ml-2 font-medium">
-                      {manager.properties?.length || 0} properties
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Rating:</span>
-                    <span className="ml-2 font-medium">4.8/5</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Status:</span>
-                    <span className="ml-2 font-medium capitalize">{manager.status}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1">
-                    View Profile
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedManager(manager.id);
-                      setShowAssignmentForm(true);
-                    }}
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Assign
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {managers.length === 0 && (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold">No managers available</h3>
-              <p className="text-gray-500">Add property managers to assign them to properties</p>
-              <Button className="mt-4">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Manager
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

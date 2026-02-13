@@ -146,9 +146,19 @@ const AuthCallback = () => {
           }
         } else if (profile) {
           // Role-based redirect if no specific redirect
-          if (profile.role === 'admin') {
-            finalRedirectPath = "/portal/admin";
-          } else if (profile.role === 'tenant' || profile.role === 'landlord') {
+          if (profile.role === 'super_admin') {
+            finalRedirectPath = "/portal/super-admin";
+          } else if (profile.role === 'property_manager') {
+            finalRedirectPath = "/portal/manager";
+          } else if (profile.role === 'accountant') {
+            finalRedirectPath = "/portal/accountant";
+          } else if (profile.role === 'technician') {
+            finalRedirectPath = "/portal/technician";
+          } else if (profile.role === 'proprietor') {
+            finalRedirectPath = "/portal/proprietor";
+          } else if (profile.role === 'caretaker') {
+            finalRedirectPath = "/portal/caretaker";
+          } else {
             finalRedirectPath = "/portal/tenant";
           }
           

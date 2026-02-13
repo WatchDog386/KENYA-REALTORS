@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser, Provider } from "@supabase/supabase-js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 // Available roles
 const AVAILABLE_ROLES = [
@@ -10,6 +10,10 @@ const AVAILABLE_ROLES = [
   { name: "property_manager", description: "Property Manager" },
   { name: "super_admin", description: "Super Administrator" },
   { name: "owner", description: "Property Owner" },
+  { name: "technician", description: "Maintenance Technician" },
+  { name: "proprietor", description: "Proprietor" },
+  { name: "caretaker", description: "Caretaker" },
+  { name: "accountant", description: "Accountant" },
 ] as const;
 
 // Permissions by role
@@ -30,7 +34,7 @@ interface UserProfile {
   email: string;
   first_name?: string;
   last_name?: string;
-  role: "super_admin" | "property_manager" | "tenant" | "owner" | null;
+  role: "super_admin" | "property_manager" | "tenant" | "owner" | "technician" | "proprietor" | "caretaker" | "accountant" | null;
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
@@ -90,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [session, setSession] = useState<Session | null>(null);
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -218,7 +223,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("🔄 Updating role to:", role);
 
       // Default approval status is false for sensitive roles
-      const isAutoApproved = role === 'super_admin'; // Only super_admin via this method if allowed (usually restricted)
+      // For development/demo purposes, we are auto-approving these roles
+      const isAutoApproved = ['super_admin', 'accountant', 'technician', 'proprietor', 'caretaker', 'tenant', 'manager', 'property_manager', 'owner'].includes(role);
       
       const { error } = await supabase
         .from("profiles")
@@ -336,36 +342,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const handlePostLoginRedirect = (userProfile: UserProfile | null) => {
     if (!userProfile) return;
 
+    // Check if we are already on the correct path to avoid loops
+    const currentPath = location.pathname;
+    
+    // Helper to check if we should redirect
+    const shouldRedirect = (targetPath: string) => {
+      // If we are already on a sub-path of the target, don't redirect
+      if (currentPath.startsWith(targetPath)) {
+        console.log(`✅ Already on correct path: ${currentPath}`);
+        return false;
+      }
+      return true;
+    };
+
     console.log(`🚀 Redirecting based on role: ${userProfile.role}...`);
 
     // If no role yet, send to role selection
     if (!userProfile.role) {
-      console.log("⚠️ No role assigned yet");
-      setTimeout(() => {
-        navigate("/auth/role-selection", { replace: true });
-      }, 100);
+      if (currentPath !== "/auth/role-selection") {
+        console.log("⚠️ No role assigned yet");
+        setTimeout(() => {
+          navigate("/auth/role-selection", { replace: true });
+        }, 100);
+      }
       return;
     }
 
     // User is approved (auto-approved on login) and has a role - redirect to dashboard
-    setTimeout(() => {
-      switch (userProfile.role) {
-        case "super_admin":
-          navigate("/portal/super-admin/dashboard", { replace: true });
-          break;
-        case "property_manager":
-          navigate("/portal/manager", { replace: true });
-          break;
-        case "tenant":
-          navigate("/portal/tenant", { replace: true });
-          break;
-        case "owner":
-          navigate("/portal/owner", { replace: true });
-          break;
-        default:
-          navigate("/profile", { replace: true });
-      }
-    }, 100);
+    let targetDash = "/profile";
+    switch (userProfile.role) {
+      case "super_admin":
+        targetDash = "/portal/super-admin/dashboard";
+        break;
+      case "property_manager":
+        targetDash = "/portal/manager";
+        break;
+      case "tenant":
+        targetDash = "/portal/tenant";
+        break;
+      case "owner":
+        targetDash = "/portal/owner";
+        break;
+      case "accountant":
+        targetDash = "/portal/accountant";
+        break;
+      case "technician":
+        targetDash = "/portal/technician";
+        break;
+      case "proprietor":
+        targetDash = "/portal/proprietor";
+        break;
+      case "caretaker":
+        targetDash = "/portal/caretaker";
+        break;
+    }
+
+    if (shouldRedirect(targetDash)) {
+       setTimeout(() => {
+         navigate(targetDash, { replace: true });
+       }, 100);
+    }
   };
 
   // Initialize auth
@@ -422,8 +458,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             const profile = await fetchUserProfileFromDB(session.user.id);
             setUser(profile);
 
-            // Only redirect on explicit SIGNED_IN event, not on token refresh
-            if (profile && event === "SIGNED_IN") {
+            // Redirect on both SIGNED_IN (fresh login) and INITIAL_SESSION (page refresh)
+            if (profile && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
               handlePostLoginRedirect(profile);
             } else if (!profile && event === "SIGNED_IN") {
               await createProfileIfMissing();

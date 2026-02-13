@@ -14,33 +14,44 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'manage_notifications',
     'manage_payments'
   ],
-  admin: [
-    'manage_properties',
-    'manage_users',
-    'manage_approvals',
-    'view_analytics',
-    'view_reports',
-    'export_data',
-    'manage_notifications'
-  ],
   property_manager: [
     'manage_properties',
     'manage_approvals',
     'view_analytics',
     'view_reports'
   ],
-  tenant: [
+  proprietor: [
+    'view_analytics',
+    'view_reports',
+    'export_data',
+    'manage_properties'
+  ],
+  accountant: [
+    'manage_payments',
+    'view_reports',
+    'view_analytics',
+    'export_data'
+  ],
+  technician: [
     'view_reports'
   ],
-  guest: []
+  caretaker: [
+    'view_reports',
+    'manage_properties'
+  ],
+  tenant: [
+    'view_reports'
+  ]
 };
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: 'Full system access with all permissions',
-  admin: 'Administrative access with most permissions',
   property_manager: 'Manage properties and tenant applications',
-  tenant: 'Tenant access for viewing their information',
-  guest: 'Limited access for unauthenticated users'
+  proprietor: 'Property owner with analytics and reporting view',
+  accountant: 'Manage financial records and payments',
+  technician: 'Maintenance and repair task management',
+  caretaker: 'On-site property supervision',
+  tenant: 'Tenant access for viewing their information'
 };
 
 export const DEFAULT_ROLE: UserRole = 'tenant';
@@ -109,11 +120,13 @@ export const canPerformAction = (
 // Get hierarchical role level (higher number = more permissions)
 export const getRoleLevel = (role: UserRole): number => {
   const roleLevels: Record<UserRole, number> = {
-    super_admin: 5,
-    admin: 4,
-    property_manager: 3,
-    tenant: 2,
-    guest: 1
+    super_admin: 10,
+    property_manager: 5,
+    proprietor: 4,
+    accountant: 4,
+    caretaker: 3,
+    technician: 2,
+    tenant: 1
   };
   
   return roleLevels[role] || 0;
@@ -163,7 +176,11 @@ export const validateRoleAssignment = (
 
 // Get available roles for assignment by a given role
 export const getAssignableRoles = (assignerRole: UserRole): UserRole[] => {
-  const allRoles: UserRole[] = ['super_admin', 'admin', 'property_manager', 'tenant', 'guest'];
+  const allRoles: UserRole[] = [
+    'super_admin', 'property_manager', 
+    'proprietor', 'accountant', 'caretaker', 'technician', 
+    'tenant'
+  ];
   
   return allRoles.filter(targetRole => 
     canManageRole(assignerRole, targetRole) && 
@@ -179,9 +196,9 @@ export const formatRole = (role: UserRole): string => {
     .join(' ');
 };
 
-// Check if user is elevated (admin or super admin)
+// Check if user is elevated (super admin)
 export const isElevatedUser = (role: UserRole): boolean => {
-  return role === 'super_admin' || role === 'admin';
+  return role === 'super_admin';
 };
 
 // Check if user can access super admin features

@@ -58,6 +58,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { propertyService, Property, CreatePropertyDTO } from '@/services/propertyService';
 import { PropertyUnitManager } from "./properties/PropertyUnitManager";
+import ManagerAssignment from '@/pages/portal/components/ManagerAssignment';
 
 const PropertyManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -69,7 +70,13 @@ const PropertyManager: React.FC = () => {
   const [showEditProperty, setShowEditProperty] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [propertyForUnits, setPropertyForUnits] = useState<Property | null>(null);
-  const [assignedManagers, setAssignedManagers] = useState<Record<string, string>>({});
+  // assignedStaff maps propertyId to lists of names
+  const [assignedStaff, setAssignedStaff] = useState<Record<string, {
+      managers: string[],
+      technicians: string[],
+      proprietors: string[],
+      caretakers: string[]
+  }>>({});
   const [occupiedUnitsCount, setOccupiedUnitsCount] = useState(0);
   
   // New state for assignment
@@ -91,7 +98,7 @@ const PropertyManager: React.FC = () => {
 
   useEffect(() => {
     fetchProperties();
-    fetchAssignedManagers();
+    fetchAssignedStaff();
     fetchAvailableManagers();
   }, []);
 
@@ -109,76 +116,93 @@ const PropertyManager: React.FC = () => {
       }
   };
 
-  const handleAssignManager = async () => {
-     if (!selectedProperty || !selectedManagerId) {
-         toast.error("Please select a manager");
-         return;
-     }
-
-     try {
-         // Upsert assignment
-         const { error } = await supabase
-            .from('property_manager_assignments')
-            .upsert(
-                { 
-                    property_id: selectedProperty.id, 
-                    property_manager_id: selectedManagerId,
-                    status: 'active'
-                },
-                { onConflict: 'property_id' }
-            );
-
-         if (error) throw error;
-
-         toast.success("Manager assigned successfully");
-         
-         // Wait for assignments to refresh before closing dialog
-         await fetchAssignedManagers();
-         
-         setShowAssignManagerDialog(false);
-     } catch (err: any) {
-         console.error("Error assigning manager:", err);
-         toast.error(err.message || "Failed to assign manager");
-     }
-  };
-
-  const fetchAssignedManagers = async () => {
+  const fetchAssignedStaff = async () => {
     try {
-      // 1. Fetch all assignments
-      const { data: assignments, error: assignError } = await supabase
-        .from('property_manager_assignments')
-        .select('property_id, property_manager_id');
+      const staffMap: Record<string, { managers: string[], technicians: string[], proprietors: string[], caretakers: string[] }> = {};
 
-      if (assignError) throw assignError;
+      const initMap = (propId: string) => {
+          if (!staffMap[propId]) {
+              staffMap[propId] = { managers: [], technicians: [], proprietors: [], caretakers: [] };
+          }
+      };
 
-      if (!assignments || assignments.length === 0) {
-        setAssignedManagers({});
-        return;
+      // 1. Managers
+      const { data: managers } = await supabase.from('property_manager_assignments').select('property_id, property_manager_id').eq('status', 'active');
+      if (managers?.length) {
+          const ids = managers.map((m: any) => m.property_manager_id);
+          const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', ids);
+          managers.forEach((m: any) => {
+              const p = profiles?.find((prof: any) => prof.id === m.property_manager_id);
+              if (p && m.property_id) {
+                  initMap(m.property_id);
+                  staffMap[m.property_id].managers.push(`${p.first_name} ${p.last_name}`);
+              }
+          });
       }
 
-      // 2. Get all manager IDs
-      const managerIds = assignments.map((a: any) => a.property_manager_id);
+      // 2. Technicians
+      const { data: techAssigns } = await supabase.from('technician_property_assignments').select('property_id, technician_id');
+      if (techAssigns?.length) {
+          const techIds = techAssigns.map((t: any) => t.technician_id);
+          const { data: technicians } = await supabase.from('technicians').select('id, user_id, technician_categories(name)').in('id', techIds); 
+          if (technicians?.length) {
+              const userIds = technicians.map((t: any) => t.user_id);
+              const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', userIds);
+              
+              techAssigns.forEach((t: any) => {
+                  const tech = technicians.find((te: any) => te.id === t.technician_id);
+                  if (tech) {
+                      const p = profiles?.find((prof: any) => prof.id === tech.user_id);
+                      if (p && t.property_id) {
+                          initMap(t.property_id);
+                          const cat = (tech.technician_categories as any)?.name || 'Tech';
+                          staffMap[t.property_id].technicians.push(`${p.first_name} ${p.last_name} (${cat})`);
+                      }
+                  }
+              });
+          }
+      }
 
-      // 3. Fetch profiles for these managers
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .in('id', managerIds);
+      // 3. Proprietors
+      const { data: propAssigns } = await supabase.from('proprietor_properties').select('property_id, proprietor_id');
+      if (propAssigns?.length) {
+          const propIds = propAssigns.map((p: any) => p.proprietor_id);
+          const { data: proprietors } = await supabase.from('proprietors').select('id, user_id').in('id', propIds);
+          
+          if (proprietors?.length) {
+              const userIds = proprietors.map((p: any) => p.user_id);
+              const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', userIds);
+              
+              propAssigns.forEach((pa: any) => {
+                   const prop = proprietors.find((pr: any) => pr.id === pa.proprietor_id);
+                   if (prop) {
+                       const p = profiles?.find((prof: any) => prof.id === prop.user_id);
+                       if (p && pa.property_id) {
+                           initMap(pa.property_id);
+                           staffMap[pa.property_id].proprietors.push(`${p.first_name} ${p.last_name}`);
+                       }
+                   }
+              });
+          }
+      }
 
-      if (profileError) throw profileError;
+      // 4. Caretakers
+      const { data: caretakers } = await supabase.from('caretakers').select('property_id, user_id').eq('status', 'active');
+      if (caretakers?.length) {
+          const userIds = caretakers.map((c: any) => c.user_id);
+          const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', userIds);
+          caretakers.forEach((c: any) => {
+               const p = profiles?.find((prof: any) => prof.id === c.user_id);
+               if (p && c.property_id) {
+                   initMap(c.property_id);
+                   staffMap[c.property_id].caretakers.push(`${p.first_name} ${p.last_name}`);
+               }
+          });
+      }
 
-      // 4. Create map of property_id -> manager_name
-      const managers: Record<string, string> = {};
-      assignments.forEach((assignment: any) => {
-        const profile = profiles?.find((p: any) => p.id === assignment.property_manager_id);
-        if (profile) {
-          managers[assignment.property_id] = `${profile.first_name} ${profile.last_name}`;
-        }
-      });
-
-      setAssignedManagers(managers);
+      setAssignedStaff(staffMap);
     } catch (error) {
-      console.error("Error fetching assigned managers:", error);
+      console.error("Error fetching assigned staff:", error);
     }
   };
 
@@ -689,12 +713,31 @@ const PropertyManager: React.FC = () => {
                   </div>
                 )}
 
-                {/* Assigned Manager */}
+                {/* Assigned Staff */}
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 mb-2">Assigned Manager</h3>
-                  <p className="text-lg font-semibold text-blue-900">
-                    {assignedManagers[selectedProperty.id] || <span className="text-slate-500">No manager assigned</span>}
-                  </p>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 mb-2">Assigned Staff</h3>
+                  <div className="space-y-1">
+                      {assignedStaff[selectedProperty.id]?.managers?.length > 0 && (
+                          <div className="text-sm text-blue-900"><span className="font-semibold">Managers:</span> {assignedStaff[selectedProperty.id].managers.join(', ')}</div>
+                      )}
+                      {assignedStaff[selectedProperty.id]?.technicians?.length > 0 && (
+                          <div className="text-sm text-blue-900"><span className="font-semibold">Technicians:</span> {assignedStaff[selectedProperty.id].technicians.join(', ')}</div>
+                      )}
+                      {assignedStaff[selectedProperty.id]?.proprietors?.length > 0 && (
+                          <div className="text-sm text-blue-900"><span className="font-semibold">Proprietors:</span> {assignedStaff[selectedProperty.id].proprietors.join(', ')}</div>
+                      )}
+                       {assignedStaff[selectedProperty.id]?.caretakers?.length > 0 && (
+                          <div className="text-sm text-blue-900"><span className="font-semibold">Caretakers:</span> {assignedStaff[selectedProperty.id].caretakers.join(', ')}</div>
+                      )}
+                      {(!assignedStaff[selectedProperty.id] || (
+                          !assignedStaff[selectedProperty.id].managers.length && 
+                          !assignedStaff[selectedProperty.id].technicians.length &&
+                          !assignedStaff[selectedProperty.id].proprietors.length &&
+                          !assignedStaff[selectedProperty.id].caretakers.length
+                      )) && (
+                          <span className="text-slate-500 italic text-sm">No staff assigned</span>
+                      )}
+                  </div>
                 </div>
 
                 {/* Units Overview */}
@@ -865,37 +908,22 @@ const PropertyManager: React.FC = () => {
       </Dialog>
 
       {/* ASSIGN MANAGER DIALOG */}
-      <Dialog open={showAssignManagerDialog} onOpenChange={setShowAssignManagerDialog}>
-        <DialogContent className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200">
+      <Dialog open={showAssignManagerDialog} onOpenChange={(open) => {
+        setShowAssignManagerDialog(open);
+        if (!open) fetchAssignedStaff();
+      }}>
+        <DialogContent className="sm:max-w-[600px] bg-white rounded-xl border border-slate-200">
             <DialogHeader>
-                <DialogTitle className="text-[#154279] font-bold">Assign Property Manager</DialogTitle>
+                <DialogTitle className="text-[#154279] font-bold">Assign Staff</DialogTitle>
                 <DialogDescription>
-                    Assign a manager to <span className="font-semibold text-[#154279]">{selectedProperty?.name}</span>.
+                    Assign Managers, Technicians, Proprietors, or Caretakers to <span className="font-semibold text-[#154279]">{selectedProperty?.name}</span>.
                 </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                    <Label>Select Manager</Label>
-                    <Select value={selectedManagerId} onValueChange={setSelectedManagerId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a manager..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {availableManagers.map(mgr => (
-                                <SelectItem key={mgr.id} value={mgr.id}>
-                                    {mgr.first_name} {mgr.last_name} ({mgr.email})
-                                </SelectItem>
-                            ))}
-                            {availableManagers.length === 0 && (
-                                <div className="p-2 text-sm text-slate-500 text-center">No active managers found</div>
-                            )}
-                        </SelectContent>
-                    </Select>
-                </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+                <ManagerAssignment propertyId={selectedProperty?.id} showForm={true} />
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAssignManagerDialog(false)}>Cancel</Button>
-                <Button onClick={handleAssignManager} className="bg-[#154279] text-white">Assign Manager</Button>
+                <Button variant="outline" onClick={() => setShowAssignManagerDialog(false)}>Close</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1008,10 +1036,38 @@ const PropertyManager: React.FC = () => {
                                             {property.location} • <span className="text-slate-500">{property.type || 'Apartment'}</span>
                                         </CardDescription>
                                     </div>
-                                    <Badge variant="outline" className={`capitalize flex items-center gap-1 ${assignedManagers[property.id] ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                                        <UserPlus className="w-3 h-3" />
-                                        {assignedManagers[property.id] || 'Unassigned'}
-                                    </Badge>
+                                    <div className="flex flex-col gap-1 items-end">
+                                        {assignedStaff[property.id]?.managers?.map((name, i) => (
+                                            <Badge key={`m-${i}`} variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1 w-fit">
+                                                <UserPlus className="w-3 h-3" /> {name}
+                                            </Badge>
+                                        ))}
+                                        {assignedStaff[property.id]?.technicians?.map((name, i) => (
+                                            <Badge key={`t-${i}`} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 w-fit">
+                                                <Users className="w-3 h-3" /> {name}
+                                            </Badge>
+                                        ))}
+                                          {assignedStaff[property.id]?.proprietors?.map((name, i) => (
+                                            <Badge key={`p-${i}`} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1 w-fit">
+                                                <Building className="w-3 h-3" /> {name}
+                                            </Badge>
+                                        ))}
+                                        {assignedStaff[property.id]?.caretakers?.map((name, i) => (
+                                            <Badge key={`c-${i}`} variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex items-center gap-1 w-fit">
+                                                <UserPlus className="w-3 h-3" /> {name}
+                                            </Badge>
+                                        ))}
+                                        {(!assignedStaff[property.id] || (
+                                            !assignedStaff[property.id].managers.length && 
+                                            !assignedStaff[property.id].technicians.length &&
+                                            !assignedStaff[property.id].proprietors.length &&
+                                            !assignedStaff[property.id].caretakers.length
+                                        )) && (
+                                            <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 flex items-center gap-1">
+                                                <UserPlus className="w-3 h-3" /> Unassigned
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -1075,7 +1131,7 @@ const PropertyManager: React.FC = () => {
                                                         setShowAssignManagerDialog(true);
                                                     }}
                                                     className="h-9 w-9 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl"
-                                                    title="Assign Manager"
+                                                    title="Assign Staff"
                                                 >
                                                     <UserPlus className="w-4 h-4" />
                                                 </Button>

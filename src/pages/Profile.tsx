@@ -85,9 +85,12 @@ const Profile = () => {
     try {
       await updateUserRole(role);
       setSelectedRole(role);
-      setSuccess("Role request submitted for approval! A system administrator will review your request shortly.");
+      setSuccess("Role updated successfully! Redirecting to dashboard...");
 
-      // Don't redirect yet - wait for approval
+      // Redirect to portal which will route to correct dashboard
+      setTimeout(() => {
+        navigate("/portal");
+      }, 1500);
       // Once approved, user's profile will be updated and they can navigate to their dashboard
     } catch (err: any) {
       console.error("Error submitting role change:", err);

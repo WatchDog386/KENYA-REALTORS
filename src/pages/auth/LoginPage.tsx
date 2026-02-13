@@ -55,12 +55,15 @@ const LoginPage: React.FC = () => {
             case "super_admin": targetPath = "/portal/super-admin"; break;
             case "property_manager": targetPath = "/portal/manager"; break;
             case "tenant": targetPath = "/portal/tenant"; break;
-            case "owner": targetPath = "/portal/owner"; break;
+            case "accountant": targetPath = "/portal/accountant"; break;
+            case "technician": targetPath = "/portal/technician"; break;
+            case "proprietor": targetPath = "/portal/proprietor"; break;
+            case "caretaker": targetPath = "/portal/caretaker"; break;
             default: targetPath = "/profile";
           }
           navigate(targetPath, { replace: true });
         }
-      }, 2000);
+      }, 3000);
     }
   }, [user, supabaseUser, authLoading, navigate, location.search, getUserRole, isSuccess]);
 
@@ -75,7 +78,7 @@ const LoginPage: React.FC = () => {
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
       
-      toast.success("Login successful!");
+      // toast.success("Login successful!");
       setIsSuccess(true);
     } catch (error: any) {
       setIsSubmitting(false);
@@ -84,44 +87,7 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  if (isSuccess) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white font-nunito">
-        <GlobalStyles />
-        
-        <div className="flex flex-col items-center animate-in fade-in zoom-in-95 duration-700">
-          
-          {/* Clean Animated Icon */}
-          <div className="mb-6 relative">
-            <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-30"></div>
-            <div className="relative bg-green-50 rounded-full p-4">
-              <CheckCircle size={42} className="text-[#86bc25]" strokeWidth={2.5} />
-            </div>
-          </div>
 
-          <h2 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">
-            Login Successful
-          </h2>
-          
-          <p className="text-slate-500 text-sm font-medium mb-12">
-            Redirecting to dashboard...
-          </p>
-
-          {/* Minimalist Loading Bar */}
-          <div className="w-32 h-1 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-[#00356B] animate-[loading_1.5s_ease-in-out_infinite]" style={{ width: '50%' }}></div>
-          </div>
-          
-          <style>{`
-            @keyframes loading {
-              0% { transform: translateX(-150%); }
-              100% { transform: translateX(250%); }
-            }
-          `}</style>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -140,7 +106,7 @@ const LoginPage: React.FC = () => {
           <span className="text-sm font-bold">Back Home</span>
         </button>
 
-        <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden w-full max-w-[850px] min-h-[600px] md:min-h-[520px] z-10">
+        <div className={`relative bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden w-full max-w-[850px] min-h-[600px] md:min-h-[520px] z-10 transition-opacity duration-500 ${isSuccess ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           
           {/* SIGN UP FORM */}
           <div
@@ -390,9 +356,46 @@ const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* SUCCESS MESSAGE */}
-          {/* Success overlay removed to provide a smoother transitions and rely on toast notification */}
         </div>
+
+          {/* SUCCESS MESSAGE OVERLAY */}
+          {isSuccess && (
+            <div 
+              className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white font-nunito animate-in fade-in duration-500"
+              style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }}
+            >
+              <div className="flex flex-col items-center animate-in zoom-in-95 duration-500">
+                
+                {/* Clean Animated Icon */}
+                <div className="mb-6 relative">
+                  <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-30"></div>
+                  <div className="relative bg-green-50 rounded-full p-4">
+                    <CheckCircle size={42} className="text-[#86bc25]" strokeWidth={2.5} />
+                  </div>
+                </div>
+
+                <h2 className="text-2xl font-bold text-slate-800 mb-2 tracking-tight">
+                  Login Successful
+                </h2>
+                
+                <p className="text-slate-500 text-sm font-medium mb-12">
+                  Preparing your dashboard...
+                </p>
+
+                {/* Minimalist Loading Bar */}
+                <div className="w-32 h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#00356B] animate-[loading_1.5s_ease-in-out_infinite]" style={{ width: '50%' }}></div>
+                </div>
+                
+                <style>{`
+                  @keyframes loading {
+                    0% { transform: translateX(-150%); }
+                    100% { transform: translateX(250%); }
+                  }
+                `}</style>
+              </div>
+            </div>
+          )}
       </div>
     </>
   );

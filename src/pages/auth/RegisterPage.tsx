@@ -171,8 +171,8 @@ export default function RegisterPage() {
                   type: "new_user_registration",
                   related_entity_type: "user",
                   related_entity_id: data.user.id,
-                  title: `New ${formData.accountType === 'tenant' ? 'Tenant' : 'Property Manager'} Registration`,
-                  message: `${formData.firstName} ${formData.lastName} has registered as a ${formData.accountType === 'tenant' ? 'tenant' : 'property manager'}. Review and assign in User Management.`,
+                  title: `New ${formData.accountType.charAt(0).toUpperCase() + formData.accountType.slice(1).replace('_', ' ')} Registration`,
+                  message: `${formData.firstName} ${formData.lastName} has registered as a ${formData.accountType.replace('_', ' ')}. Review and assign in User Management.`,
                 });
             }
             console.log("✅ Notifications sent to super admins");
@@ -339,6 +339,11 @@ export default function RegisterPage() {
                       <SelectContent className="z-[9999] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
                         <SelectItem value="tenant">👤 Tenant / Renter</SelectItem>
                         <SelectItem value="property_manager">🏢 Property Manager</SelectItem>
+                        <SelectItem value="owner">🏠 Property Owner / Landlord</SelectItem>
+                        <SelectItem value="proprietor">💼 Proprietor</SelectItem>
+                        <SelectItem value="caretaker">🔑 Caretaker</SelectItem>
+                        <SelectItem value="technician">🔧 Technician</SelectItem>
+                        <SelectItem value="accountant">💰 Accountant</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -85,7 +85,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('first_name, last_name, email, phone, role')
+          .select('first_name, last_name, email, phone, role, avatar_url')
           .eq('id', user.id)
           .single();
 
@@ -819,8 +819,16 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-3 p-1.5 hover:bg-slate-50 rounded-xl transition-colors border border-transparent hover:border-slate-200"
               >
-                <div className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md">
-                  {initials}
+                <div className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md overflow-hidden">
+                  {userProfile?.avatar_url ? (
+                    <img 
+                      src={userProfile.avatar_url} 
+                      alt={fullName} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    initials
+                  )}
                 </div>
                 <div className="text-left hidden md:block">
                   <p className="text-sm font-bold text-[#154279]">{fullName}</p>
@@ -835,8 +843,16 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                   <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-2xl border border-slate-200 z-50">
                     <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#154279]/5 to-blue-500/5 rounded-t-xl">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold">
-                          {initials}
+                        <div className="w-10 h-10 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold overflow-hidden">
+                          {userProfile?.avatar_url ? (
+                            <img 
+                              src={userProfile.avatar_url} 
+                              alt={fullName} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            initials
+                          )}
                         </div>
                         <div className="overflow-hidden">
                           <p className="font-bold text-[#154279] truncate">{fullName}</p>

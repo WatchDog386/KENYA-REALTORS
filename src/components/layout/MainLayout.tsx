@@ -40,7 +40,7 @@ const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
           Desktop: 10.5rem (pt-[10.5rem]) matches Navbar config
       */}
       <main className={`flex-grow bg-[#f7f7f7] ${!isAuthPage ? 'pt-16 lg:pt-[10.5rem]' : ''}`}>
-        <Outlet />
+        {children || <Outlet />}
       </main>
 
       {/* ✅ 3. CTA Banner - Only show on non-auth pages */}

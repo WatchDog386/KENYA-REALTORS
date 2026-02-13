@@ -253,24 +253,22 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         return;
       }
 
-       // Clear existing units before import
-      const { error: deleteError } = await supabase
+      // Fetch existing units to determine update vs insert
+      const { data: existingUnits, error: fetchError } = await supabase
         .from('units')
-        .delete()
+        .select('id, unit_number')
         .eq('property_id', property.id);
 
-      if (deleteError) {
-          console.error("Delete error:", deleteError);
-          // Check for foreign key constraint error usually 23503
-          if (deleteError.code === '23503') {
-             toast.error("Cannot overwrite units: Some units are linked to existing records (leases/tenants).");
-             return; 
-          }
-          toast.error("Failed to clear existing units");
-          return;
+      if (fetchError) {
+        console.error("Error fetching existing units:", fetchError);
+        toast.error("Failed to fetch existing units");
+        return;
       }
+      
+      const existingUnitsMap = new Map(existingUnits?.map(u => [u.unit_number.toString().toLowerCase(), u.id]));
 
       let importedCount = 0;
+      let updatedCount = 0;
       
       // Refresh types to ensure we have latest
       const { data: currentTypes } = await supabase
@@ -281,22 +279,41 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       const localTypes = currentTypes ? [...currentTypes] : [];
 
       for (const row of jsonData) {
-        // Expected columns: Unit Number, Floor, Type, Price (optional)
-        const unitNumber = row['Unit Number'] || row['unit_number'] || row['Unit'] || row['unit'];
-        const floorNumber = row['Floor'] || row['floor_number'] || row['Floor Number'] || 1;
-        const typeName = row['Type'] || row['Unit Type'] || row['unit_type'] || 'Standard';
-        const price = row['Price'] || row['price'] || null;
-        let status = (row['Status'] || row['status'] || 'available').toLowerCase();
-        if (status === 'vacant') status = 'available';
-        
-        const description = row['Description'] || row['description'] || null;
-        const features = row['Features'] || row['features'] ? (String(row['Features'] || row['features'])).split(',').map((f: string) => f.trim()) : [];
+        // Normalize keys to lowercase to handle variations
+        const normalizedRow: any = {};
+        Object.keys(row).forEach(key => {
+            normalizedRow[key.toString().toLowerCase().trim()] = row[key];
+        });
 
-        if (!unitNumber) continue;
+        // Expected columns: Unit Number, Floor, Type, Price (optional)
+        // Check various likely column names
+        const unitNumber = normalizedRow['unit number'] || normalizedRow['unit_number'] || normalizedRow['unit'] || normalizedRow['unit #'] || normalizedRow['unit#'];
+        const floorNumber = normalizedRow['floor'] || normalizedRow['floor_number'] || normalizedRow['floor number'] || 1;
+        const typeName = normalizedRow['type'] || normalizedRow['unit type'] || normalizedRow['unit_type'] || 'Standard';
+        const price = normalizedRow['price'] || normalizedRow['price (kes)'] || normalizedRow['amount'] || null;
+        
+        // Handle "status" or "availability"
+        // Also map 'vacant' -> 'available'
+        let status = (normalizedRow['status'] || normalizedRow['availability'] || 'available').toString().toLowerCase().trim();
+        if (status === 'vacant') status = 'available';
+
+        const validStatuses = ['available', 'occupied', 'booked', 'maintenance'];
+        if (!validStatuses.includes(status)) status = 'available'; // Default fallback
+        
+        const description = normalizedRow['description'] || normalizedRow['details'] || null;
+        const featuresRaw = normalizedRow['features'] || normalizedRow['amenities'];
+        const features = featuresRaw ? (String(featuresRaw)).split(',').map((f: string) => f.trim()) : [];
+
+        if (!unitNumber) {
+            console.log("Skipping row without unit number:", row);
+            continue;
+        }
+
+        const unitNumberStr = String(unitNumber).trim();
 
         // Find or create Unit Type
         let typeId = "";
-        const existingType = localTypes.find(t => t.name.toLowerCase() === String(typeName).toLowerCase());
+        const existingType = localTypes.find(t => t.name.toLowerCase() === String(typeName).trim().toLowerCase());
         
         if (existingType) {
           typeId = existingType.id!;
@@ -306,8 +323,8 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
               .from('property_unit_types')
               .insert({
                 property_id: property.id,
-                name: String(typeName),
-                price_per_unit: Number(price) || 0
+                name: String(typeName).trim(),
+                price_per_unit: price ? Number(price) : 0
               })
               .select()
               .single();
@@ -320,56 +337,102 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             localTypes.push(newType); 
         }
 
-        const { error: insertError } = await supabase
-            .from('units')
-            .insert({
-                property_id: property.id,
-                unit_number: String(unitNumber),
-                floor_number: Number(floorNumber),
-                unit_type_id: typeId,
-                price: price ? Number(price) : null,
-                status: status,
-                description: description,
-                features: features
-            });
+        const unitData = {
+            property_id: property.id,
+            unit_number: unitNumberStr,
+            floor_number: Number(floorNumber),
+            unit_type_id: typeId,
+            price: price ? Number(price) : null,
+            status: status,
+            description: description,
+            features: features
+        };
 
-        if (insertError) {
-            // If duplicate unit number, ignore or log
-             console.error("Error inserting unit", insertError);
+        const existingUnitId = existingUnitsMap.get(unitNumberStr.toLowerCase());
+
+        if (existingUnitId) {
+            // Update existing unit
+            const { error: updateError } = await supabase
+                .from('units')
+                .update(unitData)
+                .eq('id', existingUnitId);
+            
+            if (updateError) {
+                console.error(`Error updating unit ${unitNumberStr}`, updateError);
+            } else {
+                updatedCount++;
+            }
         } else {
-            importedCount++;
+            // Insert new unit
+            const { error: insertError } = await supabase
+                .from('units')
+                .insert(unitData);
+
+            if (insertError) {
+                console.error(`Error inserting unit ${unitNumberStr}`, insertError);
+            } else {
+                importedCount++;
+            }
         }
       }
 
-      toast.success(`Successfully imported ${importedCount} units`);
+      toast.success(`Processed units: ${importedCount} created, ${updatedCount} updated`);
+      
+      if (importedCount === 0 && updatedCount === 0) {
+          toast.warning("No units were processed. Please check your Excel column headers. Expected: 'Unit Number', 'Floor', 'Type', 'Price'.", { duration: 6000 });
+          console.warn("First row keys found:", Object.keys(jsonData[0] || {}));
+      }
+
       fetchUnits();
       fetchUnitTypes();
 
     } catch (error) {
       console.error("Import error:", error);
-      toast.error("Failed to process Excel file");
+      toast.error("Failed to process Excel file. Please ensure it is a valid .xlsx file.");
     } finally {
       setIsImporting(false);
       e.target.value = '';
     }
   };
 
-  const handleDeleteUnit = async (id: string) => {
-    if(!confirm("Delete this unit?")) return;
+  const handleDeleteUnit = async (id: string, unitNumber: string) => {
+    if(!confirm(`Are you sure you want to permanently delete Unit ${unitNumber}?`)) return;
+    
     const { error } = await supabase.from('units').delete().eq('id', id);
-    if(error) toast.error("Failed to delete");
-    else {
-        toast.success("Unit deleted");
+    
+    if (error) {
+        console.error("Delete error details:", error);
+        
+        // Handle Foreign Key Violations (23503) or generic constraint errors trying to delete referenced Data
+        // 400 Bad Request often indicates a trigger or RLS failure, but can also cover complex constraints in some Supabase configs
+        if (error.code === '23503' || error.message?.includes('foreign key') || error.code === '409') {
+             toast.error(`Cannot delete Unit ${unitNumber}: It is linked to existing Leases, Tenants, or Payments.`, {
+                 duration: 6000,
+                 description: "You must delete the lease or tenant first, OR run the 'FIX_UNIT_DELETION.sql' database script to allow safe deletion."
+             });
+        } else if (JSON.stringify(error).includes('violates foreign key constraint')) {
+             toast.error(`Cannot delete Unit ${unitNumber}. Linked data found.`, {
+                 description: "Check for active leases or maintenance requests linked to this unit."
+             });
+        } else {
+             // Fallback for generic 400s
+             toast.error(`Failed to delete Unit ${unitNumber}`, {
+                 description: error.message || "Database restriction. Run database/FIX_UNIT_DELETION.sql to fix constraints."
+             });
+        }
+    } else {
+        toast.success(`Unit ${unitNumber} deleted successfully`);
         setUnits(units.filter(u => u.id !== id));
     }
   };
 
-  const handleUpdateUnit = async () => {
+  const handleSaveUnit = async () => {
     if (!editingUnit) return;
     try {
         let typeId = editingUnit.unit_type_id;
         const typeName = editingUnit.property_unit_types?.name;
 
+        // If a type name is provided but no ID, or if we want to ensure the type exists
         if (typeName) {
             // Find existing type by name (case-insensitive)
             const existingType = unitTypes.find(t => t.name.toLowerCase() === typeName.toLowerCase());
@@ -392,9 +455,13 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 typeId = newType.id;
                 await fetchUnitTypes(); // Refresh types list
             }
+        } else if (!typeId && unitTypes.length > 0) {
+            // Fallback: use first available type if none selected
+             typeId = unitTypes[0].id!;
         }
 
-        const { error } = await supabase.from('units').update({
+        const unitData = {
+            property_id: property.id,
             unit_number: editingUnit.unit_number,
             floor_number: editingUnit.floor_number,
             unit_type_id: typeId,
@@ -402,16 +469,41 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             status: editingUnit.status,
             description: editingUnit.description,
             features: editingUnit.features
-        }).eq('id', editingUnit.id);
+        };
 
-        if (error) throw error;
-        toast.success("Unit updated");
+        if (editingUnit.id) {
+            // Update
+            const { error } = await supabase.from('units').update(unitData).eq('id', editingUnit.id);
+            if (error) throw error;
+            toast.success("Unit updated");
+        } else {
+            // Create
+            const { error } = await supabase.from('units').insert(unitData);
+            if (error) throw error;
+            toast.success("Unit created");
+        }
+
         setIsEditOpen(false);
         fetchUnits();
     } catch(e) {
         console.error(e);
-        toast.error("Failed to update unit");
+        toast.error("Failed to save unit");
     }
+  };
+
+  const handleAddUnit = () => {
+     setEditingUnit({
+         id: '',
+         unit_number: '',
+         floor_number: 1,
+         unit_type_id: '',
+         price: 0,
+         status: 'available',
+         description: '',
+         features: [],
+         property_unit_types: { name: '', price_per_unit: 0 }
+     });
+     setIsEditOpen(true);
   };
 
   // Unit Type CRUD
@@ -667,6 +759,9 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                             className="pl-9 h-9 text-xs border-slate-300 focus:border-[#F96302] focus:ring-0 rounded-lg w-40 md:w-60 bg-white"
                         />
                     </div>
+                    <Button onClick={handleAddUnit} className="ml-4 bg-[#F96302] hover:bg-[#e05802] text-white font-bold h-9 text-xs uppercase tracking-widest shadow-sm">
+                        <Plus className="w-4 h-4 mr-2" /> Add Unit
+                    </Button>
                 </div>
                 
                 <div className="overflow-x-auto bg-white">
@@ -755,7 +850,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                             <Button 
                                                 variant="ghost" 
                                                 size="sm" 
-                                                onClick={() => handleDeleteUnit(unit.id)}
+                                                onClick={() => handleDeleteUnit(unit.id, unit.unit_number)}
                                                 className="h-8 w-8 p-0 text-slate-400 hover:text-red-500 hover:bg-transparent"
                                             >
                                                 <Trash2 className="w-4 h-4" />
@@ -1064,11 +1159,13 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] text-white p-6 sticky top-0 z-20">
                 <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-white/10 rounded-lg">
-                        <Pencil className="w-5 h-5 text-[#F96302]" />
+                        {editingUnit?.id ? <Pencil className="w-5 h-5 text-[#F96302]" /> : <Plus className="w-5 h-5 text-[#F96302]" />}
                     </div>
                     <div>
-                        <DialogTitle className="font-bold text-xl">Edit Unit {editingUnit?.unit_number}</DialogTitle>
-                        <DialogDescription className="text-blue-200 text-xs font-medium uppercase tracking-widest mt-1">Update unit details and status</DialogDescription>
+                        <DialogTitle className="font-bold text-xl">{editingUnit?.id ? `Edit Unit ${editingUnit.unit_number}` : 'Add New Unit'}</DialogTitle>
+                        <DialogDescription className="text-blue-200 text-xs font-medium uppercase tracking-widest mt-1">
+                            {editingUnit?.id ? 'Update unit details and status' : 'Enter details for the new unit'}
+                        </DialogDescription>
                     </div>
                 </div>
             </div>
@@ -1209,8 +1306,8 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             </div>
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 sticky bottom-0 z-20">
                 <Button variant="ghost" onClick={() => setIsEditOpen(false)} className="font-bold text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl h-11 px-6">Cancel</Button>
-                <Button onClick={handleUpdateUnit} className="bg-[#154279] hover:bg-[#0f325e] text-white font-bold shadow-lg shadow-blue-900/20 rounded-xl h-11 px-8 uppercase tracking-widest text-xs">
-                    Save Changes
+                <Button onClick={handleSaveUnit} className="bg-[#154279] hover:bg-[#0f325e] text-white font-bold shadow-lg shadow-blue-900/20 rounded-xl h-11 px-8 uppercase tracking-widest text-xs">
+                    Save Unit
                 </Button>
             </div>
         </DialogContent>
