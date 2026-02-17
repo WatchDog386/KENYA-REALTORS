@@ -98,6 +98,7 @@ import ManagerRentCollection from "@/components/portal/manager/ManagerRentCollec
 import ManagerApplications from "@/components/portal/manager/ManagerApplications";
 import ManagerDeposits from "@/components/portal/manager/ManagerDeposits";
 import ManagerLeases from "@/components/portal/manager/ManagerLeases";
+import ManagerCaretakerDuties from "@/components/portal/manager/ManagerCaretakerDuties";
 import ManagerProfile from "@/components/portal/manager/ManagerProfile";
 import ManagerApprovalRequests from "@/pages/portal/manager/ApprovalRequests";
 
@@ -188,6 +189,7 @@ import CaretakerMaintenance from "@/components/portal/caretaker/CaretakerMainten
 import CaretakerProperty from "@/components/portal/caretaker/CaretakerProperty";
 import CaretakerReports from "@/components/portal/caretaker/CaretakerReports";
 import CaretakerMessages from "@/components/portal/caretaker/CaretakerMessages";
+import CaretakerDuties from "@/components/portal/caretaker/CaretakerDuties";
 
 import ProprietorProperties from "@/pages/portal/proprietor/ProprietorProperties";
 import ProprietorReports from "@/pages/portal/proprietor/ProprietorReports";
@@ -809,6 +811,7 @@ const App = () => {
                     path="vacation-notices"
                     element={<ManagerVacancyNotices />}
                   />
+                  <Route path="caretaker-duties" element={<ManagerCaretakerDuties />} />
                 </Route>
 
                 {/* TENANT PORTAL ROUTES */}
@@ -907,6 +910,7 @@ const App = () => {
                   <Route path="property" element={<CaretakerProperty />} />
                   <Route path="reports" element={<CaretakerReports />} />
                   <Route path="messages" element={<CaretakerMessages />} />
+                  <Route path="duties" element={<CaretakerDuties />} />
                 </Route>
 
                 {/* SHARED PORTAL PAGES */}

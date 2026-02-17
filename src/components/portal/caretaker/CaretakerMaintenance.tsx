@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { maintenanceService } from '@/services/maintenanceService';
 import { caretakerService } from '@/services/caretakerService';
+import { technicianService } from '@/services/technicianService';
+import { TechnicianCategory } from '@/types/newRoles';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Table,
     TableBody,
@@ -18,6 +21,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger
@@ -30,7 +34,7 @@ import {
     SelectValue
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, Wrench, Calendar, Eye, FileText } from 'lucide-react';
+import { Search, Filter, Wrench, Calendar, Eye, FileText, Loader2, Plus, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CaretakerMaintenance = () => {
@@ -42,10 +46,45 @@ const CaretakerMaintenance = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    
+    // Create Dialog Inputs
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [categories, setCategories] = useState<TechnicianCategory[]>([]);
+    const [newRequest, setNewRequest] = useState({
+        title: '',
+        description: '',
+        priority: 'medium',
+        categoryId: '',
+        image: null as File | null
+    });
 
     useEffect(() => {
         fetchRequests();
+        fetchCategories();
     }, [user?.id]);
+
+    const fetchRequests = async () => {
+        if (!user?.id) return;
+        try {
+            setLoading(true);
+            const userCaretaker = await caretakerService.getCaretakerByUserId(user.id);
+            if (!userCaretaker) {
+                toast.error('Caretaker profile not found');
+                return;
+            }
+            
+            // Get requests submitted by this caretaker
+            const requests = await maintenanceService.getCaretakerRequests(userCaretaker.id);
+            setRequests(requests);
+            setFilteredRequests(requests);
+        } catch (error: any) {
+            console.error('Error fetching requests:', error);
+            // toast.error('Failed to load maintenance requests');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         let result = requests;
@@ -67,25 +106,55 @@ const CaretakerMaintenance = () => {
         setFilteredRequests(result);
     }, [requests, searchQuery, statusFilter]);
 
-    const fetchRequests = async () => {
-        try {
-            setLoading(true);
-            if (!user?.id) return;
 
-            const caretaker = await caretakerService.getCaretakerByUserId(user.id);
-            if (!caretaker?.property_id) {
-                toast.error("No property assigned");
+    const fetchCategories = async () => {
+        try {
+            const data = await technicianService.getCategories();
+            setCategories(data);
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+        }
+    };
+
+    const handleCreateRequest = async () => {
+        if (!newRequest.title.trim() || !newRequest.description.trim() || !newRequest.categoryId) {
+            toast.error('Please fill in all required fields');
+            return;
+        }
+
+        try {
+            setCreating(true);
+            const userCaretaker = await caretakerService.getCaretakerByUserId(user!.id);
+            if (!userCaretaker || !userCaretaker.property_id) {
+                toast.error('Caretaker profile or property assignment not found');
                 return;
             }
 
-            const data = await maintenanceService.getPropertyMaintenanceRequests(caretaker.property_id);
-            setRequests(data);
-            setFilteredRequests(data);
+            await maintenanceService.createCaretakerMaintenanceRequest(
+                userCaretaker.id,
+                userCaretaker.property_id,
+                newRequest.title,
+                newRequest.description,
+                newRequest.priority as any,
+                newRequest.categoryId,
+                newRequest.image || undefined
+            );
+
+            toast.success('Maintenance request created successfully');
+            setIsCreateOpen(false);
+            setNewRequest({
+                title: '',
+                description: '',
+                priority: 'medium',
+                categoryId: '',
+                image: null
+            });
+            fetchRequests(); // Refresh list
         } catch (error) {
-            console.error('Error fetching maintenance requests:', error);
-            toast.error('Failed to load maintenance requests');
+            console.error('Error creating request:', error);
+            toast.error('Failed to create request');
         } finally {
-            setLoading(false);
+            setCreating(false);
         }
     };
 
@@ -122,8 +191,11 @@ const CaretakerMaintenance = () => {
                     <h1 className="text-3xl font-black text-[#154279] tracking-tight mb-2">Maintenance Management</h1>
                     <p className="text-slate-500 font-medium">Track and manage property repairs and requests.</p>
                 </div>
-                <Button className="bg-[#F96302] hover:bg-[#d35400] text-white font-bold shadow-lg shadow-orange-200">
-                    <Wrench className="w-4 h-4 mr-2" />
+                <Button 
+                    className="bg-[#F96302] hover:bg-[#d35400] text-white font-bold shadow-lg shadow-orange-200"
+                    onClick={() => setIsCreateOpen(true)}
+                >
+                    <Plus className="w-4 h-4 mr-2" />
                     Log New Issue
                 </Button>
             </div>
@@ -241,6 +313,116 @@ const CaretakerMaintenance = () => {
                     </Table>
                 </div>
             </Card>
+
+            {/* Create Request Dialog */}
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Log Maintenance Issue</DialogTitle>
+                        <DialogDescription>
+                            Report a maintenance issue at the property.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="title">Issue Summary (Title) *</Label>
+                            <Input
+                                id="title"
+                                value={newRequest.title}
+                                onChange={(e) => setNewRequest({ ...newRequest, title: e.target.value })}
+                                placeholder="E.g. Broken light in hallway"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="category">Category *</Label>
+                            <Select 
+                                value={newRequest.categoryId} 
+                                onValueChange={(val) => setNewRequest({ ...newRequest, categoryId: val })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {categories.map((cat) => (
+                                        <SelectItem key={cat.id} value={cat.id}>
+                                            {cat.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="priority">Priority</Label>
+                            <Select 
+                                value={newRequest.priority} 
+                                onValueChange={(val) => setNewRequest({ ...newRequest, priority: val })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="low">Low - Cosmetic/Minor</SelectItem>
+                                    <SelectItem value="medium">Medium - Standard Repair</SelectItem>
+                                    <SelectItem value="high">High - Functionality Impaired</SelectItem>
+                                    <SelectItem value="emergency">Emergency - Safety Hazard</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Detailed Description *</Label>
+                            <Textarea
+                                id="description"
+                                value={newRequest.description}
+                                onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
+                                placeholder="Describe the location and nature of the problem..."
+                                rows={4}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="image">Attach Photo (Optional)</Label>
+                            <div className="border border-dashed border-slate-300 rounded-lg p-4 bg-slate-50 text-center hover:bg-slate-100 transition-colors relative cursor-pointer">
+                                <Input 
+                                    id="image" 
+                                    type="file" 
+                                    accept="image/*"
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    onChange={(e) => {
+                                        if (e.target.files?.[0]) {
+                                            setNewRequest({ ...newRequest, image: e.target.files[0] });
+                                        }
+                                    }}
+                                />
+                                <div className="flex flex-col items-center justify-center gap-2 text-slate-500 pointer-events-none">
+                                    {newRequest.image ? (
+                                        <>
+                                            <ImageIcon className="w-8 h-8 text-emerald-500" />
+                                            <span className="text-sm font-medium text-emerald-600 truncate max-w-[200px]">{newRequest.image.name}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ImageIcon className="w-8 h-8 opacity-50" />
+                                            <span className="text-xs">Click to upload photo</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateRequest} disabled={creating} className="bg-[#154279]">
+                            {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                            Submit Request
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Request Details Dialog */}
             <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

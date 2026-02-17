@@ -580,6 +580,75 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       }
   };
 
+  // Handle Unassign Tenant from Unit
+  const handleUnassignTenant = async () => {
+      if(!selectedUnit || !selectedUnit.active_lease) {
+          toast.error("No tenant assigned to this unit");
+          return;
+      }
+      
+      if (!window.confirm("Are you sure you want to unassign this tenant from the unit? This will end their lease.")) {
+          return;
+      }
+      
+      try {
+          setSavingUnit(true);
+          const tenantId = selectedUnit.active_lease.tenant_id;
+          const leaseId = selectedUnit.active_lease.id;
+          
+          console.log("🔹 Starting tenant unassignment...", { tenantId, unitId: selectedUnit.id, leaseId });
+          
+          // 1. Update the lease status to 'terminated' instead of deleting
+          console.log("📝 Terminating lease...");
+          const { error: leaseError } = await supabase
+              .from('tenant_leases')
+              .update({ 
+                  status: 'terminated',
+                  end_date: new Date().toISOString()
+              })
+              .eq('id', leaseId);
+          
+          if(leaseError) throw leaseError;
+          console.log("✅ Lease terminated");
+          
+          // 2. Clear the tenant's unit assignment
+          console.log("📝 Clearing tenant unit assignment...");
+          const { error: tenantError } = await supabase
+              .from('tenants')
+              .update({
+                  unit_id: null,
+                  status: 'inactive',
+                  move_out_date: new Date().toISOString()
+              })
+              .eq('user_id', tenantId);
+          
+          if(tenantError) {
+              console.warn("Warning: Could not update tenant record:", tenantError);
+          } else {
+              console.log("✅ Tenant record updated");
+          }
+          
+          // 3. Update unit status back to 'vacant'
+          console.log("🔄 Updating unit status to vacant...");
+          const { error: unitError } = await supabase
+              .from('units')
+              .update({ status: 'vacant' })
+              .eq('id', selectedUnit.id);
+          
+          if(unitError) throw unitError;
+          console.log("✅ Unit status updated to vacant");
+          
+          toast.success("Tenant unassigned successfully");
+          setIsDetailsOpen(false);
+          loadUnits();
+      } catch(e: any) {
+          console.error("❌ Unassignment error:", e);
+          toast.error("Failed to unassign tenant: " + (e.message || JSON.stringify(e)));
+      } finally {
+          setSavingUnit(false);
+      }
+  };
+
   const filteredUnits = units.filter(unit =>
     unit.unit_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -1102,7 +1171,16 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             }}
                                             className="w-full bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 font-semibold"
                                         >
-                                            Manage Lease
+                                            Reassign Tenant
+                                        </Button>
+                                        
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={handleUnassignTenant}
+                                            disabled={savingUnit}
+                                            className="w-full bg-white text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-semibold"
+                                        >
+                                            {savingUnit ? 'Unassigning...' : 'Unassign Tenant'}
                                         </Button>
                                     </div>
                                 ) : ( // Vacant State

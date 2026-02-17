@@ -235,15 +235,30 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
         // Check if caretaker record exists for this user. 
         // Note: Caretakers table has unique constraint on user_id, so a user can only be caretaker for one property at a time based on schema.
         
-        // We need to upsert or insert.
-        // Also need property_manager_id. Defaulting to current user (Super Admin) as requested.
+        // Get the actual property manager for this property
+        let propertyManagerId = currentUser.id; // Default to current user
+        try {
+          const { data: pmAssignment } = await supabase
+            .from('property_manager_assignments')
+            .select('property_manager_id')
+            .eq('property_id', selectedProperty)
+            .eq('status', 'active')
+            .limit(1)
+            .maybeSingle();
+          
+          if (pmAssignment?.property_manager_id) {
+            propertyManagerId = pmAssignment.property_manager_id;
+          }
+        } catch (e) {
+          console.warn('Could not find property manager, using current user');
+        }
         
         const { error } = await supabase
           .from('caretakers')
           .upsert({
             user_id: selectedUser,
             property_id: selectedProperty,
-            property_manager_id: currentUser.id, // Assigning current user as manager
+            property_manager_id: propertyManagerId, // Use actual property manager
             assigned_by: currentUser.id,
             status: 'active',
             assignment_date: new Date().toISOString()

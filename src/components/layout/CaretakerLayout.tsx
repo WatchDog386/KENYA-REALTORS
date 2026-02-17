@@ -22,7 +22,8 @@ import {
   Mail,
   Home,
   Wrench,
-  ClipboardList
+  ClipboardList,
+  Briefcase
 } from 'lucide-react';
 
 interface NavItem {
@@ -237,6 +238,12 @@ const CaretakerLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/caretaker/reports',
       icon: <ClipboardList size={20} />,
       description: 'Daily logs & reports'
+    },
+    {
+      title: 'My Duties',
+      href: '/portal/caretaker/duties',
+      icon: <Briefcase size={20} />,
+      description: 'View assigned duties'
     },
     {
       title: 'Messages',

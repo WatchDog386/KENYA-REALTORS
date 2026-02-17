@@ -21,7 +21,8 @@ import {
   Search,
   ChevronRight,
   Mail,
-  Loader2
+  Loader2,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -366,6 +367,12 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       icon: <AlertTriangle size={20} />,
       badge: pendingTasks.approvals,
       description: 'Pending Manager Actions'
+    },
+    {
+      title: 'Caretaker Duties',
+      href: '/portal/manager/caretaker-duties',
+      icon: <Briefcase size={20} />,
+      description: 'Assign tasks to caretakers'
     },
     {
       title: 'Messages',

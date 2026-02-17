@@ -84,7 +84,7 @@ const CaretakerDashboard = () => {
       }
 
       if (!caretaker) {
-        setError('No caretaker profile found. Please contact admin.');
+        setError('CARETAKER_NOT_ASSIGNED');
         console.warn('No caretaker profile for user:', user.id);
         return;
       }
@@ -166,6 +166,29 @@ const CaretakerDashboard = () => {
   }
 
   if (error) {
+    // Special handling for unassigned caretaker
+    if (error === 'CARETAKER_NOT_ASSIGNED') {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh] p-8 font-nunito bg-slate-50">
+          <div className="max-w-lg w-full bg-amber-50 rounded-2xl border border-amber-200 shadow-sm p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-amber-700 mb-2">Caretaker Assignment Pending</h2>
+            <p className="text-amber-600 mb-4">
+              Your account is set up as a caretaker, but you haven't been assigned to a property yet.
+            </p>
+            <div className="bg-white rounded-lg p-4 text-left text-sm text-slate-600 space-y-2">
+              <p className="font-semibold text-slate-700">What to do:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Contact your property manager or administrator</li>
+                <li>Ask them to assign you to a property via the <strong>Property Assignment</strong> page</li>
+                <li>Once assigned, refresh this page to see your dashboard</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-8 font-nunito bg-slate-50">
         <div className="max-w-md w-full bg-white rounded-2xl border border-red-200 shadow-sm p-6">

@@ -9,37 +9,112 @@ export const caretakerService = {
 
   // Get caretaker by user ID
   async getCaretakerByUserId(userId: string): Promise<Caretaker | null> {
-    const { data, error } = await supabase
+    // First get the caretaker record
+    const { data: caretakerData, error: caretakerError } = await supabase
       .from('caretakers')
-      .select(`
-        *,
-        profile:profiles(id, first_name, last_name, email, phone, avatar_url),
-        property:properties(id, name, location, type),
-        property_manager:profiles!property_manager_id(id, first_name, last_name, email)
-      `)
+      .select('*')
       .eq('user_id', userId)
       .single();
     
-    if (error && error.code === 'PGRST116') return null; // Not found
-    if (error) throw error;
-    return data;
+    if (caretakerError && caretakerError.code === 'PGRST116') return null; // Not found
+    if (caretakerError) {
+      console.error('Error fetching caretaker:', caretakerError);
+      throw caretakerError;
+    }
+    
+    // Build the result object
+    const result: any = { ...caretakerData };
+    
+    // Try to fetch property info (might fail due to RLS)
+    if (caretakerData.property_id) {
+      try {
+        const { data: propertyData } = await supabase
+          .from('properties')
+          .select('id, name, location, type')
+          .eq('id', caretakerData.property_id)
+          .single();
+        result.property = propertyData || null;
+      } catch (e) {
+        console.warn('Could not fetch property:', e);
+        result.property = null;
+      }
+    }
+    
+    // Try to fetch property manager info (might fail due to RLS)
+    if (caretakerData.property_manager_id) {
+      try {
+        const { data: managerData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .eq('id', caretakerData.property_manager_id)
+          .single();
+        result.property_manager = managerData || null;
+      } catch (e) {
+        console.warn('Could not fetch property manager:', e);
+        result.property_manager = null;
+      }
+    }
+    
+    // Try to fetch profile info
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, phone, avatar_url')
+        .eq('id', userId)
+        .single();
+      result.profile = profileData || null;
+    } catch (e) {
+      console.warn('Could not fetch profile:', e);
+      result.profile = null;
+    }
+    
+    return result;
   },
 
   // Get caretaker by ID
   async getCaretakerById(id: string): Promise<Caretaker> {
-    const { data, error } = await supabase
+    // First get the caretaker record
+    const { data: caretakerData, error } = await supabase
       .from('caretakers')
-      .select(`
-        *,
-        profile:profiles(id, first_name, last_name, email, phone, avatar_url),
-        property:properties(id, name, location, type),
-        property_manager:profiles!property_manager_id(id, first_name, last_name, email)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
     
     if (error) throw error;
-    return data;
+    
+    const result: any = { ...caretakerData };
+    
+    // Fetch profile
+    if (caretakerData.user_id) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, phone, avatar_url')
+        .eq('id', caretakerData.user_id)
+        .maybeSingle();
+      result.profile = profileData || null;
+    }
+    
+    // Fetch property
+    if (caretakerData.property_id) {
+      const { data: propertyData } = await supabase
+        .from('properties')
+        .select('id, name, location, type')
+        .eq('id', caretakerData.property_id)
+        .maybeSingle();
+      result.property = propertyData || null;
+    }
+    
+    // Fetch property manager
+    if (caretakerData.property_manager_id) {
+      const { data: managerData } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', caretakerData.property_manager_id)
+        .maybeSingle();
+      result.property_manager = managerData || null;
+    }
+    
+    return result;
   },
 
   // Create caretaker profile (by super admin or property manager)
@@ -80,35 +155,83 @@ export const caretakerService = {
 
   // Get caretakers for a property
   async getCaretakersForProperty(propertyId: string): Promise<Caretaker[]> {
-    const { data, error } = await supabase
+    // First get caretakers
+    const { data: caretakersData, error } = await supabase
       .from('caretakers')
-      .select(`
-        *,
-        profile:profiles(id, first_name, last_name, email, phone, avatar_url)
-      `)
+      .select('*')
       .eq('property_id', propertyId)
       .eq('status', 'active')
       .order('assignment_date', { ascending: false });
     
-    if (error) throw error;
-    return data || [];
+    if (error) {
+      console.error('Error fetching caretakers:', error);
+      throw error;
+    }
+    
+    if (!caretakersData || caretakersData.length === 0) {
+      return [];
+    }
+    
+    // Get unique user IDs
+    const userIds = [...new Set(caretakersData.map(c => c.user_id))];
+    
+    // Fetch profiles separately
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email, phone, avatar_url')
+      .in('id', userIds);
+    
+    // Create a map of profiles
+    const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
+    
+    // Merge profiles into caretakers
+    return caretakersData.map(caretaker => ({
+      ...caretaker,
+      profile: profilesMap.get(caretaker.user_id) || null
+    }));
   },
 
   // Get caretakers under a property manager
   async getCaretakersUnderManager(propertyManagerId: string): Promise<Caretaker[]> {
-    const { data, error } = await supabase
+    // First get caretakers
+    const { data: caretakersData, error } = await supabase
       .from('caretakers')
-      .select(`
-        *,
-        profile:profiles(id, first_name, last_name, email, phone, avatar_url),
-        property:properties(id, name, location)
-      `)
+      .select('*')
       .eq('property_manager_id', propertyManagerId)
       .eq('status', 'active')
       .order('assignment_date', { ascending: false });
     
-    if (error) throw error;
-    return data || [];
+    if (error) {
+      console.error('Error fetching caretakers:', error);
+      throw error;
+    }
+    
+    if (!caretakersData || caretakersData.length === 0) {
+      return [];
+    }
+    
+    // Get unique user IDs and property IDs
+    const userIds = [...new Set(caretakersData.map(c => c.user_id))];
+    const propertyIds = [...new Set(caretakersData.map(c => c.property_id).filter(Boolean))];
+    
+    // Fetch profiles and properties separately
+    const [profilesResult, propertiesResult] = await Promise.all([
+      supabase.from('profiles').select('id, first_name, last_name, email, phone, avatar_url').in('id', userIds),
+      propertyIds.length > 0 
+        ? supabase.from('properties').select('id, name, location').in('id', propertyIds)
+        : Promise.resolve({ data: [] })
+    ]);
+    
+    // Create maps
+    const profilesMap = new Map((profilesResult.data || []).map(p => [p.id, p]));
+    const propertiesMap = new Map((propertiesResult.data || []).map(p => [p.id, p]));
+    
+    // Merge data
+    return caretakersData.map(caretaker => ({
+      ...caretaker,
+      profile: profilesMap.get(caretaker.user_id) || null,
+      property: caretaker.property_id ? propertiesMap.get(caretaker.property_id) || null : null
+    }));
   },
 
   // Update caretaker performance rating
