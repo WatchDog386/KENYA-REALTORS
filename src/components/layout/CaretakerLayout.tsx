@@ -234,23 +234,10 @@ const CaretakerLayout = ({ children }: { children?: ReactNode }) => {
       description: 'View property details'
     },
     {
-      title: 'Reports',
-      href: '/portal/caretaker/reports',
-      icon: <ClipboardList size={20} />,
-      description: 'Daily logs & reports'
-    },
-    {
       title: 'My Duties',
       href: '/portal/caretaker/duties',
       icon: <Briefcase size={20} />,
       description: 'View assigned duties'
-    },
-    {
-      title: 'Messages',
-      href: '/portal/caretaker/messages',
-      icon: <MessageSquare size={20} />,
-      description: 'Tenant communication',
-      badge: 0 
     }
   ];
 

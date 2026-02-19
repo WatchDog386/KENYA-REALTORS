@@ -92,6 +92,29 @@ export const caretakerDutyService = {
     return data;
   },
 
+  // Create an ad-hoc report/duty (initiated by caretaker)
+  async createAdhocReport(input: CreateDutyInput & { report_text?: string, report_submitted?: boolean, report_images?: string[] }): Promise<CaretakerDuty> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const status = input.report_submitted ? 'completed' : 'in_progress';
+    const submittedAt = input.report_submitted ? new Date().toISOString() : null;
+
+    const { data, error } = await supabase
+      .from('caretaker_duties')
+      .insert({
+        ...input,
+        assigned_by: user.id, // Self-assigned for ad-hoc reports
+        status: status,
+        report_submitted_at: submittedAt
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
   // Get duties for a property (for property managers)
   async getPropertyDuties(propertyId: string): Promise<CaretakerDuty[]> {
     const { data, error } = await supabase

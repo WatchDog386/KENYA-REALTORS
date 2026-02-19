@@ -908,8 +908,6 @@ const App = () => {
                   <Route index element={<CaretakerDashboard />} />
                   <Route path="maintenance" element={<CaretakerMaintenance />} />
                   <Route path="property" element={<CaretakerProperty />} />
-                  <Route path="reports" element={<CaretakerReports />} />
-                  <Route path="messages" element={<CaretakerMessages />} />
                   <Route path="duties" element={<CaretakerDuties />} />
                 </Route>
 

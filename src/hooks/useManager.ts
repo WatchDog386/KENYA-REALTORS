@@ -178,7 +178,7 @@ export const useManager = (managerId?: string) => {
       // 3. Get unit types for revenue calculation
       const { data: unitTypes, error: unitTypesError } = await supabase
         .from("property_unit_types")
-        .select("property_id, price_per_unit, units_count")
+        .select("property_id, price_per_unit, total_units_of_type") /* Changed units_count to total_units_of_type for consistency */
         .in("property_id", propertyIds);
 
       if (unitTypesError) {
@@ -194,8 +194,8 @@ export const useManager = (managerId?: string) => {
          
          // Calculate theoretical revenue
          // If we don't know which tenant is in which unit type, we approximate average price
-         const totalUnitCount = pUnits.reduce((sum, u) => sum + (u.units_count || 0), 0);
-         const totalPotentialRevenue = pUnits.reduce((sum, u) => sum + ((u.price_per_unit || 0) * (u.units_count || 0)), 0);
+         const totalUnitCount = pUnits.reduce((sum, u) => sum + (u.total_units_of_type || 0), 0);
+         const totalPotentialRevenue = pUnits.reduce((sum, u) => sum + ((u.price_per_unit || 0) * (u.total_units_of_type || 0)), 0);
          const avgPrice = totalUnitCount > 0 ? totalPotentialRevenue / totalUnitCount : 0;
          
          const estimatedRevenue = pTenants.length * avgPrice;

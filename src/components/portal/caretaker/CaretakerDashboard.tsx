@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../integrations/supabase/client';
@@ -38,6 +39,7 @@ interface CaretakerStats {
 
 const CaretakerDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<CaretakerStats | null>(null);
   const [caretakerInfo, setCaretakerInfo] = useState<any>(null);
@@ -411,6 +413,7 @@ const CaretakerDashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
+                onClick={() => navigate('/portal/caretaker/maintenance')}
                 className="relative overflow-hidden group cursor-pointer rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
              >
                 <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 opacity-90 group-hover:opacity-100 transition-opacity"></div>
@@ -437,6 +440,7 @@ const CaretakerDashboard = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
+                onClick={() => navigate('/portal/caretaker/duties')}
                 className="relative overflow-hidden group cursor-pointer rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
              >
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 opacity-90 group-hover:opacity-100 transition-opacity"></div>
@@ -445,7 +449,7 @@ const CaretakerDashboard = () => {
                 <div className="relative p-6 flex flex-col h-full justify-between min-h-[140px]">
                    <div className="flex justify-between items-start">
                       <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/20">
-                         <ClipboardList className="w-6 h-6 text-white" />
+                         <Briefcase className="w-6 h-6 text-white" />
                       </div>
                       <div className="p-2 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
                          <ChevronRight className="w-4 h-4 text-white" />
@@ -453,34 +457,8 @@ const CaretakerDashboard = () => {
                    </div>
                    
                    <div>
-                      <h3 className="text-xl font-bold text-white mb-1">Daily Reports</h3>
-                      <p className="text-blue-100 text-xs font-medium">Submit status updates</p>
-                   </div>
-                </div>
-             </motion.div>
-
-             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="relative overflow-hidden group cursor-pointer rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-             >
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 opacity-90 group-hover:opacity-100 transition-opacity"></div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
-                
-                <div className="relative p-6 flex flex-col h-full justify-between min-h-[140px]">
-                   <div className="flex justify-between items-start">
-                      <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/20">
-                         <Phone className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="p-2 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
-                         <ChevronRight className="w-4 h-4 text-white" />
-                      </div>
-                   </div>
-                   
-                   <div>
-                      <h3 className="text-xl font-bold text-white mb-1">Contact Manager</h3>
-                      <p className="text-emerald-100 text-xs font-medium">Messages & notifications</p>
+                      <h3 className="text-xl font-bold text-white mb-1">My Duties</h3>
+                      <p className="text-blue-100 text-xs font-medium">Manage assigned tasks</p>
                    </div>
                 </div>
              </motion.div>

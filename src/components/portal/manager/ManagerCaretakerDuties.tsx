@@ -1,5 +1,6 @@
 // src/components/portal/manager/ManagerCaretakerDuties.tsx
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { caretakerService } from '@/services/caretakerService';
 import { caretakerDutyService, CaretakerDuty, CreateDutyInput } from '@/services/caretakerDutyService';
@@ -245,6 +246,7 @@ const ManagerCaretakerDuties = () => {
   };
 
   const openReviewDialog = (duty: CaretakerDuty) => {
+    console.log("Opening review dialog for duty:", duty);
     setReviewingDuty(duty);
     setReviewFeedback('');
     setReviewRating(5);
@@ -491,31 +493,46 @@ const ManagerCaretakerDuties = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="w-4 h-4" />
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          {duty.status === 'completed' && !duty.rating && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openReviewDialog(duty);
+                              }}
+                              className="h-8 text-[#00356B] border-[#00356B] hover:bg-[#00356B] hover:text-white"
+                            >
+                              Review
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openViewDialog(duty)}>
-                              <Eye className="w-4 h-4 mr-2" /> View Details
-                            </DropdownMenuItem>
-                            {duty.status === 'completed' && !duty.rating && (
-                              <DropdownMenuItem onClick={() => openReviewDialog(duty)}>
-                                <MessageSquare className="w-4 h-4 mr-2" /> Review & Rate
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openViewDialog(duty)}>
+                                <Eye className="w-4 h-4 mr-2" /> View Details
                               </DropdownMenuItem>
-                            )}
-                            {(duty.status === 'pending' || duty.status === 'in_progress') && (
-                              <DropdownMenuItem 
-                                onClick={() => handleCancelDuty(duty.id)}
-                                className="text-red-600"
-                              >
-                                <X className="w-4 h-4 mr-2" /> Cancel
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              {duty.status === 'completed' && !duty.rating && (
+                                <DropdownMenuItem onClick={() => openReviewDialog(duty)}>
+                                  <MessageSquare className="w-4 h-4 mr-2" /> Review & Rate
+                                </DropdownMenuItem>
+                              )}
+                              {(duty.status === 'pending' || duty.status === 'in_progress') && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleCancelDuty(duty.id)}
+                                  className="text-red-600"
+                                >
+                                  <X className="w-4 h-4 mr-2" /> Cancel
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -660,11 +677,52 @@ const ManagerCaretakerDuties = () => {
             {reviewingDuty?.report_text && (
               <div className="space-y-2">
                 <Label>Caretaker's Report</Label>
-                <div className="p-3 bg-slate-50 rounded-lg border text-sm max-h-40 overflow-y-auto">
+                <div className="p-3 bg-slate-50 rounded-lg border text-sm max-h-40 overflow-y-auto whitespace-pre-wrap">
                   {reviewingDuty.report_text}
                 </div>
               </div>
             )}
+
+            {(() => {
+              // Parse images if they come as a JSON string (sometimes happens with Supabase array columns)
+              let images: string[] = [];
+              if (Array.isArray(reviewingDuty?.report_images)) {
+                images = reviewingDuty.report_images;
+              } else if (typeof reviewingDuty?.report_images === 'string') {
+                try {
+                  images = JSON.parse(reviewingDuty.report_images);
+                  if (!Array.isArray(images)) images = [];
+                } catch (e) {
+                  images = [];
+                }
+              }
+
+              if (images.length === 0) return null;
+
+              // Resolve image URLs
+              const resolvedImages = images.map(img => {
+                if (img.startsWith('http')) return img;
+                // If not http, assume it's a relative path in duty-reports
+                return supabase.storage.from('duty-reports').getPublicUrl(img).data.publicUrl;
+              });
+
+              return (
+                <div className="space-y-2">
+                  <Label>Attached Photos</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {resolvedImages.map((img, idx) => (
+                      <div key={idx} className="relative rounded-lg overflow-hidden border border-slate-200 aspect-video group cursor-pointer" onClick={() => window.open(img, '_blank')}>
+                        <img 
+                          src={img} 
+                          alt={`Report attachment ${idx+1}`} 
+                          className="w-full h-full object-cover transition-transform hover:scale-105" 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <Label>Rating</Label>
@@ -763,11 +821,51 @@ const ManagerCaretakerDuties = () => {
             {viewingDuty?.report_text && (
               <div className="space-y-2">
                 <Label>Caretaker Report</Label>
-                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm">
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm whitespace-pre-wrap">
                   {viewingDuty.report_text}
                 </div>
               </div>
             )}
+
+            {(() => {
+              // Parse images if they come as a JSON string (sometimes happens with Supabase array columns)
+              let images: string[] = [];
+              if (Array.isArray(viewingDuty?.report_images)) {
+                images = viewingDuty.report_images;
+              } else if (typeof viewingDuty?.report_images === 'string') {
+                try {
+                  images = JSON.parse(viewingDuty.report_images);
+                  if (!Array.isArray(images)) images = [];
+                } catch (e) {
+                  images = [];
+                }
+              }
+
+              if (images.length === 0) return null;
+
+              // Resolve image URLs
+              const resolvedImages = images.map(img => {
+                if (img.startsWith('http')) return img;
+                return supabase.storage.from('duty-reports').getPublicUrl(img).data.publicUrl;
+              });
+
+              return (
+                <div className="space-y-2">
+                  <Label>Attached Photos</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {resolvedImages.map((img, idx) => (
+                      <div key={idx} className="relative rounded-lg overflow-hidden border border-slate-200 aspect-video group cursor-pointer" onClick={() => window.open(img, '_blank')}>
+                        <img 
+                          src={img} 
+                          alt={`Report attachment ${idx+1}`} 
+                          className="w-full h-full object-cover transition-transform hover:scale-105" 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {viewingDuty?.manager_feedback && (
               <div className="space-y-2">

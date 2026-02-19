@@ -44,27 +44,48 @@ const CaretakerMessages = () => {
     const fetchManagerAndMessages = async () => {
         try {
             setLoading(true);
-            // Get caretaker details including manager
-            const caretakerData = await caretakerService.getCaretakerByUserId(user!.id);
+            // Get caretaker details
+            const caretakerData = (await caretakerService.getCaretakerByUserId(user!.id)) as any;
             
-            if (caretakerData?.property_manager) {
-                setManager(caretakerData.property_manager);
-                await fetchMessages(caretakerData.property_manager.id);
-            } else if (caretakerData?.property_id) {
-                 // Fallback: try to find manager via property if direct link missing
-                 const { data: propertyData } = await supabase
+            let managerId: string | null = null;
+            let currentManager: any = null;
+
+            // STRATEGY 1: Check Property Assignment (Preferred "via property" method)
+            if (caretakerData?.property_id) {
+                 const { data: assignmentData, error: assignmentError } = await supabase
                     .from('property_manager_assignments')
                     .select('property_manager:profiles(id, first_name, last_name, email, avatar_url)')
                     .eq('property_id', caretakerData.property_id)
                     .eq('status', 'active')
-                    .single();
+                    .maybeSingle();
                  
-                 if (propertyData?.property_manager) {
-                     setManager(propertyData.property_manager);
-                     await fetchMessages(propertyData.property_manager.id);
+                 if (!assignmentError && assignmentData?.property_manager) {
+                     // The query structure returns { property_manager: { ... } }
+                     // We need to use 'as any' casting to handle potential type mismatches from Supabase joint query
+                     const pm = assignmentData.property_manager as any;
+                     managerId = pm.id;
+                     currentManager = pm;
                  }
+            }
+
+            // STRATEGY 2: Fallback to direct assignment in caretaker profile
+            if (!managerId && caretakerData?.property_manager) {
+                // Determine if property_manager is an array (from joint result) or single object
+                const pm = Array.isArray(caretakerData.property_manager) 
+                    ? caretakerData.property_manager[0] 
+                    : caretakerData.property_manager;
+                
+                if (pm) {
+                    managerId = pm.id;
+                    currentManager = pm;
+                }
+            }
+
+            if (managerId && currentManager) {
+                setManager(currentManager);
+                await fetchMessages(managerId);
             } else {
-                toast.error("No property manager assigned to you.");
+                toast.error("No property manager found for your assigned property.");
             }
         } catch (error) {
             console.error("Error loading messages:", error);

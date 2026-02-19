@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { maintenanceService } from '@/services/maintenanceService';
 import { caretakerService } from '@/services/caretakerService';
@@ -482,17 +483,24 @@ const CaretakerMaintenance = () => {
                             </div>
 
                             {selectedRequest.image_url && (
-                                <div>
+                                <div className="mt-4">
                                     <h3 className="text-sm font-bold text-slate-900 mb-2">Attached Image</h3>
-                                    <img 
-                                        src={selectedRequest.image_url} // Note: This needs proper Supabase storage URL handling usually
-                                        alt="Maintenance Issue" 
-                                        className="w-full h-48 object-cover rounded-lg border border-slate-200"
-                                    />
+                                    <div className="relative w-full h-48 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                                        <img 
+                                            src={selectedRequest.image_url.startsWith('http') 
+                                                ? selectedRequest.image_url 
+                                                : supabase.storage.from('maintenance-images').getPublicUrl(selectedRequest.image_url).data.publicUrl}
+                                            alt="Maintenance Issue" 
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500 truncate">
+                                        {selectedRequest.image_url.split('/').pop()}
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
                                 <Button variant="outline" onClick={() => setDetailsOpen(false)}>Close</Button>
                                 <Button className="bg-[#154279] hover:bg-[#0f325e]" onClick={() => handleCreateReport(selectedRequest)}>
                                     <FileText className="w-4 h-4 mr-2" />
