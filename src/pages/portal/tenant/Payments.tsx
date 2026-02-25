@@ -57,6 +57,7 @@ const PaymentsPage: React.FC = () => {
   const navigate = useNavigate();
   const [rentPayments, setRentPayments] = useState<Payment[]>([]);
   const [utilityBills, setUtilityBills] = useState<Payment[]>([]);
+  const [utilitySettings, setUtilitySettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -111,6 +112,17 @@ const PaymentsPage: React.FC = () => {
              remarks: b.remarks
           }));
           setUtilityBills(formattedBills);
+      }
+
+      // 4. Fetch Utility Settings
+      const { data: settingsData } = await supabase
+        .from("utility_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      
+      if (settingsData) {
+        setUtilitySettings(settingsData);
       }
 
     } catch (err) {
@@ -178,7 +190,15 @@ const PaymentsPage: React.FC = () => {
      return sum + (p.amount - (p.amount_paid || 0));
   }, 0);
 
-  const totalArrears = rentDue + utilitiesDue;
+  const globalUtilityFee = utilitySettings ? (
+    (Number(utilitySettings.water_fee) || 0) +
+    (Number(utilitySettings.electricity_fee) || 0) +
+    (Number(utilitySettings.garbage_fee) || 0) +
+    (Number(utilitySettings.security_fee) || 0) +
+    (Number(utilitySettings.service_fee) || 0)
+  ) : 0;
+
+  const totalArrears = rentDue + utilitiesDue + globalUtilityFee;
 
   return (
     <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50 pb-20">
@@ -261,9 +281,12 @@ const PaymentsPage: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-800">
-              {formatCurrency(utilitiesDue)}
+              {formatCurrency(utilitiesDue + globalUtilityFee)}
             </div>
-            <p className="text-xs text-gray-500 mt-1">{utilityBills.filter(p => p.status !== 'paid').length} bills pending</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {utilityBills.filter(p => p.status !== 'paid').length} bills pending
+              {globalUtilityFee > 0 && " + Monthly Utilities"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -279,6 +302,29 @@ const PaymentsPage: React.FC = () => {
 
 
         <TabsContent value="all" className="space-y-4">
+           {globalUtilityFee > 0 && (
+             <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg flex justify-between items-center">
+               <div className="flex items-center gap-3">
+                 <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                   <Droplets size={18} />
+                 </div>
+                 <div>
+                   <h3 className="font-semibold text-blue-900">Monthly Utilities & Services</h3>
+                   <p className="text-sm text-blue-700">Standard monthly fee for water, electricity, garbage, security, and services</p>
+                 </div>
+               </div>
+               <div className="text-right">
+                 <div className="text-xl font-bold text-blue-900">{formatCurrency(globalUtilityFee)} <span className="text-sm font-normal text-blue-700">/ month</span></div>
+                 <Button 
+                   size="sm" 
+                   className="mt-2 bg-blue-600 hover:bg-blue-700"
+                   onClick={() => navigate(`/portal/tenant/payments/make?type=utilities&amount=${globalUtilityFee}`)}
+                 >
+                   Pay Now
+                 </Button>
+               </div>
+             </div>
+           )}
            <PaymentsTable 
               data={[...rentPayments, ...utilityBills].sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())}
               formatCurrency={formatCurrency}
@@ -299,6 +345,29 @@ const PaymentsPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="utilities" className="space-y-4">
+           {globalUtilityFee > 0 && (
+             <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-lg flex justify-between items-center">
+               <div className="flex items-center gap-3">
+                 <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                   <Droplets size={18} />
+                 </div>
+                 <div>
+                   <h3 className="font-semibold text-blue-900">Monthly Utilities & Services</h3>
+                   <p className="text-sm text-blue-700">Standard monthly fee for water, electricity, garbage, security, and services</p>
+                 </div>
+               </div>
+               <div className="text-right">
+                 <div className="text-xl font-bold text-blue-900">{formatCurrency(globalUtilityFee)} <span className="text-sm font-normal text-blue-700">/ month</span></div>
+                 <Button 
+                   size="sm" 
+                   className="mt-2 bg-blue-600 hover:bg-blue-700"
+                   onClick={() => navigate(`/portal/tenant/payments/make?type=utilities&amount=${globalUtilityFee}`)}
+                 >
+                   Pay Now
+                 </Button>
+               </div>
+             </div>
+           )}
            <PaymentsTable 
               data={utilityBills}
               formatCurrency={formatCurrency}

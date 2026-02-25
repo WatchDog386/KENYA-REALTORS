@@ -30,7 +30,12 @@ import {
   Filter,
   Download,
   LayoutGrid,
-  ChevronRight
+  ChevronRight,
+  Search,
+  ChevronDown,
+  Heart,
+  MoreHorizontal,
+  ChevronLeft
 } from "lucide-react";
 import {
   Card,
@@ -43,23 +48,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-// Helper function to format currency
-const formatCurrency = (amount: number): string => {
-  if (amount === null || amount === undefined || isNaN(amount)) {
-    return "$0.00";
-  }
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-};
+import { formatCurrency } from "@/utils/formatCurrency";
 
 // Interfaces matching your database schema
 interface Payment {
@@ -148,6 +142,7 @@ const TenantDashboard: React.FC = () => {
   >([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [upcomingDueDates, setUpcomingDueDates] = useState<any[]>([]);
+  const [utilitySettings, setUtilitySettings] = useState<any>(null);
 
   const [stats, setStats] = useState({
     currentBalance: 0,
@@ -377,6 +372,12 @@ const TenantDashboard: React.FC = () => {
         console.warn("Could not fetch upcoming due dates:", err);
       }
 
+      try {
+        await fetchUtilitySettings();
+      } catch (err) {
+        console.warn("Could not fetch utility settings:", err);
+      }
+
       // Set up real-time subscriptions
       setupRealtimeSubscriptions();
     } catch (err: any) {
@@ -476,6 +477,23 @@ const TenantDashboard: React.FC = () => {
       }
     } catch (err) {
       console.warn("Could not fetch upcoming due dates:", err);
+    }
+  };
+
+  const fetchUtilitySettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("utility_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setUtilitySettings(data);
+      }
+    } catch (err) {
+      console.warn("Could not fetch utility settings:", err);
     }
   };
 
@@ -1049,6 +1067,35 @@ const TenantDashboard: React.FC = () => {
                    </Button>
                 </CardContent>
              </Card>
+
+             {/* UTILITIES & SERVICES */}
+             {utilitySettings && (
+               <Card className="border-none shadow-lg bg-blue-50 rounded-2xl overflow-hidden border border-blue-100">
+                  <CardHeader className="p-6 pb-2">
+                     <div className="flex items-center gap-2 text-[#154279]">
+                        <Zap className="w-5 h-5" />
+                        <CardTitle className="text-base font-bold uppercase tracking-wider">Utilities & Services</CardTitle>
+                     </div>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                     <div className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-blue-100">
+                        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">Monthly Total</div>
+                        <div className="text-[#154279] font-black text-2xl">
+                           {formatCurrency(
+                             (Number(utilitySettings.water_fee) || 0) +
+                             (Number(utilitySettings.electricity_fee) || 0) +
+                             (Number(utilitySettings.garbage_fee) || 0) +
+                             (Number(utilitySettings.security_fee) || 0) +
+                             (Number(utilitySettings.service_fee) || 0)
+                           )}
+                        </div>
+                     </div>
+                     <p className="text-xs text-blue-600 font-medium leading-relaxed">
+                        This is your summarized monthly fee for water, electricity, garbage, security, and general services.
+                     </p>
+                  </CardContent>
+               </Card>
+             )}
 
              {/* EMERGENCY CONTACT */}
              <Card className="border-none shadow-lg bg-red-50 rounded-2xl overflow-hidden border border-red-100">

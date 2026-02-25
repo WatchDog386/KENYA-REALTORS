@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Plus, CheckCircle, AlertTriangle, AlertCircle, TrendingUp, Calendar, Home, Loader2, User } from 'lucide-react';
-import { HeroBackground } from '@/components/ui/HeroBackground';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Plus, CheckCircle, AlertTriangle, AlertCircle, TrendingUp, Calendar, Home, Loader2, User, Trash2, Eye, Phone, Mail, Search, Filter } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from 'date-fns';
@@ -14,10 +15,14 @@ interface TenantData {
   user_id: string;
   property_id: string;
   unit_id: string;
+  move_in_date?: string;
+  move_out_date?: string;
   profiles: {
     first_name: string | null;
     last_name: string | null;
     email: string | null;
+    avatar_url?: string | null;
+    phone?: string | null;
   } | null;
   properties: {
     name: string;
@@ -33,6 +38,7 @@ interface TenantData {
 }
 
 const LeasesManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<TenantData[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -63,7 +69,7 @@ const LeasesManagement: React.FC = () => {
           unit_id,
           move_in_date,
           move_out_date,
-          profiles(first_name, last_name, email),
+          profiles(first_name, last_name, email, avatar_url, phone),
           properties(name),
           units(unit_number, price)
         `);
@@ -86,7 +92,7 @@ const LeasesManagement: React.FC = () => {
 
             // Fetch related data in parallel
             const [profilesRes, propsRes, unitsRes] = await Promise.all([
-                userIds.length ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds) : { data: [] },
+                userIds.length ? supabase.from('profiles').select('id, first_name, last_name, email, avatar_url, phone').in('id', userIds) : { data: [] },
                 propIds.length ? supabase.from('properties').select('id, name').in('id', propIds) : { data: [] },
                 unitIds.length ? supabase.from('units').select('id, unit_number, price').in('id', unitIds) : { data: [] }
             ]);
@@ -183,41 +189,61 @@ const LeasesManagement: React.FC = () => {
     }
   };
 
+  const handleDeleteTenant = async (tenantId: string) => {
+    if (!confirm("Are you sure you want to delete this tenant? This action cannot be undone.")) return;
+    
+    try {
+      const { error: tenantError } = await supabase
+        .from('tenants')
+        .delete()
+        .eq('id', tenantId);
+        
+      if (tenantError) throw tenantError;
+      
+      toast.success("Tenant deleted successfully");
+      fetchTenants();
+    } catch (error) {
+      console.error("Error deleting tenant:", error);
+      toast.error("Failed to delete tenant");
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
-        <HeroBackground />
-        <div className="relative z-10 max-w-[1400px] mx-auto">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div className="space-y-2">
-              <h1 className="text-4xl font-extrabold tracking-tight">Tenants Management</h1>
-              <p className="text-lg text-blue-100 max-w-2xl font-light">
-                Manage all tenants, their assignments, and lease statuses.
-              </p>
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      {/* Header Section */}
+      <div className="bg-white border-b border-slate-200 px-6 py-6 shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-[#154279]">Tenants Management</h1>
+            <p className="text-sm text-slate-500">Manage all tenants, their assignments, and lease statuses.</p>
+          </div>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input 
+                placeholder="Search tenants..." 
+                className="pl-9 bg-slate-50 border-slate-200 focus-visible:ring-[#154279]"
+              />
             </div>
-            
-            <Button
-                className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5 font-semibold"
-            >
-              <Plus className="mr-2 h-5 w-5" /> 
-              Add New Tenant
+            <Button className="bg-[#154279] hover:bg-[#0f325e] text-white shadow-sm shrink-0">
+              <Plus className="mr-2 h-4 w-4" /> Add New Tenant
             </Button>
           </div>
         </div>
-      </section>
+      </div>
       
-      <div className="max-w-[1400px] mx-auto px-6 pb-20 space-y-8">
+      <div className="max-w-7xl mx-auto px-6 mt-8 space-y-8">
         
-        {/* Metric Cards - Enhanced */}
+        {/* Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all">
+          <Card className="border-none shadow-sm hover:shadow-md transition-all bg-white">
             <CardContent className="p-6">
                 <div className="flex justify-between items-start">
                     <div>
                         <p className="text-sm font-medium text-slate-500">Active Tenants</p>
-                        <h3 className="text-3xl font-black text-[#154279] mt-2">{stats.activeTenants}</h3>
+                        <h3 className="text-3xl font-bold text-slate-800 mt-2">{stats.activeTenants}</h3>
                     </div>
-                    <div className="p-3 bg-green-50 rounded-xl">
+                    <div className="p-3 bg-green-50 rounded-xl border border-green-100">
                         <CheckCircle className="h-6 w-6 text-green-600" />
                     </div>
                 </div>
@@ -227,31 +253,31 @@ const LeasesManagement: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-yellow-500 shadow-md hover:shadow-lg transition-all">
+          <Card className="border-none shadow-sm hover:shadow-md transition-all bg-white">
             <CardContent className="p-6">
                 <div className="flex justify-between items-start">
                     <div>
                         <p className="text-sm font-medium text-slate-500">Expiring Leases</p>
-                        <h3 className="text-3xl font-black text-[#154279] mt-2">{stats.expiringSoon}</h3>
+                        <h3 className="text-3xl font-bold text-slate-800 mt-2">{stats.expiringSoon}</h3>
                     </div>
-                    <div className="p-3 bg-yellow-50 rounded-xl">
+                    <div className="p-3 bg-yellow-50 rounded-xl border border-yellow-100">
                         <AlertTriangle className="h-6 w-6 text-yellow-600" />
                     </div>
                 </div>
-                 <div className="mt-4 text-xs font-medium text-slate-400">
+                 <div className="mt-4 text-xs font-medium text-slate-500">
                     Within next 30 days
                 </div>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all">
+          <Card className="border-none shadow-sm hover:shadow-md transition-all bg-white">
             <CardContent className="p-6">
                 <div className="flex justify-between items-start">
                     <div>
                         <p className="text-sm font-medium text-slate-500">Overdue Payments</p>
-                        <h3 className="text-3xl font-black text-[#154279] mt-2">{stats.overduePayments}</h3>
+                        <h3 className="text-3xl font-bold text-slate-800 mt-2">{stats.overduePayments}</h3>
                     </div>
-                    <div className="p-3 bg-red-50 rounded-xl">
+                    <div className="p-3 bg-red-50 rounded-xl border border-red-100">
                         <AlertCircle className="h-6 w-6 text-red-600" />
                     </div>
                 </div>
@@ -262,20 +288,22 @@ const LeasesManagement: React.FC = () => {
           </Card>
         </div>
 
-
-        <div className="bg-white shadow-xl rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center bg-slate-50/50 gap-4">
-             <h3 className="text-lg font-bold text-[#154279] flex items-center gap-2">
-                <User className="h-5 w-5" /> All Tenants
+        {/* Tenants Table */}
+        <Card className="border-none shadow-sm bg-white overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <User className="h-5 w-5 text-[#154279]" /> All Tenants
              </h3>
              <div className="flex gap-2">
-                 {/* Placeholder for filters */}
+                <Button variant="outline" size="sm" className="text-slate-600 border-slate-200">
+                  <Filter className="h-4 w-4 mr-2" /> Filter
+                </Button>
              </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100 text-left">
+                <tr className="bg-slate-50/50 border-b border-slate-100 text-left">
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tenant</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Property</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Lease Duration</th>
@@ -289,8 +317,8 @@ const LeasesManagement: React.FC = () => {
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-slate-500">
-                        <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                        <p>Loading tenants...</p>
+                        <Loader2 className="h-8 w-8 animate-spin mb-2 text-[#154279]" />
+                        <p className="text-sm font-medium">Loading tenants...</p>
                       </div>
                     </td>
                   </tr>
@@ -302,47 +330,64 @@ const LeasesManagement: React.FC = () => {
                   </tr>
                 ) : (
                   tenants.map((tenant) => (
-                  <tr key={tenant.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={tenant.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
-                            <span className="font-bold text-slate-700">{getFullName(tenant)}</span>
-                            <span className="text-xs text-slate-400">{tenant.profiles?.email}</span>
+                            <span className="font-bold text-slate-800">{getFullName(tenant)}</span>
+                            <span className="text-xs text-slate-500">{tenant.profiles?.email}</span>
                         </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                          <div className="flex items-center gap-2 text-slate-600">
                             <Home className="h-4 w-4 text-slate-400" />
-                            {tenant.properties?.name || 'Unassigned'}
+                            <span className="font-medium">{tenant.properties?.name || 'Unassigned'}</span>
                             {tenant.units?.unit_number && (
-                              <Badge variant="outline" className="ml-1 text-xs">{tenant.units.unit_number}</Badge>
+                              <Badge variant="outline" className="ml-1 text-xs bg-white border-slate-200 text-slate-600">{tenant.units.unit_number}</Badge>
                             )}
                          </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                          {tenant.active_lease ? (
-                           <div className="text-sm text-slate-600 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatDate(tenant.active_lease.start_date)} - {formatDate(tenant.active_lease.end_date)}
+                           <div className="text-sm text-slate-600 flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-slate-400" />
+                              <span>{formatDate(tenant.active_lease.start_date)} - {formatDate(tenant.active_lease.end_date)}</span>
                            </div>
                          ) : (
                            <span className="text-sm text-slate-400 italic">No Active Lease</span>
                          )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-[#154279]">
+                    <td className="px-6 py-4 whitespace-nowrap font-bold text-[#154279]">
                         {formatCurrency(tenant.units?.price || null)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                        tenant.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
-                        tenant.status === 'notice_given' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                        'bg-slate-50 text-slate-700 border-slate-200'
+                      <Badge className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                        tenant.status === 'active' ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50' :
+                        tenant.status === 'notice_given' ? 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-50' :
+                        'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-50'
                       }`}>
                         {tenant.status === 'notice_given' ? 'Notice Given' : 
                          tenant.status.charAt(0).toUpperCase() + tenant.status.slice(1)}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-[#154279]">Edit</Button>
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                            onClick={() => navigate(`/portal/super-admin/leases/${tenant.id}`)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-red-600 hover:text-red-800 hover:bg-red-50"
+                            onClick={() => handleDeleteTenant(tenant.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                     </td>
                   </tr>
                   ))
@@ -350,7 +395,7 @@ const LeasesManagement: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

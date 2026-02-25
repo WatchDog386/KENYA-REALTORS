@@ -52,6 +52,7 @@ import PropertyDetailsPage from "@/pages/marketplace/PropertyDetailsPage";
    PORTAL PAGES
 ====================== */
 import SuperAdminDashboard from "@/pages/portal/SuperAdminDashboard";
+import SuperAdminUtilities from "@/pages/portal/SuperAdminUtilities";
 import SuperAdminProfilePage from "@/pages/portal/SuperAdminProfilePage";
 import ManagerPortal from "@/pages/portal/ManagerPortal";
 import PortalTenantDashboard from "@/pages/portal/TenantDashboard";
@@ -63,6 +64,7 @@ import ProfileManagement from "@/pages/portal/ProfileManagement";
 import RefundStatusPage from "@/pages/portal/RefundStatusPage";
 import Applications from "@/pages/portal/Applications";
 import RentalApplications from "@/components/portal/RentalApplications";
+import TenantDetails from "@/pages/portal/TenantDetails";
 
 // Tenant portal pages
 import TenantPaymentsPageComponent from "@/pages/portal/tenant/Payments";
@@ -735,9 +737,11 @@ const App = () => {
                   <Route path="users" element={<UserManagementNew />} />
                   <Route path="approvals" element={<ApprovalQueue />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />
+                  <Route path="utilities" element={<SuperAdminUtilities />} />
                   <Route path="settings" element={<SystemSettings />} />
                   <Route path="reports" element={<Reports />} /> {/* ADDED THIS LINE */}
                   <Route path="leases" element={<LeasesManagement />} />
+                  <Route path="leases/:id" element={<TenantDetails />} />
                   <Route path="payments" element={<PaymentsManagement />} />
                   <Route path="profile" element={<SuperAdminProfilePage />} />
                   <Route path="refunds" element={<RefundStatusPage />} />

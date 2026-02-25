@@ -19,8 +19,23 @@ import {
   Building2,
   Plus,
   Play,
-  Ban
+  Ban,
+  TrendingUp,
+  UserCheck,
+  UserPlus,
+  Activity
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import {
   Dialog,
   DialogContent,
@@ -342,8 +357,277 @@ const UserManagementComplete: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Header Section */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-[#1a3a52] to-[#0f325e] rounded-3xl p-8 text-white relative overflow-hidden shadow-lg"
+      >
+        <div className="absolute top-0 right-0 w-40 h-40 opacity-5">
+          <Users className="w-full h-full" />
+        </div>
+        <div className="flex items-center justify-between relative z-10">
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <Shield className="w-5 h-5" />
+              <span className="text-xs font-bold tracking-widest uppercase opacity-90">Directory</span>
+            </div>
+            <h1 className="text-4xl font-bold mb-2">
+              User <span className="text-[#F96302]">Management</span>
+            </h1>
+            <p className="text-blue-100 text-sm">Manage all system users, assign roles, track account status, and control access permissions.</p>
+          </div>
+          <Dialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-white text-[#154279] hover:bg-slate-100 font-bold rounded-xl px-6 py-2">
+                <Plus className="w-4 h-4 mr-2" /> ADD NEW USER
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add New User</DialogTitle>
+                <DialogDescription>Create a new user account.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">First Name</label>
+                    <Input value={newUser.firstName} onChange={e => setNewUser({...newUser, firstName: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Last Name</label>
+                    <Input value={newUser.lastName} onChange={e => setNewUser({...newUser, lastName: e.target.value})} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input type="email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Password</label>
+                  <Input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Role</label>
+                  <Select value={newUser.role} onValueChange={val => setNewUser({...newUser, role: val})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tenant">Tenant</SelectItem>
+                      <SelectItem value="property_manager">Property Manager</SelectItem>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsAddUserDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddUser} disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="animate-spin w-4 h-4" /> : "Create User"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </motion.div>
+
+      {/* Stats Cards Grid - 2 rows */}
+      <div className="space-y-4">
+        {/* First Row - Main Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0 }}
+            className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Users className="w-6 h-6 text-blue-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">{stats.totalUsers}</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Total Users</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Clock className="w-6 h-6 text-amber-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">{stats.pendingUsers}</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Pending</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Shield className="w-6 h-6 text-red-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">1</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Super Admins</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Building2 className="w-6 h-6 text-green-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">{stats.propertyManagers}</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Managers</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-purple-50 border border-purple-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Users className="w-6 h-6 text-purple-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">{stats.tenants}</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Tenants</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="bg-teal-50 border border-teal-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <CheckCircle className="w-6 h-6 text-teal-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">{stats.totalUsers}</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Assigned</p>
+          </motion.div>
+        </div>
+
+        {/* Second Row - Role Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Mail className="w-6 h-6 text-yellow-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">2</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Accountants</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-pink-50 border border-pink-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Edit2 className="w-6 h-6 text-pink-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">1</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Technicians</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-orange-50 border border-orange-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Building2 className="w-6 h-6 text-orange-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">1</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Proprietors</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+            className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 text-center hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-center mb-3">
+              <Shield className="w-6 h-6 text-indigo-600" />
+            </div>
+            <p className="text-3xl font-bold text-slate-900">1</p>
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider mt-2">Caretakers</p>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Filter Section */}
+      <Card className="border-slate-200">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-xl text-slate-900">All User Accounts</CardTitle>
+              <p className="text-sm text-slate-500 mt-1">{filteredUsers.length} users • Total: {users.length}</p>
+            </div>
+            <Button
+              onClick={loadUsers}
+              className="flex items-center gap-2 text-[#154279] hover:text-[#0f325e] text-sm font-bold tracking-wider uppercase"
+              variant="ghost"
+            >
+              <RefreshCw className="w-4 h-4" /> REFRESH
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:border-[#154279] focus:ring-1 focus:ring-[#154279] outline-none transition-all font-medium text-sm"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2.5 bg-white border border-slate-300 rounded-lg focus:border-[#154279] focus:ring-1 focus:ring-[#154279] outline-none transition-all font-medium text-sm md:w-48"
+            >
+              <option value="all">All Roles</option>
+              <option value="pending">Pending Approval</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Users Table */}
+      <Card className="border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-[#154279] text-white">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">User</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Role</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Joined</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -512,13 +796,13 @@ const UserManagementComplete: React.FC = () => {
       <Card className="border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[#154279] text-white">
+            <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">User</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Role</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">Joined</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -536,59 +820,45 @@ const UserManagementComplete: React.FC = () => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    className="hover:bg-slate-50/50 transition-colors"
+                    className="hover:bg-slate-50 transition-colors"
                   >
                     <td className="px-6 py-4">
-                      <div>
-                        <p className="font-semibold text-slate-900 text-sm">
-                          {user.first_name} {user.last_name}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">{user.email}</p>
-                      </div>
+                      <p className="font-semibold text-slate-900 text-sm">
+                        {user.first_name} {user.last_name}
+                      </p>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge className="bg-[#154279]/10 text-[#154279] hover:bg-[#154279]/20 capitalize">
+                      <p className="text-sm text-slate-600">{user.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 capitalize font-semibold text-xs">
                         {user.role || "Unassigned"}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className={cn("w-2.5 h-2.5 rounded-full")}
-                          style={{
-                            backgroundColor:
-                              user.status === "active"
-                                ? "#10b981"
-                                : user.status === "pending"
-                                ? "#f59e0b"
-                                : "#ef4444",
-                          }}
-                        ></div>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(user.status)}
-                          <span className={cn("text-xs font-semibold uppercase tracking-wider", getStatusBadgeColor(user.status))}>
-                            {user.status || "Unknown"}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-600 font-medium">
-                      {new Date(user.created_at).toLocaleDateString()}
+                      <Badge className={cn("font-semibold text-xs", 
+                        user.status === "active" ? "bg-emerald-100 text-emerald-700" :
+                        user.status === "pending" ? "bg-amber-100 text-amber-700" :
+                        "bg-red-100 text-red-700"
+                      )}>
+                        {user.status?.toUpperCase() || "UNKNOWN"}
+                      </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex justify-center gap-3">
                         {user.status === "pending" && (
                           <Dialog open={isActionDialogOpen && selectedUser?.id === user.id} onOpenChange={setIsActionDialogOpen}>
                             <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg"
+                              <button
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setActionType("approve");
                                 }}
+                                className="text-amber-600 hover:text-amber-700 transition-colors"
+                                title="Approve"
                               >
-                                <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                              </Button>
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
                             </DialogTrigger>
                             <DialogContent className="border-slate-200">
                               <DialogHeader>
@@ -626,69 +896,19 @@ const UserManagementComplete: React.FC = () => {
                           </Dialog>
                         )}
 
-                        {(user.status === "suspended" || user.status === "inactive") && (
-                          <Dialog open={isActionDialogOpen && selectedUser?.id === user.id} onOpenChange={setIsActionDialogOpen}>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setActionType("activate");
-                                }}
-                              >
-                                <Play className="w-4 h-4 mr-1" /> Activate
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="border-slate-200">
-                              <DialogHeader>
-                                <DialogTitle>Activate User</DialogTitle>
-                                <DialogDescription>
-                                  This will reactivate {user.first_name} {user.last_name}.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <Alert>
-                                  <CheckCircle className="h-4 w-4" />
-                                  <AlertDescription>
-                                    User will be set to <strong>ACTIVE</strong> status.
-                                  </AlertDescription>
-                                </Alert>
-                                <div className="flex gap-3 justify-end">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => setIsActionDialogOpen(false)}
-                                    disabled={isProcessing}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
-                                    onClick={handleAction}
-                                    disabled={isProcessing}
-                                  >
-                                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                                    Activate User
-                                  </Button>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        )}
-
                         {user.status === "active" && (
                           <Dialog open={isActionDialogOpen && selectedUser?.id === user.id} onOpenChange={setIsActionDialogOpen}>
                             <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                className="bg-red-500 hover:bg-red-600 text-white font-bold rounded-lg"
+                              <button
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setActionType("suspend");
                                 }}
+                                className="text-amber-600 hover:text-amber-700 transition-colors"
+                                title="Suspend"
                               >
-                                <XCircle className="w-4 h-4 mr-1" /> Suspend
-                              </Button>
+                                <Clock className="w-4 h-4" />
+                              </button>
                             </DialogTrigger>
                             <DialogContent className="border-slate-200">
                               <DialogHeader>
@@ -726,56 +946,53 @@ const UserManagementComplete: React.FC = () => {
                           </Dialog>
                         )}
 
-                        {user.status !== "pending" && (
-                          <Dialog open={isActionDialogOpen && selectedUser?.id === user.id} onOpenChange={setIsActionDialogOpen}>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 font-bold rounded-lg"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setActionType("delete");
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4 mr-1" /> Delete
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="border-slate-200">
-                              <DialogHeader>
-                                <DialogTitle>Delete User</DialogTitle>
-                                <DialogDescription>
-                                  This will permanently delete {user.first_name} {user.last_name} and cannot be undone.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <Alert className="bg-red-50 border-red-200">
-                                  <AlertCircle className="h-4 w-4 text-red-600" />
-                                  <AlertDescription className="text-red-800">
-                                    <strong>Warning:</strong> This action is permanent and cannot be reversed. The user's account and all associated data will be deleted.
-                                  </AlertDescription>
-                                </Alert>
-                                <div className="flex gap-3 justify-end">
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => setIsActionDialogOpen(false)}
-                                    disabled={isProcessing}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    className="bg-red-600 hover:bg-red-700 text-white font-bold"
-                                    onClick={handleAction}
-                                    disabled={isProcessing}
-                                  >
-                                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                                    {isProcessing ? "Deleting..." : "Delete User"}
-                                  </Button>
-                                </div>
+                        <Dialog open={isActionDialogOpen && selectedUser?.id === user.id} onOpenChange={setIsActionDialogOpen}>
+                          <DialogTrigger asChild>
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setActionType("delete");
+                              }}
+                              className="text-red-600 hover:text-red-700 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </DialogTrigger>
+                          <DialogContent className="border-slate-200">
+                            <DialogHeader>
+                              <DialogTitle>Delete User</DialogTitle>
+                              <DialogDescription>
+                                This will permanently delete {user.first_name} {user.last_name} and cannot be undone.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <Alert className="bg-red-50 border-red-200">
+                                <AlertCircle className="h-4 w-4 text-red-600" />
+                                <AlertDescription className="text-red-800">
+                                  <strong>Warning:</strong> This action is permanent and cannot be reversed. The user's account and all associated data will be deleted.
+                                </AlertDescription>
+                              </Alert>
+                              <div className="flex gap-3 justify-end">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setIsActionDialogOpen(false)}
+                                  disabled={isProcessing}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                                  onClick={handleAction}
+                                  disabled={isProcessing}
+                                >
+                                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                  {isProcessing ? "Deleting..." : "Delete User"}
+                                </Button>
                               </div>
-                            </DialogContent>
-                          </Dialog>
-                        )}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </td>
                   </motion.tr>
@@ -783,10 +1000,6 @@ const UserManagementComplete: React.FC = () => {
               )}
             </tbody>
           </table>
-        </div>
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-600 font-semibold">
-          Showing <span className="text-[#F96302]">{filteredUsers.length}</span> of{" "}
-          <span className="text-[#154279]">{users.length}</span> users
         </div>
       </Card>
     </div>
