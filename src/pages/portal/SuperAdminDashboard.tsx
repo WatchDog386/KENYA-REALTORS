@@ -43,7 +43,6 @@ import {
   Target,
   Layers,
   LayoutGrid,
-  Link,
   Settings2,
   X,
   MapPin,
@@ -64,10 +63,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
-import { UtilityReadingsPaymentTracker } from "@/components/portal/super-admin/UtilityReadingsPaymentTracker";
 
 interface DashboardStats {
   totalProperties: number;
@@ -109,6 +106,10 @@ const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [activeView, setActiveView] = useState<"executive" | "operations" | "finance">("executive");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [refreshIntervalMs, setRefreshIntervalMs] = useState(60000);
   const [stats, setStats] = useState<DashboardStats>({
     totalProperties: 0,
     activeUsers: 0,
@@ -148,18 +149,21 @@ const SuperAdminDashboard = () => {
     };
 
     initDashboard();
-    
-    const interval = setInterval(() => {
-      if (isMounted) {
-        loadDashboardData();
-      }
-    }, 60000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    if (!autoRefreshEnabled) return;
+
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, refreshIntervalMs);
+
+    return () => clearInterval(interval);
+  }, [autoRefreshEnabled, refreshIntervalMs]);
 
   const loadDashboardData = async () => {
     if (refreshing) return;
@@ -536,6 +540,116 @@ const SuperAdminDashboard = () => {
     setRefreshing(false);
   };
 
+  const navigationItems = [
+    {
+      title: "Users & Approvals",
+      icon: <Users className="w-4 h-4" />,
+      route: "/portal/super-admin/users",
+      badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined,
+      view: "operations"
+    },
+    {
+      title: "Properties",
+      icon: <Building className="w-4 h-4" />,
+      route: "/portal/super-admin/properties",
+      view: "operations"
+    },
+    {
+      title: "Maintenance",
+      icon: <Wrench className="w-4 h-4" />,
+      route: "/portal/super-admin/maintenance",
+      badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined,
+      view: "operations"
+    },
+    {
+      title: "Payments & Reports",
+      icon: <FileBarChart className="w-4 h-4" />,
+      route: "/portal/super-admin/reports",
+      view: "finance"
+    },
+    {
+      title: "Analytics",
+      icon: <BarChart3 className="w-4 h-4" />,
+      route: "/portal/super-admin/analytics",
+      view: "executive"
+    },
+    {
+      title: "Settings",
+      icon: <Settings className="w-4 h-4" />,
+      route: "/portal/super-admin/settings",
+      view: "executive"
+    }
+  ];
+
+  const filteredRecentItems = recentItems.filter((item) => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return true;
+    return item.title.toLowerCase().includes(term) || item.subtitle.toLowerCase().includes(term);
+  });
+
+  const topPriorityItems = [
+    { label: "Pending approvals", value: stats.pendingApprovals, route: "/portal/super-admin/approvals" },
+    { label: "Maintenance backlog", value: stats.pendingMaintenance, route: "/portal/super-admin/maintenance" },
+    { label: "Failed payments", value: stats.overduePayments, route: "/portal/super-admin/payments" },
+  ].sort((a, b) => b.value - a.value);
+
+  const handleExportSnapshot = () => {
+    const snapshotRows = [
+      ["Metric", "Value"],
+      ["Total Properties", String(stats.totalProperties)],
+      ["Total Units", String(stats.totalUnits)],
+      ["Occupied Units", String(stats.occupiedUnits)],
+      ["Vacant Units", String(stats.vacantUnits)],
+      ["Active Users", String(stats.activeUsers)],
+      ["Pending Approvals", String(stats.pendingApprovals)],
+      ["Pending Maintenance", String(stats.pendingMaintenance)],
+      ["Failed Payments", String(stats.overduePayments)],
+      ["Revenue (KSH)", String(stats.totalRevenue)],
+      ["Collection Rate", `${stats.collectionRate}%`],
+      ["Response Time", `${systemStatus.responseTime}ms`],
+      ["Database", systemStatus.database ? "Operational" : "Offline"],
+      ["API", systemStatus.api ? "Online" : "Unavailable"],
+      ["Exported At", new Date().toISOString()],
+    ];
+
+    const csvContent = snapshotRows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `superadmin-snapshot-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Dashboard snapshot exported");
+  };
+
+  const handleSmartSearch = () => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) {
+      toast.info("Type something to search");
+      return;
+    }
+
+    const navMatch = navigationItems.find((item) => item.title.toLowerCase().includes(term));
+    if (navMatch) {
+      navigate(navMatch.route);
+      return;
+    }
+
+    const itemMatch = recentItems.find((item) => item.title.toLowerCase().includes(term));
+    if (itemMatch?.action) {
+      navigate(itemMatch.action);
+      return;
+    }
+
+    toast.info("No quick matches found");
+  };
+
   const getItemIcon = (type: string) => {
     switch (type) {
       case 'property': return <Building className="w-4 h-4" />;
@@ -551,49 +665,45 @@ const SuperAdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50 font-nunito">
+      <div className="flex items-center justify-center min-h-[60vh] bg-offwhite font-brand">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#154279]" />
-          <p className="text-slate-600 text-[13px] font-medium">Loading dashboard data...</p>
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-navy" />
+          <p className="text-midgray text-[13px] font-medium">Loading dashboard data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
-        body { font-family: 'Nunito', sans-serif; }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
-      `}</style>
+    <div className="bg-offwhite min-h-screen antialiased text-darkgray font-brand">
 
       {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg">
+      <section className="relative overflow-hidden pt-12 pb-24 shadow-lg bg-gradient-to-r from-navy via-navy to-cta">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.2),transparent_45%)]" />
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-10">
-            <div className="md:w-1/2">
+          <div className="relative z-10 grid grid-cols-1 xl:grid-cols-12 items-center gap-10">
+            <div className="xl:col-span-7">
               <div className="flex items-center gap-3 mb-4">
-                <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/30">
+                <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/40">
                   System Admin
                 </span>
-                <span className="text-blue-100 text-[10px] font-semibold uppercase tracking-widest">
+                <span className="text-white/80 text-[10px] font-semibold uppercase tracking-widest">
                   v4.2.0
                 </span>
               </div>
               
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
-                Welcome back, <span className="text-[#F96302]">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
+                Welcome back, <span className="text-electric">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
               </h1>
               
-              <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
+              <p className="text-sm text-white/85 leading-relaxed mb-8 max-w-lg font-medium">
                 Here's your system overview. Monitor properties, users, revenue, and system health in real-time with our modern dashboard.
               </p>
               
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <button
                   onClick={handleRefresh}
-                  className="group flex items-center gap-2 bg-white text-[#154279] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  className="group flex items-center gap-2 bg-white text-navy px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-offwhite transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                   Refresh
@@ -601,10 +711,18 @@ const SuperAdminDashboard = () => {
                 
                 <button
                   onClick={() => navigate("/portal/super-admin/reports")}
-                  className="group flex items-center gap-2 bg-white/20 border border-white/40 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/30 transition-all duration-300 rounded-xl shadow-sm hover:shadow-md"
+                  className="group flex items-center gap-2 bg-cta border border-white/30 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-cta/90 transition-all duration-300 rounded-xl shadow-sm hover:shadow-md"
                 >
                   <FileBarChart className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
                   Reports
+                </button>
+
+                <button
+                  onClick={() => setShowProfile(true)}
+                  className="group flex items-center gap-2 bg-transparent border border-white/40 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/15 transition-all duration-300 rounded-xl"
+                >
+                  <UserCheck className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                  Profile
                 </button>
               </div>
             </div>
@@ -613,54 +731,54 @@ const SuperAdminDashboard = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
-              className="md:w-1/2 w-full"
+              className="xl:col-span-5 w-full"
             >
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-slate-200 p-8 hover:shadow-2xl hover:border-[#F96302] transition-all duration-300 transform hover:-translate-y-1">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/40 p-8 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-[#154279]/10 rounded-xl">
-                      <Shield className="w-6 h-6 text-[#154279]" />
+                    <div className="p-3 bg-navy/10 rounded-xl">
+                      <Shield className="w-6 h-6 text-navy" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                      <h3 className="text-sm font-bold text-darkgray uppercase tracking-wide">
                         System Status
                       </h3>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Last updated: {formatTimeAgo(systemStatus.lastChecked)}</p>
+                      <p className="text-[11px] text-midgray font-medium mt-0.5">Last updated: {formatTimeAgo(systemStatus.lastChecked)}</p>
                     </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${systemStatus.database ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                  <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${systemStatus.database ? "bg-electric/10 text-electric border-electric/30" : "bg-cta/10 text-cta border-cta/30"}`}>
                     {systemStatus.uptime} Uptime
                   </div>
                 </div>
                 
                 <div className="space-y-6">
                   <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Database</span>
+                    <span className="text-[13px] font-semibold text-midgray group-hover:text-darkgray transition-colors">Database</span>
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.database ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`} />
-                      <span className={`text-[12px] font-bold ${systemStatus.database ? 'text-emerald-700' : 'text-red-700'}`}>
+                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.database ? 'bg-electric ring-electric/20' : 'bg-cta ring-cta/20'}`} />
+                      <span className={`text-[12px] font-bold ${systemStatus.database ? 'text-electric' : 'text-cta'}`}>
                         {systemStatus.database ? 'Operational' : 'Offline'}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="w-full h-px bg-slate-100" />
+                  <div className="w-full h-px bg-navy/10" />
                   
                   <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">API Service</span>
+                    <span className="text-[13px] font-semibold text-midgray group-hover:text-darkgray transition-colors">API Service</span>
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.api ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`} />
-                      <span className={`text-[12px] font-bold ${systemStatus.api ? 'text-emerald-700' : 'text-red-700'}`}>
+                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.api ? 'bg-electric ring-electric/20' : 'bg-cta ring-cta/20'}`} />
+                      <span className={`text-[12px] font-bold ${systemStatus.api ? 'text-electric' : 'text-cta'}`}>
                         {systemStatus.api ? 'Online' : 'Unavailable'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="w-full h-px bg-slate-100" />
+                  <div className="w-full h-px bg-navy/10" />
                   
                   <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Latency</span>
-                    <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-lg border ${systemStatus.responseTime < 500 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
+                    <span className="text-[13px] font-semibold text-midgray group-hover:text-darkgray transition-colors">Latency</span>
+                    <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-lg border ${systemStatus.responseTime < 500 ? "bg-electric/10 text-electric border-electric/30" : "bg-cta/10 text-cta border-cta/30"}`}>
                       {systemStatus.responseTime}ms
                     </span>
                   </div>
@@ -671,283 +789,337 @@ const SuperAdminDashboard = () => {
         </div>
       </section>
 
-      {/* KEY METRICS SECTION */}
-      <section className="bg-white py-20">
+      {/* FLOATING QUICK STRIP */}
+      <section className="relative -mt-12 z-20">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="mb-16 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">
-                Performance Overview
-              </h2>
-              <p className="text-sm text-slate-600">
-                Real-time metrics of your property management system
-              </p>
-            </div>
-            <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2.5 rounded-lg border border-emerald-200">
-               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-               <span className="text-[12px] font-semibold text-emerald-700">Live</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {[
               {
-                title: "Total Properties",
-                value: stats.totalProperties,
-                icon: <Building className="w-6 h-6" />,
-                metric: `${stats.totalUnits} Units`,
-                color: "slate"
+                title: "Occupancy",
+                value: `${stats.occupancyRate}%`,
+                subtitle: `${stats.occupiedUnits}/${stats.totalUnits} units occupied`,
+                icon: <Home className="w-5 h-5" />,
+                tone: "navy"
               },
               {
-                title: "Active Users",
-                value: stats.activeUsers,
-                icon: <Users className="w-6 h-6" />,
-                metric: `${stats.totalLeases} Leases`,
-                color: "slate"
+                title: "Collection",
+                value: `${stats.collectionRate}%`,
+                subtitle: `${formatForDisplay(stats.totalRevenue, 'KSH', true)} collected`,
+                icon: <TrendingUp className="w-5 h-5" />,
+                tone: "cta"
               },
               {
-                title: "Monthly Revenue",
-                value: formatForDisplay(stats.totalRevenue, 'KSH', true),
-                icon: <DollarSign className="w-6 h-6" />,
-                metric: `${stats.collectionRate.toFixed(0)}% Collection`,
-                color: "slate"
+                title: "Pending Actions",
+                value: stats.pendingApprovals + stats.pendingMaintenance,
+                subtitle: "approvals + maintenance", 
+                icon: <Bell className="w-5 h-5" />,
+                tone: "dark"
               },
               {
-                title: "System Health",
+                title: "API Latency",
                 value: `${systemStatus.responseTime}ms`,
-                icon: <Activity className="w-6 h-6" />,
-                metric: `${systemStatus.uptime} Uptime`,
-                color: "slate"
+                subtitle: systemStatus.api ? "service online" : "service degraded",
+                icon: <Database className="w-5 h-5" />,
+                tone: "electric"
               }
-            ].map((metric, index) => {
-              const colorMap = {
-                slate: { bg: "bg-slate-50", icon: "text-slate-600", border: "border-slate-200", hover: "hover:border-slate-400 hover:shadow-md" },
-                blue: { bg: "bg-blue-50", icon: "text-blue-600", border: "border-blue-200", hover: "hover:border-blue-400 hover:shadow-lg" },
-                emerald: { bg: "bg-emerald-50", icon: "text-emerald-600", border: "border-emerald-200", hover: "hover:border-emerald-400 hover:shadow-lg" }
-              };
-              const colors = colorMap[metric.color as keyof typeof colorMap];
-              
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                  className={`${colors.bg} border-2 ${colors.border} rounded-xl p-6 cursor-pointer transition-all ${colors.hover}`}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`p-3 bg-white rounded-lg ${colors.icon}`}>
-                      {metric.icon}
-                    </div>
+            ].map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.08 * index }}
+                className={`rounded-2xl border shadow-lg p-5 ${
+                  item.tone === "navy" ? "bg-white border-navy/20" :
+                  item.tone === "cta" ? "bg-cta text-white border-white/30" :
+                  item.tone === "electric" ? "bg-electric text-white border-white/30" :
+                  "bg-darkgray text-white border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${item.tone === "navy" ? "text-midgray" : "text-white/85"}`}>{item.title}</span>
+                  <span className={`${item.tone === "navy" ? "text-navy" : "text-white"}`}>{item.icon}</span>
+                </div>
+                <p className={`text-2xl font-bold mb-1 ${item.tone === "navy" ? "text-darkgray" : "text-white"}`}>{item.value}</p>
+                <p className={`text-xs ${item.tone === "navy" ? "text-midgray" : "text-white/80"}`}>{item.subtitle}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CONTROL HUB */}
+      <section className="bg-white border-b border-navy/10 pt-8">
+        <div className="max-w-[1400px] mx-auto px-6 py-6">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+            <Card className="xl:col-span-7 border-navy/20 bg-offwhite">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-darkgray flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-navy" />
+                  Dashboard Focus Mode
+                </CardTitle>
+                <CardDescription className="text-midgray">Switch layout context based on what you’re managing now.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { key: "executive", label: "Executive", icon: <Target className="w-3.5 h-3.5" /> },
+                    { key: "operations", label: "Operations", icon: <Layers className="w-3.5 h-3.5" /> },
+                    { key: "finance", label: "Finance", icon: <DollarSign className="w-3.5 h-3.5" /> },
+                  ].map((view) => (
+                    <Button
+                      key={view.key}
+                      type="button"
+                      onClick={() => setActiveView(view.key as "executive" | "operations" | "finance")}
+                      className={`${activeView === view.key ? "bg-navy text-white hover:bg-navy/90" : "bg-white text-navy border border-navy/20 hover:bg-navy/5"} rounded-lg`}
+                    >
+                      {view.icon}
+                      {view.label}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-midgray absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search activities, modules, tasks..."
+                      className="w-full h-10 pl-9 pr-3 rounded-lg border border-navy/20 bg-white text-sm text-darkgray placeholder:text-midgray focus:outline-none focus:ring-2 focus:ring-navy/20"
+                    />
                   </div>
-                  
-                  <h3 className="text-[13px] font-semibold text-slate-600 mb-2 uppercase tracking-wide">{metric.title}</h3>
-                  <p className="text-3xl font-bold text-slate-900 mb-3">{metric.value}</p>
-                  <p className="text-sm text-slate-600 font-medium">{metric.metric}</p>
-                </motion.div>
-              );
-            })}
+                  <Button onClick={handleSmartSearch} className="bg-cta hover:bg-cta/90 text-white">
+                    <Zap className="w-4 h-4" />
+                    Smart Go
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="xl:col-span-3 border-navy/20 bg-offwhite">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-darkgray flex items-center gap-2">
+                  <Settings2 className="w-4 h-4 text-navy" />
+                  Controls
+                </CardTitle>
+                <CardDescription className="text-midgray">Automation and export tools.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-navy/10">
+                  <span className="text-xs font-semibold text-midgray uppercase tracking-wide">Auto Refresh</span>
+                  <Button
+                    type="button"
+                    onClick={() => setAutoRefreshEnabled((prev) => !prev)}
+                    className={`${autoRefreshEnabled ? "bg-electric hover:bg-electric/90 text-white" : "bg-navy/10 hover:bg-navy/20 text-navy"} h-8 px-3 text-xs`}
+                  >
+                    {autoRefreshEnabled ? "ON" : "OFF"}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-midgray uppercase tracking-wide">Refresh Interval</p>
+                  <select
+                    value={refreshIntervalMs}
+                    onChange={(e) => setRefreshIntervalMs(Number(e.target.value))}
+                    className="w-full h-10 px-3 rounded-lg border border-navy/20 bg-white text-sm text-darkgray"
+                    disabled={!autoRefreshEnabled}
+                  >
+                    <option value={30000}>Every 30 seconds</option>
+                    <option value={60000}>Every 1 minute</option>
+                    <option value={300000}>Every 5 minutes</option>
+                  </select>
+                </div>
+
+                <Button onClick={handleExportSnapshot} className="w-full bg-navy hover:bg-navy/90 text-white">
+                  <Download className="w-4 h-4" />
+                  Export Snapshot
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="xl:col-span-2 border-navy/20 bg-gradient-to-br from-navy to-navy/90 text-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-electric" />
+                  Pulse
+                </CardTitle>
+                <CardDescription className="text-white/75">Live command snapshot.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="rounded-lg bg-white/10 p-2.5 border border-white/20">
+                  <p className="text-[10px] uppercase tracking-wider text-white/70">Approvals</p>
+                  <p className="text-xl font-bold">{stats.pendingApprovals}</p>
+                </div>
+                <div className="rounded-lg bg-white/10 p-2.5 border border-white/20">
+                  <p className="text-[10px] uppercase tracking-wider text-white/70">Maint. Queue</p>
+                  <p className="text-xl font-bold">{stats.pendingMaintenance}</p>
+                </div>
+                <div className="rounded-lg bg-electric/20 p-2.5 border border-electric/40">
+                  <p className="text-[10px] uppercase tracking-wider text-white/80">Health</p>
+                  <p className="text-sm font-semibold">{systemStatus.database ? "Stable" : "Attention Needed"}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
 
       {/* MAIN CONTENT */}
-      <section className="py-16 bg-slate-50">
+      <section className="py-14 bg-white">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="space-y-16">
-            {/* ALERTS & ACTIONS SECTION */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* SYSTEM ALERTS - Takes 2 columns on desktop */}
-              <div className="lg:col-span-2">
-                <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-slate-900 mb-1">Alerts & Status</h3>
-                  <p className="text-sm text-slate-600">Critical items requiring your attention</p>
-                </div>
-                
-                <div className="space-y-3">
+          <div className="mb-7 rounded-2xl border border-navy/15 bg-offwhite px-5 py-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-midgray font-semibold">Command Center</p>
+              <h2 className="text-xl md:text-2xl font-bold text-darkgray mt-1">Critical Operations Deck</h2>
+            </div>
+            <Badge className="bg-navy text-white px-3 py-1 border-0">{activeView.toUpperCase()} Mode</Badge>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+            <div className="xl:col-span-8 space-y-8">
+              <Card className="border-navy/15">
+                <CardHeader>
+                  <CardTitle className="text-darkgray">Alerts & Status</CardTitle>
+                  <CardDescription className="text-midgray">Critical items requiring your attention.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
                   {systemAlerts.slice(0, 4).map((alert, index) => (
-                    <motion.div
+                    <motion.button
                       key={index}
                       initial={{ opacity: 0, x: -20 }}
                       whileInView={{ opacity: 1, x: 0 }}
                       viewport={{ once: true }}
                       transition={{ delay: index * 0.05 }}
-                      className={`p-4 rounded-lg border cursor-pointer transition-all group ${
-                        alert.type === 'critical' || alert.type === 'error' ? 'bg-red-50 border-red-200 hover:border-red-400 hover:shadow-md' :
-                        alert.type === 'warning' ? 'bg-amber-50 border-amber-200 hover:border-amber-400 hover:shadow-md' :
-                        'bg-emerald-50 border-emerald-200 hover:border-emerald-400 hover:shadow-md'
-                      }`}
                       onClick={() => alert.action && navigate(alert.action)}
+                      className={`w-full text-left p-4 rounded-lg border transition-all ${
+                        alert.type === 'critical' || alert.type === 'error' ? 'bg-cta/10 border-cta/30 hover:border-cta/60' :
+                        alert.type === 'warning' ? 'bg-navy/5 border-navy/20 hover:border-navy/50' :
+                        'bg-electric/10 border-electric/30 hover:border-electric/50'
+                      }`}
                     >
                       <div className="flex items-start gap-3">
                         <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                          alert.type === 'critical' || alert.type === 'error' ? 'bg-red-200 text-red-700' :
-                          alert.type === 'warning' ? 'bg-amber-200 text-amber-700' :
-                          'bg-emerald-200 text-emerald-700'
+                          alert.type === 'critical' || alert.type === 'error' ? 'bg-cta/20 text-cta' :
+                          alert.type === 'warning' ? 'bg-navy/15 text-navy' :
+                          'bg-electric/20 text-electric'
                         }`}>
-                          {alert.type === 'critical' || alert.type === 'error' ? 
-                            <AlertCircle className="w-4 h-4" /> :
-                            alert.type === 'warning' ? 
-                            <AlertTriangle className="w-4 h-4" /> :
-                            <CheckCircle className="w-4 h-4" />
-                          }
+                          {alert.type === 'critical' || alert.type === 'error' ? <AlertCircle className="w-4 h-4" /> : alert.type === 'warning' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-bold text-[13px] text-slate-900 mb-0.5">{alert.title}</h4>
-                          <p className="text-[12px] text-slate-600 font-medium">{alert.description}</p>
+                        <div>
+                          <p className="text-[13px] font-bold text-darkgray">{alert.title}</p>
+                          <p className="text-[12px] text-midgray">{alert.description}</p>
                         </div>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-
-              {/* QUICK NAVIGATION - Right column */}
-              <div>
-                <div className="mb-6">
-                  <h3 className="text-2xl font-bold text-slate-900 mb-1">Navigation</h3>
-                  <p className="text-sm text-slate-600">Quick access to key areas</p>
-                </div>
-
-                <div className="space-y-2.5">
-                  {[
-                    {
-                      title: "Users & Approvals",
-                      icon: <Users className="w-4 h-4" />,
-                      route: "/portal/super-admin/users",
-                      badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined
-                    },
-                    {
-                      title: "Properties",
-                      icon: <Building className="w-4 h-4" />,
-                      route: "/portal/super-admin/properties"
-                    },
-                    {
-                      title: "Maintenance",
-                      icon: <Wrench className="w-4 h-4" />,
-                      route: "/portal/super-admin/maintenance",
-                      badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined
-                    },
-                    {
-                      title: "Payments & Reports",
-                      icon: <FileBarChart className="w-4 h-4" />,
-                      route: "/portal/super-admin/reports"
-                    },
-                    {
-                      title: "Analytics",
-                      icon: <BarChart3 className="w-4 h-4" />,
-                      route: "/portal/super-admin/analytics"
-                    },
-                    {
-                      title: "Settings",
-                      icon: <Settings className="w-4 h-4" />,
-                      route: "/portal/super-admin/settings"
-                    }
-                  ].map((action, index) => (
-                    <motion.button
-                      key={index}
-                      initial={{ opacity: 0, y: 10 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => navigate(action.route)}
-                      className="w-full flex items-center justify-between gap-3 p-3.5 bg-white border-2 border-slate-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group text-left"
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="p-2 bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white rounded-lg transition-all shrink-0">
-                          {action.icon}
-                        </div>
-                        <span className="text-[13px] font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
-                          {action.title}
-                        </span>
-                      </div>
-                      {action.badge && (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shrink-0">
-                          {action.badge}
-                        </span>
-                      )}
-                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
                     </motion.button>
                   ))}
-                </div>
-              </div>
-            </div>
+                </CardContent>
+              </Card>
 
-            {/* UTILITY READINGS PAYMENT TRACKER */}
-            <div>
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold text-slate-900 mb-1">Utility Readings & Payments</h3>
-                <p className="text-sm text-slate-600">Track utility readings and reconcile tenant payments</p>
-              </div>
-              <UtilityReadingsPaymentTracker />
-            </div>
-
-            {/* RECENT ACTIVITY */}
-            <div>
-              <div className="mb-6">
-                <div className="flex items-center justify-between">
+              <Card className="border-navy/15 overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-1">Recent Activity</h3>
-                    <p className="text-sm text-slate-600">Latest updates across your platform</p>
+                    <CardTitle className="text-darkgray">Recent Activity</CardTitle>
+                    <CardDescription className="text-midgray">Filtered by your current search and focus mode.</CardDescription>
                   </div>
-                  {recentItems.length > 0 && (
-                    <button
-                      onClick={() => navigate("/portal/super-admin/activity-logs")}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-bold rounded-lg transition-all flex items-center gap-2"
-                    >
+                  {filteredRecentItems.length > 0 && (
+                    <Button onClick={() => navigate("/portal/super-admin/activity-logs")} className="bg-cta hover:bg-cta/90 text-white">
                       View All
                       <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    </Button>
                   )}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-sm">
-                <div className="divide-y divide-slate-100">
-                  {recentItems.length > 0 ? (
-                    recentItems.slice(0, 6).map((item, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0 }}
-                        whileInView={{ opacity: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: index * 0.05 }}
-                        className="flex items-start gap-4 p-5 hover:bg-slate-50 transition-colors cursor-pointer group"
-                        onClick={() => item.action && navigate(item.action)}
-                      >
-                        <div className={`mt-1 p-2.5 rounded-lg shrink-0 group-hover:scale-110 transition-transform ${
-                            item.type === 'property' ? 'bg-blue-100 text-blue-600' :
-                            item.type === 'user' ? 'bg-emerald-100 text-emerald-600' :
-                            item.type === 'payment' ? 'bg-cyan-100 text-cyan-600' :
-                            item.type === 'approval' ? 'bg-amber-100 text-amber-600' :
-                            'bg-slate-100 text-slate-600'
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-navy/10">
+                    {filteredRecentItems.length > 0 ? (
+                      filteredRecentItems.slice(0, 6).map((item, index) => (
+                        <motion.button
+                          key={index}
+                          initial={{ opacity: 0 }}
+                          whileInView={{ opacity: 1 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.05 }}
+                          onClick={() => item.action && navigate(item.action)}
+                          className="w-full text-left flex items-start gap-4 p-5 hover:bg-offwhite transition-colors"
+                        >
+                          <div className={`mt-1 p-2.5 rounded-lg shrink-0 ${
+                            item.type === 'property' ? 'bg-navy/15 text-navy' :
+                            item.type === 'user' ? 'bg-electric/20 text-electric' :
+                            item.type === 'payment' ? 'bg-cta/15 text-cta' :
+                            'bg-navy/10 text-navy'
                           }`}>
-                          {getItemIcon(item.type)}
+                            {getItemIcon(item.type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-bold text-darkgray truncate">{item.title}</p>
+                            <p className="text-[12px] text-midgray mb-1.5 truncate font-medium">{item.subtitle}</p>
+                            <span className="text-[11px] text-midgray/80 flex items-center gap-1 font-medium">
+                              <Clock className="w-3 h-3" /> {item.time}
+                            </span>
+                          </div>
+                        </motion.button>
+                      ))
+                    ) : (
+                      <div className="text-center py-14 px-6">
+                        <div className="bg-navy/10 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Clock className="w-7 h-7 text-navy/50" />
                         </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                              {item.title}
-                          </p>
-                          <p className="text-[12px] text-slate-500 mb-1.5 truncate font-medium">{item.subtitle}</p>
-                          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                             <Clock className="w-3 h-3" /> {item.time}
-                          </span>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <div className="text-center py-16 px-6">
-                      <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                         <Clock className="w-8 h-8 text-slate-300" />
+                        <p className="text-darkgray text-sm font-bold">No matching activity</p>
+                        <p className="text-midgray text-xs mt-1 font-medium">Try another search term or clear the filter.</p>
                       </div>
-                      <p className="text-slate-900 text-sm font-bold">No recent activity</p>
-                      <p className="text-slate-500 text-xs mt-1 font-medium">Activities will appear here as they occur</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="xl:col-span-4 space-y-6 xl:sticky xl:top-6 self-start">
+              <Card className="border-navy/15 bg-offwhite">
+                <CardHeader>
+                  <CardTitle className="text-darkgray flex items-center gap-2">
+                    <ClipboardList className="w-4 h-4 text-cta" />
+                    Priority Queue
+                  </CardTitle>
+                  <CardDescription className="text-midgray">What needs immediate follow-up today.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2.5">
+                  {topPriorityItems.map((task) => (
+                    <button
+                      key={task.label}
+                      onClick={() => navigate(task.route)}
+                      className="w-full p-3 rounded-lg border border-navy/15 bg-white hover:border-cta/40 transition-all text-left"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] text-midgray font-medium">{task.label}</span>
+                        <Badge className={`${task.value > 0 ? "bg-cta text-white" : "bg-electric/15 text-electric"} border-0`}>{task.value}</Badge>
+                      </div>
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card className="border-navy/15">
+                <CardHeader>
+                  <CardTitle className="text-darkgray flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-navy" />
+                    Quick Actions
+                  </CardTitle>
+                  <CardDescription className="text-midgray">Launch common admin actions in one click.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button onClick={() => navigate("/portal/super-admin/properties")} className="w-full justify-start bg-navy hover:bg-navy/90 text-white">
+                    <Building className="w-4 h-4" />
+                    Add / Manage Property
+                  </Button>
+                  <Button onClick={() => navigate("/portal/super-admin/users")} className="w-full justify-start bg-cta hover:bg-cta/90 text-white">
+                    <UserPlus className="w-4 h-4" />
+                    Invite / Manage Users
+                  </Button>
+                  <Button onClick={() => navigate("/portal/super-admin/approvals")} className="w-full justify-start bg-white border border-navy/20 text-navy hover:bg-navy/5">
+                    <ShieldCheck className="w-4 h-4" />
+                    Review Approvals
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
@@ -970,12 +1142,12 @@ const SuperAdminDashboard = () => {
               onClick={(e) => e.stopPropagation()}
               className="w-full m-4"
             >
-              <div className="bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto relative">
+              <div className="bg-offwhite rounded-2xl shadow-2xl border border-navy/15 max-w-4xl mx-auto relative">
                 <button
                   onClick={() => setShowProfile(false)}
-                  className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-lg transition-colors z-10"
+                  className="absolute top-4 right-4 p-2 hover:bg-navy/10 rounded-lg transition-colors z-10"
                 >
-                  <X className="w-5 h-5 text-slate-600" />
+                  <X className="w-5 h-5 text-midgray" />
                 </button>
                 <SuperAdminProfile />
               </div>
