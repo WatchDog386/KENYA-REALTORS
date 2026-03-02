@@ -103,6 +103,21 @@ export const technicianService = {
     return data;
   },
 
+  // Get all technicians (with their profile and category)
+  async getAllTechnicians(): Promise<Technician[]> {
+    const { data, error } = await supabase
+      .from('technicians')
+      .select(`
+        *,
+        category:technician_categories(*),
+        profile:profiles(id, first_name, last_name, email, phone, avatar_url)
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   // Get all technicians for a category
   async getTechniciansByCategory(categoryId: string, propertyId?: string): Promise<Technician[]> {
     let query = supabase
@@ -135,6 +150,18 @@ export const technicianService = {
     certificationUrl?: string,
     experienceYears?: number
   ): Promise<Technician> {
+    // Validate that category_id is provided and is not empty
+    if (!categoryId || categoryId.trim() === '') {
+      throw new Error('Technician category is required. A technician must belong to a specific category (plumber, electrician, etc.)');
+    }
+
+    // Verify category exists
+    try {
+      await this.getCategoryById(categoryId);
+    } catch (err) {
+      throw new Error(`Invalid category ID: ${categoryId}`);
+    }
+
     const { data, error } = await supabase
       .from('technicians')
       .insert([{
@@ -160,6 +187,46 @@ export const technicianService = {
       .update(updates)
       .eq('id', id)
       .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // ============================================================================
+  // CATEGORY ASSIGNMENT (Super Admin Function)
+  // ============================================================================
+
+  // Assign or change technician category (Super Admin Only)
+  async assignTechnicianCategory(
+    technicianId: string,
+    categoryId: string
+  ): Promise<Technician> {
+    // Validate category_id is provided
+    if (!categoryId || categoryId.trim() === '') {
+      throw new Error('Category ID is required');
+    }
+
+    // Verify category exists and is active
+    try {
+      const category = await this.getCategoryById(categoryId);
+      if (!category.is_active) {
+        throw new Error('Cannot assign inactive category');
+      }
+    } catch (err) {
+      throw new Error(`Invalid or inactive category: ${categoryId}`);
+    }
+
+    // Update technician's category
+    const { data, error } = await supabase
+      .from('technicians')
+      .update({ category_id: categoryId })
+      .eq('id', technicianId)
+      .select(`
+        *,
+        category:technician_categories(*),
+        profile:profiles(id, first_name, last_name, email, phone)
+      `)
       .single();
     
     if (error) throw error;

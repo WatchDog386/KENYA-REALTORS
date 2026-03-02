@@ -28,6 +28,9 @@ import {
 
 interface TenantData {
   id: string;
+  user_id: string;
+  unit_id: string;
+  property_id: string;
   first_name: string;
   last_name: string;
   unit_number: string;
@@ -78,6 +81,7 @@ const PaymentsManagement = () => {
           id,
           user_id,
           unit_id,
+          property_id,
           unit:units (
             unit_number,
             property_unit_types (
@@ -124,6 +128,9 @@ const PaymentsManagement = () => {
         const lease = leaseMap.get(tenant.user_id);
         return {
           id: tenant.id,
+          user_id: tenant.user_id,
+          unit_id: tenant.unit_id,
+          property_id: tenant.property_id,
           first_name: profile?.first_name || "",
           last_name: profile?.last_name || "",
           unit_number: tenant.unit?.unit_number || "N/A",
@@ -144,9 +151,53 @@ const PaymentsManagement = () => {
 
   const fetchPaymentRecords = async () => {
     try {
-      // Placeholder - can fetch payment records from a payments table if it exists
-      // For now, initialize empty payment records
-      setPaymentRecords({});
+      const startOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).toISOString();
+
+      const { data, error } = await supabase
+        .from("rent_payments")
+        .select("*")
+        .gte("created_at", startOfMonth)
+        .lte("created_at", endOfMonth);
+
+      if (error) throw error;
+
+      const records: Record<string, PaymentRecord> = {};
+      
+      // Map rent_payments to our local state
+      data?.forEach((payment) => {
+        // Find the tenant ID from the payment
+        // Note: rent_payments has tenant_id which is the user_id, but our local state uses tenant.id as key
+        const tenant = tenants.find(t => t.user_id === payment.tenant_id);
+        
+        if (tenant) {
+          const tenantId = tenant.id;
+          
+          // If we already have a record for this tenant, we might want to aggregate or just take the latest
+          // For simplicity, we'll aggregate amounts if there are multiple payments
+          const existing = records[tenantId] || {
+            tenant_id: tenantId,
+            rent: tenant.rent || 0,
+            penalty_fee: 0,
+            total_paid: 0,
+            arrears: 0,
+            advance_rent: 0,
+            transaction_date: payment.created_at.split('T')[0],
+            reference_code: payment.transaction_id || "",
+            status: payment.status,
+            payment_date: payment.created_at.split('T')[0],
+          };
+
+          records[tenantId] = {
+            ...existing,
+            total_paid: existing.total_paid + (payment.amount_paid || (payment.status === 'paid' ? payment.amount : 0)),
+            status: payment.status === 'paid' ? 'paid' : existing.status,
+            reference_code: payment.transaction_id || existing.reference_code,
+          };
+        }
+      });
+
+      setPaymentRecords(records);
     } catch (error) {
       console.error("Error fetching payment records:", error);
     }
@@ -206,8 +257,50 @@ const PaymentsManagement = () => {
         status: record.status || "pending",
       };
 
-      // Here you would save to a payments_received table
-      // For now, just show success
+      // Find the user_id for this tenant
+      const tenant = tenants.find(t => t.id === tenantId);
+      if (tenant && tenant.user_id) {
+        // Check if a payment record already exists for this month
+        const startOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1).toISOString();
+        const endOfMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0).toISOString();
+
+        const { data: existingPayments } = await supabase
+          .from("rent_payments")
+          .select("id")
+          .eq("tenant_id", tenant.user_id)
+          .gte("created_at", startOfMonth)
+          .lte("created_at", endOfMonth)
+          .limit(1);
+
+        if (existingPayments && existingPayments.length > 0) {
+          // Update existing
+          await supabase
+            .from("rent_payments")
+            .update({
+              amount_paid: record.total_paid,
+              status: record.total_paid >= record.rent ? 'paid' : (record.total_paid > 0 ? 'partial' : 'pending'),
+              transaction_id: record.reference_code,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existingPayments[0].id);
+        } else {
+          // Insert new
+          await supabase
+            .from("rent_payments")
+            .insert({
+              tenant_id: tenant.user_id,
+              property_id: tenant.property_id,
+              unit_id: tenant.unit_id,
+              amount: record.rent,
+              amount_paid: record.total_paid,
+              due_date: new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 5).toISOString(),
+              status: record.total_paid >= record.rent ? 'paid' : (record.total_paid > 0 ? 'partial' : 'pending'),
+              transaction_id: record.reference_code,
+              remarks: `Rent Payment for ${format(selectedMonth, "MMMM yyyy")}`
+            });
+        }
+      }
+
       toast.success("Payment record saved");
     } catch (error) {
       console.error("Error saving payment:", error);

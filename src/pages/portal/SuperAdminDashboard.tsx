@@ -67,6 +67,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
+import { UtilityReadingsPaymentTracker } from "@/components/portal/super-admin/UtilityReadingsPaymentTracker";
 
 interface DashboardStats {
   totalProperties: number;
@@ -670,21 +671,21 @@ const SuperAdminDashboard = () => {
         </div>
       </section>
 
-      {/* KEY METRICS SECTION - ORANGE ICONS */}
-      <section className="bg-slate-50 py-14">
+      {/* KEY METRICS SECTION */}
+      <section className="bg-white py-20">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="mb-16 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-[#154279] tracking-tight mb-2">
+              <h2 className="text-3xl font-bold text-slate-900 mb-2">
                 Performance Overview
               </h2>
-              <p className="text-sm text-slate-600 font-medium max-w-2xl">
-                Real-time metrics for your system's key performance indicators.
+              <p className="text-sm text-slate-600">
+                Real-time metrics of your property management system
               </p>
             </div>
-            <div className="bg-white px-4 py-2 rounded-xl border-2 border-slate-200 flex items-center gap-2 shadow-sm">
+            <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2.5 rounded-lg border border-emerald-200">
                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-               <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Live Updates</span>
+               <span className="text-[12px] font-semibold text-emerald-700">Live</span>
             </div>
           </div>
 
@@ -693,443 +694,258 @@ const SuperAdminDashboard = () => {
               {
                 title: "Total Properties",
                 value: stats.totalProperties,
-                icon: <Building className="w-8 h-8 text-[#154279]" />,
+                icon: <Building className="w-6 h-6" />,
                 metric: `${stats.totalUnits} Units`,
-                progress: stats.occupancyRate,
-                label: "Occupancy",
-                route: "/portal/super-admin/properties",
-                primaryColor: "#3b82f6",
-                secondaryColor: "#1e40af",
-                accentColor: "from-blue-50 via-blue-50/30 to-white",
-                borderHover: "hover:border-blue-400 hover:shadow-blue-500/20"
+                color: "slate"
               },
               {
                 title: "Active Users",
                 value: stats.activeUsers,
-                icon: <Users className="w-8 h-8 text-[#154279]" />,
+                icon: <Users className="w-6 h-6" />,
                 metric: `${stats.totalLeases} Leases`,
-                progress: (stats.totalLeases / (stats.totalUnits || 1)) * 100,
-                label: "Lease Rate",
-                route: "/portal/super-admin/users",
-                primaryColor: "#0ea5e9",
-                secondaryColor: "#0284c7",
-                accentColor: "from-cyan-50 via-cyan-50/30 to-white",
-                borderHover: "hover:border-cyan-400 hover:shadow-cyan-500/20"
+                color: "slate"
               },
               {
                 title: "Monthly Revenue",
                 value: formatForDisplay(stats.totalRevenue, 'KSH', true),
-                icon: <DollarSign className="w-8 h-8 text-[#F96302]" />,
+                icon: <DollarSign className="w-6 h-6" />,
                 metric: `${stats.collectionRate.toFixed(0)}% Collection`,
-                progress: stats.collectionRate,
-                label: "Collections",
-                route: "/portal/super-admin/payments",
-                primaryColor: "#10b981",
-                secondaryColor: "#059669",
-                accentColor: "from-emerald-50 via-emerald-50/30 to-white",
-                borderHover: "hover:border-emerald-400 hover:shadow-emerald-500/20"
+                color: "slate"
               },
               {
                 title: "System Health",
                 value: `${systemStatus.responseTime}ms`,
-                icon: <Activity className="w-8 h-8 text-[#F96302]" />,
+                icon: <Activity className="w-6 h-6" />,
                 metric: `${systemStatus.uptime} Uptime`,
-                progress: systemStatus.responseTime < 500 ? 95 : 70,
-                label: "Performance",
-                route: "/portal/super-admin/settings",
-                primaryColor: "#f59e0b",
-                secondaryColor: "#d97706",
-                accentColor: "from-amber-50 via-amber-50/30 to-white",
-                borderHover: "hover:border-amber-400 hover:shadow-amber-500/20"
+                color: "slate"
               }
-            ].map((metric, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                onClick={() => navigate(metric.route)}
-                className={`group relative border-2 rounded-2xl transition-all duration-300 flex flex-col h-full overflow-hidden cursor-pointer bg-gradient-to-br ${metric.accentColor} border-slate-300 ${metric.borderHover} hover:shadow-2xl hover:scale-[1.02] shadow-lg shadow-slate-300/30`}
-              >
-                {/* Decorative corner accent */}
-                <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 bg-gradient-to-br from-[#154279] transition-all duration-300" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-
-                {/* Main content */}
-                <div className="flex-grow relative p-8 flex flex-col items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#154279] to-transparent opacity-5 pointer-events-none transition-all duration-300" />
-                  
-                  <motion.div 
-                    whileHover={{ scale: 1.15, rotate: 5 }}
-                    className="relative z-10"
-                  >
-                    {metric.icon}
-                  </motion.div>
-                  
-                  <div className="relative z-10 mt-6 text-center w-full px-2">
-                    <h3 className="text-[13px] font-bold leading-tight group-hover:scale-105 transition-all uppercase tracking-tight text-[#154279]">
-                      {metric.title}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 font-medium mt-2">
-                      {metric.metric}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Bottom section with progress */}
-                <div className="relative z-30 p-6 border-t-2 transition-all bg-gradient-to-r from-slate-50 via-white to-slate-50 border-slate-200">
-                  <div className="absolute bottom-0 right-0 w-20 h-20 opacity-10 pointer-events-none transition-all duration-300">
-                    {metric.icon}
-                  </div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#154279]">
-                        {metric.label}
-                      </span>
-                      <span className="text-xs font-bold text-[#154279]">
-                        {Math.min(metric.progress || 0, 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(metric.progress || 0, 100)}%` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="h-full rounded-full"
-                        style={{ background: `linear-gradient(90deg, ${metric.primaryColor}, ${metric.secondaryColor})` }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-3">
-                      <span className="text-[9px] font-bold text-slate-600 uppercase tracking-wide">
-                        {metric.value}
-                      </span>
+            ].map((metric, index) => {
+              const colorMap = {
+                slate: { bg: "bg-slate-50", icon: "text-slate-600", border: "border-slate-200", hover: "hover:border-slate-400 hover:shadow-md" },
+                blue: { bg: "bg-blue-50", icon: "text-blue-600", border: "border-blue-200", hover: "hover:border-blue-400 hover:shadow-lg" },
+                emerald: { bg: "bg-emerald-50", icon: "text-emerald-600", border: "border-emerald-200", hover: "hover:border-emerald-400 hover:shadow-lg" }
+              };
+              const colors = colorMap[metric.color as keyof typeof colorMap];
+              
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className={`${colors.bg} border-2 ${colors.border} rounded-xl p-6 cursor-pointer transition-all ${colors.hover}`}
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className={`p-3 bg-white rounded-lg ${colors.icon}`}>
+                      {metric.icon}
                     </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                  
+                  <h3 className="text-[13px] font-semibold text-slate-600 mb-2 uppercase tracking-wide">{metric.title}</h3>
+                  <p className="text-3xl font-bold text-slate-900 mb-3">{metric.value}</p>
+                  <p className="text-sm text-slate-600 font-medium">{metric.metric}</p>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* MAIN CONTENT */}
-      <section className="py-12 bg-white">
+      <section className="py-16 bg-slate-50">
         <div className="max-w-[1400px] mx-auto px-6">
-          <div className="space-y-8">
-            {/* QUICK ACTIONS - HOWITWORKS STYLE */}
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px w-8 bg-[#F96302]"></div>
-                <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Quick Actions</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  {
-                    title: "Manage Users",
-                    icon: <Users className="w-6 h-6 text-white" />,
-                    description: "Add, edit, remove users",
-                    route: "/portal/super-admin/users",
-                    badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined,
-                    bgGradient: "from-blue-500 via-blue-600 to-blue-700",
-                    borderColor: "border-blue-300",
-                    iconBg: "bg-blue-400"
-                  },
-                  {
-                    title: "Properties",
-                    icon: <Building className="w-6 h-6 text-white" />,
-                    description: "View property listing",
-                    route: "/portal/super-admin/properties",
-                    bgGradient: "from-emerald-500 via-emerald-600 to-emerald-700",
-                    borderColor: "border-emerald-300",
-                    iconBg: "bg-emerald-400"
-                  },
-                  {
-                    title: "Approvals",
-                    icon: <FileCheck className="w-6 h-6 text-white" />,
-                    description: "Pending requests queue",
-                    route: "/portal/super-admin/approvals",
-                    badge: stats.pendingRequests > 0 ? stats.pendingRequests : undefined,
-                    bgGradient: "from-purple-500 via-purple-600 to-purple-700",
-                    borderColor: "border-purple-300",
-                    iconBg: "bg-purple-400"
-                  },
-                  {
-                    title: "Analytics",
-                    icon: <BarChart3 className="w-6 h-6 text-white" />,
-                    description: "Performance reports",
-                    route: "/portal/super-admin/analytics",
-                    bgGradient: "from-cyan-500 via-cyan-600 to-cyan-700",
-                    borderColor: "border-cyan-300",
-                    iconBg: "bg-cyan-400"
-                  },
-                  {
-                    title: "Reports",
-                    icon: <FileBarChart className="w-6 h-6 text-white" />,
-                    description: "Financial summaries",
-                    route: "/portal/super-admin/reports",
-                    bgGradient: "from-pink-500 via-pink-600 to-pink-700",
-                    borderColor: "border-pink-300",
-                    iconBg: "bg-pink-400"
-                  },
-                  {
-                    title: "Maintenance",
-                    icon: <Wrench className="w-6 h-6 text-white" />,
-                    description: "Service requests",
-                    route: "/portal/super-admin/maintenance",
-                    badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined,
-                    bgGradient: "from-orange-500 via-orange-600 to-orange-700",
-                    borderColor: "border-orange-300",
-                    iconBg: "bg-orange-400"
-                  }
-                ].map((action, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    onClick={() => navigate(action.route)}
-                    className={`group relative border-2 ${action.borderColor} rounded-2xl p-6 cursor-pointer transition-all duration-300 bg-gradient-to-br ${action.bgGradient} hover:border-white hover:shadow-2xl hover:shadow-black/20 hover:scale-[1.05] shadow-lg overflow-hidden text-white`}
-                  >
-                    {/* Decorative corner */}
-                    <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none opacity-20 bg-white group-hover:opacity-30 transition-all" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-4">
-                        <motion.div whileHover={{ scale: 1.1, rotate: -5 }} className={`p-3 ${action.iconBg} rounded-xl shadow-md group-hover:shadow-lg transition-all`}>
-                          {action.icon}
-                        </motion.div>
-                        {action.badge && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-900 shadow-md ring-2 ring-white">
-                            {action.badge}
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-[15px] font-bold text-white mb-1">{action.title}</h4>
-                      <p className="text-[12px] text-white/90 font-medium">{action.description}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* SYSTEM ALERTS */}
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px w-8 bg-[#F96302]"></div>
-                <h3 className="text-lg font-semibold text-[#154279] tracking-tight">System Alerts</h3>
-                {systemAlerts.length > 0 && <Badge className="border-red-300 text-red-700 bg-red-50 border-2 ml-auto">{systemAlerts.length} Active</Badge>}
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {systemAlerts.map((alert, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${
-                      alert.type === 'critical' ? 'bg-red-50 border-red-300 hover:bg-red-100 hover:shadow-lg hover:shadow-red-500/20' :
-                      alert.type === 'error' ? 'bg-red-50 border-red-200 hover:bg-red-100 hover:shadow-lg hover:shadow-red-500/20' :
-                      alert.type === 'warning' ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 hover:shadow-lg hover:shadow-amber-500/20' :
-                      'bg-emerald-50 border-emerald-300 hover:bg-emerald-100 hover:shadow-lg hover:shadow-emerald-500/20'
-                    }`}
-                    onClick={() => alert.action && navigate(alert.action)}
-                  >
-                    {/* Decorative accent */}
-                    <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none opacity-10 bg-gradient-to-br from-[#F96302] group-hover:opacity-20 transition-all" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                       alert.type === 'critical' || alert.type === 'error' ? 'bg-red-500' :
-                       alert.type === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}></div>
-
-                    <div className="flex items-start gap-4 pl-2 relative z-10">
-                      <div className={`p-3 rounded-xl mt-0.5 shrink-0 ${
-                        alert.type === 'critical' || alert.type === 'error' ? 'bg-red-200 text-red-700' :
-                        alert.type === 'warning' ? 'bg-amber-200 text-amber-700' :
-                        'bg-emerald-200 text-emerald-700'
-                      }`}>
-                        {alert.type === 'critical' || alert.type === 'error' ? 
-                          <AlertCircle className="w-5 h-5" /> :
-                          alert.type === 'warning' ? 
-                          <AlertTriangle className="w-5 h-5" /> :
-                          <CheckCircle className="w-5 h-5" />
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-[14px] text-slate-900">{alert.title}</h4>
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border-2 whitespace-nowrap ${
-                            alert.priority === 'critical' || alert.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300' : 
-                            'bg-slate-100 text-slate-700 border-slate-300'
-                          }`}>
-                            {alert.priority}
-                          </span>
-                        </div>
-                        <p className="text-[13px] text-slate-700 leading-relaxed font-medium">{alert.description}</p>
-                        
-                        {alert.action && (
-                          <div className="flex items-center gap-1 mt-3 text-[#154279] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <span className="text-[11px] font-bold uppercase tracking-wide">View Details</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* RECENT ACTIVITY & SHORTCUTS GRID */}
+          <div className="space-y-16">
+            {/* ALERTS & ACTIONS SECTION */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* RECENT ACTIVITY - LEFT */}
+              {/* SYSTEM ALERTS - Takes 2 columns on desktop */}
               <div className="lg:col-span-2">
-                <div className="space-y-5">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-px w-8 bg-[#F96302]"></div>
-                    <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Recent Activity</h3>
-                  </div>
-
-                  <div className="bg-white rounded-2xl shadow-lg border-2 border-slate-200 overflow-hidden">
-                    <div className="p-0">
-                      <div className="divide-y-2 divide-slate-100">
-                        {recentItems.length > 0 ? (
-                          recentItems.slice(0, 6).map((item, index) => (
-                            <motion.div
-                              key={index}
-                              initial={{ opacity: 0 }}
-                              whileInView={{ opacity: 1 }}
-                              viewport={{ once: true }}
-                              transition={{ delay: index * 0.05 }}
-                              className="flex items-start gap-3 p-4 hover:bg-slate-50 transition-colors cursor-pointer group border-l-4 border-l-transparent hover:border-l-[#F96302]"
-                              onClick={() => item.action && navigate(item.action)}
-                            >
-                              <div className={`mt-1 p-2.5 rounded-lg shrink-0 group-hover:scale-110 transition-transform ${
-                                  item.type === 'property' ? 'bg-blue-100 text-[#154279]' :
-                                  item.type === 'user' ? 'bg-emerald-100 text-emerald-700' :
-                                  item.type === 'payment' ? 'bg-violet-100 text-violet-700' :
-                                  item.type === 'approval' ? 'bg-amber-100 text-amber-700' :
-                                  'bg-slate-100 text-slate-700'
-                                }`}>
-                                {getItemIcon(item.type)}
-                              </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[13px] font-bold text-slate-900 group-hover:text-[#F96302] transition-colors truncate">
-                                    {item.title}
-                                </p>
-                                <p className="text-[12px] text-slate-500 mb-1 truncate font-medium">{item.subtitle}</p>
-                                <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                                   <Clock className="w-3 h-3" /> {item.time}
-                                </span>
-                              </div>
-                            </motion.div>
-                          ))
-                        ) : (
-                          <div className="text-center py-12 px-6">
-                            <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                               <Clock className="w-8 h-8 text-slate-300" />
-                            </div>
-                            <p className="text-slate-900 text-sm font-bold">No recent activity</p>
-                            <p className="text-slate-500 text-xs mt-1 font-medium">Activities will appear here as they occur</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {recentItems.length > 0 && (
-                        <div className="p-4 bg-slate-50 border-t-2 border-slate-200">
-                          <button
-                            onClick={() => navigate("/portal/super-admin/activity-logs")}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-[#154279] to-[#0f325e] border-2 border-[#154279] text-white text-[12px] font-bold uppercase tracking-wider rounded-xl hover:from-[#F96302] hover:to-[#ff8c42] hover:border-[#F96302] transition-all shadow-md hover:shadow-lg"
-                          >
-                            View Full History
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-1">Alerts & Status</h3>
+                  <p className="text-sm text-slate-600">Critical items requiring your attention</p>
+                </div>
+                
+                <div className="space-y-3">
+                  {systemAlerts.slice(0, 4).map((alert, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`p-4 rounded-lg border cursor-pointer transition-all group ${
+                        alert.type === 'critical' || alert.type === 'error' ? 'bg-red-50 border-red-200 hover:border-red-400 hover:shadow-md' :
+                        alert.type === 'warning' ? 'bg-amber-50 border-amber-200 hover:border-amber-400 hover:shadow-md' :
+                        'bg-emerald-50 border-emerald-200 hover:border-emerald-400 hover:shadow-md'
+                      }`}
+                      onClick={() => alert.action && navigate(alert.action)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                          alert.type === 'critical' || alert.type === 'error' ? 'bg-red-200 text-red-700' :
+                          alert.type === 'warning' ? 'bg-amber-200 text-amber-700' :
+                          'bg-emerald-200 text-emerald-700'
+                        }`}>
+                          {alert.type === 'critical' || alert.type === 'error' ? 
+                            <AlertCircle className="w-4 h-4" /> :
+                            alert.type === 'warning' ? 
+                            <AlertTriangle className="w-4 h-4" /> :
+                            <CheckCircle className="w-4 h-4" />
+                          }
                         </div>
-                      )}
-                    </div>
-                  </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-[13px] text-slate-900 mb-0.5">{alert.title}</h4>
+                          <p className="text-[12px] text-slate-600 font-medium">{alert.description}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
 
-              {/* QUICK LINKS / SHORTCUTS - RIGHT */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px w-8 bg-[#F96302]"></div>
-                  <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Shortcuts</h3>
+              {/* QUICK NAVIGATION - Right column */}
+              <div>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-1">Navigation</h3>
+                  <p className="text-sm text-slate-600">Quick access to key areas</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-[#154279] to-[#0f325e] rounded-2xl shadow-xl border-2 border-[#154279] overflow-hidden text-white relative hover:shadow-2xl hover:border-[#F96302] transition-all">
-                   <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                   <div className="absolute bottom-0 left-0 p-24 bg-[#F96302]/10 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none"></div>
-                   
-                    <div className="p-6 relative z-10">
-                      <div className="space-y-2">
-                        {[
-                          {
-                            title: "Add New User",
-                            icon: <UserPlus className="w-4 h-4" />,
-                            route: "/portal/super-admin/users"
-                          },
-                          {
-                            title: "My Profile",
-                            icon: <Shield className="w-4 h-4" />,
-                            action: () => setShowProfile(true)
-                          },
-                          {
-                            title: "Add Property",
-                            icon: <Home className="w-4 h-4" />,
-                            route: "/portal/super-admin/properties"
-                          },
-                          {
-                            title: "Rental Report",
-                            icon: <FileBarChart className="w-4 h-4" />,
-                            route: "/portal/super-admin/reports"
-                          },
-                          {
-                            title: "Analytics",
-                            icon: <BarChart3 className="w-4 h-4" />,
-                            route: "/portal/super-admin/analytics"
-                          },
-                          {
-                            title: "Settings",
-                            icon: <Settings className="w-4 h-4" />,
-                            route: "/portal/super-admin/settings"
-                          }
-                        ].map((link, index) => (
-                          <motion.button
-                            key={index}
-                            whileHover={{ x: 4 }}
-                            onClick={() => {
-                              if ('action' in link && link.action) {
-                                link.action();
-                              } else if ('route' in link) {
-                                navigate(link.route);
-                              }
-                            }}
-                            className="w-full flex items-center justify-between p-3 text-left bg-white/10 hover:bg-white/20 hover:bg-[#F96302]/20 rounded-xl transition-all duration-200 group border-2 border-white/10 hover:border-[#F96302]"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-white/10 group-hover:bg-[#F96302]/30 rounded-lg text-white group-hover:text-[#F96302] transition-all">
-                                  <motion.div whileHover={{ rotate: 10 }}>
-                                    {link.icon}
-                                  </motion.div>
-                              </div>
-                              <span className="text-[13px] font-bold text-white group-hover:text-[#F96302] transition-colors">
-                                {link.title}
-                              </span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-[#F96302] transition-colors" />
-                          </motion.button>
-                        ))}
+                <div className="space-y-2.5">
+                  {[
+                    {
+                      title: "Users & Approvals",
+                      icon: <Users className="w-4 h-4" />,
+                      route: "/portal/super-admin/users",
+                      badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined
+                    },
+                    {
+                      title: "Properties",
+                      icon: <Building className="w-4 h-4" />,
+                      route: "/portal/super-admin/properties"
+                    },
+                    {
+                      title: "Maintenance",
+                      icon: <Wrench className="w-4 h-4" />,
+                      route: "/portal/super-admin/maintenance",
+                      badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined
+                    },
+                    {
+                      title: "Payments & Reports",
+                      icon: <FileBarChart className="w-4 h-4" />,
+                      route: "/portal/super-admin/reports"
+                    },
+                    {
+                      title: "Analytics",
+                      icon: <BarChart3 className="w-4 h-4" />,
+                      route: "/portal/super-admin/analytics"
+                    },
+                    {
+                      title: "Settings",
+                      icon: <Settings className="w-4 h-4" />,
+                      route: "/portal/super-admin/settings"
+                    }
+                  ].map((action, index) => (
+                    <motion.button
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => navigate(action.route)}
+                      className="w-full flex items-center justify-between gap-3 p-3.5 bg-white border-2 border-slate-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group text-left"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="p-2 bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white rounded-lg transition-all shrink-0">
+                          {action.icon}
+                        </div>
+                        <span className="text-[13px] font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
+                          {action.title}
+                        </span>
                       </div>
+                      {action.badge && (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shrink-0">
+                          {action.badge}
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* UTILITY READINGS PAYMENT TRACKER */}
+            <div>
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-slate-900 mb-1">Utility Readings & Payments</h3>
+                <p className="text-sm text-slate-600">Track utility readings and reconcile tenant payments</p>
+              </div>
+              <UtilityReadingsPaymentTracker />
+            </div>
+
+            {/* RECENT ACTIVITY */}
+            <div>
+              <div className="mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-1">Recent Activity</h3>
+                    <p className="text-sm text-slate-600">Latest updates across your platform</p>
+                  </div>
+                  {recentItems.length > 0 && (
+                    <button
+                      onClick={() => navigate("/portal/super-admin/activity-logs")}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-bold rounded-lg transition-all flex items-center gap-2"
+                    >
+                      View All
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-sm">
+                <div className="divide-y divide-slate-100">
+                  {recentItems.length > 0 ? (
+                    recentItems.slice(0, 6).map((item, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-start gap-4 p-5 hover:bg-slate-50 transition-colors cursor-pointer group"
+                        onClick={() => item.action && navigate(item.action)}
+                      >
+                        <div className={`mt-1 p-2.5 rounded-lg shrink-0 group-hover:scale-110 transition-transform ${
+                            item.type === 'property' ? 'bg-blue-100 text-blue-600' :
+                            item.type === 'user' ? 'bg-emerald-100 text-emerald-600' :
+                            item.type === 'payment' ? 'bg-cyan-100 text-cyan-600' :
+                            item.type === 'approval' ? 'bg-amber-100 text-amber-600' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                          {getItemIcon(item.type)}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                              {item.title}
+                          </p>
+                          <p className="text-[12px] text-slate-500 mb-1.5 truncate font-medium">{item.subtitle}</p>
+                          <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
+                             <Clock className="w-3 h-3" /> {item.time}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="text-center py-16 px-6">
+                      <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                         <Clock className="w-8 h-8 text-slate-300" />
+                      </div>
+                      <p className="text-slate-900 text-sm font-bold">No recent activity</p>
+                      <p className="text-slate-500 text-xs mt-1 font-medium">Activities will appear here as they occur</p>
                     </div>
+                  )}
                 </div>
               </div>
             </div>

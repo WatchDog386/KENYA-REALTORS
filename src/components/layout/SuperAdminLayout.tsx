@@ -40,6 +40,7 @@ import {
   Filter,
   MoreVertical,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -125,6 +126,13 @@ const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
       description: "View analytics",
       permission: "view_analytics",
     },
+    {
+      title: "Utilities",
+      path: "/portal/super-admin/utilities",
+      icon: "zap",
+      description: "Manage utility readings & billing",
+      permission: "manage_utilities",
+    },
   ];
 };
 
@@ -189,6 +197,8 @@ const getIconComponent = (iconName?: string) => {
       return <Filter size={20} />;
     case "more-vertical":
       return <MoreVertical size={20} />;
+    case "zap":
+      return <Zap size={20} />;
     default:
       return <FileText size={20} />;
   }

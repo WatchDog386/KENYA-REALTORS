@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from 'date-fns';
+import { TenantBillingHistory } from "@/components/utilities/TenantBillingHistory";
 
 interface TenantData {
   id: string;
@@ -420,6 +421,11 @@ const TenantDetails: React.FC = () => {
           </div>
 
         </div>
+
+        {/* Billing History Section */}
+        {tenant.user_id && (
+          <TenantBillingHistory tenantId={tenant.id} userId={tenant.user_id} />
+        )}
       </div>
     </div>
   );

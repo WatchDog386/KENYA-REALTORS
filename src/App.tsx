@@ -53,6 +53,7 @@ import PropertyDetailsPage from "@/pages/marketplace/PropertyDetailsPage";
 ====================== */
 import SuperAdminDashboard from "@/pages/portal/SuperAdminDashboard";
 import SuperAdminUtilities from "@/pages/portal/SuperAdminUtilities";
+import SuperAdminUtilitiesManager from "@/pages/portal/SuperAdminUtilitiesManager";
 import SuperAdminProfilePage from "@/pages/portal/SuperAdminProfilePage";
 import ManagerPortal from "@/pages/portal/ManagerPortal";
 import PortalTenantDashboard from "@/pages/portal/TenantDashboard";
@@ -83,6 +84,7 @@ import TenantSafetyPageComponent from "@/pages/portal/tenant/Safety";
 import TenantHelpPageComponent from "@/pages/portal/tenant/Help";
 import TenantRefundStatusPageComponent from "@/pages/portal/tenant/RefundStatus";
 import TenantVacancyNoticePageComponent from "@/pages/portal/tenant/VacancyNotice";
+import TenantBillHistoryPageComponent from "@/pages/portal/tenant/BillHistory";
 
 // Import Super Admin Context
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
@@ -103,6 +105,7 @@ import ManagerLeases from "@/components/portal/manager/ManagerLeases";
 import ManagerCaretakerDuties from "@/components/portal/manager/ManagerCaretakerDuties";
 import ManagerProfile from "@/components/portal/manager/ManagerProfile";
 import ManagerApprovalRequests from "@/pages/portal/manager/ApprovalRequests";
+import ManagerUtilityReadings from "@/pages/portal/manager/UtilityReadings";
 
 // Create a fallback component in case of import issues
 const GlobalLoader = () => (
@@ -737,7 +740,8 @@ const App = () => {
                   <Route path="users" element={<UserManagementNew />} />
                   <Route path="approvals" element={<ApprovalQueue />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />
-                  <Route path="utilities" element={<SuperAdminUtilities />} />
+                  <Route path="utilities" element={<SuperAdminUtilitiesManager />} />
+                  <Route path="utilities/settings" element={<SuperAdminUtilities />} />
                   <Route path="settings" element={<SystemSettings />} />
                   <Route path="reports" element={<Reports />} /> {/* ADDED THIS LINE */}
                   <Route path="leases" element={<LeasesManagement />} />
@@ -816,6 +820,7 @@ const App = () => {
                     element={<ManagerVacancyNotices />}
                   />
                   <Route path="caretaker-duties" element={<ManagerCaretakerDuties />} />
+                  <Route path="utilities" element={<ManagerUtilityReadings />} />
                 </Route>
 
                 {/* TENANT PORTAL ROUTES */}
@@ -855,6 +860,10 @@ const App = () => {
                   <Route
                     path="vacation-notice"
                     element={<TenantVacancyNoticePageComponent />}
+                  />
+                  <Route
+                    path="bills"
+                    element={<TenantBillHistoryPageComponent />}
                   />
                 </Route>
 

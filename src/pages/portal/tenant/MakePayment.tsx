@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import PaystackPaymentDialog from "@/components/dialogs/PaystackPaymentDialog";
+import { processPaymentWithReceipt, ReceiptData } from "@/utils/receiptGenerator";
 
 const MakePaymentPage: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ const MakePaymentPage: React.FC = () => {
   const paymentTypeParam = searchParams.get('type');
   const referenceId = searchParams.get('id');
   const dueAmount = searchParams.get('amount') ? parseFloat(searchParams.get('amount')!) : 0;
+  const selectedItemsParam = searchParams.get('items');
 
   const [paymentType, setPaymentType] = useState<string | null>(paymentTypeParam);
   const [amount, setAmount] = useState(dueAmount > 0 ? dueAmount.toString() : "");
@@ -28,6 +30,7 @@ const MakePaymentPage: React.FC = () => {
   const [details, setDetails] = useState<any>(null);
   const [userEmail, setUserEmail] = useState<string>("");
   const [showPaystackDialog, setShowPaystackDialog] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>(selectedItemsParam ? selectedItemsParam.split(',') : []);
 
   useEffect(() => {
     if (paymentTypeParam) {
@@ -81,7 +84,61 @@ const MakePaymentPage: React.FC = () => {
     try {
       const payAmount = parseFloat(amount);
       
-      if (paymentType && referenceId && details) {
+      // Get tenant info for receipt
+      const { data: tenant } = await supabase
+        .from("tenants")
+        .select("id, unit_id, property_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!tenant) throw new Error("Tenant not found");
+
+      // Build receipt items based on payment type
+      let receiptItems: ReceiptData['items'] = [];
+      let rentPaymentId: string | undefined;
+      let billPaymentId: string | undefined;
+
+      if (paymentType === 'custom' && selectedItems.length > 0) {
+          // For custom combined payments, create a single payment record
+          // Create a combined payment record
+          const { data: rentPaymentData, error: insertError } = await supabase.from("rent_payments").insert([
+            {
+              tenant_id: user.id,
+              unit_id: tenant.unit_id,
+              property_id: tenant.property_id,
+              amount: payAmount,
+              amount_paid: payAmount,
+              payment_date: new Date().toISOString(),
+              due_date: new Date().toISOString(),
+              payment_method: 'paystack',
+              status: "completed",
+              remarks: remarks || `Combined payment for: ${selectedItems.map(getItemLabel).join(', ')}`,
+              transaction_reference: transactionRef,
+              bill_type: 'combined'
+            },
+          ])
+          .select('id')
+          .single();
+          
+          if (insertError) throw insertError;
+          rentPaymentId = rentPaymentData?.id;
+
+          // Create receipt items from selected items
+          selectedItems.forEach((itemId: string) => {
+            const label = getItemLabel(itemId);
+            const itemAmount = itemId === 'rent' ? payAmount * 0.5 : (payAmount * 0.5) / (selectedItems.length - 1);
+            receiptItems.push({
+              description: label,
+              amount: itemAmount,
+              type: itemId.includes('electricity') ? 'electricity' : 
+                    itemId.includes('water') ? 'water' :
+                    itemId.includes('garbage') ? 'garbage' :
+                    itemId.includes('security') ? 'security' :
+                    itemId.includes('service') ? 'service' : 
+                    itemId === 'rent' ? 'rent' : 'other'
+            });
+          });
+      } else if (paymentType && referenceId && details) {
           // Update existing record
           const currentPaid = details.amount_paid || details.paid_amount || 0;
           const totalDue = details.amount || 0;
@@ -103,6 +160,12 @@ const MakePaymentPage: React.FC = () => {
                   })
                   .eq('id', referenceId);
               if (error) throw error;
+              rentPaymentId = referenceId;
+              receiptItems = [{
+                description: 'Rent Payment',
+                amount: payAmount,
+                type: 'rent'
+              }];
           } else {
                const { error } = await supabase
                   .from('bills_and_utilities')
@@ -114,54 +177,86 @@ const MakePaymentPage: React.FC = () => {
                   })
                   .eq('id', referenceId);
                if (error) throw error;
+               billPaymentId = referenceId;
+               receiptItems = [{
+                description: `${paymentType?.charAt(0).toUpperCase()}${paymentType?.slice(1)} Bill`,
+                amount: payAmount,
+                type: (paymentType as any) || 'other'
+              }];
           }
       } else {
           // New Manual Payment
-           const { data: tenant } = await supabase
-            .from("tenants")
-            .select("id, unit_id, property_id")
-            .eq("user_id", user.id)
-            .single();
-
-           if (!tenant) throw new Error("Tenant not found");
-
            // If it's rent, insert into rent_payments
            if (paymentType === 'rent') {
-               const { error } = await supabase.from("rent_payments").insert([
+               const { data: rentData, error } = await supabase.from("rent_payments").insert([
                 {
-                  tenant_id: tenant.id,
+                      tenant_id: user.id,
                   unit_id: tenant.unit_id,
                   property_id: tenant.property_id,
                   amount: payAmount,
-                  amount_paid: payAmount,
+                      amount_paid: payAmount,
                   payment_date: new Date().toISOString(),
                   due_date: new Date().toISOString(),
                   payment_method: 'paystack',
                   status: "completed",
                   remarks: remarks || "Rent Payment via Paystack",
-                  transaction_reference: transactionRef
+                  transaction_reference: transactionRef,
                 },
-              ]);
+              ])
+              .select('id')
+              .single();
               if (error) throw error;
+              rentPaymentId = rentData?.id;
+              receiptItems = [{
+                description: 'Rent Payment',
+                amount: payAmount,
+                type: 'rent'
+              }];
            } else {
-               const { error } = await supabase.from("bills_and_utilities").insert([
+               const { data: billData, error } = await supabase.from("bills_and_utilities").insert([
                    {
                        unit_id: tenant.unit_id,
+                           property_id: tenant.property_id,
                        bill_type: paymentType || 'utility',
                        amount: payAmount,
-                       paid_amount: payAmount,
-                       bill_date: new Date().toISOString(),
+                           paid_amount: payAmount,
                        due_date: new Date().toISOString(),
                        status: 'completed',
-                       remarks: remarks || `${paymentType} Payment via Paystack`,
-                       payment_reference: transactionRef
+                           remarks: remarks || `${paymentType} Payment via Paystack`,
+                           payment_reference: transactionRef
                    }
-               ]);
+               ])
+               .select('id')
+               .single();
                if (error) throw error;
+               billPaymentId = billData?.id;
+               receiptItems = [{
+                description: `${paymentType?.charAt(0).toUpperCase()}${paymentType?.slice(1)} Bill`,
+                amount: payAmount,
+                type: (paymentType as any) || 'other'
+              }];
            }
       }
 
-      toast.success("Payment processed successfully via Paystack!");
+      // Generate receipt
+      try {
+        await processPaymentWithReceipt(
+          user.id,
+          tenant.property_id,
+          tenant.unit_id,
+          payAmount,
+          'paystack',
+          transactionRef,
+          receiptItems,
+          rentPaymentId,
+          billPaymentId
+        );
+      } catch (receiptErr) {
+        console.warn('Receipt generation failed, but payment was successful:', receiptErr);
+        // Continue anyway - payment was successful
+      }
+
+      toast.success("Payment processed successfully via Paystack! Receipt generated.");
       navigate("/portal/tenant/payments");
     } catch (err) {
       console.error("Error processing payment:", err);
@@ -173,6 +268,7 @@ const MakePaymentPage: React.FC = () => {
   };
 
   const getTitle = () => {
+      if (paymentType === 'custom') return 'Pay Selected Bills';
       if (paymentType === 'water') return 'Pay Water Bill';
       if (paymentType === 'rent') return 'Pay Rent';
       if (details?.bill_type) {
@@ -187,7 +283,18 @@ const MakePaymentPage: React.FC = () => {
       if (type === 'water') return <Droplets size={24} className="text-cyan-600"/>;
       if (type === 'electricity') return <Zap size={24} className="text-yellow-500"/>;
       if (type === 'garbage') return <Trash2 size={24} className="text-green-600"/>;
+      if (type === 'custom') return <CreditCard size={24} className="text-purple-600"/>;
       return <HelpCircle size={24} className="text-purple-600"/>; 
+  };
+
+  const getItemLabel = (itemId: string) => {
+    if (itemId === 'rent') return 'Rent';
+    if (itemId.includes('electricity')) return 'Electricity';
+    if (itemId.includes('water')) return 'Water';
+    if (itemId.includes('garbage')) return 'Garbage Collection';
+    if (itemId.includes('security')) return 'Security Fee';
+    if (itemId.includes('service')) return 'Service Fee';
+    return 'Bill';
   };
 
   if (!paymentType) {
@@ -283,6 +390,29 @@ const MakePaymentPage: React.FC = () => {
                         <span className="font-bold text-blue-900">
                             {formatCurrency((details.amount || 0) - (details.amount_paid || details.paid_amount || 0))}
                         </span>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
+
+        {paymentType === 'custom' && selectedItems.length > 0 && (
+            <Card className="bg-purple-50/50 border-purple-100 shadow-sm">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base text-purple-800 flex items-center gap-2">
+                        <CreditCard size={18} />
+                        Selected Items
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                    {selectedItems.map((itemId, idx) => (
+                        <div key={idx} className="flex justify-between p-2 bg-white rounded border border-purple-200">
+                            <span className="text-gray-700">{getItemLabel(itemId)}</span>
+                            <span className="font-semibold text-purple-900">•</span>
+                        </div>
+                    ))}
+                    <div className="border-t border-purple-200 pt-2 mt-2 flex justify-between font-bold">
+                        <span className="text-purple-900">Total to Pay:</span>
+                        <span className="text-purple-900">{formatCurrency(parseFloat(amount) || 0)}</span>
                     </div>
                 </CardContent>
             </Card>

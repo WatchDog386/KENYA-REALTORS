@@ -22,7 +22,8 @@ import {
   ChevronRight,
   Mail,
   Loader2,
-  Briefcase
+  Briefcase,
+  Zap
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -373,6 +374,12 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/manager/caretaker-duties',
       icon: <Briefcase size={20} />,
       description: 'Assign tasks to caretakers'
+    },
+    {
+      title: 'Utilities',
+      href: '/portal/manager/utilities',
+      icon: <Zap size={20} />,
+      description: 'Manage utility readings & billing'
     },
     {
       title: 'Messages',

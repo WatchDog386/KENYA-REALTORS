@@ -41,50 +41,50 @@ export interface PaystackVerificationResponse {
   };
 }
 
-const PAYSTACK_API_URL = "https://api.paystack.co";
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-const PAYSTACK_SECRET_KEY = import.meta.env.VITE_PAYSTACK_SECRET_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 /**
- * Initialize a Paystack transaction
+ * Initialize a Paystack transaction using backend Edge Function
+ * This is SECURE because the secret key is never exposed to the client
  */
 export const initializePaystackPayment = async (
   request: PaystackInitializeRequest
 ): Promise<PaystackResponse> => {
   try {
-    if (!PAYSTACK_PUBLIC_KEY) {
-      throw new Error("Paystack public key is not configured");
+    if (!SUPABASE_URL) {
+      throw new Error("Supabase URL is not configured");
     }
 
-    // Generate unique reference if not provided
-    const reference =
-      request.reference || `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    if (!request.email || !request.amount) {
+      throw new Error("Email and amount are required");
+    }
 
-    const response = await fetch(`${PAYSTACK_API_URL}/transaction/initialize`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      },
-      body: JSON.stringify({
-        email: request.email,
-        amount: Math.round(request.amount * 100), // Convert to kobo
-        reference: reference,
-        description: request.description || "Payment for rent or bills",
-        metadata: {
-          ...request.metadata,
-          timestamp: new Date().toISOString(),
+    // Call the Supabase Edge Function for secure initialization
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/initialize-paystack-payment`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          email: request.email,
+          amount: request.amount,
+          reference: request.reference,
+          description: request.description,
+          metadata: request.metadata,
+        }),
+      }
+    );
+
+    const data = await response.json();
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+      throw new Error(data.message || `Initialization failed: ${response.status}`);
     }
 
-    const data: PaystackResponse = await response.json();
-    return data;
+    return data as PaystackResponse;
   } catch (error) {
     console.error("Error initializing Paystack payment:", error);
     throw error;
@@ -92,66 +92,59 @@ export const initializePaystackPayment = async (
 };
 
 /**
- * Verify a Paystack transaction
+ * Verify a Paystack transaction using backend Edge Function
+ * This is SECURE because the secret key is never exposed to the client
  */
 export const verifyPaystackTransaction = async (
   reference: string
 ): Promise<PaystackVerificationResponse> => {
   try {
-    if (!PAYSTACK_SECRET_KEY) {
-      throw new Error("Paystack secret key is not configured");
+    if (!SUPABASE_URL) {
+      throw new Error("Supabase URL is not configured");
     }
 
+    // Call the Supabase Edge Function for secure verification
     const response = await fetch(
-      `${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(reference)}`,
+      `${SUPABASE_URL}/functions/v1/verify-paystack-transaction`,
       {
-        method: "GET",
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
         },
+        body: JSON.stringify({ reference }),
       }
     );
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP ${response.status}`);
+      throw new Error(data.message || `Verification failed: ${response.status}`);
     }
 
-    const data: PaystackVerificationResponse = await response.json();
-    return data;
+    return data as PaystackVerificationResponse;
   } catch (error) {
     console.error("Error verifying Paystack transaction:", error);
     throw error;
   }
 };
 
+
 /**
  * Get list of banks for bank transfers
+ * Note: This requires backend implementation to keep secret key secure
+ * Temporarily removing client-side implementation
  */
 export const getPaystackBanks = async (): Promise<any> => {
-  try {
-    const response = await fetch(`${PAYSTACK_API_URL}/bank`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error fetching banks:", error);
-    throw error;
-  }
+  throw new Error(
+    "getPaystackBanks must be called through a secure backend endpoint. " +
+    "This function is deprecated on the client side for security reasons."
+  );
 };
 
 /**
  * Create a payment plan
+ * Note: This requires backend implementation to keep secret key secure
+ * Temporarily removing client-side implementation
  */
 export const createPaymentPlan = async (
   name: string,
@@ -159,34 +152,16 @@ export const createPaymentPlan = async (
   amount: number,
   interval: "monthly" | "quarterly" | "half-annually" | "annually"
 ): Promise<any> => {
-  try {
-    const response = await fetch(`${PAYSTACK_API_URL}/plan`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      },
-      body: JSON.stringify({
-        name,
-        description,
-        amount: Math.round(amount * 100), // Convert to kobo
-        interval,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error creating payment plan:", error);
-    throw error;
-  }
+  throw new Error(
+    "createPaymentPlan must be called through a secure backend endpoint. " +
+    "This function is deprecated on the client side for security reasons."
+  );
 };
 
 /**
  * Charge an authorization (for recurring payments)
+ * Note: This requires backend implementation to keep secret key secure
+ * Temporarily removing client-side implementation
  */
 export const chargeAuthorization = async (
   authorizationCode: string,
@@ -194,33 +169,10 @@ export const chargeAuthorization = async (
   amount: number,
   reference?: string
 ): Promise<PaystackResponse> => {
-  try {
-    const response = await fetch(`${PAYSTACK_API_URL}/transaction/charge_authorization`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
-      },
-      body: JSON.stringify({
-        authorization_code: authorizationCode,
-        email,
-        amount: Math.round(amount * 100), // Convert to kobo
-        reference:
-          reference ||
-          `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error charging authorization:", error);
-    throw error;
-  }
+  throw new Error(
+    "chargeAuthorization must be called through a secure backend endpoint. " +
+    "This function is deprecated on the client side for security reasons."
+  );
 };
 
 export default {

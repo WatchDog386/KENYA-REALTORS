@@ -148,6 +148,61 @@ const SuperAdminDashboard = () => {
 
     initDashboard();
     
+    // Set up real-time subscriptions for payment updates
+    const rentPaymentChannel = supabase
+      .channel('rent_payments_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rent_payments'
+        },
+        () => {
+          if (isMounted) {
+            loadStats();
+            loadRecentItems();
+          }
+        }
+      )
+      .subscribe();
+
+    const utilityReadingChannel = supabase
+      .channel('utility_readings_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'utility_readings'
+        },
+        () => {
+          if (isMounted) {
+            loadStats();
+            loadRecentItems();
+          }
+        }
+      )
+      .subscribe();
+
+    const billsUtilitiesChannel = supabase
+      .channel('bills_utilities_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bills_and_utilities'
+        },
+        () => {
+          if (isMounted) {
+            loadStats();
+            loadRecentItems();
+          }
+        }
+      )
+      .subscribe();
+    
     const interval = setInterval(() => {
       if (isMounted) {
         loadDashboardData();
@@ -157,6 +212,9 @@ const SuperAdminDashboard = () => {
     return () => {
       isMounted = false;
       clearInterval(interval);
+      supabase.removeChannel(rentPaymentChannel);
+      supabase.removeChannel(utilityReadingChannel);
+      supabase.removeChannel(billsUtilitiesChannel);
     };
   }, []);
 
@@ -249,13 +307,29 @@ const SuperAdminDashboard = () => {
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
-      const { data: payments } = await supabase
-        .from("payments")
-        .select("amount")
+      // Fetch revenue from multiple sources
+      const { data: rentPayments } = await supabase
+        .from("rent_payments")
+        .select("amount_paid")
         .eq("status", "completed")
-        .gte("created_at", startOfMonth.toISOString());
+        .gte("payment_date", startOfMonth.toISOString());
 
-      const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      const { data: utilizyPayments } = await supabase
+        .from("utility_readings")
+        .select("total_bill")
+        .eq("status", "paid")
+        .gte("reading_month", startOfMonth.toISOString());
+
+      const { data: billPayments } = await supabase
+        .from("bills_and_utilities")
+        .select("total_amount")
+        .eq("status", "completed")
+        .gte("payment_date", startOfMonth.toISOString());
+
+      const rentRevenue = rentPayments?.reduce((sum, payment) => sum + (payment.amount_paid || 0), 0) || 0;
+      const utilityRevenue = utilizyPayments?.reduce((sum, payment) => sum + (payment.total_bill || 0), 0) || 0;
+      const billRevenue = billPayments?.reduce((sum, payment) => sum + (payment.total_amount || 0), 0) || 0;
+      const totalRevenue = rentRevenue + utilityRevenue + billRevenue;
 
       const totalExpectedRevenue = propertiesData.reduce((sum, p: any) => {
         // Use potential income calculated from unit types
@@ -342,19 +416,40 @@ const SuperAdminDashboard = () => {
       }
 
       const { data: recentPayments } = await supabase
-        .from("payments")
-        .select("id, amount, payment_method, status, created_at")
-        .order("created_at", { ascending: false })
+        .from("rent_payments")
+        .select("id, amount_paid, payment_method, status, payment_date, created_at")
+        .eq("status", "completed")
+        .order("payment_date", { ascending: false })
         .limit(2);
+
+      const { data: recentUtilityPayments } = await supabase
+        .from("utility_readings")
+        .select("id, total_bill, status, reading_month")
+        .eq("status", "paid")
+        .order("reading_month", { ascending: false })
+        .limit(1);
 
       if (recentPayments) {
         recentPayments.forEach(payment => {
           items.push({
             id: payment.id,
-            title: `Payment of ${formatCurrency(payment.amount || 0)}`,
+            title: `Rent Payment of ${formatCurrency(payment.amount_paid || 0)}`,
             subtitle: `${payment.payment_method || 'Online'} • ${payment.status}`,
             type: 'payment',
             time: formatTimeAgo(payment.created_at),
+            action: `/portal/super-admin/payments`,
+          });
+        });
+      }
+
+      if (recentUtilityPayments) {
+        recentUtilityPayments.forEach(payment => {
+          items.push({
+            id: payment.id,
+            title: `Utility Payment of ${formatCurrency(payment.total_bill || 0)}`,
+            subtitle: `Utilities • ${payment.status}`,
+            type: 'payment',
+            time: formatTimeAgo(payment.reading_month),
             action: `/portal/super-admin/payments`,
           });
         });

@@ -34,6 +34,7 @@ interface UtilitySettings {
   garbage_fee: number;
   security_fee: number;
   service_fee: number;
+  custom_utilities?: Record<string, number>;
 }
 
 const SuperAdminUtilities = () => {
@@ -43,7 +44,9 @@ const SuperAdminUtilities = () => {
     garbage_fee: 0,
     security_fee: 0,
     service_fee: 0,
+    custom_utilities: {},
   });
+  const [newUtilityName, setNewUtilityName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,7 @@ const SuperAdminUtilities = () => {
           garbage_fee: Number(data.garbage_fee) || 0,
           security_fee: Number(data.security_fee) || 0,
           service_fee: Number(data.service_fee) || 0,
+          custom_utilities: data.custom_utilities || {},
         });
       }
     } catch (err: any) {
@@ -94,6 +98,7 @@ const SuperAdminUtilities = () => {
         garbage_fee: settings.garbage_fee,
         security_fee: settings.security_fee,
         service_fee: settings.service_fee,
+        custom_utilities: settings.custom_utilities,
         updated_at: new Date().toISOString(),
       };
 
@@ -131,12 +136,54 @@ const SuperAdminUtilities = () => {
     }));
   };
 
+  const handleCustomUtilityChange = (name: string, value: string) => {
+    const numValue = parseFloat(value);
+    setSettings(prev => ({
+      ...prev,
+      custom_utilities: {
+        ...prev.custom_utilities,
+        [name]: isNaN(numValue) ? 0 : numValue
+      }
+    }));
+  };
+
+  const handleAddCustomUtility = () => {
+    if (!newUtilityName.trim()) return;
+    
+    const safeName = newUtilityName.trim();
+    if (settings.custom_utilities && settings.custom_utilities[safeName] !== undefined) {
+      toast.error("Utility already exists");
+      return;
+    }
+
+    setSettings(prev => ({
+      ...prev,
+      custom_utilities: {
+        ...prev.custom_utilities,
+        [safeName]: 0
+      }
+    }));
+    setNewUtilityName("");
+  };
+
+  const handleRemoveCustomUtility = (name: string) => {
+    setSettings(prev => {
+      const newCustom = { ...prev.custom_utilities };
+      delete newCustom[name];
+      return {
+        ...prev,
+        custom_utilities: newCustom
+      };
+    });
+  };
+
   const totalFees = 
     settings.water_fee + 
     settings.electricity_fee + 
     settings.garbage_fee + 
     settings.security_fee + 
-    settings.service_fee;
+    settings.service_fee +
+    Object.values(settings.custom_utilities || {}).reduce((sum, val) => sum + val, 0);
 
   if (loading) {
     return (
@@ -182,7 +229,7 @@ const SuperAdminUtilities = () => {
             <div className="space-y-2">
               <Label htmlFor="water_fee" className="flex items-center gap-2">
                 <Droplets className="h-4 w-4 text-blue-500" />
-                Water Fee (KES)
+                Water Rate (per unit in KES)
               </Label>
               <Input
                 id="water_fee"
@@ -198,7 +245,7 @@ const SuperAdminUtilities = () => {
             <div className="space-y-2">
               <Label htmlFor="electricity_fee" className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-yellow-500" />
-                Electricity Fee (KES)
+                Electricity Rate (per unit in KES)
               </Label>
               <Input
                 id="electricity_fee"
@@ -257,6 +304,48 @@ const SuperAdminUtilities = () => {
                 onChange={(e) => handleChange("service_fee", e.target.value)}
                 placeholder="0.00"
               />
+            </div>
+
+            {/* Custom Utilities */}
+            {Object.entries(settings.custom_utilities || {}).map(([name, value]) => (
+              <div key={name} className="space-y-2 relative">
+                <Label htmlFor={`custom_${name}`} className="flex items-center gap-2 capitalize">
+                  <Zap className="h-4 w-4 text-gray-500" />
+                  {name.replace(/_/g, ' ')} Fee (KES)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id={`custom_${name}`}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={value || ""}
+                    onChange={(e) => handleCustomUtilityChange(name, e.target.value)}
+                    placeholder="0.00"
+                  />
+                  <Button 
+                    variant="destructive" 
+                    size="icon"
+                    onClick={() => handleRemoveCustomUtility(name)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            <div className="pt-4 border-t border-gray-100">
+              <Label className="mb-2 block">Add Custom Utility</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. Internet, Parking"
+                  value={newUtilityName}
+                  onChange={(e) => setNewUtilityName(e.target.value)}
+                />
+                <Button onClick={handleAddCustomUtility} type="button" variant="secondary">
+                  Add
+                </Button>
+              </div>
             </div>
           </CardContent>
           <CardFooter>

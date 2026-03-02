@@ -174,7 +174,8 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
           .insert({
             technician_id: technicianId,
             property_id: selectedProperty,
-            assigned_by: currentUser.id
+            assigned_by: currentUser.id,
+            is_active: true
           });
         
         if (assignError) {

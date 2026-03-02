@@ -7,6 +7,7 @@ import ManagerMaintenance from './Maintenance';
 import ManagerApprovalRequests from './ApprovalRequests';
 import ManagerVacationNotices from './VacationNotices';
 import ManagerReports from './Reports';
+import ManagerUtilityReadings from './UtilityReadings';
 
 export const managerRoutes: RouteObject[] = [
   {
@@ -40,6 +41,10 @@ export const managerRoutes: RouteObject[] = [
       {
         path: 'reports',
         element: <ManagerReports />,
+      },
+      {
+        path: 'utilities',
+        element: <ManagerUtilityReadings />,
       },
     ],
   },

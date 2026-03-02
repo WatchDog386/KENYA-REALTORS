@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Badge } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -73,51 +73,35 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = externalOnOpenChange || setInternalOpen;
-  const [categories, setCategories] = useState<TechnicianCategory[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [assignments, setAssignments] = useState<TechnicianPropertyAssignment[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTechnician, setSelectedTechnician] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(''); // Read-only, derived from selected technician
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
 
   useEffect(() => {
     if (open) {
-      loadCategoriesAndTechnicians();
+      loadAllActiveTechnicians();
       loadAssignments();
     }
   }, [open]);
 
   useEffect(() => {
-    if (selectedCategory) {
-      filterTechniciansByCategory();
+    // When technician is selected, auto-populate the category
+    if (selectedTechnician) {
+      const technician = technicians.find(t => t.id === selectedTechnician);
+      if (technician?.category) {
+        setSelectedCategory(technician.category.name);
+      }
     } else {
-      setTechnicians([]);
-      setSelectedTechnician('');
+      setSelectedCategory('');
     }
-  }, [selectedCategory]);
+  }, [selectedTechnician, technicians]);
 
-  const loadCategoriesAndTechnicians = async () => {
+  const loadAllActiveTechnicians = async () => {
     try {
       setFetchingData(true);
-      const { data: categories, error: catError } = await supabase
-        .from('technician_categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (catError) throw catError;
-      setCategories(categories || []);
-    } catch (error: any) {
-      console.error('Error loading categories:', error);
-      toast.error('Failed to load technician categories');
-    } finally {
-      setFetchingData(false);
-    }
-  };
-
-  const filterTechniciansByCategory = async () => {
-    try {
       const { data, error } = await supabase
         .from('technicians')
         .select(`
@@ -129,10 +113,20 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
           profiles:user_id(first_name, last_name, email),
           technician_categories:category_id(id, name, description)
         `)
-        .eq('category_id', selectedCategory)
         .eq('status', 'active')
         .eq('is_available', true)
-        .order('profiles.first_name', { ascending: true });
+        .order('technician_categories.name', { ascending: true })
+        .then(response => {
+          // Additional client-side order by first name
+          if (response.data) {
+            response.data = response.data.sort((a: any, b: any) => {
+              const nameA = a.profiles?.first_name || '';
+              const nameB = b.profiles?.first_name || '';
+              return nameA.localeCompare(nameB);
+            });
+          }
+          return response;
+        });
 
       if (error) throw error;
       
@@ -145,8 +139,10 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
       
       setTechnicians(mappedTechnicians);
     } catch (error: any) {
-      console.error('Error filtering technicians:', error);
+      console.error('Error loading technicians:', error);
       toast.error('Failed to load technicians');
+    } finally {
+      setFetchingData(false);
     }
   };
 
@@ -217,6 +213,7 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
             technician_id: selectedTechnician,
             property_id: propertyId,
             assigned_by: profile?.id,
+            is_active: true,
           }
         ]);
 
@@ -271,6 +268,24 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
     return 'Unknown';
   };
 
+  const getCategoryColor = (categoryName?: string): string => {
+    const colors: { [key: string]: string } = {
+      'Plumbing': 'bg-blue-100 text-blue-800',
+      'Electrical': 'bg-yellow-100 text-yellow-800',
+      'HVAC': 'bg-purple-100 text-purple-800',
+      'Carpentry': 'bg-orange-100 text-orange-800',
+      'Tile Fixing': 'bg-pink-100 text-pink-800',
+      'Painting': 'bg-red-100 text-red-800',
+      'Lift Maintenance': 'bg-indigo-100 text-indigo-800',
+      'Roofing': 'bg-amber-100 text-amber-800',
+      'Pest Control': 'bg-green-100 text-green-800',
+      'Masonry': 'bg-stone-100 text-stone-800',
+      'Landscaping': 'bg-lime-100 text-lime-800',
+      'General Maintenance': 'bg-gray-100 text-gray-800',
+    };
+    return colors[categoryName || ''] || 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -292,21 +307,30 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
           {assignments.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Current Assignments</CardTitle>
+                <CardTitle className="text-sm">Current Assignments ({assignments.length})</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {assignments.map(assignment => (
                   <div
                     key={assignment.id}
-                    className="flex items-center justify-between p-2 border rounded"
+                    className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                   >
                     <div className="flex-1">
                       <p className="font-medium text-sm">
                         {getAssignmentTechnicianName(assignment)}
                       </p>
-                      <p className="text-xs text-gray-600">
-                        Category: {assignment.technician?.category?.name || 'N/A'}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${getCategoryColor(
+                            assignment.technician?.category?.name
+                          )}`}
+                        >
+                          {assignment.technician?.category?.name || 'N/A'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Assigned: {new Date(assignment.assigned_at).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -328,37 +352,36 @@ export const TechnicianAssignmentDialog: React.FC<TechnicianAssignmentDialogProp
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Technician Category</label>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <label className="text-sm font-medium">Select Technician</label>
+                <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
+                    <SelectValue placeholder="Select a technician" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                        {cat.description && <span className="text-xs"> - {cat.description}</span>}
+                    {technicians.map(tech => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {getTechnicianName(tech)} • {tech.category?.name || 'Unassigned'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500">
+                  Technicians are listed with their specialization
+                </p>
               </div>
 
-              {selectedCategory && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Technician</label>
-                  <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a technician" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {technicians.map(tech => (
-                        <SelectItem key={tech.id} value={tech.id}>
-                          {getTechnicianName(tech)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {selectedTechnician && selectedCategory && (
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-300 rounded-lg">
+                  <p className="text-xs text-blue-600 font-semibold mb-2 uppercase tracking-wide">
+                    Selected Specialization
+                  </p>
+                  <span
+                    className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(
+                      selectedCategory
+                    )}`}
+                  >
+                    {selectedCategory}
+                  </span>
                 </div>
               )}
 

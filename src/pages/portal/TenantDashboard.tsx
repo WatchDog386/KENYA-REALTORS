@@ -35,7 +35,9 @@ import {
   ChevronDown,
   Heart,
   MoreHorizontal,
-  ChevronLeft
+  ChevronLeft,
+  Droplets,
+  Trash2
 } from "lucide-react";
 import {
   Card,
@@ -143,6 +145,8 @@ const TenantDashboard: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [upcomingDueDates, setUpcomingDueDates] = useState<any[]>([]);
   const [utilitySettings, setUtilitySettings] = useState<any>(null);
+  const [utilityBills, setUtilityBills] = useState<any[]>([]);
+  const [currentMonthUtility, setCurrentMonthUtility] = useState<any>(null);
 
   const [stats, setStats] = useState({
     currentBalance: 0,
@@ -332,6 +336,46 @@ const TenantDashboard: React.FC = () => {
     }
   };
 
+  const fetchLeaseData = async () => {
+    try {
+      if (!user?.id) return;
+      
+      // Fetch active lease for current tenant
+      const { data: lease, error: leaseError } = await supabase
+        .from("tenant_leases")
+        .select("*, units!inner(property_id)")
+        .eq("tenant_id", user.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (leaseError) throw leaseError;
+
+      if (lease) {
+        setLeaseData({
+          id: lease.id,
+          start_date: lease.start_date,
+          end_date: lease.end_date,
+          monthly_rent: lease.monthly_rent || 0,
+          security_deposit: lease.security_deposit || 0,
+          status: lease.status,
+          terms: lease.terms || "",
+          created_at: lease.created_at,
+        });
+
+        // Calculate months remaining
+        const leaseMonthsLeft = calculateLeaseMonthsLeft(lease.end_date);
+        setStats((prev) => ({
+          ...prev,
+          leaseMonthsLeft,
+        }));
+      }
+    } catch (err) {
+      console.warn("Could not fetch lease data:", err);
+    }
+  };
+
   const fetchDashboardData = async () => {
     if (!user?.id) {
       setLoading(false);
@@ -358,6 +402,12 @@ const TenantDashboard: React.FC = () => {
         await fetchPayments();
       } catch (err) {
         console.warn("Could not fetch payments:", err);
+      }
+
+      try {
+        await fetchLeaseData();
+      } catch (err) {
+        console.warn("Could not fetch lease data:", err);
       }
 
       try {
@@ -390,28 +440,38 @@ const TenantDashboard: React.FC = () => {
 
   const fetchPayments = async () => {
     try {
-      // Query rent_payments table
+      if (!user?.id) return;
+
+      // Query rent_payments table - FILTERED BY CURRENT TENANT
       const { data: payments, error: paymentsError } = await supabase
         .from("rent_payments")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
+        .eq("tenant_id", user.id)
+        .order("payment_date", { ascending: false })
+        .limit(10);
 
       if (paymentsError) throw paymentsError;
 
-      if (payments) {
+      if (payments && payments.length > 0) {
         setRecentPayments(payments);
 
         // Calculate stats
         const currentBalance = calculateCurrentBalance(payments);
         const totalPaid = payments
           .filter((p) => p.status === "completed")
-          .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+          .reduce((sum, payment) => sum + (payment.amount_paid || payment.amount || 0), 0);
 
         setStats((prev) => ({
           ...prev,
           currentBalance,
           totalPaid,
+        }));
+      } else {
+        // No payments found for this tenant
+        setStats((prev) => ({
+          ...prev,
+          currentBalance: 0,
+          totalPaid: 0,
         }));
       }
     } catch (err) {
@@ -461,11 +521,13 @@ const TenantDashboard: React.FC = () => {
 
   const fetchUpcomingDueDates = async () => {
     try {
-      if (!tenantInfo) return;
+      if (!user?.id) return;
       
+      // Fetch upcoming/overdue payments ONLY FOR CURRENT TENANT
       const { data: upcoming, error: upcomingError } = await supabase
         .from("rent_payments")
         .select("*")
+        .eq("tenant_id", user.id)
         .in("status", ["pending", "overdue"])
         .order("due_date", { ascending: true });
 
@@ -474,6 +536,8 @@ const TenantDashboard: React.FC = () => {
       if (upcoming) {
         setUpcomingDueDates(upcoming);
         setStats((prev) => ({ ...prev, upcomingEvents: upcoming.length }));
+      } else {
+        setStats((prev) => ({ ...prev, upcomingEvents: 0 }));
       }
     } catch (err) {
       console.warn("Could not fetch upcoming due dates:", err);
@@ -494,6 +558,42 @@ const TenantDashboard: React.FC = () => {
       }
     } catch (err) {
       console.warn("Could not fetch utility settings:", err);
+    }
+  };
+
+  const fetchUtilityBills = async () => {
+    try {
+      if (!user?.id) return;
+      
+      const { data, error } = await supabase
+        .from("utility_readings")
+        .select("*")
+        .eq("tenant_id", user.id)
+        .order("reading_month", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setUtilityBills(data);
+        
+        // Set current month as the latest reading
+        const latestReading = data[0];
+        setCurrentMonthUtility({
+          id: latestReading.id,
+          month: new Date(latestReading.reading_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          electricity_bill: latestReading.electricity_bill || 0,
+          water_bill: latestReading.water_bill || 0,
+          garbage_fee: latestReading.garbage_fee || 0,
+          security_fee: latestReading.security_fee || 0,
+          service_fee: latestReading.service_fee || 0,
+          other_charges: latestReading.other_charges || 0,
+          total_bill: latestReading.total_bill || 0,
+          status: latestReading.status,
+          created_at: latestReading.created_at
+        });
+      }
+    } catch (err) {
+      console.warn("Could not fetch utility bills:", err);
     }
   };
 
@@ -1065,36 +1165,141 @@ const TenantDashboard: React.FC = () => {
                       </div>
                       <Download className="w-4 h-4 opacity-50" />
                    </Button>
+
+                   <Button 
+                     className="w-full justify-between bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 h-auto py-3 px-4 rounded-xl shadow-sm transition-all hover:translate-x-1"
+                     onClick={() => navigate("/portal/tenant/bills")}
+                   >
+                      <div className="flex items-center gap-3">
+                         <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg"><Zap className="w-4 h-4"/></div>
+                         <span className="font-bold text-sm">View Bills</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 opacity-50" />
+                   </Button>
                 </CardContent>
              </Card>
 
-             {/* UTILITIES & SERVICES */}
-             {utilitySettings && (
-               <Card className="border-none shadow-lg bg-blue-50 rounded-2xl overflow-hidden border border-blue-100">
-                  <CardHeader className="p-6 pb-2">
-                     <div className="flex items-center gap-2 text-[#154279]">
-                        <Zap className="w-5 h-5" />
-                        <CardTitle className="text-base font-bold uppercase tracking-wider">Utilities & Services</CardTitle>
-                     </div>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                     <div className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-blue-100">
-                        <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">Monthly Total</div>
-                        <div className="text-[#154279] font-black text-2xl">
-                           {formatCurrency(
-                             (Number(utilitySettings.water_fee) || 0) +
-                             (Number(utilitySettings.electricity_fee) || 0) +
-                             (Number(utilitySettings.garbage_fee) || 0) +
-                             (Number(utilitySettings.security_fee) || 0) +
-                             (Number(utilitySettings.service_fee) || 0)
-                           )}
+             {/* UTILITIES & SERVICES - DETAILED BREAKDOWN */}
+             {currentMonthUtility ? (
+               <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 p-6">
+                     <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-emerald-100 rounded-lg">
+                           <Zap className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                           <CardTitle className="text-base font-bold text-emerald-900">Bill Calculation Breakdown</CardTitle>
+                           <CardDescription className="text-emerald-700 text-xs font-semibold uppercase tracking-wider">{currentMonthUtility.month}</CardDescription>
                         </div>
                      </div>
-                     <p className="text-xs text-blue-600 font-medium leading-relaxed">
-                        This is your summarized monthly fee for water, electricity, garbage, security, and general services.
-                     </p>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                     {/* Electricity */}
+                     <div className="border-b border-slate-100 pb-4">
+                        <div className="flex justify-between items-center mb-3">
+                           <div className="flex items-center gap-2">
+                              <Zap className="w-4 h-4 text-yellow-600" />
+                              <span className="text-sm font-semibold text-slate-700">Electricity</span>
+                           </div>
+                           <span className="text-lg font-bold text-yellow-700">{formatCurrency(currentMonthUtility.electricity_bill)}</span>
+                        </div>
+                     </div>
+
+                     {/* Water */}
+                     {currentMonthUtility.water_bill > 0 && (
+                        <div className="border-b border-slate-100 pb-4">
+                           <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                 <Droplets className="w-4 h-4 text-blue-600" />
+                                 <span className="text-sm font-semibold text-slate-700">Water</span>
+                              </div>
+                              <span className="text-lg font-bold text-blue-700">{formatCurrency(currentMonthUtility.water_bill)}</span>
+                           </div>
+                        </div>
+                     )}
+
+                     {/* Fixed Fees */}
+                     {(currentMonthUtility.garbage_fee > 0 || currentMonthUtility.security_fee > 0 || currentMonthUtility.service_fee > 0) && (
+                        <>
+                           {currentMonthUtility.garbage_fee > 0 && (
+                              <div className="flex justify-between items-center">
+                                 <span className="text-sm text-slate-700">Garbage Fee</span>
+                                 <span className="font-semibold text-slate-900">{formatCurrency(currentMonthUtility.garbage_fee)}</span>
+                              </div>
+                           )}
+                           {currentMonthUtility.security_fee > 0 && (
+                              <div className="flex justify-between items-center">
+                                 <span className="text-sm text-slate-700">Security Fee</span>
+                                 <span className="font-semibold text-slate-900">{formatCurrency(currentMonthUtility.security_fee)}</span>
+                              </div>
+                           )}
+                           {currentMonthUtility.service_fee > 0 && (
+                              <div className="flex justify-between items-center">
+                                 <span className="text-sm text-slate-700">Service Fee</span>
+                                 <span className="font-semibold text-slate-900">{formatCurrency(currentMonthUtility.service_fee)}</span>
+                              </div>
+                           )}
+                        </>
+                     )}
+
+                     {/* Other Charges */}
+                     {currentMonthUtility.other_charges > 0 && (
+                        <div className="flex justify-between items-center">
+                           <span className="text-sm text-slate-700">Other Charges</span>
+                           <span className="font-semibold text-slate-900">{formatCurrency(currentMonthUtility.other_charges)}</span>
+                        </div>
+                     )}
+
+                     {/* Total Bill - Highlighted */}
+                     <div className="bg-gradient-to-r from-emerald-100 to-teal-100 p-4 rounded-lg border-2 border-emerald-300 mt-4">
+                        <div className="flex justify-between items-center">
+                           <h3 className="text-lg font-bold text-emerald-900">TOTAL BILL</h3>
+                           <div className="text-right">
+                              <p className="text-2xl font-extrabold text-emerald-700">{formatCurrency(currentMonthUtility.total_bill)}</p>
+                              <p className="text-xs text-emerald-600 mt-1">Amount Due</p>
+                           </div>
+                        </div>
+                     </div>
+
+                     {/* Action Button */}
+                     <Button 
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold mt-4"
+                        onClick={() => navigate("/portal/tenant/payments")}
+                     >
+                        View Full Bill Details
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                     </Button>
                   </CardContent>
                </Card>
+             ) : (
+               // Fallback: Show summary if detailed breakdown not available
+               utilitySettings && (
+                 <Card className="border-none shadow-lg bg-blue-50 rounded-2xl overflow-hidden border border-blue-100">
+                    <CardHeader className="p-6 pb-2">
+                       <div className="flex items-center gap-2 text-[#154279]">
+                          <Zap className="w-5 h-5" />
+                          <CardTitle className="text-base font-bold uppercase tracking-wider">Utilities & Services</CardTitle>
+                       </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                       <div className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-blue-100">
+                          <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">Monthly Total</div>
+                          <div className="text-[#154279] font-black text-2xl">
+                             {formatCurrency(
+                               (Number(utilitySettings.water_fee) || 0) +
+                               (Number(utilitySettings.electricity_fee) || 0) +
+                               (Number(utilitySettings.garbage_fee) || 0) +
+                               (Number(utilitySettings.security_fee) || 0) +
+                               (Number(utilitySettings.service_fee) || 0)
+                             )}
+                          </div>
+                       </div>
+                       <p className="text-xs text-blue-600 font-medium leading-relaxed">
+                          This is your summarized monthly fee for water, electricity, garbage, security, and general services.
+                       </p>
+                    </CardContent>
+                 </Card>
+               )
              )}
 
              {/* EMERGENCY CONTACT */}

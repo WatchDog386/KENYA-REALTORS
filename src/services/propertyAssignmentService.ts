@@ -119,6 +119,7 @@ export const PropertyAssignmentService = {
           technician_id: technicianId,
           property_id: propertyId,
           assigned_by: profile?.id,
+          is_active: true,
         }
       ])
       .select();

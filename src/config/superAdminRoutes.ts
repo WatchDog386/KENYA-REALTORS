@@ -75,6 +75,14 @@ export const SUPER_ADMIN_ROUTES: SuperAdminRoute[] = [
     showInNavigation: true
   },
   {
+    title: 'Utilities Management',
+    path: '/portal/super-admin/utilities',
+    icon: 'zap',
+    description: 'Manage utility readings and billing',
+    permission: 'manage_utilities',
+    showInNavigation: true
+  },
+  {
     title: 'Manager Portal',
     path: '/portal/super-admin/manager',
     icon: 'shield',
