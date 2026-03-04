@@ -127,10 +127,10 @@ const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
       permission: "view_analytics",
     },
     {
-      title: "Utilities",
+      title: "Billing and Invoicing",
       path: "/portal/super-admin/utilities",
       icon: "zap",
-      description: "Manage utility readings & billing",
+      description: "Manage billing and invoicing",
       permission: "manage_utilities",
     },
   ];
@@ -210,10 +210,23 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { stats, systemAlerts, recentActivities } = useSuperAdmin();
+  const profileImageUrl =
+    (user as any)?.avatar_url ||
+    (user as any)?.profile_image ||
+    (user as any)?.profile_picture ||
+    (user as any)?.photo_url ||
+    "";
+  const userInitial = user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A";
+  const hasProfileImage = Boolean(profileImageUrl) && !avatarLoadError;
+
+  React.useEffect(() => {
+    setAvatarLoadError(false);
+  }, [profileImageUrl]);
 
   // Default stats if undefined
   const safeStats: DashboardStats = stats || {
@@ -554,9 +567,18 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
           </button>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-white"
+            className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-white overflow-hidden"
           >
-            {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
+            {hasProfileImage ? (
+              <img
+                src={profileImageUrl}
+                alt="Super Admin"
+                className="w-full h-full object-cover"
+                onError={() => setAvatarLoadError(true)}
+              />
+            ) : (
+              userInitial
+            )}
           </button>
         </div>
       </div>
@@ -814,8 +836,17 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-3 pl-1 pr-3 py-1.5 hover:bg-slate-100 rounded-lg border-2 border-slate-200 hover:border-[#F96302] hover:shadow-sm transition-all"
               >
-                <div className="w-9 h-9 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold border-2 border-[#F96302]">
-                  {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
+                <div className="w-9 h-9 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold border-2 border-[#F96302] overflow-hidden">
+                  {hasProfileImage ? (
+                    <img
+                      src={profileImageUrl}
+                      alt="Super Admin"
+                      className="w-full h-full object-cover"
+                      onError={() => setAvatarLoadError(true)}
+                    />
+                  ) : (
+                    userInitial
+                  )}
                 </div>
                 <div className="text-left hidden xl:block">
                   <div className="text-xs font-bold text-[#154279]">

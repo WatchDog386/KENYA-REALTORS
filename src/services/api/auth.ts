@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+  import { supabase } from "../supabase";
 
 export const authService = {
   // Sign in with email and password

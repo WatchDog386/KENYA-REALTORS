@@ -101,6 +101,47 @@ const PaymentsPage: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+
+    // Setup real-time subscriptions for utility readings
+    const readingsChannel = supabase
+      .channel(`utility_readings_tenant_${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'utility_readings',
+        },
+        (payload) => {
+          console.log('Real-time utility reading change detected:', payload);
+          // Refetch data when readings change
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // Setup real-time subscriptions for rent payments
+    const paymentsChannel = supabase
+      .channel(`rent_payments_tenant_${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'rent_payments',
+        },
+        (payload) => {
+          console.log('Real-time rent payment change detected:', payload);
+          // Refetch data when payments change
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      readingsChannel.unsubscribe();
+      paymentsChannel.unsubscribe();
+    };
   }, [user?.id]);
 
   // Build a payment-style bill entry from raw utility readings when invoices are missing

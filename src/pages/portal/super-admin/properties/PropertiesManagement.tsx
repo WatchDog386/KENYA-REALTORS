@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Building, Plus, Search, Filter, Eye, Edit, MapPin, Trash2, Home, Maximize, AlertCircle } from 'lucide-react';
+import { Loader2, Building, Plus, Search, Filter, Eye, Edit, MapPin, Trash2, Home, Maximize, AlertCircle, Zap, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { HeroBackground } from '@/components/ui/HeroBackground';
 import { propertyService, Property, CreatePropertyDTO } from '@/services/propertyService';
+import { supabase } from '@/integrations/supabase/client';
 import AddPropertyModal from './AddPropertyModal';
 import { toast } from 'sonner';
+
+interface UtilityOption {
+  id: string;
+  utility_name: string;
+  is_metered: boolean;
+  price?: number;
+  constant: number;
+}
 
 const PropertiesManagement: React.FC = () => {
   const { hasPermission } = useSuperAdmin();
@@ -20,10 +29,23 @@ const PropertiesManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<Property[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [utilityOptions, setUtilityOptions] = useState<UtilityOption[]>([]);
+  const [propertyUtilityMap, setPropertyUtilityMap] = useState<Record<string, string[]>>({});
+  const [selectedPropertyForUtilities, setSelectedPropertyForUtilities] = useState<Property | null>(null);
+  const [selectedUtilityIds, setSelectedUtilityIds] = useState<string[]>([]);
+  const [savingUtilities, setSavingUtilities] = useState(false);
+  const [newPropertyUtilityName, setNewPropertyUtilityName] = useState('');
+  const [newPropertyUtilityIsRated, setNewPropertyUtilityIsRated] = useState(false);
+  const [newPropertyUtilityPrice, setNewPropertyUtilityPrice] = useState(0);
+  const [newPropertyUtilityRate, setNewPropertyUtilityRate] = useState(1);
 
   useEffect(() => {
-    loadProperties();
+    initializePage();
   }, []);
+
+  const initializePage = async () => {
+    await Promise.all([loadProperties(), loadUtilityAssignments()]);
+  };
 
   const loadProperties = async () => {
     try {
@@ -42,7 +64,7 @@ const PropertiesManagement: React.FC = () => {
     try {
       await propertyService.createProperty(data);
       toast.success("Property created successfully");
-      loadProperties();
+      initializePage();
     } catch (error) {
       console.error("Failed to create property:", error);
       toast.error("Failed to create property");
@@ -55,10 +77,183 @@ const PropertiesManagement: React.FC = () => {
     try {
       await propertyService.deleteProperty(id);
       toast.success("Property deleted successfully");
-      loadProperties(); // Refresh list
+      initializePage(); // Refresh list
     } catch (error) {
       console.error("Failed to delete property:", error);
       toast.error("Failed to delete property");
+    }
+  };
+
+  const loadUtilityAssignments = async () => {
+    try {
+      const { data: constants, error: constantsError } = await supabase
+        .from('utility_constants')
+        .select('id, utility_name, is_metered, price, constant')
+        .order('utility_name');
+
+      if (constantsError) throw constantsError;
+
+      const { data: assignments, error: assignmentError } = await supabase
+        .from('property_utilities')
+        .select('property_id, utility_constant_id');
+
+      if (assignmentError) {
+        const missingTable = assignmentError.message?.toLowerCase().includes('relation') && assignmentError.message?.toLowerCase().includes('property_utilities');
+        if (missingTable) {
+          setUtilityOptions(constants || []);
+          setPropertyUtilityMap({});
+          return;
+        }
+        throw assignmentError;
+      }
+
+      const mapped: Record<string, string[]> = {};
+      (assignments || []).forEach((item: any) => {
+        if (!mapped[item.property_id]) mapped[item.property_id] = [];
+        mapped[item.property_id].push(item.utility_constant_id);
+      });
+
+      setUtilityOptions(constants || []);
+      setPropertyUtilityMap(mapped);
+    } catch (error) {
+      console.error('Failed to load utility assignments:', error);
+      toast.error('Failed to load property utilities');
+    }
+  };
+
+  const openUtilityManager = (property: Property) => {
+    setSelectedPropertyForUtilities(property);
+    setSelectedUtilityIds(propertyUtilityMap[property.id] || []);
+    setNewPropertyUtilityName('');
+    setNewPropertyUtilityIsRated(false);
+    setNewPropertyUtilityPrice(0);
+    setNewPropertyUtilityRate(1);
+  };
+
+  const toggleUtilitySelection = (utilityId: string) => {
+    setSelectedUtilityIds((prev) =>
+      prev.includes(utilityId) ? prev.filter((id) => id !== utilityId) : [...prev, utilityId]
+    );
+  };
+
+  const savePropertyUtilities = async () => {
+    if (!selectedPropertyForUtilities) return;
+    try {
+      setSavingUtilities(true);
+
+      const propertyId = selectedPropertyForUtilities.id;
+
+      const { error: deleteError } = await supabase
+        .from('property_utilities')
+        .delete()
+        .eq('property_id', propertyId);
+
+      if (deleteError) throw deleteError;
+
+      if (selectedUtilityIds.length > 0) {
+        const inserts = selectedUtilityIds.map((utilityId) => ({
+          property_id: propertyId,
+          utility_constant_id: utilityId,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('property_utilities')
+          .insert(inserts);
+
+        if (insertError) throw insertError;
+      }
+
+      toast.success('Property utilities updated successfully');
+      setSelectedPropertyForUtilities(null);
+      await loadUtilityAssignments();
+    } catch (error) {
+      console.error('Failed to save property utilities:', error);
+      toast.error('Failed to save property utilities');
+    } finally {
+      setSavingUtilities(false);
+    }
+  };
+
+  const addUtilityForSelectedProperty = async () => {
+    if (!selectedPropertyForUtilities) return;
+
+    if (!newPropertyUtilityName.trim()) {
+      toast.error('Enter utility name');
+      return;
+    }
+
+    if (!newPropertyUtilityIsRated && Number(newPropertyUtilityPrice) <= 0) {
+      toast.error('Enter fixed price for fixed utility');
+      return;
+    }
+
+    if (newPropertyUtilityIsRated && Number(newPropertyUtilityRate) <= 0) {
+      toast.error('Enter rate for rated utility');
+      return;
+    }
+
+    try {
+      setSavingUtilities(true);
+
+      const normalizedName = newPropertyUtilityName.trim();
+      let utilityId = '';
+
+      const existing = utilityOptions.find(
+        (item) => item.utility_name.toLowerCase() === normalizedName.toLowerCase()
+      );
+
+      if (existing) {
+        utilityId = existing.id;
+      } else {
+        const { data: createdUtility, error: createError } = await supabase
+          .from('utility_constants')
+          .insert([
+            {
+              utility_name: normalizedName,
+              is_metered: newPropertyUtilityIsRated,
+              constant: newPropertyUtilityIsRated ? Number(newPropertyUtilityRate) : 1,
+              price: newPropertyUtilityIsRated ? null : Number(newPropertyUtilityPrice),
+              description: newPropertyUtilityIsRated ? `Rated utility - ${normalizedName}` : `Fixed utility - ${normalizedName}`,
+            },
+          ])
+          .select('id')
+          .single();
+
+        if (createError) throw createError;
+        utilityId = createdUtility.id;
+      }
+
+      const { error: assignmentError } = await supabase
+        .from('property_utilities')
+        .insert([
+          {
+            property_id: selectedPropertyForUtilities.id,
+            utility_constant_id: utilityId,
+          },
+        ]);
+
+      if (assignmentError && !assignmentError.message?.toLowerCase().includes('duplicate')) {
+        throw assignmentError;
+      }
+
+      toast.success('Utility added to property successfully');
+      setNewPropertyUtilityName('');
+      setNewPropertyUtilityPrice(0);
+      setNewPropertyUtilityRate(1);
+      setNewPropertyUtilityIsRated(false);
+      await loadUtilityAssignments();
+
+      const { data: refreshedAssignments } = await supabase
+        .from('property_utilities')
+        .select('utility_constant_id')
+        .eq('property_id', selectedPropertyForUtilities.id);
+
+      setSelectedUtilityIds((refreshedAssignments || []).map((item: any) => item.utility_constant_id));
+    } catch (error) {
+      console.error('Failed to add utility to property:', error);
+      toast.error('Failed to add utility to property');
+    } finally {
+      setSavingUtilities(false);
     }
   };
 
@@ -251,6 +446,41 @@ const PropertiesManagement: React.FC = () => {
                         <span className="bg-slate-100 text-slate-400 text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200">+{((property.property_unit_types?.length || 0) - 3)} more</span>
                       )}
                     </div>
+
+                    <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#154279] flex items-center gap-1">
+                          <Zap size={12} className="text-[#F96302]" /> Utilities
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openUtilityManager(property)}
+                          className="h-7 text-[10px] px-2.5 border-[#154279]/20 text-[#154279] hover:bg-[#154279]/5"
+                        >
+                          Configure
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(propertyUtilityMap[property.id] || []).length === 0 ? (
+                          <span className="text-[11px] text-slate-500">No utilities assigned</span>
+                        ) : (
+                          utilityOptions
+                            .filter((option) => (propertyUtilityMap[property.id] || []).includes(option.id))
+                            .slice(0, 4)
+                            .map((option) => (
+                              <Badge key={option.id} className="bg-white text-[#154279] border border-blue-200 text-[10px]">
+                                {option.utility_name}
+                              </Badge>
+                            ))
+                        )}
+                        {(propertyUtilityMap[property.id] || []).length > 4 && (
+                          <Badge className="bg-slate-100 text-slate-600 border border-slate-200 text-[10px]">
+                            +{(propertyUtilityMap[property.id] || []).length - 4} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                     
                     <div className="mt-auto border-t border-slate-200 pt-4 flex justify-between items-center gap-2">
                        <Button variant="outline" size="sm" onClick={() => {/* Manage logic */}} className="flex-1 bg-[#154279] hover:bg-[#0f325e] text-white font-bold rounded-xl border-none text-xs">
@@ -273,6 +503,123 @@ const PropertiesManagement: React.FC = () => {
         onClose={() => setIsAddModalOpen(false)} 
         onSave={handleCreateProperty} 
       />
+
+      {selectedPropertyForUtilities && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl shadow-2xl border-2 border-slate-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b">
+              <div>
+                <CardTitle className="text-xl text-[#154279]">Configure Property Utilities</CardTitle>
+                <p className="text-sm text-slate-500 mt-1">
+                  Select utilities available for <span className="font-semibold">{selectedPropertyForUtilities.name}</span>.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedPropertyForUtilities(null)}
+                className="h-8 w-8 p-0 rounded-full"
+              >
+                <X size={16} />
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-5 space-y-4 max-h-[60vh] overflow-y-auto">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <p className="text-sm font-bold text-[#154279]">Add Utility to This Property</p>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Utility Name</label>
+                  <input
+                    type="text"
+                    value={newPropertyUtilityName}
+                    onChange={(e) => setNewPropertyUtilityName(e.target.value)}
+                    placeholder="e.g. WIFI, Parking, Borehole"
+                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600">Utility Type</label>
+                    <select
+                      value={newPropertyUtilityIsRated ? 'rated' : 'fixed'}
+                      onChange={(e) => setNewPropertyUtilityIsRated(e.target.value === 'rated')}
+                      className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"
+                    >
+                      <option value="fixed">Fixed</option>
+                      <option value="rated">Rated</option>
+                    </select>
+                  </div>
+                  <div>
+                    {newPropertyUtilityIsRated ? (
+                      <>
+                        <label className="text-xs font-semibold text-slate-600">Rate</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.0001"
+                          value={newPropertyUtilityRate}
+                          onChange={(e) => setNewPropertyUtilityRate(Number(e.target.value || 0))}
+                          className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <label className="text-xs font-semibold text-slate-600">Fixed Price (KES)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newPropertyUtilityPrice}
+                          onChange={(e) => setNewPropertyUtilityPrice(Number(e.target.value || 0))}
+                          className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={addUtilityForSelectedProperty} disabled={savingUtilities} className="bg-[#154279] hover:bg-[#0f325e] text-white">
+                    {savingUtilities ? 'Adding...' : 'Add Utility'}
+                  </Button>
+                </div>
+              </div>
+
+              {utilityOptions.length === 0 ? (
+                <p className="text-sm text-slate-500">No utilities found. Add utilities from Billing and Invoicing page first.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {utilityOptions.map((utility) => (
+                    <label
+                      key={utility.id}
+                      className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 cursor-pointer hover:border-[#154279]/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUtilityIds.includes(utility.id)}
+                        onChange={() => toggleUtilitySelection(utility.id)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{utility.utility_name}</p>
+                        <p className="text-xs text-slate-500">
+                          {utility.is_metered ? `Metered • Rate Multiplier: ${utility.constant}` : `Fixed • KES ${Number(utility.price || 0).toLocaleString()}`}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+            <div className="border-t p-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSelectedPropertyForUtilities(null)}>
+                Cancel
+              </Button>
+              <Button onClick={savePropertyUtilities} disabled={savingUtilities} className="bg-[#154279] hover:bg-[#0f325e] text-white">
+                {savingUtilities ? 'Saving...' : 'Save Utilities'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </>
   );
 };

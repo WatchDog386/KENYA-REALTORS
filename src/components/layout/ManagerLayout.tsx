@@ -376,10 +376,10 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       description: 'Assign tasks to caretakers'
     },
     {
-      title: 'Utilities',
+      title: 'Billing and Invoicing',
       href: '/portal/manager/utilities',
       icon: <Zap size={20} />,
-      description: 'Manage utility readings & billing'
+      description: 'Manage billing and invoicing'
     },
     {
       title: 'Messages',

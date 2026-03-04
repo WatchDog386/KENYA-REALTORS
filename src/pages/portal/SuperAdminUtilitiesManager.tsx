@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Zap,
@@ -21,9 +21,13 @@ import {
   X,
   Users,
   Settings,
+  Edit3,
+  Send,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import {
   Card,
@@ -100,10 +104,34 @@ interface TenantWithReadings {
   tenant_phone: string;
   unit_number: string;
   property_name: string;
+  property_id?: string;
+  unit_id?: string;
+  rent_amount: number;
+  utility_total: number;
   total_due: number;
   status: 'pending' | 'paid';
   readings: UtilityReading[];
   latest_reading?: UtilityReading;
+}
+
+interface PropertyOption {
+  id: string;
+  name: string;
+}
+
+interface InvoiceDraft {
+  tenant: TenantWithReadings;
+  reading: UtilityReading;
+  rentAmount: number;
+  electricityBill: number;
+  waterBill: number;
+  garbageFee: number;
+  securityFee: number;
+  serviceFee: number;
+  otherCharges: number;
+  customUtilities: Record<string, number>;
+  dueDate: string;
+  notes: string;
 }
 
 const SuperAdminUtilitiesManager = () => {
@@ -127,14 +155,18 @@ const SuperAdminUtilitiesManager = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedTenant, setSelectedTenant] = useState<TenantWithReadings | null>(null);
   const [properties, setProperties] = useState<string[]>([]);
+  const [propertyOptions, setPropertyOptions] = useState<PropertyOption[]>([]);
   const [showAddUtility, setShowAddUtility] = useState(false);
   const [newUtilityName, setNewUtilityName] = useState('');
   const [newUtilityConstant, setNewUtilityConstant] = useState(1);
   const [newUtilityPrice, setNewUtilityPrice] = useState(0);
   const [newUtilityIsMetered, setNewUtilityIsMetered] = useState(false);
+  const [newUtilityPropertyId, setNewUtilityPropertyId] = useState('');
   const [updatingUtilityId, setUpdatingUtilityId] = useState<string | null>(null);
-  const [updatingField, setUpdatingField] = useState<string | null>(null);
-  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [utilityDrafts, setUtilityDrafts] = useState<Record<string, { constant: string; price: string }>>({});
+  const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraft | null>(null);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
 
   // Fetch utility settings and constants
   useEffect(() => {
@@ -173,6 +205,19 @@ const SuperAdminUtilitiesManager = () => {
           console.log("Fetched utility constants:", constants);
           setUtilityConstants(constants);
         }
+
+        const { data: propertyData, error: propertiesError } = await supabase
+          .from("properties")
+          .select("id, name")
+          .order("name", { ascending: true });
+
+        if (propertiesError) throw propertiesError;
+
+        const mappedProperties = (propertyData || []).map((p: any) => ({ id: p.id, name: p.name }));
+        setPropertyOptions(mappedProperties);
+        if (!newUtilityPropertyId && mappedProperties.length > 0) {
+          setNewUtilityPropertyId(mappedProperties[0].id);
+        }
       } catch (err: any) {
         console.error("Error fetching utility settings:", err);
         setError(err.message || "Failed to load utility settings");
@@ -206,178 +251,237 @@ const SuperAdminUtilitiesManager = () => {
       )
       .subscribe();
 
-    // Cleanup: unsubscribe and clear any pending timeouts on unmount
+    // Cleanup: unsubscribe on unmount
     return () => {
       channel.unsubscribe();
-      if (updateTimerRef.current) {
-        clearTimeout(updateTimerRef.current);
-      }
     };
   }, []);
 
-  // Fetch all utility readings with tenant details
   useEffect(() => {
-    const fetchAllReadings = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    setUtilityDrafts((prev) => {
+      const next: Record<string, { constant: string; price: string }> = { ...prev };
 
-        // Fetch all utility readings
-        const { data: readings, error: readingsError } = await supabase
-          .from("utility_readings")
-          .select("*")
-          .order("reading_month", { ascending: false });
-
-        if (readingsError) {
-          console.error("Readings error details:", readingsError);
-          
-          // Handle common errors
-          if (readingsError.code === 'PGRST116') {
-            // Table doesn't exist or no rows
-            console.warn("No utility readings found or table issue");
-            setTenantsWithReadings([]);
-            setProperties([]);
-            setLoading(false);
-            return;
-          }
-          
-          throw readingsError;
+      for (const utility of utilityConstants) {
+        if (updatingUtilityId === utility.id && prev[utility.id]) {
+          continue;
         }
 
-        if (!readings || readings.length === 0) {
-          console.log("No utility readings in database yet");
+        next[utility.id] = {
+          constant: String(utility.constant ?? 0),
+          price: String(utility.price ?? 0),
+        };
+      }
+
+      Object.keys(next).forEach((key) => {
+        if (!utilityConstants.some((utility) => utility.id === key)) {
+          delete next[key];
+        }
+      });
+
+      return next;
+    });
+  }, [utilityConstants, updatingUtilityId]);
+
+  // Render the index.html brand SVG into a PNG data URL for use in PDFs
+  useEffect(() => {
+    const svgMarkup = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="grad-front" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#E2D6B5"/></linearGradient><linearGradient id="grad-side" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#D4AF37"/><stop offset="100%" stop-color="#8A7D55"/></linearGradient><linearGradient id="grad-dark" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#998A5E"/><stop offset="100%" stop-color="#5C5035"/></linearGradient></defs><path fill="url(#grad-front)" d="M110 90 V170 L160 150 V70 L110 90 Z"/><path fill="url(#grad-dark)" d="M160 70 L180 80 V160 L160 150 Z"/><path fill="url(#grad-front)" d="M30 150 V50 L80 20 V120 L30 150 Z"/><path fill="url(#grad-side)" d="M80 20 L130 40 V140 L80 120 Z"/><g fill="#1a232e"><path d="M85 50 L100 56 V86 L85 80 Z"/><path d="M85 90 L100 96 V126 L85 120 Z"/><path d="M45 60 L55 54 V124 L45 130 Z"/><path d="M120 130 L140 122 V152 L120 160 Z"/></g></svg>`;
+
+    const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml' });
+    const svgUrl = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const size = 220;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, size, size);
+        setLogoDataUrl(canvas.toDataURL('image/png'));
+      }
+      URL.revokeObjectURL(svgUrl);
+    };
+    img.onerror = () => URL.revokeObjectURL(svgUrl);
+    img.src = svgUrl;
+  }, []);
+
+
+  const loadTenantReadings = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: readings, error: readingsError } = await supabase
+        .from("utility_readings")
+        .select("*")
+        .order("reading_month", { ascending: false });
+
+      if (readingsError) {
+        if (readingsError.code === 'PGRST116') {
           setTenantsWithReadings([]);
           setProperties([]);
-          setLoading(false);
           return;
         }
+        throw readingsError;
+      }
 
-        // Fetch unit details for each reading
-        const tenantMap = new Map<string, TenantWithReadings>();
+      if (!readings || readings.length === 0) {
+        setTenantsWithReadings([]);
+        setProperties([]);
+        return;
+      }
 
-        for (const reading of readings) {
-          try {
-            // Fetch unit details
-            const { data: unit, error: unitError } = await supabase
-              .from("units")
-              .select("unit_number, property_id")
-              .eq("id", reading.unit_id)
+      const tenantMap = new Map<string, TenantWithReadings>();
+
+      for (const reading of readings) {
+        try {
+          const { data: unit, error: unitError } = await supabase
+            .from("units")
+            .select("unit_number, property_id, price")
+            .eq("id", reading.unit_id)
+            .single();
+
+          if (unitError || !unit) continue;
+
+          const { data: property, error: propertyError } = await supabase
+            .from("properties")
+            .select("name")
+            .eq("id", reading.property_id)
+            .single();
+
+          if (propertyError || !property) continue;
+
+          let tenantName = 'Unknown';
+          let tenantEmail = '';
+          let tenantPhone = '';
+
+          if (reading.tenant_id) {
+            const { data: tenant } = await supabase
+              .from("profiles")
+              .select("first_name, last_name, email, phone")
+              .eq("id", reading.tenant_id)
               .single();
 
-            if (unitError) {
-              console.error("Error fetching unit:", unitError);
-              continue;
+            if (tenant) {
+              tenantName = tenant.first_name && tenant.last_name
+                ? `${tenant.first_name} ${tenant.last_name}`
+                : 'Unknown Tenant';
+              tenantEmail = tenant.email || '';
+              tenantPhone = tenant.phone || '';
             }
+          }
 
-            // Fetch property details
-            const { data: property, error: propertyError } = await supabase
-              .from("properties")
-              .select("name")
-              .eq("id", reading.property_id)
-              .single();
+          const key = `${reading.tenant_id}-${reading.unit_id}`;
+          const rentAmount = Number(unit.price || 0);
 
-            if (propertyError) {
-              console.error("Error fetching property:", propertyError);
-              continue;
-            }
+          const electricityUsage = Math.abs(reading.current_reading - reading.previous_reading);
+          const electricityBill = Number(reading.electricity_bill || (electricityUsage * reading.electricity_rate));
+          const waterUsage = Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0));
+          const waterBill = Number(reading.water_bill || (waterUsage * (reading.water_rate || 0)));
 
-            // Fetch tenant details
-            let tenantName = 'Unknown';
-            let tenantEmail = '';
-            let tenantPhone = '';
+          let customUtilitiesTotal = 0;
+          if (reading.custom_utilities) {
+            Object.values(reading.custom_utilities).forEach((val) => {
+              customUtilitiesTotal += Number(val) || 0;
+            });
+          }
 
-            if (reading.tenant_id) {
-              const { data: tenant, error: tenantError } = await supabase
-                .from("profiles")
-                .select("first_name, last_name, email, phone")
-                .eq("id", reading.tenant_id)
-                .single();
+          const utilityTotal =
+            electricityBill +
+            waterBill +
+            Number(reading.garbage_fee || 0) +
+            Number(reading.security_fee || 0) +
+            Number(reading.service_fee || 0) +
+            customUtilitiesTotal +
+            Number(reading.other_charges || 0);
 
-              if (!tenantError && tenant) {
-                tenantName = tenant.first_name && tenant.last_name 
-                  ? `${tenant.first_name} ${tenant.last_name}`
-                  : 'Unknown Tenant';
-                tenantEmail = tenant.email || '';
-                tenantPhone = tenant.phone || '';
-              }
-            }
+          const totalDue = rentAmount + utilityTotal;
 
-            const key = `${reading.tenant_id}-${reading.unit_id}`;
-            
-            // Calculate bills
-            const electricityUsage = Math.abs(reading.current_reading - reading.previous_reading);
-            const electricityBill = electricityUsage * reading.electricity_rate;
-            
-            const waterUsage = Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0));
-            const waterBill = waterUsage * (reading.water_rate || 0);
+          const enrichedReading: UtilityReading = {
+            ...reading,
+            electricity_usage: electricityUsage,
+            electricity_bill: electricityBill,
+            water_bill: waterBill,
+            total_bill: utilityTotal,
+            tenant_name: tenantName,
+            tenant_email: tenantEmail,
+            tenant_phone: tenantPhone,
+            unit_number: unit.unit_number,
+            property_name: property.name,
+          };
 
-            let customUtilitiesTotal = 0;
-            if (reading.custom_utilities) {
-              Object.values(reading.custom_utilities).forEach(val => {
-                customUtilitiesTotal += Number(val) || 0;
-              });
-            }
-
-            const totalBill = electricityBill + waterBill + reading.garbage_fee + 
-                             reading.security_fee + (reading.service_fee || 0) + customUtilitiesTotal + reading.other_charges;
-
-            const enrichedReading = {
-              ...reading,
-              electricity_usage: electricityUsage,
-              electricity_bill: electricityBill,
-              total_bill: totalBill,
+          if (!tenantMap.has(key)) {
+            tenantMap.set(key, {
+              tenant_id: reading.tenant_id,
               tenant_name: tenantName,
               tenant_email: tenantEmail,
               tenant_phone: tenantPhone,
               unit_number: unit.unit_number,
               property_name: property.name,
-            };
-
-            if (!tenantMap.has(key)) {
-              tenantMap.set(key, {
-                tenant_id: reading.tenant_id,
-                tenant_name: tenantName,
-                tenant_email: tenantEmail,
-                tenant_phone: tenantPhone,
-                unit_number: unit.unit_number,
-                property_name: property.name,
-                total_due: totalBill,
-                status: reading.status,
-                readings: [enrichedReading],
-                latest_reading: enrichedReading,
-              });
-            } else {
-              const existing = tenantMap.get(key)!;
-              existing.readings.push(enrichedReading);
-              existing.total_due += totalBill;
-              if (!existing.latest_reading || 
-                  new Date(enrichedReading.reading_month) > new Date(existing.latest_reading.reading_month)) {
-                existing.latest_reading = enrichedReading;
-              }
+              property_id: reading.property_id,
+              unit_id: reading.unit_id,
+              rent_amount: rentAmount,
+              utility_total: utilityTotal,
+              total_due: totalDue,
+              status: reading.status,
+              readings: [enrichedReading],
+              latest_reading: enrichedReading,
+            });
+          } else {
+            const existing = tenantMap.get(key)!;
+            existing.readings.push(enrichedReading);
+            if (!existing.latest_reading || new Date(enrichedReading.reading_month) > new Date(existing.latest_reading.reading_month)) {
+              existing.latest_reading = enrichedReading;
+              existing.utility_total = utilityTotal;
+              existing.rent_amount = rentAmount;
+              existing.total_due = totalDue;
+              existing.status = reading.status;
             }
-          } catch (itemError) {
-            console.error("Error processing reading item:", itemError);
-            continue;
           }
+        } catch (itemError) {
+          console.error("Error processing reading item:", itemError);
+          continue;
         }
-
-        const tenantList = Array.from(tenantMap.values());
-        const propertyNames = [...new Set(tenantList.map(t => t.property_name))];
-
-        setTenantsWithReadings(tenantList);
-        setProperties(propertyNames.sort());
-      } catch (err: any) {
-        console.error("Error fetching readings:", err);
-        console.error("Error code:", err.code);
-        console.error("Error message:", err.message);
-        setError(err.message || "Failed to load utility readings. Please check your database setup.");
-        toast.error(err.message || "Failed to load utility readings");
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchAllReadings();
+      const tenantList = Array.from(tenantMap.values());
+      const propertyNames = [...new Set(tenantList.map((t) => t.property_name))];
+      setTenantsWithReadings(tenantList);
+      setProperties(propertyNames.sort());
+    } catch (err: any) {
+      console.error("Error fetching readings:", err);
+      setError(err.message || "Failed to load utility readings. Please check your database setup.");
+      toast.error(err.message || "Failed to load utility readings");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTenantReadings();
+
+    // Setup real-time subscription for utility readings
+    const readingsChannel = supabase
+      .channel('utility_readings_superadmin')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'utility_readings',
+        },
+        async (payload) => {
+          console.log('Real-time utility reading change detected:', payload);
+          // Refresh all readings when any change occurs
+          await loadTenantReadings();
+        }
+      )
+      .subscribe();
+
+    // Cleanup: unsubscribe on unmount
+    return () => {
+      readingsChannel.unsubscribe();
+    };
   }, []);
 
   // Filter tenants
@@ -483,6 +587,16 @@ const SuperAdminUtilitiesManager = () => {
       return;
     }
 
+    if (!newUtilityPropertyId) {
+      toast.error("Please select a property");
+      return;
+    }
+
+    if (/\brent\b/i.test(newUtilityName.trim())) {
+      toast.error("Rent is auto-fetched from tenant unit price and should not be added as a utility constant");
+      return;
+    }
+
     if (!newUtilityIsMetered && newUtilityPrice === 0) {
       toast.error("Please enter a price for fixed utilities");
       return;
@@ -513,7 +627,22 @@ const SuperAdminUtilitiesManager = () => {
 
       if (error) throw error;
 
-      if (data) {
+      if (data && data.length > 0) {
+        const newUtility = data[0];
+
+        const { error: assignmentError } = await supabase
+          .from("property_utilities")
+          .insert([
+            {
+              property_id: newUtilityPropertyId,
+              utility_constant_id: newUtility.id,
+            },
+          ]);
+
+        if (assignmentError) {
+          throw assignmentError;
+        }
+
         // Refresh all constants from database to ensure persistence
         const { data: refreshedConstants, error: refreshError } = await supabase
           .from('utility_constants')
@@ -531,7 +660,7 @@ const SuperAdminUtilitiesManager = () => {
         setNewUtilityPrice(0);
         setNewUtilityIsMetered(false);
         setShowAddUtility(false);
-        toast.success("Utility added successfully");
+        toast.success("Utility added and assigned to property successfully");
       }
     } catch (err: any) {
       console.error("Error adding utility:", err);
@@ -542,126 +671,111 @@ const SuperAdminUtilitiesManager = () => {
     }
   };
 
-  const handleUpdateConstant = async (utilityId: string, newConstant: number) => {
-    // Clear previous timer
-    if (updateTimerRef.current) {
-      clearTimeout(updateTimerRef.current);
-    }
+  const isRentUtility = (utilityName: string) => /\brent\b/i.test(utilityName.trim());
 
-    // Update local state immediately for UI feedback
-    setUtilityConstants(prev => prev.map(u => u.id === utilityId ? { ...u, constant: newConstant } : u));
-    
-    // Set updating state
-    setUpdatingUtilityId(utilityId);
-    setUpdatingField('constant');
-
-    // Debounce the database update
-    updateTimerRef.current = setTimeout(async () => {
-      try {
-        const { error } = await supabase
-          .from("utility_constants")
-          .update({ 
-            constant: newConstant,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", utilityId);
-
-        if (error) {
-          console.error("Update error:", error);
-          throw error;
-        }
-
-        // Refresh all constants from database to ensure persistence
-        const { data: refreshedConstants, error: refreshError } = await supabase
-          .from('utility_constants')
-          .select('*')
-          .order('utility_name');
-
-        if (refreshError) throw refreshError;
-
-        if (refreshedConstants) {
-          console.log('Constants refreshed from database:', refreshedConstants);
-          setUtilityConstants(refreshedConstants);
-        }
-
-        toast.success("Constant updated successfully");
-      } catch (err: any) {
-        console.error("Error updating constant:", err);
-        toast.error(`Failed to update constant: ${err.message}`);
-        // Refresh to get current state from database
-        const { data: refreshedConstants } = await supabase
-          .from('utility_constants')
-          .select('*')
-          .order('utility_name');
-        if (refreshedConstants) {
-          setUtilityConstants(refreshedConstants);
-        }
-      } finally {
-        setUpdatingUtilityId(null);
-        setUpdatingField(null);
-      }
-    }, 800); // Wait 800ms after user stops typing
+  const handleDraftConstantChange = (utilityId: string, value: string) => {
+    setUtilityDrafts((prev) => ({
+      ...prev,
+      [utilityId]: {
+        constant: value,
+        price: prev[utilityId]?.price ?? '0',
+      },
+    }));
   };
 
-  const handleUpdatePrice = async (utilityId: string, newPrice: number) => {
-    // Clear previous timer
-    if (updateTimerRef.current) {
-      clearTimeout(updateTimerRef.current);
+  const handleDraftPriceChange = (utilityId: string, value: string) => {
+    setUtilityDrafts((prev) => ({
+      ...prev,
+      [utilityId]: {
+        constant: prev[utilityId]?.constant ?? '0',
+        price: value,
+      },
+    }));
+  };
+
+  const handleSaveUtility = async (utility: UtilityConstant) => {
+    if (isRentUtility(utility.utility_name)) {
+      toast.info('Rent is derived from the assigned unit price and cannot be saved here');
+      return;
     }
 
-    // Update local state immediately for UI feedback
-    setUtilityConstants(prev => prev.map(u => u.id === utilityId ? { ...u, price: newPrice } : u));
-    
-    // Set updating state
-    setUpdatingUtilityId(utilityId);
-    setUpdatingField('price');
+    const draft = utilityDrafts[utility.id];
+    const parsedConstant = parseFloat(draft?.constant ?? String(utility.constant ?? 0));
+    const parsedPrice = parseFloat(draft?.price ?? String(utility.price ?? 0));
 
-    // Debounce the database update
-    updateTimerRef.current = setTimeout(async () => {
-      try {
-        const { error } = await supabase
-          .from("utility_constants")
-          .update({ 
-            price: newPrice,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", utilityId);
+    if (Number.isNaN(parsedConstant) || parsedConstant < 0) {
+      toast.error('Please enter a valid multiplier');
+      return;
+    }
 
-        if (error) {
-          console.error("Update error:", error);
-          throw error;
-        }
+    if (!utility.is_metered && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+      toast.error('Please enter a valid fixed price');
+      return;
+    }
 
-        // Refresh all constants from database to ensure persistence
-        const { data: refreshedConstants, error: refreshError } = await supabase
-          .from('utility_constants')
-          .select('*')
-          .order('utility_name');
+    try {
+      setUpdatingUtilityId(utility.id);
 
-        if (refreshError) throw refreshError;
+      const updatePayload: { constant: number; price?: number; updated_at: string } = {
+        constant: parsedConstant,
+        updated_at: new Date().toISOString(),
+      };
 
-        if (refreshedConstants) {
-          console.log('Constants refreshed from database:', refreshedConstants);
-          setUtilityConstants(refreshedConstants);
-        }
-
-        toast.success("Price updated successfully");
-      } catch (err: any) {
-        console.error("Error updating price:", err);
-        toast.error(`Failed to update price: ${err.message}`);
-        // Refresh to get current state from database
-        const { data: refreshedConstants } = await supabase
-          .from('utility_constants')
-          .select('*')
-          .order('utility_name');
-        if (refreshedConstants) {
-          setUtilityConstants(refreshedConstants);
-        }
-      } finally {
-        setUpdatingUtilityId(null);
-        setUpdatingField(null);
+      if (!utility.is_metered) {
+        updatePayload.price = parsedPrice;
       }
-    }, 800); // Wait 800ms after user stops typing
+
+      const { data: updatedRow, error } = await supabase
+        .from('utility_constants')
+        .update(updatePayload)
+        .eq('id', utility.id)
+        .select('id, constant, price, updated_at')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!updatedRow) {
+        throw new Error('No row was updated. Please check database permissions (RLS) for utility constants update.');
+      }
+
+      setUtilityConstants((prev) =>
+        prev.map((item) =>
+          item.id === utility.id
+            ? {
+                ...item,
+                constant: Number(updatedRow.constant ?? item.constant),
+                price: item.is_metered ? item.price : Number(updatedRow.price ?? item.price ?? 0),
+                updated_at: updatedRow.updated_at || item.updated_at,
+              }
+            : item
+        )
+      );
+
+      setUtilityDrafts((prev) => ({
+        ...prev,
+        [utility.id]: {
+          constant: String(updatedRow.constant ?? parsedConstant),
+          price: String(updatedRow.price ?? (utility.is_metered ? utility.price ?? 0 : parsedPrice)),
+        },
+      }));
+
+      const { data: refreshedConstants, error: refreshError } = await supabase
+        .from('utility_constants')
+        .select('*')
+        .order('utility_name');
+
+      if (refreshError) throw refreshError;
+
+      if (refreshedConstants) {
+        setUtilityConstants(refreshedConstants);
+      }
+
+      toast.success('Utility settings saved successfully');
+    } catch (err: any) {
+      console.error('Error saving utility settings:', err);
+      toast.error(`Failed to save utility settings: ${err.message}`);
+    } finally {
+      setUpdatingUtilityId(null);
+    }
   };
 
   const handleChange = (field: keyof UtilitySettings, value: string) => {
@@ -679,69 +793,325 @@ const SuperAdminUtilitiesManager = () => {
     settings.security_fee +
     settings.service_fee;
 
-  const handleDownloadBill = (tenant: TenantWithReadings) => {
-    // Generate a simple bill text
-    const latestReading = tenant.latest_reading;
-    if (!latestReading) return;
+  const formatKES = (value: number) => `KES ${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    let customUtilitiesText = '';
-    if (latestReading.custom_utilities) {
-      Object.entries(latestReading.custom_utilities).forEach(([key, value]) => {
-        const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        customUtilitiesText += `${formattedKey.padEnd(40)} KES ${Number(value || 0).toFixed(2)}\n`;
-      });
+  const calculateDraftTotal = (draft: InvoiceDraft) => {
+    const customTotal = Object.values(draft.customUtilities || {}).reduce((sum, val) => sum + Number(val || 0), 0);
+    return (
+      Number(draft.rentAmount || 0) +
+      Number(draft.electricityBill || 0) +
+      Number(draft.waterBill || 0) +
+      Number(draft.garbageFee || 0) +
+      Number(draft.securityFee || 0) +
+      Number(draft.serviceFee || 0) +
+      Number(draft.otherCharges || 0) +
+      customTotal
+    );
+  };
+
+  const buildInvoiceDraft = (tenant: TenantWithReadings): InvoiceDraft | null => {
+    if (!tenant.latest_reading) return null;
+    const latest = tenant.latest_reading;
+    return {
+      tenant,
+      reading: latest,
+      rentAmount: Number(tenant.rent_amount || 0),
+      electricityBill: Number(latest.electricity_bill || 0),
+      waterBill: Number(latest.water_bill || 0),
+      garbageFee: Number(latest.garbage_fee || 0),
+      securityFee: Number(latest.security_fee || 0),
+      serviceFee: Number(latest.service_fee || 0),
+      otherCharges: Number(latest.other_charges || 0),
+      customUtilities: { ...(latest.custom_utilities || {}) },
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
+      notes: '',
+    };
+  };
+
+  const openInvoiceEditor = (tenant: TenantWithReadings) => {
+    const draft = buildInvoiceDraft(tenant);
+    if (!draft) {
+      toast.error('No latest reading available for this tenant');
+      return;
+    }
+    setSelectedTenant(tenant);
+    setInvoiceDraft(draft);
+  };
+
+  const handleDraftChange = (field: keyof Omit<InvoiceDraft, 'tenant' | 'reading' | 'customUtilities'>, value: string) => {
+    setInvoiceDraft((prev) => {
+      if (!prev) return prev;
+      if (field === 'dueDate' || field === 'notes') {
+        return { ...prev, [field]: value };
+      }
+      const parsed = parseFloat(value);
+      return { ...prev, [field]: Number.isNaN(parsed) ? 0 : parsed } as InvoiceDraft;
+    });
+  };
+
+  const handleDraftCustomUtilityChange = (key: string, value: string) => {
+    setInvoiceDraft((prev) => {
+      if (!prev) return prev;
+      const parsed = parseFloat(value);
+      return {
+        ...prev,
+        customUtilities: {
+          ...prev.customUtilities,
+          [key]: Number.isNaN(parsed) ? 0 : parsed,
+        },
+      };
+    });
+  };
+
+  const handleSaveInvoiceChanges = async () => {
+    if (!invoiceDraft?.reading?.id) return;
+    try {
+      const total = calculateDraftTotal(invoiceDraft);
+      const utilityTotal = total - Number(invoiceDraft.rentAmount || 0);
+
+      const { error: updateError } = await supabase
+        .from('utility_readings')
+        .update({
+          electricity_bill: invoiceDraft.electricityBill,
+          water_bill: invoiceDraft.waterBill,
+          garbage_fee: invoiceDraft.garbageFee,
+          security_fee: invoiceDraft.securityFee,
+          service_fee: invoiceDraft.serviceFee,
+          other_charges: invoiceDraft.otherCharges,
+          custom_utilities: invoiceDraft.customUtilities,
+          total_bill: utilityTotal,
+        })
+        .eq('id', invoiceDraft.reading.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Invoice changes saved successfully');
+      await loadTenantReadings();
+    } catch (error: any) {
+      console.error('Error saving invoice changes:', error);
+      toast.error(error.message || 'Failed to save invoice changes');
+    }
+  };
+
+  const downloadInvoicePdf = (draft: InvoiceDraft) => {
+    const total = calculateDraftTotal(draft);
+    const doc = new jsPDF();
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`;
+    const issueDate = new Date().toLocaleDateString();
+    const dueDate = new Date(draft.dueDate).toLocaleDateString();
+    const primaryColor: [number, number, number] = [21, 66, 121];
+
+    // Header bar
+    doc.setFillColor(...primaryColor);
+    doc.rect(0, 0, 210, 50, 'F');
+
+    // Brand logo from index.html (vector rendered to PNG)
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, 'PNG', 12, 10, 30, 30, undefined, 'FAST');
+      } catch (logoErr) {
+        console.warn('Logo embed failed', logoErr);
+      }
+    } else {
+      doc.setDrawColor(255, 255, 255);
+      doc.setLineWidth(0.8);
+      doc.rect(12, 10, 30, 30);
     }
 
-    const billContent = `
-================================
-     UTILITY BILL STATEMENT
-================================
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(17);
+    doc.setFont(undefined, 'bold');
+    doc.text('KENYA REALTORS', 48, 18);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text('Billing and Invoicing Department', 48, 25);
+    doc.text('Nairobi, Kenya', 48, 31);
 
-TENANT INFORMATION:
-Name: ${tenant.tenant_name}
-Email: ${tenant.tenant_email}
-Phone: ${tenant.tenant_phone}
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(22);
+    doc.text('INVOICE', 154, 20);
+    doc.setFontSize(9.5);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Invoice #: ${invoiceNumber}`, 144, 29);
+    doc.text(`Issue Date: ${issueDate}`, 144, 34.5);
+    doc.text(`Due Date: ${dueDate}`, 144, 40);
 
-PROPERTY & UNIT:
-Property: ${tenant.property_name}
-Unit: ${tenant.unit_number}
+    doc.setTextColor(...primaryColor);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9.5);
+    doc.text('Billed To', 16, 66);
+    doc.text('Invoice Details', 112, 66);
 
-METER READINGS:
-Month: ${new Date(latestReading.reading_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-Electricity Previous Reading: ${latestReading.previous_reading.toFixed(2)}
-Electricity Current Reading: ${latestReading.current_reading.toFixed(2)}
-Electricity Usage: ${latestReading.electricity_usage?.toFixed(2)} units
+    doc.setTextColor(51, 65, 85);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(8.5);
+    doc.text(draft.tenant.tenant_name, 16, 73);
+    doc.text(draft.tenant.tenant_email || 'N/A', 16, 78);
+    doc.text(draft.tenant.tenant_phone || 'N/A', 16, 83);
+    doc.text(`Unit ${draft.tenant.unit_number} • ${draft.tenant.property_name}`, 16, 88);
 
-Water Previous Reading: ${(latestReading.water_previous_reading || 0).toFixed(2)}
-Water Current Reading: ${(latestReading.water_current_reading || 0).toFixed(2)}
-Water Usage: ${Math.abs((latestReading.water_current_reading || 0) - (latestReading.water_previous_reading || 0)).toFixed(2)} units
+    doc.text(`Status: ${draft.tenant.status.toUpperCase()}`, 112, 73);
+    doc.text(`Tenant ID: ${draft.tenant.tenant_id}`, 112, 78);
+    doc.text(`Property ID: ${draft.tenant.property_id || 'N/A'}`, 112, 83);
+    doc.text('Currency: KES', 112, 88);
 
-CHARGE BREAKDOWN:
-Electricity (${latestReading.electricity_usage?.toFixed(2)} units @ KES ${latestReading.electricity_rate}):  KES ${latestReading.electricity_bill?.toFixed(2)}
-Water (${Math.abs((latestReading.water_current_reading || 0) - (latestReading.water_previous_reading || 0)).toFixed(2)} units @ KES ${latestReading.water_rate || 0}):  KES ${latestReading.water_bill.toFixed(2)}
-Garbage Fee:                              KES ${latestReading.garbage_fee.toFixed(2)}
-Security Fee:                             KES ${latestReading.security_fee.toFixed(2)}
-Service Fee:                              KES ${(latestReading.service_fee || 0).toFixed(2)}
-${customUtilitiesText}Other Charges:                            KES ${latestReading.other_charges.toFixed(2)}
+    const rows: Array<[string, string]> = [
+      ['Rent (Fixed from Unit Price)', formatKES(draft.rentAmount)],
+      ['Electricity', formatKES(draft.electricityBill)],
+      ['Water', formatKES(draft.waterBill)],
+      ['Garbage', formatKES(draft.garbageFee)],
+      ['Security', formatKES(draft.securityFee)],
+      ['Service', formatKES(draft.serviceFee)],
+    ];
 
-================================
-TOTAL AMOUNT DUE:                  KES ${tenant.total_due.toFixed(2)}
-================================
+    Object.entries(draft.customUtilities || {}).forEach(([key, value]) => {
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+      rows.push([label, formatKES(Number(value || 0))]);
+    });
 
-Status: ${tenant.status === 'paid' ? 'PAID' : 'PENDING'}
+    rows.push(['Other Charges', formatKES(draft.otherCharges)]);
 
-Generated: ${new Date().toLocaleDateString('en-US')}
-`;
+    autoTable(doc, {
+      startY: 96,
+      head: [['Description', 'Amount']],
+      body: rows,
+      theme: 'grid',
+      headStyles: {
+        fillColor: primaryColor,
+        textColor: 255,
+        fontStyle: 'bold',
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+      },
+      bodyStyles: {
+        textColor: [30, 41, 59],
+        lineColor: [226, 232, 240],
+        lineWidth: 0.2,
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: { fontSize: 9, cellPadding: 3.6 },
+      columnStyles: { 1: { halign: 'right' } },
+      margin: { left: 12, right: 12 },
+    });
 
-    const element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(billContent));
-    element.setAttribute('download', `Bill_${tenant.tenant_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`);
-    element.style.display = 'none';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    const finalY = (doc as any).lastAutoTable.finalY || 134;
+    const subtotalUtilities = total - Number(draft.rentAmount || 0);
 
-    toast.success('Bill downloaded successfully');
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(120, finalY + 6, 78, 22, 2, 2, 'F');
+
+    doc.setTextColor(71, 85, 105);
+    doc.setFontSize(8.5);
+    doc.setFont(undefined, 'normal');
+    doc.text('Utilities Subtotal:', 124, finalY + 13);
+    doc.text(formatKES(subtotalUtilities), 194, finalY + 13, { align: 'right' });
+
+    doc.setDrawColor(...primaryColor);
+    doc.setLineWidth(0.6);
+    doc.line(124, finalY + 16, 194, finalY + 16);
+
+    doc.setTextColor(...primaryColor);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('TOTAL DUE:', 124, finalY + 24);
+    doc.text(formatKES(total), 194, finalY + 24, { align: 'right' });
+
+    if (draft.notes?.trim()) {
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      doc.text('Notes:', 12, finalY + 16);
+      doc.text(draft.notes, 12, finalY + 21, { maxWidth: 100 });
+    }
+
+    // Payment summary + details block
+    let sectionStartY = draft.notes?.trim() ? finalY + 34 : finalY + 28;
+    if (sectionStartY > 240) {
+      doc.addPage();
+      sectionStartY = 20;
+    }
+
+    const paymentBlockY = sectionStartY;
+    doc.setFillColor(244, 247, 252);
+    doc.roundedRect(12, paymentBlockY, 186, 38, 2, 2, 'F');
+
+    doc.setTextColor(...primaryColor);
+    doc.setFont(undefined, 'bold');
+    doc.setFontSize(9.5);
+    doc.text('PAYMENT DETAILS', 16, paymentBlockY + 9);
+
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(55, 65, 81);
+    doc.setFontSize(8.5);
+    doc.text('M-Pesa Paybill: 123456', 16, paymentBlockY + 17);
+    doc.text(`Account Number: ${invoiceNumber}`, 16, paymentBlockY + 24);
+    doc.text('Bank: KCB - 1234567890', 16, paymentBlockY + 31);
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Include account/invoice number as payment reference', 16, paymentBlockY + 37);
+
+    const footerY = paymentBlockY + 48 > 270 ? 282 : paymentBlockY + 48;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(12, footerY - 5, 198, footerY - 5);
+    doc.setFontSize(8.5);
+    doc.setTextColor(...primaryColor);
+    doc.setFont(undefined, 'bold');
+    doc.text('Thank you for your business!', 105, footerY, { align: 'center' });
+
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('support@kenyarealtors.com  •  +254 700 000 000  •  www.kenyarealtors.com', 105, footerY + 6, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 105, footerY + 12, { align: 'center' });
+
+    const fileName = `Invoice_${draft.tenant.tenant_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    toast.success('Invoice PDF downloaded successfully');
+  };
+
+  const handleSendInvoice = async () => {
+    if (!invoiceDraft) return;
+    try {
+      setSendingInvoice(true);
+      const total = calculateDraftTotal(invoiceDraft);
+
+      const reference = `INV-${Date.now()}`;
+      const { error } = await supabase
+        .from('invoices')
+        .insert([
+          {
+            reference_number: reference,
+            property_id: invoiceDraft.tenant.property_id,
+            tenant_id: invoiceDraft.tenant.tenant_id,
+            amount: total,
+            due_date: invoiceDraft.dueDate,
+            issued_date: new Date().toISOString().split('T')[0],
+            status: invoiceDraft.tenant.status === 'paid' ? 'paid' : 'unpaid',
+            items: {
+              rent: invoiceDraft.rentAmount,
+              electricity: invoiceDraft.electricityBill,
+              water: invoiceDraft.waterBill,
+              garbage: invoiceDraft.garbageFee,
+              security: invoiceDraft.securityFee,
+              service: invoiceDraft.serviceFee,
+              other_charges: invoiceDraft.otherCharges,
+              custom_utilities: invoiceDraft.customUtilities,
+            },
+            notes: invoiceDraft.notes || null,
+          },
+        ]);
+
+      if (error) throw error;
+      toast.success('Invoice saved and sent successfully');
+      setSelectedTenant(null);
+      setInvoiceDraft(null);
+    } catch (err: any) {
+      console.error('Error sending invoice:', err);
+      toast.error(err.message || 'Failed to send invoice');
+    } finally {
+      setSendingInvoice(false);
+    }
   };
 
   if (loading) {
@@ -762,10 +1132,10 @@ Generated: ${new Date().toLocaleDateString('en-US')}
       <div>
         <h1 className="text-4xl font-bold text-slate-900 flex items-center gap-3">
           <Zap className="w-10 h-10 text-amber-500" />
-          Utility Management
+            Billing and Invoicing
         </h1>
         <p className="text-slate-600 mt-2">
-          Monitor and manage all utility readings, charges, and tenant billing
+            Monitor and manage all billing, charges, and tenant invoices
         </p>
       </div>
 
@@ -789,7 +1159,7 @@ Generated: ${new Date().toLocaleDateString('en-US')}
               Manage Utility Constants
             </CardTitle>
             <CardDescription>
-              Configure constants for all available utilities (metered and fixed)
+              Configure global prices/rates, then assign utilities to specific properties
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -803,47 +1173,59 @@ Generated: ${new Date().toLocaleDateString('en-US')}
                       <th className="text-center py-3 px-4 font-semibold text-slate-700">Multiplier</th>
                       <th className="text-center py-3 px-4 font-semibold text-slate-700">Fixed Price (KES)</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-700">Description</th>
+                      <th className="text-center py-3 px-4 font-semibold text-slate-700">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {utilityConstants.map(constant => (
+                      (() => {
+                        const rentUtility = isRentUtility(constant.utility_name);
+                        const draft = utilityDrafts[constant.id] || {
+                          constant: String(constant.constant ?? 0),
+                          price: String(constant.price ?? 0),
+                        };
+
+                        return (
                       <tr key={constant.id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-3 px-4 font-semibold text-slate-900">{constant.utility_name}</td>
                         <td className="py-3 px-4">
-                          <Badge variant={constant.is_metered ? "default" : "outline"}>
-                            {constant.is_metered ? "Metered" : "Fixed"}
+                          <Badge variant={rentUtility ? "secondary" : constant.is_metered ? "default" : "outline"}>
+                            {rentUtility ? "Unit Rent (Auto)" : constant.is_metered ? "Metered" : "Fixed"}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <input
-                            type="number"
-                            step="0.0001"
-                            min="0"
-                            value={constant.constant}
-                            onChange={e => handleUpdateConstant(constant.id, parseFloat(e.target.value))}
-                            disabled={updatingUtilityId === constant.id && updatingField === 'constant'}
-                            className={`w-24 px-2 py-1 border rounded text-center font-semibold transition-all ${
-                              updatingUtilityId === constant.id && updatingField === 'constant'
-                                ? 'border-blue-400 bg-blue-50 opacity-75'
-                                : 'border-slate-300 hover:border-slate-400'
-                            }`}
-                            title={updatingUtilityId === constant.id ? 'Saving...' : 'Edit multiplier value'}
-                          />
-                          {updatingUtilityId === constant.id && updatingField === 'constant' && (
-                            <span className="ml-2 text-xs text-blue-600">saving...</span>
+                          {rentUtility ? (
+                            <span className="text-slate-400 text-xs italic">N/A (From unit rent)</span>
+                          ) : (
+                            <input
+                              type="number"
+                              step="0.0001"
+                              min="0"
+                              value={draft.constant}
+                              onChange={e => handleDraftConstantChange(constant.id, e.target.value)}
+                              disabled={updatingUtilityId === constant.id}
+                              className={`w-24 px-2 py-1 border rounded text-center font-semibold transition-all ${
+                                updatingUtilityId === constant.id
+                                  ? 'border-blue-400 bg-blue-50 opacity-75'
+                                  : 'border-slate-300 hover:border-slate-400'
+                              }`}
+                              title={updatingUtilityId === constant.id ? 'Saving...' : 'Edit multiplier value'}
+                            />
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {!constant.is_metered ? (
+                          {rentUtility ? (
+                            <span className="text-slate-400 text-xs italic">N/A (From unit rent)</span>
+                          ) : !constant.is_metered ? (
                             <input
                               type="number"
                               step="0.01"
                               min="0"
-                              value={constant.price || 0}
-                              onChange={e => handleUpdatePrice(constant.id, parseFloat(e.target.value))}
-                              disabled={updatingUtilityId === constant.id && updatingField === 'price'}
+                              value={draft.price}
+                              onChange={e => handleDraftPriceChange(constant.id, e.target.value)}
+                              disabled={updatingUtilityId === constant.id}
                               className={`w-28 px-2 py-1 border rounded text-center font-semibold transition-all ${
-                                updatingUtilityId === constant.id && updatingField === 'price'
+                                updatingUtilityId === constant.id
                                   ? 'border-green-400 bg-green-50 opacity-75'
                                   : 'border-slate-300 hover:border-slate-400'
                               }`}
@@ -852,12 +1234,23 @@ Generated: ${new Date().toLocaleDateString('en-US')}
                           ) : (
                             <span className="text-slate-400 text-xs italic">N/A (Metered)</span>
                           )}
-                          {updatingUtilityId === constant.id && updatingField === 'price' && (
-                            <span className="ml-2 text-xs text-green-600">saving...</span>
-                          )}
                         </td>
                         <td className="py-3 px-4 text-slate-600 text-xs">{constant.description}</td>
+                        <td className="py-3 px-4 text-center">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveUtility(constant)}
+                            disabled={updatingUtilityId === constant.id || rentUtility}
+                            className="h-8"
+                          >
+                            {updatingUtilityId === constant.id ? 'Saving...' : 'Save'}
+                          </Button>
+                        </td>
                       </tr>
+                        );
+                      })()
                     ))}
                   </tbody>
                 </table>
@@ -882,6 +1275,23 @@ Generated: ${new Date().toLocaleDateString('en-US')}
 
               {showAddUtility && (
                 <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+                  <div>
+                    <Label htmlFor="utility_property">Property</Label>
+                    <select
+                      id="utility_property"
+                      value={newUtilityPropertyId}
+                      onChange={(e) => setNewUtilityPropertyId(e.target.value)}
+                      className="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                    >
+                      <option value="">Select property</option>
+                      {propertyOptions.map((property) => (
+                        <option key={property.id} value={property.id}>
+                          {property.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <Label htmlFor="utility_name">Utility Name</Label>
                     <Input
@@ -1053,7 +1463,13 @@ Generated: ${new Date().toLocaleDateString('en-US')}
                         Latest Usage
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                        Total Due
+                        Rent
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        Utilities
+                      </th>
+                      <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                        Invoice Total
                       </th>
                       <th className="text-center py-3 px-4 font-semibold text-slate-700">
                         Status
@@ -1087,6 +1503,12 @@ Generated: ${new Date().toLocaleDateString('en-US')}
                           {tenant.latest_reading?.electricity_usage?.toFixed(2) || '0.00'} units
                         </td>
                         <td className="py-3 px-4 text-right font-bold text-slate-900">
+                          KES {tenant.rent_amount.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-semibold text-slate-800">
+                          KES {tenant.utility_total.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-slate-900">
                           KES {tenant.total_due.toFixed(2)}
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -1102,16 +1524,20 @@ Generated: ${new Date().toLocaleDateString('en-US')}
                         <td className="py-3 px-4 text-center">
                           <div className="flex gap-2 justify-center">
                             <button
-                              onClick={() => setSelectedTenant(tenant)}
+                              onClick={() => openInvoiceEditor(tenant)}
                               className="p-2 hover:bg-blue-50 rounded text-blue-600 transition"
-                              title="View Details"
+                              title="Edit Invoice"
                             >
-                              <Eye size={16} />
+                              <Edit3 size={16} />
                             </button>
                             <button
-                              onClick={() => handleDownloadBill(tenant)}
+                              onClick={() => {
+                                const draft = buildInvoiceDraft(tenant);
+                                if (!draft) return;
+                                downloadInvoicePdf(draft);
+                              }}
                               className="p-2 hover:bg-green-50 rounded text-green-600 transition"
-                              title="Download Bill"
+                              title="Download Invoice PDF"
                             >
                               <FileDown size={16} />
                             </button>
@@ -1127,21 +1553,26 @@ Generated: ${new Date().toLocaleDateString('en-US')}
         </Card>
       </motion.div>
 
-      {/* Tenant Detail Modal */}
-      {selectedTenant && (
+      {/* Invoice Editor Modal */}
+      {selectedTenant && invoiceDraft && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
         >
-          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <CardHeader className="flex flex-row items-center justify-between border-b">
               <div>
-                <CardTitle>{selectedTenant.tenant_name}</CardTitle>
-                <CardDescription>{selectedTenant.unit_number} - {selectedTenant.property_name}</CardDescription>
+                <CardTitle>Edit Invoice - {selectedTenant.tenant_name}</CardTitle>
+                <CardDescription>
+                  {selectedTenant.unit_number} - {selectedTenant.property_name}
+                </CardDescription>
               </div>
               <button
-                onClick={() => setSelectedTenant(null)}
+                onClick={() => {
+                  setSelectedTenant(null);
+                  setInvoiceDraft(null);
+                }}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X size={24} />
@@ -1149,8 +1580,7 @@ Generated: ${new Date().toLocaleDateString('en-US')}
             </CardHeader>
 
             <CardContent className="pt-6 space-y-6">
-              {/* Tenant Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-slate-600">Email</p>
                   <p className="font-semibold text-slate-900">{selectedTenant.tenant_email}</p>
@@ -1159,79 +1589,91 @@ Generated: ${new Date().toLocaleDateString('en-US')}
                   <p className="text-sm text-slate-600">Phone</p>
                   <p className="font-semibold text-slate-900">{selectedTenant.tenant_phone}</p>
                 </div>
-              </div>
-
-              {/* Readings History */}
-              <div>
-                <h3 className="font-semibold text-slate-900 mb-4">Reading History</h3>
-                <div className="space-y-4">
-                  {selectedTenant.readings.map((reading, idx) => (
-                    <div key={reading.id} className="border border-slate-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {new Date(reading.reading_month).toLocaleDateString('en-US', {
-                              month: 'long',
-                              year: 'numeric'
-                            })}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            Usage: {reading.electricity_usage?.toFixed(2)} units
-                          </p>
-                        </div>
-                        <Badge variant={reading.status === 'paid' ? 'default' : 'outline'}>
-                          {reading.status}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2 text-sm border-t pt-3">
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Electricity Bill:</span>
-                          <span className="font-semibold">KES {reading.electricity_bill?.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Water Bill:</span>
-                          <span className="font-semibold">KES {reading.water_bill.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Garbage Fee:</span>
-                          <span className="font-semibold">KES {reading.garbage_fee.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Security Fee:</span>
-                          <span className="font-semibold">KES {reading.security_fee.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Service Fee:</span>
-                          <span className="font-semibold">KES {(reading.service_fee || 0).toFixed(2)}</span>
-                        </div>
-                        {reading.custom_utilities && Object.entries(reading.custom_utilities).map(([key, value]) => (
-                          <div key={key} className="flex justify-between">
-                            <span className="text-slate-600 capitalize">{key.replace(/_/g, ' ')}:</span>
-                            <span className="font-semibold">KES {Number(value || 0).toFixed(2)}</span>
-                          </div>
-                        ))}
-                        <div className="flex justify-between">
-                          <span className="text-slate-600">Other Charges:</span>
-                          <span className="font-semibold">KES {reading.other_charges.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between border-t pt-2 font-bold text-slate-900">
-                          <span>Total:</span>
-                          <span>KES {reading.total_bill?.toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-sm text-slate-600">Invoice Due Date</p>
+                  <Input
+                    type="date"
+                    value={invoiceDraft.dueDate}
+                    onChange={(e) => handleDraftChange('dueDate', e.target.value)}
+                    className="mt-1"
+                  />
                 </div>
               </div>
 
-              {/* Summary */}
+              <div className="border border-slate-200 rounded-lg p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-slate-900">Invoice Line Items (Editable)</h3>
+                  <Badge variant="outline">{new Date(invoiceDraft.reading.reading_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Monthly Rent (Auto from Tenant Unit)</Label>
+                    <Input type="number" value={invoiceDraft.rentAmount} disabled className="mt-1 bg-slate-100" />
+                    <p className="text-[11px] text-slate-500 mt-1">This value is fetched dynamically from the tenant's assigned unit rent.</p>
+                  </div>
+                  <div>
+                    <Label>Electricity Bill</Label>
+                    <Input type="number" value={invoiceDraft.electricityBill} onChange={(e) => handleDraftChange('electricityBill', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Water Bill</Label>
+                    <Input type="number" value={invoiceDraft.waterBill} onChange={(e) => handleDraftChange('waterBill', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Garbage Fee</Label>
+                    <Input type="number" value={invoiceDraft.garbageFee} onChange={(e) => handleDraftChange('garbageFee', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Security Fee</Label>
+                    <Input type="number" value={invoiceDraft.securityFee} onChange={(e) => handleDraftChange('securityFee', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Service Fee</Label>
+                    <Input type="number" value={invoiceDraft.serviceFee} onChange={(e) => handleDraftChange('serviceFee', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Other Charges</Label>
+                    <Input type="number" value={invoiceDraft.otherCharges} onChange={(e) => handleDraftChange('otherCharges', e.target.value)} className="mt-1" />
+                  </div>
+                </div>
+
+                {Object.keys(invoiceDraft.customUtilities || {}).length > 0 && (
+                  <div className="space-y-2 border-t pt-4">
+                    <p className="text-sm font-semibold text-slate-700">Custom Utilities</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {Object.entries(invoiceDraft.customUtilities).map(([key, value]) => (
+                        <div key={key}>
+                          <Label className="capitalize">{key.replace(/_/g, ' ')}</Label>
+                          <Input
+                            type="number"
+                            value={Number(value || 0)}
+                            onChange={(e) => handleDraftCustomUtilityChange(key, e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <Label>Notes</Label>
+                  <textarea
+                    value={invoiceDraft.notes}
+                    onChange={(e) => handleDraftChange('notes', e.target.value)}
+                    className="w-full mt-1 min-h-[80px] px-3 py-2 border border-slate-300 rounded-md"
+                    placeholder="Optional internal or invoice notes"
+                  />
+                </div>
+              </div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-sm text-slate-600">Total Amount Due</p>
                     <p className="text-3xl font-bold text-blue-600">
-                      KES {selectedTenant.total_due.toFixed(2)}
+                      {formatKES(calculateDraftTotal(invoiceDraft))}
                     </p>
                   </div>
                   <DollarSign size={48} className="text-blue-300" />
@@ -1239,22 +1681,37 @@ Generated: ${new Date().toLocaleDateString('en-US')}
               </div>
             </CardContent>
 
-            <CardFooter className="gap-3 border-t">
+            <CardFooter className="gap-3 border-t flex-wrap justify-end">
               <Button
                 variant="outline"
-                onClick={() => setSelectedTenant(null)}
+                onClick={() => {
+                  setSelectedTenant(null);
+                  setInvoiceDraft(null);
+                }}
               >
                 Close
               </Button>
               <Button
-                onClick={() => {
-                  handleDownloadBill(selectedTenant);
-                  setSelectedTenant(null);
-                }}
+                onClick={handleSaveInvoiceChanges}
+                className="gap-2 bg-[#154279] hover:bg-[#0f325e]"
+              >
+                <Edit3 size={18} />
+                Save Changes
+              </Button>
+              <Button
+                onClick={() => downloadInvoicePdf(invoiceDraft)}
                 className="gap-2 bg-green-600 hover:bg-green-700"
               >
                 <FileDown size={18} />
-                Download Bill
+                Download PDF
+              </Button>
+              <Button
+                onClick={handleSendInvoice}
+                disabled={sendingInvoice}
+                className="gap-2 bg-amber-600 hover:bg-amber-700"
+              >
+                {sendingInvoice ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                {sendingInvoice ? 'Sending...' : 'Save & Send'}
               </Button>
             </CardFooter>
           </Card>

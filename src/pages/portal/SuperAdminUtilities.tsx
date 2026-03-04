@@ -200,9 +200,9 @@ const SuperAdminUtilities = () => {
       className="space-y-6"
     >
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Utilities & Services</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Billing and Invoicing</h1>
         <p className="text-gray-500 mt-2">
-          Manage global utility and service fees charged to all tenants.
+          Manage billing and invoicing fees charged to all tenants.
         </p>
       </div>
 

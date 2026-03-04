@@ -75,10 +75,10 @@ export const SUPER_ADMIN_ROUTES: SuperAdminRoute[] = [
     showInNavigation: true
   },
   {
-    title: 'Utilities Management',
+    title: 'Billing and Invoicing',
     path: '/portal/super-admin/utilities',
     icon: 'zap',
-    description: 'Manage utility readings and billing',
+    description: 'Manage billing and invoicing',
     permission: 'manage_utilities',
     showInNavigation: true
   },

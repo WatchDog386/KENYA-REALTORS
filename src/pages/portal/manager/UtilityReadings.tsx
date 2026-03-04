@@ -60,6 +60,7 @@ interface UtilityReading {
   garbage_fee: number;
   security_fee: number;
   service_fee?: number;
+  rent_amount?: number;
   custom_utilities?: Record<string, number>;
   other_charges: number;
   total_bill?: number;
@@ -80,6 +81,9 @@ interface Unit {
   tenant_id?: string;
   tenant_name?: string;
   tenant_number?: string;
+  rent_amount?: number;
+  unit_price?: number;
+  unit_type_price?: number;
   latestReading?: UtilityReading;
   totalBill?: number;
 }
@@ -131,6 +135,7 @@ const ManagerUtilityReadings = () => {
     custom_utilities: {},
   });
   const [utilityConstants, setUtilityConstants] = useState<UtilityConstant[]>([]);
+  const [propertyUtilityMap, setPropertyUtilityMap] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -156,16 +161,25 @@ const ManagerUtilityReadings = () => {
     garbage_fee: 0,
     security_fee: 0,
     service_fee: 0,
+    rent_amount: 0,
     custom_utilities: {},
     other_charges: 0,
     status: 'pending',
   });
 
   // Helpers are declared early to avoid TDZ issues when used for derived state
-  function buildCustomUtilityValues() {
+  function buildCustomUtilityValues(propertyId?: string) {
+    const hasAssignments = Object.keys(propertyUtilityMap).length > 0;
+    const assignedIds = propertyId ? (propertyUtilityMap[propertyId] || []) : [];
     const values: Record<string, number> = {};
     utilityConstants
-      .filter(u => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name))
+      .filter(u => {
+        const isCustom = !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name);
+        if (!isCustom) return false;
+        if (!hasAssignments) return true;
+        if (!propertyId) return false;
+        return assignedIds.includes(u.id);
+      })
       .forEach(u => {
         values[u.utility_name] = u.is_metered ? (u.constant || 0) : (u.price || 0);
       });
@@ -175,28 +189,79 @@ const ManagerUtilityReadings = () => {
   const getUtilityConstant = (name: string) =>
     utilityConstants.find(u => u.utility_name === name);
 
+  const CORE_UTILITY_NAMES = ['Electricity', 'Water', 'Garbage', 'Security', 'Service'];
+
+  function isUtilityActiveForProperty(utilityName: string, propertyId?: string) {
+    const utility = getUtilityConstant(utilityName);
+    if (!utility) return false;
+
+    // Core utilities should always be available for billing forms.
+    // Property assignments are mainly used to scope custom utilities.
+    if (CORE_UTILITY_NAMES.includes(utilityName)) return true;
+
+    const hasAnyAssignments = Object.keys(propertyUtilityMap).length > 0;
+    if (!hasAnyAssignments) return true;
+    if (!propertyId) return false;
+
+    const assignedIds = propertyUtilityMap[propertyId] || [];
+    return assignedIds.includes(utility.id);
+  }
+
+  function getActiveUtilitiesForProperty(propertyId?: string) {
+    const coreUtilities = utilityConstants.filter((u) => CORE_UTILITY_NAMES.includes(u.utility_name));
+
+    const hasAnyAssignments = Object.keys(propertyUtilityMap).length > 0;
+    if (!hasAnyAssignments) return utilityConstants;
+    if (!propertyId) return coreUtilities;
+
+    const assignedIds = propertyUtilityMap[propertyId] || [];
+    const assignedCustomUtilities = utilityConstants.filter(
+      (u) => !CORE_UTILITY_NAMES.includes(u.utility_name) && assignedIds.includes(u.id)
+    );
+
+    return [...coreUtilities, ...assignedCustomUtilities];
+  }
+
+  function getUnitRent(unitId?: string, propertyId?: string) {
+    if (!unitId) return 0;
+    const unit = units.find(u => u.id === unitId && (!propertyId || u.property_id === propertyId));
+    if (!unit) return 0;
+    return Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
+  }
+
   function calculateBills(reading: UtilityReading) {
-    // Get constants from utility_constants table
-    const waterConstant = getUtilityConstant('Water')?.constant || 1;
-    const electricityConstant = getUtilityConstant('Electricity')?.constant || 1;
-    const garbagePrice = Math.abs(getUtilityConstant('Garbage')?.price || reading.garbage_fee);
-    const securityPrice = Math.abs(getUtilityConstant('Security')?.price || reading.security_fee);
-    const servicePrice = Math.abs(getUtilityConstant('Service')?.price || (reading.service_fee || 0));
+    const propertyId = reading.property_id || formData.property_id;
+    const rentAmount = Math.abs(
+      reading.rent_amount ?? getUnitRent(reading.unit_id, propertyId)
+    );
+    const electricityEnabled = isUtilityActiveForProperty('Electricity', propertyId);
+    const waterEnabled = isUtilityActiveForProperty('Water', propertyId);
+    const garbageEnabled = isUtilityActiveForProperty('Garbage', propertyId);
+    const securityEnabled = isUtilityActiveForProperty('Security', propertyId);
+    const serviceEnabled = isUtilityActiveForProperty('Service', propertyId);
+
+    // Get constants from utility_constants table with utility_settings fallback
+    const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
+    const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
+    const garbagePrice = garbageEnabled ? Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? reading.garbage_fee ?? 0) : 0;
+    const securityPrice = securityEnabled ? Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? reading.security_fee ?? 0) : 0;
+    const servicePrice = serviceEnabled ? Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (reading.service_fee ?? 0)) : 0;
     
     // Calculate usage as the range/magnitude between readings (absolute difference)
-    const electricityUsage = Math.abs(reading.current_reading - reading.previous_reading);
-    const electricityBill = electricityUsage * (reading.electricity_rate || electricityConstant);
+    const electricityUsage = electricityEnabled ? Math.abs(reading.current_reading - reading.previous_reading) : 0;
+    const electricityBill = electricityEnabled ? electricityUsage * (reading.electricity_rate || electricityConstant) : 0;
     
-    const waterUsage = Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0));
-    const waterBill = waterUsage * (reading.water_rate || waterConstant);
+    const waterUsage = waterEnabled ? Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0)) : 0;
+    const waterBill = waterEnabled ? waterUsage * (reading.water_rate || waterConstant) : 0;
 
-    const customUtilityValues = buildCustomUtilityValues();
+    const customUtilityValues = buildCustomUtilityValues(propertyId);
     let customUtilitiesTotal = 0;
     Object.values(customUtilityValues).forEach(val => {
       customUtilitiesTotal += Math.abs(Number(val) || 0);
     });
 
     const totalBill =
+      rentAmount +
       electricityBill +
       waterBill +
       garbagePrice +
@@ -213,6 +278,7 @@ const ManagerUtilityReadings = () => {
       garbagePrice,
       securityPrice,
       servicePrice,
+      rentAmount,
       customUtilitiesTotal,
       totalBill,
       customUtilityValues,
@@ -280,8 +346,70 @@ const ManagerUtilityReadings = () => {
 
         if (constantsError && constantsError.code !== 'PGRST116') throw constantsError;
 
-        if (constants) {
-          setUtilityConstants(constants);
+        let finalConstants = constants || [];
+        
+        // Ensure Garbage, Security, and Service utilities exist with proper prices
+        const requiredUtilities = [
+          { name: 'Garbage', is_metered: false, settingField: 'garbage_fee' },
+          { name: 'Security', is_metered: false, settingField: 'security_fee' },
+          { name: 'Service', is_metered: false, settingField: 'service_fee' },
+          { name: 'Electricity', is_metered: true, settingField: 'electricity_constant' },
+          { name: 'Water', is_metered: true, settingField: 'water_constant' }
+        ];
+        
+        for (const required of requiredUtilities) {
+          const existingIndex = finalConstants.findIndex(c => c.utility_name === required.name);
+          const settingValue = data?.[required.settingField] || 0;
+          
+          if (existingIndex === -1) {
+            // Create new utility constant
+            const { data: newConstant } = await supabase
+              .from('utility_constants')
+              .insert([{
+                utility_name: required.name,
+                is_metered: required.is_metered,
+                price: !required.is_metered ? (settingValue || 0) : null,
+                constant: required.is_metered ? (settingValue || 1) : 1,
+              }])
+              .select()
+              .single();
+            
+            if (newConstant) {
+              finalConstants.push(newConstant);
+              console.log(`Created utility constant: ${required.name} with price/constant: ${settingValue}`);
+            }
+          } else if (!required.is_metered && settingValue > 0) {
+            // Update existing fixed utility if price is missing or needs sync
+            if (!finalConstants[existingIndex].price || finalConstants[existingIndex].price === 0) {
+              const { data: updated } = await supabase
+                .from('utility_constants')
+                .update({ price: settingValue })
+                .eq('id', finalConstants[existingIndex].id)
+                .select()
+                .single();
+              
+              if (updated) {
+                finalConstants[existingIndex] = updated;
+                console.log(`Updated ${required.name} price to ${settingValue}`);
+              }
+            }
+          }
+        }
+
+        setUtilityConstants(finalConstants);
+        console.log('Final utility constants:', finalConstants);
+
+        const { data: propertyUtilities, error: propertyUtilitiesError } = await supabase
+          .from('property_utilities')
+          .select('property_id, utility_constant_id');
+
+        if (!propertyUtilitiesError && propertyUtilities) {
+          const mapped: Record<string, string[]> = {};
+          propertyUtilities.forEach((item: any) => {
+            if (!mapped[item.property_id]) mapped[item.property_id] = [];
+            mapped[item.property_id].push(item.utility_constant_id);
+          });
+          setPropertyUtilityMap(mapped);
         }
       } catch (err) {
         console.error('Error fetching utility settings:', err);
@@ -328,7 +456,7 @@ const ManagerUtilityReadings = () => {
     const servicePrice = getUtilityConstant('Service')?.price || 0;
     const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
     const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
-    const customUtilityValues = buildCustomUtilityValues();
+    const customUtilityValues = buildCustomUtilityValues(formData.property_id);
 
     setFormData(prev => ({
       ...prev,
@@ -339,7 +467,7 @@ const ManagerUtilityReadings = () => {
       electricity_rate: electricityConstant,
       water_rate: waterConstant,
     }));
-  }, [utilityConstants, utilitySettings.electricity_constant, utilitySettings.water_constant]);
+  }, [utilityConstants, propertyUtilityMap, utilitySettings.electricity_constant, utilitySettings.water_constant]);
 
   // Fetch managed properties and their units
   useEffect(() => {
@@ -373,8 +501,9 @@ const ManagerUtilityReadings = () => {
             id,
             unit_number,
             property_id,
+            price,
             properties(name),
-            property_unit_types(unit_type_name),
+            property_unit_types(unit_type_name, price_per_unit),
             tenants(user_id)
           `
           )
@@ -438,6 +567,7 @@ const ManagerUtilityReadings = () => {
               r => r.unit_id === unit.id
             );
             const latestReading = unitReadings.length > 0 ? unitReadings[0] : undefined;
+            const rentAmount = Math.abs(unit.price || unit.property_unit_types?.price_per_unit || 0);
             
             let totalBill = 0;
             if (latestReading) {
@@ -447,14 +577,21 @@ const ManagerUtilityReadings = () => {
               const waterUsage = Math.abs((latestReading.water_current_reading || 0) - (latestReading.water_previous_reading || 0));
               const waterBill = waterUsage * (latestReading.water_rate || 0);
 
+              const readingRent = Math.abs(latestReading.rent_amount ?? rentAmount);
+
+              // Fetch fresh prices from superadmin settings
+              const garbagePrice = Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? latestReading.garbage_fee ?? 0);
+              const securityPrice = Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? latestReading.security_fee ?? 0);
+              const servicePrice = Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (latestReading.service_fee ?? 0));
+
               let customUtilitiesTotal = 0;
               if (latestReading.custom_utilities) {
                 Object.values(latestReading.custom_utilities).forEach(val => {
-                  customUtilitiesTotal += Number(val) || 0;
+                  customUtilitiesTotal += Math.abs(Number(val) || 0);
                 });
               }
 
-              totalBill = electricityBill + waterBill + latestReading.garbage_fee + latestReading.security_fee + (latestReading.service_fee || 0) + customUtilitiesTotal + latestReading.other_charges;
+              totalBill = readingRent + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (latestReading.other_charges || 0);
             }
 
             return {
@@ -466,6 +603,9 @@ const ManagerUtilityReadings = () => {
               tenant_id: tenantId,
               tenant_name: tenantName,
               tenant_number: tenantNumber,
+              rent_amount: rentAmount,
+              unit_price: unit.price || 0,
+              unit_type_price: unit.property_unit_types?.price_per_unit || 0,
               latestReading: latestReading,
               totalBill: totalBill,
             };
@@ -510,17 +650,25 @@ const ManagerUtilityReadings = () => {
                 const updatedUnits = enrichedUnits.map(unit => {
                   const newLatestReading = updatedReadings.find(r => r.unit_id === unit.id);
                   if (newLatestReading) {
+                    const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
                     const electricityUsage = Math.abs(newLatestReading.current_reading - newLatestReading.previous_reading);
                     const electricityBill = electricityUsage * newLatestReading.electricity_rate;
                     const waterUsage = Math.abs((newLatestReading.water_current_reading || 0) - (newLatestReading.water_previous_reading || 0));
                     const waterBill = waterUsage * (newLatestReading.water_rate || 0);
+                    const readingRent = Math.abs(newLatestReading.rent_amount ?? rentAmount);
+                    
+                    // Fetch fresh garbage/security/service fees from superadmin settings
+                    const garbagePrice = Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? newLatestReading.garbage_fee ?? 0);
+                    const securityPrice = Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? newLatestReading.security_fee ?? 0);
+                    const servicePrice = Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (newLatestReading.service_fee ?? 0));
+                    
                     let customUtilitiesTotal = 0;
                     if (newLatestReading.custom_utilities) {
                       Object.values(newLatestReading.custom_utilities).forEach(val => {
-                        customUtilitiesTotal += Number(val) || 0;
+                        customUtilitiesTotal += Math.abs(Number(val) || 0);
                       });
                     }
-                    const totalBill = electricityBill + waterBill + newLatestReading.garbage_fee + newLatestReading.security_fee + (newLatestReading.service_fee || 0) + customUtilitiesTotal + newLatestReading.other_charges;
+                    const totalBill = readingRent + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (newLatestReading.other_charges || 0);
                     return { ...unit, latestReading: newLatestReading, totalBill };
                   }
                   return unit;
@@ -577,10 +725,10 @@ const ManagerUtilityReadings = () => {
   const handleAddReading = () => {
     setEditingReading(null);
     
-    // Get fixed utility prices from database
-    const garbagePrice = utilityConstants.find(u => u.utility_name === 'Garbage')?.price || 0;
-    const securityPrice = utilityConstants.find(u => u.utility_name === 'Security')?.price || 0;
-    const servicePrice = utilityConstants.find(u => u.utility_name === 'Service')?.price || 0;
+    // Get fixed utility prices from database via utility_constants
+    const garbagePrice = getUtilityConstant('Garbage')?.price || utilitySettings.garbage_fee || 0;
+    const securityPrice = getUtilityConstant('Security')?.price || utilitySettings.security_fee || 0;
+    const servicePrice = getUtilityConstant('Service')?.price || utilitySettings.service_fee || 0;
     const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
     const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
     const customUtilityValues = buildCustomUtilityValues();
@@ -600,6 +748,7 @@ const ManagerUtilityReadings = () => {
       garbage_fee: garbagePrice,
       security_fee: securityPrice,
       service_fee: servicePrice,
+      rent_amount: 0,
       custom_utilities: customUtilityValues,
       other_charges: 0,
       status: 'pending',
@@ -608,7 +757,7 @@ const ManagerUtilityReadings = () => {
   };
 
   const handleEditReading = (reading: UtilityReading) => {
-    const customUtilityValues = buildCustomUtilityValues();
+    const customUtilityValues = buildCustomUtilityValues(reading.property_id);
     const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
     const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
 
@@ -618,10 +767,11 @@ const ManagerUtilityReadings = () => {
       reading_month: (reading.reading_month || '').substring(0, 7),
       electricity_rate: electricityConstant,
       water_rate: waterConstant,
+      rent_amount: reading.rent_amount ?? getUnitRent(reading.unit_id, reading.property_id),
       custom_utilities: customUtilityValues,
-      garbage_fee: getUtilityConstant('Garbage')?.price || reading.garbage_fee,
-      security_fee: getUtilityConstant('Security')?.price || reading.security_fee,
-      service_fee: getUtilityConstant('Service')?.price || (reading.service_fee || 0),
+      garbage_fee: getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? reading.garbage_fee ?? 0,
+      security_fee: getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? reading.security_fee ?? 0,
+      service_fee: getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (reading.service_fee ?? 0),
     });
     setShowForm(true);
   };
@@ -629,11 +779,28 @@ const ManagerUtilityReadings = () => {
   const handleUnitChange = (unitId: string) => {
     const selectedUnit = units.find(u => u.id === unitId);
     if (selectedUnit) {
+      const customUtilityValues = buildCustomUtilityValues(selectedUnit.property_id);
+      const rentAmount = Math.abs(selectedUnit.rent_amount ?? selectedUnit.unit_price ?? selectedUnit.unit_type_price ?? 0);
+      
+      // Get fixed utility prices from superadmin settings (utility_constants table)
+      const garbagePrice = getUtilityConstant('Garbage')?.price || utilitySettings.garbage_fee || 0;
+      const securityPrice = getUtilityConstant('Security')?.price || utilitySettings.security_fee || 0;
+      const servicePrice = getUtilityConstant('Service')?.price || utilitySettings.service_fee || 0;
+      const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
+      const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
+      
       setFormData(prev => ({
         ...prev,
         unit_id: unitId,
         property_id: selectedUnit.property_id,
         tenant_id: selectedUnit.tenant_id || '',
+        rent_amount: rentAmount,
+        custom_utilities: customUtilityValues,
+        garbage_fee: garbagePrice,
+        security_fee: securityPrice,
+        service_fee: servicePrice,
+        electricity_rate: electricityConstant,
+        water_rate: waterConstant,
       }));
     }
   };
@@ -645,41 +812,87 @@ const ManagerUtilityReadings = () => {
       return;
     }
 
+    let saveToastId: string | number | undefined;
+
     try {
       setSaving(true);
+      saveToastId = toast.loading('Saving reading...');
 
-      const bills = calculateBills(formData);
+      const electricityEnabled = isUtilityActiveForProperty('Electricity', formData.property_id);
+      const waterEnabled = isUtilityActiveForProperty('Water', formData.property_id);
+
+      const normalizedReading: UtilityReading = {
+        ...formData,
+        previous_reading: electricityEnabled ? Number(formData.previous_reading || 0) : 0,
+        current_reading: electricityEnabled ? Number(formData.current_reading || 0) : 0,
+        water_previous_reading: waterEnabled ? Number(formData.water_previous_reading || 0) : 0,
+        water_current_reading: waterEnabled ? Number(formData.water_current_reading || 0) : 0,
+        rent_amount: getUnitRent(formData.unit_id, formData.property_id),
+      };
+
+      const bills = calculateBills(normalizedReading);
       const payload = {
         tenant_id: formData.tenant_id || null,
         unit_id: formData.unit_id,
         property_id: formData.property_id,
         reading_month: `${formData.reading_month}-01`,
-        previous_reading: formData.previous_reading,
-        current_reading: formData.current_reading,
-        electricity_rate: formData.electricity_rate,
-        electricity_bill: bills.electricityBill,
-        water_previous_reading: formData.water_previous_reading,
-        water_current_reading: formData.water_current_reading,
-        water_rate: formData.water_rate,
+        previous_reading: normalizedReading.previous_reading,
+        current_reading: normalizedReading.current_reading,
+        electricity_rate: normalizedReading.electricity_rate,
+        water_previous_reading: normalizedReading.water_previous_reading,
+        water_current_reading: normalizedReading.water_current_reading,
+        water_rate: normalizedReading.water_rate,
         water_bill: bills.waterBill,
-        garbage_fee: formData.garbage_fee,
-        security_fee: formData.security_fee,
-        service_fee: formData.service_fee,
-        other_charges: formData.other_charges,
-        total_bill: bills.totalBill,
+        garbage_fee: bills.garbagePrice,
+        security_fee: bills.securityPrice,
+        service_fee: bills.servicePrice,
+        custom_utilities: bills.customUtilityValues || {},
+        other_charges: Math.abs(normalizedReading.other_charges || 0),
         status: formData.status,
-        created_by: user?.id,
-        updated_at: new Date().toISOString(),
       };
 
       if (editingReading?.id) {
-        const { error } = await supabase
+        const { data: updatedReading, error } = await supabase
           .from('utility_readings')
           .update(payload)
-          .eq('id', editingReading.id);
+          .eq('id', editingReading.id)
+          .select('*')
+          .single();
 
         if (error) throw error;
-        toast.success('Reading updated successfully');
+        if (!updatedReading) throw new Error('Reading was not updated. Please check access permissions.');
+        
+        // Update readings state immediately for instant UI feedback
+        setReadings(prevReadings =>
+          prevReadings.map(r => r.id === updatedReading.id ? updatedReading : r)
+        );
+        
+        // Update units with new calculation
+        setUnits(prevUnits =>
+          prevUnits.map(unit => {
+            if (unit.id === updatedReading.unit_id) {
+              const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
+              const electricityUsage = Math.abs(updatedReading.current_reading - updatedReading.previous_reading);
+              const electricityBill = electricityUsage * updatedReading.electricity_rate;
+              const waterUsage = Math.abs((updatedReading.water_current_reading || 0) - (updatedReading.water_previous_reading || 0));
+              const waterBill = waterUsage * (updatedReading.water_rate || 0);
+              const garbagePrice = Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? updatedReading.garbage_fee ?? 0);
+              const securityPrice = Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? updatedReading.security_fee ?? 0);
+              const servicePrice = Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (updatedReading.service_fee ?? 0));
+              let customUtilitiesTotal = 0;
+              if (updatedReading.custom_utilities) {
+                Object.values(updatedReading.custom_utilities).forEach(val => {
+                  customUtilitiesTotal += Math.abs(Number(val) || 0);
+                });
+              }
+              const totalBill = rentAmount + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (updatedReading.other_charges || 0);
+              return { ...unit, latestReading: updatedReading, totalBill };
+            }
+            return unit;
+          })
+        );
+        
+        toast.success('Reading updated successfully', { id: saveToastId });
       } else {
         // Check if a reading already exists for this unit and month
         const { data: existingReading, error: checkError } = await supabase
@@ -687,42 +900,106 @@ const ManagerUtilityReadings = () => {
           .select('id')
           .eq('unit_id', formData.unit_id)
           .eq('reading_month', `${formData.reading_month}-01`)
-          .single();
+          .maybeSingle();
 
-        if (checkError && checkError.code !== 'PGRST116') {
-          // PGRST116 means no rows found, which is expected
+        if (checkError) {
           throw checkError;
         }
 
         if (existingReading) {
           // Reading already exists, update it instead
-          const { error: updateError } = await supabase
+          const { data: overwrittenReading, error: updateError } = await supabase
             .from('utility_readings')
             .update(payload)
-            .eq('id', existingReading.id);
+            .eq('id', existingReading.id)
+            .select('*')
+            .single();
 
           if (updateError) throw updateError;
-          toast.success('Reading updated successfully');
+          if (!overwrittenReading) throw new Error('Reading was not updated. Please check access permissions.');
+          
+          // Update readings state immediately
+          setReadings(prevReadings =>
+            prevReadings.map(r => r.id === overwrittenReading.id ? overwrittenReading : r)
+          );
+          
+          // Update units with new calculation
+          setUnits(prevUnits =>
+            prevUnits.map(unit => {
+              if (unit.id === overwrittenReading.unit_id) {
+                const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
+                const electricityUsage = Math.abs(overwrittenReading.current_reading - overwrittenReading.previous_reading);
+                const electricityBill = electricityUsage * overwrittenReading.electricity_rate;
+                const waterUsage = Math.abs((overwrittenReading.water_current_reading || 0) - (overwrittenReading.water_previous_reading || 0));
+                const waterBill = waterUsage * (overwrittenReading.water_rate || 0);
+                const garbagePrice = Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? overwrittenReading.garbage_fee ?? 0);
+                const securityPrice = Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? overwrittenReading.security_fee ?? 0);
+                const servicePrice = Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (overwrittenReading.service_fee ?? 0));
+                let customUtilitiesTotal = 0;
+                if (overwrittenReading.custom_utilities) {
+                  Object.values(overwrittenReading.custom_utilities).forEach(val => {
+                    customUtilitiesTotal += Math.abs(Number(val) || 0);
+                  });
+                }
+                const totalBill = rentAmount + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (overwrittenReading.other_charges || 0);
+                return { ...unit, latestReading: overwrittenReading, totalBill };
+              }
+              return unit;
+            })
+          );
+          
+          toast.success('Reading updated successfully', { id: saveToastId });
         } else {
           // No existing reading, insert it
           const { error: insertError, data } = await supabase
             .from('utility_readings')
             .insert([payload])
-            .select();
+            .select('*');
 
           if (insertError) throw insertError;
-          toast.success('Reading created successfully');
+          if (!data || data.length === 0) throw new Error('Reading was not created. Please try again.');
+          
+          const newReading = data[0];
+          
+          // Add to readings state immediately
+          setReadings(prevReadings => [newReading, ...prevReadings]);
+          
+          // Update units with new reading
+          setUnits(prevUnits =>
+            prevUnits.map(unit => {
+              if (unit.id === newReading.unit_id) {
+                const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
+                const electricityUsage = Math.abs(newReading.current_reading - newReading.previous_reading);
+                const electricityBill = electricityUsage * newReading.electricity_rate;
+                const waterUsage = Math.abs((newReading.water_current_reading || 0) - (newReading.water_previous_reading || 0));
+                const waterBill = waterUsage * (newReading.water_rate || 0);
+                const garbagePrice = Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? newReading.garbage_fee ?? 0);
+                const securityPrice = Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? newReading.security_fee ?? 0);
+                const servicePrice = Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (newReading.service_fee ?? 0));
+                let customUtilitiesTotal = 0;
+                if (newReading.custom_utilities) {
+                  Object.values(newReading.custom_utilities).forEach(val => {
+                    customUtilitiesTotal += Math.abs(Number(val) || 0);
+                  });
+                }
+                const totalBill = rentAmount + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (newReading.other_charges || 0);
+                return { ...unit, latestReading: newReading, totalBill };
+              }
+              return unit;
+            })
+          );
+          
+          toast.success('Reading created successfully', { id: saveToastId });
         }
       }
 
-      // Close form and wait for real-time subscription to update data
+      // Close form
       setShowForm(false);
-      // The real-time subscription will automatically refresh the UI
-      // No need for manual refresh anymore
       
     } catch (err: any) {
       console.error('Error saving reading:', err);
-      toast.error(err.message || 'Failed to save reading');
+      const detailedMessage = err?.message || err?.details || err?.hint || 'Failed to save reading';
+      toast.error(detailedMessage, saveToastId ? { id: saveToastId } : undefined);
     } finally {
       setSaving(false);
     }
@@ -747,6 +1024,11 @@ const ManagerUtilityReadings = () => {
   };
 
   const properties = [...new Set(units.map(u => u.property_name))];
+  const currentPropertyId = formData.property_id || units.find(u => u.id === formData.unit_id)?.property_id;
+  const activeUtilitiesForCurrentProperty = getActiveUtilitiesForProperty(currentPropertyId);
+  const activeCustomUtilitiesForCurrentProperty = activeUtilitiesForCurrentProperty.filter(
+    (u) => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name)
+  );
 
   const handleManualRefresh = async () => {
     if (!user?.id) return;
@@ -771,8 +1053,9 @@ const ManagerUtilityReadings = () => {
           id,
           unit_number,
           property_id,
+          price,
           properties(name),
-          property_unit_types(unit_type_name),
+          property_unit_types(unit_type_name, price_per_unit),
           tenants(user_id)
         `)
         .in('property_id', propertyIds)
@@ -822,6 +1105,7 @@ const ManagerUtilityReadings = () => {
 
           const unitReadings = (readingsData || []).filter(r => r.unit_id === unit.id);
           const latestReading = unitReadings.length > 0 ? unitReadings[0] : undefined;
+          const rentAmount = Math.abs(unit.price || unit.property_unit_types?.price_per_unit || 0);
           
           let totalBill = 0;
           if (latestReading) {
@@ -829,13 +1113,14 @@ const ManagerUtilityReadings = () => {
             const electricityBill = electricityUsage * latestReading.electricity_rate;
             const waterUsage = Math.abs((latestReading.water_current_reading || 0) - (latestReading.water_previous_reading || 0));
             const waterBill = waterUsage * (latestReading.water_rate || 0);
+            const readingRent = Math.abs(latestReading.rent_amount ?? rentAmount);
             let customUtilitiesTotal = 0;
             if (latestReading.custom_utilities) {
               Object.values(latestReading.custom_utilities).forEach(val => {
                 customUtilitiesTotal += Number(val) || 0;
               });
             }
-            totalBill = electricityBill + waterBill + latestReading.garbage_fee + latestReading.security_fee + (latestReading.service_fee || 0) + customUtilitiesTotal + latestReading.other_charges;
+            totalBill = readingRent + electricityBill + waterBill + latestReading.garbage_fee + latestReading.security_fee + (latestReading.service_fee || 0) + customUtilitiesTotal + latestReading.other_charges;
           }
 
           return {
@@ -847,6 +1132,9 @@ const ManagerUtilityReadings = () => {
             tenant_id: tenantId,
             tenant_name: tenantName,
             tenant_number: tenantNumber,
+            rent_amount: rentAmount,
+            unit_price: unit.price || 0,
+            unit_type_price: unit.property_unit_types?.price_per_unit || 0,
             latestReading: latestReading,
             totalBill: totalBill,
           };
@@ -863,17 +1151,17 @@ const ManagerUtilityReadings = () => {
   };
 
   return (
-    <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+    <div className="bg-gradient-to-br from-slate-100 via-white to-slate-50 min-h-screen p-4 sm:p-6 lg:p-8">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 w-full max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
           <div>
             <h1 className="text-4xl font-bold text-slate-900 flex items-center gap-3">
               <Zap className="w-10 h-10 text-amber-500" />
-              Utility Management
+              Billing and Invoicing
             </h1>
             <p className="text-slate-600 mt-2">
-              View all units and enter meter readings. Billing calculated automatically using the utility rate formula.
+              View all units and manage billing details. Invoicing is calculated automatically using configured rates.
             </p>
           </div>
           <Button
@@ -893,78 +1181,83 @@ const ManagerUtilityReadings = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="fixed inset-0 bg-black/60 flex items-start justify-center z-50"
+            className="fixed inset-0 bg-black/45 flex items-start justify-center z-50"
           >
-            <Card className="w-screen h-screen max-w-none rounded-none border-0 bg-slate-50">
-              <CardHeader className="sticky top-0 z-10 backdrop-blur bg-white/80 border-b flex flex-row items-center justify-between px-8 pt-6 pb-4 max-w-6xl w-full mx-auto">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Zap size={24} className="text-amber-500" />
-                    {editingReading ? 'Edit Meter Reading' : 'Add Meter Reading'}
-                  </CardTitle>
-                  <CardDescription className="text-sm text-slate-600">
-                    Enter readings, review auto-calculated charges, and keep fixed prices visible in one view.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowForm(false)}
-                    className="text-slate-500 hover:text-slate-700 px-3 py-2 rounded-md border border-slate-200 bg-white shadow-sm"
-                  >
-                    <X size={18} />
-                  </button>
+            <Card className="w-screen h-screen max-w-none rounded-none border-0 bg-gradient-to-b from-slate-50 to-white flex flex-col">
+              <CardHeader className="shrink-0 backdrop-blur bg-white/90 border-b px-4 sm:px-6 lg:px-8 pt-6 pb-4">
+                <div className="w-full flex flex-row items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                      <Zap size={24} className="text-amber-500" />
+                      {editingReading ? 'Edit Meter Reading' : 'Add Meter Reading'}
+                    </CardTitle>
+                    <CardDescription className="text-sm text-slate-600">
+                      Enter readings, review auto-calculated charges, and keep fixed prices visible in one view.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowForm(false)}
+                      className="text-slate-500 hover:text-slate-700 px-3 py-2 rounded-md border border-slate-200 bg-white shadow-sm"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
                 </div>
               </CardHeader>
 
-              <CardContent className="px-6 sm:px-8 pb-10 overflow-y-auto h-[calc(100vh-120px)]">
-                <div className="max-w-6xl w-full mx-auto space-y-8">
+              <CardContent className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 pb-8">
+                <div className="w-full space-y-6">
                 {/* Utility Constants Info */}
-                {utilityConstants.length > 0 && (
-                  <Alert className="bg-green-50 border-green-200">
-                    <AlertCircle className="h-4 w-4 text-green-600" />
-                    <AlertTitle className="text-green-900">Utility Calculation Guide</AlertTitle>
-                    <AlertDescription className="text-green-800 mt-2 text-sm">
-                      <div className="space-y-2">
-                        {utilityConstants.filter(u => u.is_metered).map(u => (
-                          <div key={u.id}>
-                            <span className="font-semibold">{u.utility_name}:</span> (Current - Previous) × {u.constant} = Bill
-                          </div>
-                        ))}
-                        {utilityConstants.filter(u => !u.is_metered).map(u => (
-                          <div key={u.id}>
-                            <span className="font-semibold">{u.utility_name}:</span> Fixed amount from settings
-                          </div>
-                        ))}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
+                {activeUtilitiesForCurrentProperty.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2 text-slate-900 font-semibold">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      Utility Calculation Guide
+                    </div>
+                    <div className="mt-3 space-y-1 text-sm text-slate-600">
+                      {activeUtilitiesForCurrentProperty.filter(u => u.is_metered).map(u => (
+                        <div key={u.id}>
+                          <span className="font-semibold text-slate-800">{u.utility_name}:</span> (Current - Previous) × {u.constant} = Bill
+                        </div>
+                      ))}
+                      {activeUtilitiesForCurrentProperty.filter(u => !u.is_metered).map(u => (
+                        <div key={u.id}>
+                          <span className="font-semibold text-slate-800">{u.utility_name}:</span> Fixed amount from settings
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
 
                 {/* Unit & Tenant Info */}
                 {formData.unit_id && (
-                  <Alert className="bg-blue-50 border-blue-200">
-                    <Home className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-blue-900">Unit Details</AlertTitle>
-                    <AlertDescription className="text-blue-800 mt-2 text-sm">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <span className="font-semibold">Unit:</span> {units.find(u => u.id === formData.unit_id)?.unit_number}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Type:</span> {units.find(u => u.id === formData.unit_id)?.unit_type}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Tenant:</span> {units.find(u => u.id === formData.unit_id)?.tenant_name}
-                        </div>
-                        <div>
-                          <span className="font-semibold">Property:</span> {units.find(u => u.id === formData.unit_id)?.property_name}
-                        </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2 text-slate-900 font-semibold">
+                      <Home className="h-4 w-4 text-blue-600" />
+                      Unit Details
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm text-slate-600">
+                      <div>
+                        <span className="font-semibold text-slate-800">Unit:</span> {units.find(u => u.id === formData.unit_id)?.unit_number}
                       </div>
-                    </AlertDescription>
-                  </Alert>
+                      <div>
+                        <span className="font-semibold text-slate-800">Type:</span> {units.find(u => u.id === formData.unit_id)?.unit_type}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-800">Tenant:</span> {units.find(u => u.id === formData.unit_id)?.tenant_name}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-800">Property:</span> {units.find(u => u.id === formData.unit_id)?.property_name}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-800">Monthly Rent:</span> {formatKES(billDetails.rentAmount)}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white rounded-lg border border-slate-200 p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 bg-white rounded-lg border border-slate-200 p-4">
                   <div>
                     <Label htmlFor="unit_id">Unit *</Label>
                     <select
@@ -997,13 +1290,15 @@ const ManagerUtilityReadings = () => {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
                 {/* Electricity Section */}
-                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-lg border border-amber-200 space-y-4 shadow-sm">
-                  <h4 className="font-semibold text-slate-900 text-lg flex items-center gap-2">
+                {isUtilityActiveForProperty('Electricity', currentPropertyId) && (
+                <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-4 h-full">
+                  <h4 className="font-semibold text-slate-900 text-base flex items-center gap-2">
                     <Zap className="w-5 h-5 text-amber-600" />
                     Electricity Meter Readings
                   </h4>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="previous_reading" className="font-medium">Previous Reading</Label>
                       <Input
@@ -1017,7 +1312,7 @@ const ManagerUtilityReadings = () => {
                             previous_reading: parseFloat(e.target.value) || 0,
                           }))
                         }
-                        className="mt-3 text-lg p-3"
+                        className="mt-2"
                       />
                     </div>
 
@@ -1034,26 +1329,28 @@ const ManagerUtilityReadings = () => {
                             current_reading: parseFloat(e.target.value) || 0,
                           }))
                         }
-                        className="mt-3 text-lg p-3 border-2 border-amber-400"
+                        className="mt-2"
                       />
                     </div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-amber-200">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <Label className="text-sm text-slate-600 font-medium">Metering Constant (Set by SuperAdmin)</Label>
-                    <div className="mt-3 text-2xl font-bold text-amber-700">
+                    <div className="mt-2 text-xl font-semibold text-slate-900">
                       {getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1}
                     </div>
                     <p className="text-xs text-slate-500 mt-2">Fixed by admin - cannot be changed</p>
                   </div>
                 </div>
+                )}
 
                 {/* Water Section */}
-                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-lg border border-blue-200 space-y-4 shadow-sm">
-                  <h4 className="font-semibold text-slate-900 text-lg flex items-center gap-2">
+                {isUtilityActiveForProperty('Water', currentPropertyId) && (
+                <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-4 h-full">
+                  <h4 className="font-semibold text-slate-900 text-base flex items-center gap-2">
                     <Droplets className="w-5 h-5 text-blue-600" />
                     Water Meter Readings
                   </h4>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="water_previous_reading" className="font-medium">Previous Reading</Label>
                       <Input
@@ -1067,7 +1364,7 @@ const ManagerUtilityReadings = () => {
                             water_previous_reading: parseFloat(e.target.value) || 0,
                           }))
                         }
-                        className="mt-3 text-lg p-3"
+                        className="mt-2"
                       />
                     </div>
 
@@ -1084,53 +1381,71 @@ const ManagerUtilityReadings = () => {
                             water_current_reading: parseFloat(e.target.value) || 0,
                           }))
                         }
-                        className="mt-3 text-lg p-3 border-2 border-blue-400"
+                        className="mt-2"
                       />
                     </div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-blue-200">
+                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                     <Label className="text-sm text-slate-600 font-medium">Metering Constant (Set by SuperAdmin)</Label>
-                    <div className="mt-3 text-2xl font-bold text-blue-700">
+                    <div className="mt-2 text-xl font-semibold text-slate-900">
                       {getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1}
                     </div>
                     <p className="text-xs text-slate-500 mt-2">Fixed by admin - cannot be changed</p>
                   </div>
                 </div>
+                )}
+                </div>
 
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-lg border border-slate-200 space-y-4 shadow-sm">
-                  <h4 className="font-semibold text-slate-900 text-lg flex items-center gap-2">
+                {(isUtilityActiveForProperty('Garbage', currentPropertyId) || isUtilityActiveForProperty('Security', currentPropertyId) || isUtilityActiveForProperty('Service', currentPropertyId)) && (
+                <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-4">
+                  <h4 className="font-semibold text-slate-900 text-base flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-green-600" />
                     Fixed Utility Fees (Set by SuperAdmin)
                   </h4>
-                  <div className="grid grid-cols-3 gap-6">
-                    <div className="bg-white p-4 rounded-lg border border-green-200">
-                      <Label className="text-sm text-slate-600 font-medium">Garbage Fee</Label>
-                      <div className="mt-3 text-3xl font-bold text-green-700">
-                        {formatKES(getUtilityConstant('Garbage')?.price)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {isUtilityActiveForProperty('Garbage', currentPropertyId) && (
+                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <Label className="text-sm text-slate-600 font-medium">Garbage Fee</Label>
+                        <div className="mt-2 text-2xl font-semibold text-slate-900">
+                          {formatKES(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? 0)}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
-                    </div>
+                    )}
 
-                    <div className="bg-white p-4 rounded-lg border border-blue-200">
-                      <Label className="text-sm text-slate-600 font-medium">Security Fee</Label>
-                      <div className="mt-3 text-3xl font-bold text-blue-700">
-                        {formatKES(getUtilityConstant('Security')?.price)}
+                    {isUtilityActiveForProperty('Security', currentPropertyId) && (
+                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <Label className="text-sm text-slate-600 font-medium">Security Fee</Label>
+                        <div className="mt-2 text-2xl font-semibold text-slate-900">
+                          {formatKES(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? 0)}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
-                    </div>
+                    )}
 
-                    <div className="bg-white p-4 rounded-lg border border-purple-200">
-                      <Label className="text-sm text-slate-600 font-medium">Service Fee</Label>
-                      <div className="mt-3 text-3xl font-bold text-purple-700">
-                        {formatKES(getUtilityConstant('Service')?.price)}
+                    {isUtilityActiveForProperty('Service', currentPropertyId) && (
+                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <Label className="text-sm text-slate-600 font-medium">Service Fee</Label>
+                        <div className="mt-2 text-2xl font-semibold text-slate-900">
+                          {formatKES(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? 0)}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
-                    </div>
+                    )}
                   </div>
                 </div>
+                )}
 
-                <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-lg border border-slate-200 shadow-sm">
-                  <h4 className="font-semibold text-slate-900 text-lg flex items-center gap-2 mb-4">
+                {formData.unit_id && (
+                  <div className="bg-white p-5 rounded-lg border border-slate-200">
+                    <h4 className="font-semibold text-slate-900 text-base mb-2">Monthly Rent (Auto)</h4>
+                    <div className="text-2xl font-semibold text-slate-900">{formatKES(billDetails.rentAmount)}</div>
+                    <p className="text-xs text-slate-500 mt-1">Derived from the assigned unit's type; locked for managers.</p>
+                  </div>
+                )}
+
+                <div className="bg-white p-5 rounded-lg border border-slate-200">
+                  <h4 className="font-semibold text-slate-900 text-base flex items-center gap-2 mb-3">
                     <AlertCircle className="w-5 h-5 text-amber-600" />
                     Additional Charges
                   </h4>
@@ -1147,23 +1462,21 @@ const ManagerUtilityReadings = () => {
                           other_charges: parseFloat(e.target.value) || 0,
                         }))
                       }
-                      className="mt-3 text-lg p-3"
+                      className="mt-2"
                       placeholder="Enter any additional charges"
                     />
                   </div>
                 </div>
 
                 {/* All Custom Utilities from Database */}
-                {utilityConstants.filter(u => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name)).length > 0 && (
-                  <div className="space-y-4 border-t pt-4">
+                {activeCustomUtilitiesForCurrentProperty.length > 0 && (
+                  <div className="space-y-4 border-t border-slate-200 pt-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium text-sm text-slate-700">Custom Utilities (Added by SuperAdmin)</h4>
                       <span className="text-xs text-slate-500">Read-only constants and fixed prices</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {utilityConstants
-                        .filter(u => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name))
-                        .map(utility => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {activeCustomUtilitiesForCurrentProperty.map(utility => (
                           <div key={utility.id}>
                             <Label htmlFor={`utility_${utility.utility_name}`} className="capitalize">
                               {utility.utility_name}
@@ -1182,19 +1495,19 @@ const ManagerUtilityReadings = () => {
                             />
                             <p className="text-xs text-slate-500 mt-1">Set by admin · read-only</p>
                           </div>
-                        ))}
+                      ))}
                     </div>
                   </div>
                 )}
 
                 {/* Bill Summary */}
-                {(formData.current_reading > 0 || (formData.water_current_reading || 0) > 0) && (
-                  <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 shadow-sm">
+                {formData.unit_id && (
+                  <Card className="bg-white border-slate-200">
                     <CardContent className="pt-6">
                       <div className="space-y-4 text-sm">
-                        <div className="flex items-center justify-between pb-3 border-b border-green-200">
-                          <h3 className="font-bold text-green-900">Bill Calculation Breakdown</h3>
-                          <span className="text-xs text-green-700">Live preview</span>
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                          <h3 className="font-semibold text-slate-900">Bill Calculation Breakdown</h3>
+                          <span className="text-xs text-slate-500">Live preview</span>
                         </div>
 
                         {/* Electricity Calculation */}
@@ -1260,7 +1573,11 @@ const ManagerUtilityReadings = () => {
                         </div>
 
                         {/* Other Charges */}
-                        <div className="space-y-2 border-t border-green-200 pt-3">
+                        <div className="space-y-2 border-t border-slate-200 pt-3">
+                          <div className="flex justify-between">
+                            <span className="text-slate-700">Monthly Rent</span>
+                            <span className="font-semibold">KES {billDetails.rentAmount.toFixed(2)}</span>
+                          </div>
                           <div className="flex justify-between">
                             <span className="text-slate-700">Garbage Fee</span>
                             <span className="font-semibold">KES {billDetails.garbagePrice.toFixed(2)}</span>
@@ -1288,7 +1605,7 @@ const ManagerUtilityReadings = () => {
                         </div>
 
                         {/* Total */}
-                        <div className="flex justify-between border-t border-green-200 pt-3 text-base font-bold text-green-700 bg-white/80 p-3 rounded">
+                        <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-semibold text-slate-900 bg-slate-50 p-3 rounded">
                           <span>TOTAL BILL</span>
                           <span className="font-mono">
                             KES {billDetails.totalBill.toFixed(2)}
@@ -1319,21 +1636,23 @@ const ManagerUtilityReadings = () => {
                 </div>
               </CardContent>
 
-              <CardFooter className="gap-3 max-w-6xl w-full mx-auto px-8 pb-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowForm(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveReading}
-                  disabled={saving}
-                  className="gap-2 bg-blue-600 hover:bg-blue-700"
-                >
-                  {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                  {saving ? 'Saving...' : 'Save Reading'}
-                </Button>
+              <CardFooter className="shrink-0 border-t bg-white/95 backdrop-blur px-4 sm:px-6 lg:px-8 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+                <div className="w-full flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveReading}
+                    disabled={saving}
+                    className="gap-2 bg-blue-600 hover:bg-blue-700"
+                  >
+                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    {saving ? 'Saving...' : 'Save Reading'}
+                  </Button>
+                </div>
               </CardFooter>
             </Card>
           </motion.div>
@@ -1342,7 +1661,7 @@ const ManagerUtilityReadings = () => {
 
 
         {/* Units & Tenants List */}
-        <Card>
+        <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Home size={20} />
@@ -1363,6 +1682,7 @@ const ManagerUtilityReadings = () => {
                 <p className="text-slate-600 text-lg">No units assigned to you yet</p>
               </div>
             ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1459,6 +1779,7 @@ const ManagerUtilityReadings = () => {
                                   unit_id: unit.id,
                                   property_id: unit.property_id,
                                   tenant_id: unit.tenant_id || '',
+                                  rent_amount: Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0),
                                   reading_month: new Date().toISOString().split('T')[0].substring(0, 7),
                                 }));
                                 setEditingReading(null);
@@ -1485,6 +1806,7 @@ const ManagerUtilityReadings = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
               </div>
             )}
           </CardContent>

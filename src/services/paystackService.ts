@@ -130,6 +130,55 @@ export const verifyPaystackTransaction = async (
 
 
 /**
+ * Create a rent payment (tenant invoice payment)
+ * Validates invoice exists, is unpaid, and amount matches
+ */
+export const createRentPayment = async (
+  tenantId: string,
+  invoiceId: string,
+  amount: number,
+  tenantEmail: string
+): Promise<PaystackResponse> => {
+  try {
+    if (!SUPABASE_URL) {
+      throw new Error("Supabase URL is not configured");
+    }
+
+    if (!tenantId || !invoiceId || !amount || !tenantEmail) {
+      throw new Error("tenantId, invoiceId, amount, and tenantEmail are required");
+    }
+
+    // Call the create-rent-payment Edge Function
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/create-rent-payment`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tenantId,
+          invoiceId,
+          amount,
+          tenantEmail,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `Payment creation failed: ${response.status}`);
+    }
+
+    return data as PaystackResponse;
+  } catch (error) {
+    console.error("Error creating rent payment:", error);
+    throw error;
+  }
+};
+
+/**
  * Get list of banks for bank transfers
  * Note: This requires backend implementation to keep secret key secure
  * Temporarily removing client-side implementation
@@ -177,6 +226,7 @@ export const chargeAuthorization = async (
 
 export default {
   initializePaystackPayment,
+  createRentPayment,
   verifyPaystackTransaction,
   getPaystackBanks,
   createPaymentPlan,

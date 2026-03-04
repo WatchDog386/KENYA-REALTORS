@@ -19,6 +19,18 @@ const SUPABASE_URL = getEnv("VITE_SUPABASE_URL") || getEnv("NEXT_PUBLIC_SUPABASE
 const SUPABASE_ANON_KEY = getEnv("VITE_SUPABASE_ANON_KEY") || getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 const SUPABASE_SERVICE_ROLE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY");
 
+const getProjectRef = (url?: string): string => {
+  if (!url) return "default";
+  try {
+    const host = new URL(url).hostname;
+    return host.split(".")[0] || "default";
+  } catch {
+    return "default";
+  }
+};
+
+const AUTH_STORAGE_KEY = `sb-${getProjectRef(SUPABASE_URL)}-auth-token`;
+
 if (!SUPABASE_URL) throw new Error("❌ Missing SUPABASE_URL.");
 if (isBrowser && !SUPABASE_ANON_KEY) throw new Error("❌ Missing SUPABASE_ANON_KEY for browser.");
 
@@ -40,6 +52,16 @@ if (isDev) console.log("🌐 Current Site URL:", currentSiteUrl);
 
 const storage = isBrowser ? window.localStorage : undefined;
 
+if (isBrowser) {
+  const legacyStorageKey = "supabase.auth.token";
+  if (legacyStorageKey !== AUTH_STORAGE_KEY && window.localStorage.getItem(legacyStorageKey)) {
+    window.localStorage.removeItem(legacyStorageKey);
+    if (isDev) {
+      console.log("🧹 Cleared legacy auth storage key", { legacyStorageKey, newStorageKey: AUTH_STORAGE_KEY });
+    }
+  }
+}
+
 // Ensure WebCrypto API is available for browser environments
 if (isBrowser && !globalThis.crypto) {
   console.warn("⚠️ WebCrypto API not available, using fallback");
@@ -55,7 +77,7 @@ export const supabase: SupabaseClient<Database> = createClient(SUPABASE_URL, SUP
     autoRefreshToken: true, 
     detectSessionInUrl: true, 
     flowType: "pkce",
-    storageKey: "supabase.auth.token",
+    storageKey: AUTH_STORAGE_KEY,
   },
   global: { headers: { "x-application": "realtors-kenya", "x-client": "web", "x-site-url": currentSiteUrl } },
   realtime: { params: { eventsPerSecond: 10 } },

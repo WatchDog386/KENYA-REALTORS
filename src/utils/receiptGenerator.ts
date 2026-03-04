@@ -1,157 +1,259 @@
+// src/utils/receiptGenerator.ts
+// Utility for generating PDF receipts for successful payments
+
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+
+export interface ReceiptItem {
+  description: string;
+  amount: number;
+  type: 'rent' | 'water' | 'electricity' | 'garbage' | 'other' | string;
+}
 
 export interface ReceiptData {
-  tenant_id: string;
-  property_id: string;
-  unit_id: string;
-  payment_amount: number;
-  payment_method: string;
-  transaction_reference: string;
-  payment_date: string;
-  items: Array<{
-    description: string;
-    amount: number;
-    type: 'rent' | 'electricity' | 'water' | 'garbage' | 'security' | 'service' | 'other';
-  }>;
-  rent_payment_id?: string;
-  bill_payment_id?: string;
+  receiptNumber: string;
+  tenantName: string;
+  propertyName: string;
+  unitNumber: string;
+  amount: number;
+  paymentMethod: string;
+  transactionReference: string;
+  paidDate: string;
+  invoiceDate?: string;
+  dueDate?: string;
+  companyName?: string;
+  companyLogo?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  items?: ReceiptItem[];
 }
 
 /**
- * Generate a unique receipt number based on date and sequence
+ * Generate a PDF receipt for a payment
+ * @param data - Receipt data
+ * @returns PDF blob
  */
-export const generateReceiptNumber = async (): Promise<string> => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const datePrefix = `${year}${month}${day}`;
-  const dateStart = `${year}-${month}-${day}T00:00:00Z`;
-  const dateEnd = `${year}-${month}-${day}T23:59:59Z`;
+export const generateReceiptPDF = (data: ReceiptData): Blob => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  let yPosition = margin;
 
-  // Get count of receipts created today
-  const { count } = await supabase
-    .from('receipts')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', dateStart)
-    .lte('created_at', dateEnd);
+  // Set default font
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
 
-  const sequence = String((count || 0) + 1).padStart(4, '0');
-  return `RCP-${datePrefix}-${sequence}`;
-};
-
-/**
- * Create a receipt in the database
- */
-export const createReceipt = async (data: ReceiptData) => {
-  try {
-    const receiptNumber = await generateReceiptNumber();
-
-    // Get tenant and property info
-    const { data: tenantData } = await supabase
-      .from('tenants')
-      .select('id, user_id')
-      .eq('user_id', data.tenant_id)
-      .single();
-
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('id, email, first_name, last_name')
-      .eq('id', data.tenant_id)
-      .single();
-
-    const { data: propertyData } = await supabase
-      .from('properties')
-      .select('id, name')
-      .eq('id', data.property_id)
-      .single();
-
-    // Create receipt record
-    const { data: receipt, error: insertError } = await supabase
-      .from('receipts')
-      .insert([
-        {
-          receipt_number: receiptNumber,
-          amount_paid: data.payment_amount,
-          payment_method: data.payment_method,
-          payment_date: data.payment_date,
-          generated_by: data.tenant_id, // The tenant who made the payment
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          // Store additional data as JSON
-          metadata: {
-            items: data.items,
-            unit_id: data.unit_id,
-            tenant_email: userProfile?.email,
-            tenant_name: `${userProfile?.first_name} ${userProfile?.last_name}`,
-            property_name: propertyData?.name,
-            transaction_reference: data.transaction_reference,
-            rent_payment_id: data.rent_payment_id,
-            bill_payment_id: data.bill_payment_id,
-          }
-        }
-      ])
-      .select('*')
-      .single();
-
-    if (insertError) throw insertError;
-
-    return {
-      success: true,
-      receipt: receipt,
-      receiptNumber: receiptNumber,
-      tenantEmail: userProfile?.email,
-      tenantName: `${userProfile?.first_name} ${userProfile?.last_name}`,
-      propertyName: propertyData?.name,
-    };
-  } catch (err) {
-    console.error('Error creating receipt:', err);
-    throw err;
+  // Header section
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.companyName || 'PROPERTY MANAGEMENT SYSTEM', margin, yPosition);
+  
+  yPosition += 8;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  
+  if (data.companyAddress) {
+    doc.text(data.companyAddress, margin, yPosition);
+    yPosition += 5;
   }
-};
-
-/**
- * Send receipt email to tenant
- */
-export const sendReceiptEmail = async (
-  tenantEmail: string,
-  tenantName: string,
-  receiptNumber: string,
-  receiptData: ReceiptData,
-  receiptId: string
-) => {
-  try {
-    // Call edge function to send email
-    const { data, error } = await supabase.functions.invoke('send-payment-receipt', {
-      body: {
-        to_email: tenantEmail,
-        tenant_name: tenantName,
-        receipt_number: receiptNumber,
-        amount: receiptData.payment_amount,
-        items: receiptData.items,
-        payment_date: receiptData.payment_date,
-        payment_method: receiptData.payment_method,
-        transaction_reference: receiptData.transaction_reference,
-        receipt_id: receiptId,
-      }
-    });
-
-    if (error) {
-      console.warn('Email sending failed:', error);
-      // Don't throw - receipt was still created successfully
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, data };
-  } catch (err) {
-    console.error('Error sending receipt email:', err);
-    return { success: false, error: String(err) };
+  
+  if (data.companyPhone) {
+    doc.text(`Phone: ${data.companyPhone}`, margin, yPosition);
+    yPosition += 5;
   }
+
+  // Receipt title
+  yPosition += 5;
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PAYMENT RECEIPT', margin, yPosition);
+
+  // Receipt number and date
+  yPosition += 10;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  
+  doc.text(`Receipt #: ${data.receiptNumber}`, margin, yPosition);
+  yPosition += 5;
+  doc.text(`Date: ${new Date(data.paidDate).toLocaleDateString()}`, margin, yPosition);
+
+  // Separator line
+  yPosition += 8;
+  doc.setDrawColor(100, 100, 100);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+
+  // Tenant information section
+  yPosition += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('TENANT INFORMATION', margin, yPosition);
+
+  yPosition += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Name: ${data.tenantName}`, margin, yPosition);
+
+  yPosition += 5;
+  doc.text(`Property: ${data.propertyName}`, margin, yPosition);
+
+  yPosition += 5;
+  doc.text(`Unit: ${data.unitNumber}`, margin, yPosition);
+
+  // Payment details section
+  yPosition += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('PAYMENT DETAILS', margin, yPosition);
+
+  // Create table for payment details
+  const tableData = [
+    ['Description', 'Amount'],
+    ['Rent Payment', `KES ${parseFloat(data.amount.toString()).toFixed(2)}`],
+  ];
+
+  (doc as any).autoTable({
+    startY: yPosition + 6,
+    head: [tableData[0]],
+    body: [tableData[1]],
+    margin: { left: margin, right: margin },
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+    },
+    headStyles: {
+      fillColor: [66, 139, 202],
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+  });
+
+  yPosition = (doc as any).lastAutoTable.finalY + 10;
+
+  // Total amount (highlighted)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  const totalText = `TOTAL PAID: KES ${parseFloat(data.amount.toString()).toFixed(2)}`;
+  const textWidth = doc.getTextWidth(totalText);
+  
+  doc.setDrawColor(66, 139, 202);
+  doc.rect(
+    pageWidth - margin - textWidth - 8,
+    yPosition - 5,
+    textWidth + 8,
+    8,
+    'F'
+  );
+  
+  doc.setTextColor(255, 255, 255);
+  doc.text(totalText, pageWidth - margin - textWidth - 4, yPosition);
+  
+  doc.setTextColor(0, 0, 0);
+
+  // Additional details
+  yPosition += 12;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+
+  const detailsStartY = yPosition;
+  
+  if (data.invoiceDate) {
+    doc.text(`Invoice Date: ${new Date(data.invoiceDate).toLocaleDateString()}`, margin, yPosition);
+    yPosition += 5;
+  }
+
+  if (data.dueDate) {
+    doc.text(`Due Date: ${new Date(data.dueDate).toLocaleDateString()}`, margin, yPosition);
+    yPosition += 5;
+  }
+
+  doc.text(`Payment Method: ${data.paymentMethod}`, margin, yPosition);
+  yPosition += 5;
+  
+  doc.text(`Transaction Reference: ${data.transactionReference}`, margin, yPosition);
+
+  // Footer
+  yPosition = pageHeight - margin - 15;
+  doc.setDrawColor(100, 100, 100);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+
+  yPosition += 5;
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text(
+    'This is a receipt for your rent payment. Keep it for your records.',
+    margin,
+    yPosition,
+    { align: 'center', maxWidth: pageWidth - 2 * margin }
+  );
+
+  yPosition += 5;
+  doc.text(
+    `Generated on ${new Date().toLocaleString()}`,
+    margin,
+    yPosition,
+    { align: 'center', maxWidth: pageWidth - 2 * margin }
+  );
+
+  // Return as blob
+  return doc.output('blob');
 };
 
 /**
- * Complete payment and generate receipt
+ * Download receipt PDF to user's device
+ * @param data - Receipt data
+ * @param filename - Optional filename for the download
+ */
+export const downloadReceiptPDF = (
+  data: ReceiptData,
+  filename?: string
+): void => {
+  const blob = generateReceiptPDF(data);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || `receipt-${data.receiptNumber}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Get receipt data from payment and invoice records
+ * @param payment - Payment record with relations
+ * @param receipt - Receipt record
+ * @returns Formatted receipt data
+ */
+export const formatReceiptData = (
+  receipt: any,
+  companyInfo?: {
+    name?: string;
+    address?: string;
+    phone?: string;
+    logo?: string;
+  }
+): ReceiptData => {
+  return {
+    receiptNumber: receipt.receipt_number,
+    tenantName: receipt.tenant_name,
+    propertyName: receipt.property_name,
+    unitNumber: receipt.unit_number,
+    amount: receipt.amount,
+    paymentMethod: receipt.payment_method || 'Paystack',
+    transactionReference: receipt.transaction_reference,
+    paidDate: receipt.generated_at,
+    companyName: companyInfo?.name || 'Property Management System',
+    companyAddress: companyInfo?.address,
+    companyPhone: companyInfo?.phone,
+    companyLogo: companyInfo?.logo,
+  };
+};
+
+/**
+ * Create receipt record after payment succeeds
  */
 export const processPaymentWithReceipt = async (
   tenantId: string,
@@ -160,56 +262,38 @@ export const processPaymentWithReceipt = async (
   paymentAmount: number,
   paymentMethod: string,
   transactionReference: string,
-  items: ReceiptData['items'],
+  items: ReceiptItem[],
   rentPaymentId?: string,
   billPaymentId?: string
-) => {
-  const paymentDate = new Date().toISOString();
+): Promise<any> => {
+  const receiptNumber = `RCP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-6)}`;
 
-  const receiptData: ReceiptData = {
-    tenant_id: tenantId,
-    property_id: propertyId,
-    unit_id: unitId,
-    payment_amount: paymentAmount,
-    payment_method: paymentMethod,
-    transaction_reference: transactionReference,
-    payment_date: paymentDate,
-    items: items,
-    rent_payment_id: rentPaymentId,
-    bill_payment_id: billPaymentId,
-  };
+  const { data, error } = await supabase
+    .from('receipts')
+    .insert([
+      {
+        receipt_number: receiptNumber,
+        tenant_id: tenantId,
+        property_id: propertyId,
+        unit_id: unitId,
+        amount_paid: paymentAmount,
+        payment_method: paymentMethod,
+        payment_date: new Date().toISOString(),
+        transaction_reference: transactionReference,
+        status: 'generated',
+        metadata: {
+          items,
+          rent_payment_id: rentPaymentId,
+          bill_payment_id: billPaymentId,
+        },
+      },
+    ])
+    .select('*')
+    .single();
 
-  // Create receipt
-  const receiptResult = await createReceipt(receiptData);
-
-  if (receiptResult.success && receiptResult.tenantEmail) {
-    // Send email
-    await sendReceiptEmail(
-      receiptResult.tenantEmail,
-      receiptResult.tenantName,
-      receiptResult.receiptNumber,
-      receiptData,
-      receiptResult.receipt.id
-    );
+  if (error) {
+    throw error;
   }
 
-  return receiptResult;
-};
-
-/**
- * Format receipt as displayable object
- */
-export const formatReceiptForDisplay = (receipt: any) => {
-  return {
-    id: receipt.id,
-    receiptNumber: receipt.receipt_number,
-    amount: receipt.amount_paid,
-    paymentDate: receipt.payment_date,
-    paymentMethod: receipt.payment_method,
-    status: receipt.status || 'generated',
-    items: receipt.metadata?.items || [],
-    tenantName: receipt.metadata?.tenant_name || 'N/A',
-    propertyName: receipt.metadata?.property_name || 'N/A',
-    transactionRef: receipt.metadata?.transaction_reference || 'N/A',
-  };
+  return data;
 };
