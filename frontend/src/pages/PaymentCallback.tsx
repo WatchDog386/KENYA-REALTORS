@@ -29,7 +29,7 @@ export const PaymentCallback: React.FC = () => {
 
         setTxRef(tx_ref);
 
-        // The webhook from Flutterwave will handle the actual payment confirmation
+        // The payment gateway webhook will handle the actual payment confirmation
         // This page just shows the user what happened
         if (status === "cancelled") {
           setStatus("failed");

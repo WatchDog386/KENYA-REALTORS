@@ -100,19 +100,20 @@ const PaymentsPage: React.FC = () => {
       // 1. Get Tenant Unit Info
       const { data: tenantData } = await supabase
         .from('tenants')
-        .select('unit_id, property_id')
+        .select('id, unit_id, property_id')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .single();
       
       const unitId = tenantData?.unit_id;
       const propertyId = tenantData?.property_id;
+      const tenantId = tenantData?.id;
 
       // 2. Fetch THIS MONTH's Rent Payments
       const { data: rentData, error: rentError } = await supabase
         .from("rent_payments")
         .select("*")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .order("due_date", { ascending: false });
 
       if (rentError) throw rentError;
@@ -152,7 +153,13 @@ const PaymentsPage: React.FC = () => {
           .order("due_date", { ascending: false });
 
         if (!billError && billData) {
-          const formattedBills = (billData || []).map((b: any) => ({
+          const formattedBills = (billData || [])
+            .filter((b: any) => {
+              // Exclude 'all' type bills to avoid duplication with individual rent/utility items
+              if (b.bill_type === 'all') return false;
+              return true;
+            })
+            .map((b: any) => ({
             id: b.id,
             amount: b.amount,
             amount_paid: b.paid_amount || 0,

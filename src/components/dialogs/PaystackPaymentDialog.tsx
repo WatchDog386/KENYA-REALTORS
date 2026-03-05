@@ -45,12 +45,37 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
     const script = document.createElement("script");
     script.src = "https://js.paystack.co/v1/inline.js";
     script.async = true;
+    script.onload = () => {
+      console.log("Paystack SDK loaded successfully");
+    };
+    script.onerror = () => {
+      console.error("Failed to load Paystack SDK");
+    };
     document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script);
+      // Don't remove the script to avoid reload issues
+      // document.body.removeChild(script);
     };
   }, []);
+
+  // Wait for Paystack SDK to load
+  const waitForPaystackSDK = (maxAttempts = 10): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const checkSDK = setInterval(() => {
+        const PaystackPop = (window as any).PaystackPop;
+        if (PaystackPop && PaystackPop.setup) {
+          clearInterval(checkSDK);
+          resolve(PaystackPop);
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkSDK);
+          reject(new Error("Paystack SDK failed to load. Please refresh and try again."));
+        }
+        attempts++;
+      }, 200);
+    });
+  };
 
   const handlePayment = async () => {
     if (!PAYSTACK_PUBLIC_KEY) {
@@ -65,15 +90,16 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
     setTransactionStatus("initializing");
     setErrorMessage(null);
 
-    // Generate reference needed for manual verification fallback
-    const ref = referenceId || `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Always use a unique transaction reference for Paystack
+    const ref = `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setTransactionReference(ref);
 
     try {
-      const PaystackPop = (window as any).PaystackPop;
+      // Wait for Paystack SDK to load properly
+      const PaystackPop = await waitForPaystackSDK();
       
       if (!PaystackPop || !PaystackPop.setup) {
-         throw new Error("Paystack SDK not loaded yet. Please try again.");
+         throw new Error("Paystack SDK not properly initialized");
       }
 
       const handler = PaystackPop.setup({
@@ -86,6 +112,7 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
         metadata: {
             paymentType,
             description,
+          referenceId,
              custom_fields: [
                 {
                     display_name: "Payment Type",
@@ -100,19 +127,23 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
           verifyTransaction(transaction.reference);
         },
         onClose: () => {
+          console.log("Paystack dialog closed by user");
           setLoading(false);
           setTransactionStatus("idle"); // User closed popup
           setErrorMessage("Payment canceled");
         }
       });
       
+      console.log("Opening Paystack payment dialog...");
       handler.openIframe();
       
     } catch (error: any) {
       console.error("Payment init error:", error);
-      setErrorMessage(error.message);
+      const errorMsg = error.message || "Failed to open payment dialog. Please try again.";
+      setErrorMessage(errorMsg);
       setTransactionStatus("error");
       setLoading(false);
+      onPaymentError?.(errorMsg);
     }
   };
 

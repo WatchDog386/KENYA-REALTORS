@@ -6,7 +6,10 @@ const corsHeaders = {
 };
 serve(async (req) => {
     if (req.method === "OPTIONS") {
-        return new Response(null, { headers: corsHeaders });
+        return new Response(null, {
+            status: 200,
+            headers: corsHeaders,
+        });
     }
     try {
         const supabaseClient = createClient("https://jtdtzkpqncpmmenywnlw.supabase.co", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
@@ -27,7 +30,7 @@ serve(async (req) => {
     }
     catch (error) {
         console.error("Error sending review email:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
             status: 500,
             headers: {
                 "Content-Type": "application/json",

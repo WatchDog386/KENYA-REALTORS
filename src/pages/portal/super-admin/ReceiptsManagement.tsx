@@ -45,6 +45,9 @@ import { formatCurrency } from '@/utils/formatCurrency';
 
 interface Receipt {
   id: string;
+  tenant_id?: string;
+  property_id?: string;
+  unit_id?: string;
   receipt_number: string;
   amount_paid: number;
   payment_date: string;
@@ -53,16 +56,9 @@ interface Receipt {
   metadata?: any;
   generated_by: string;
   created_at: string;
-  invoice?: {
-    reference_number: string;
-    amount: number;
-    tenant_id: string;
-    tenant?: {
-      first_name: string;
-      last_name: string;
-      email: string;
-    };
-  };
+  tenant?: { first_name?: string; last_name?: string; email?: string };
+  property?: { name?: string; address?: string };
+  unit?: { unit_number?: string; property_unit_types?: { unit_type_name?: string } };
 }
 
 const SuperAdminReceiptsManagement = () => {
@@ -90,12 +86,9 @@ const SuperAdminReceiptsManagement = () => {
         .from('receipts')
         .select(`
           *,
-          invoice:invoice_id(
-            reference_number,
-            amount,
-            tenant_id,
-            tenant:tenant_id(first_name, last_name, email)
-          )
+          tenant:tenant_id(first_name, last_name, email),
+          property:property_id(name, address),
+          unit:unit_id(unit_number, property_unit_types(unit_type_name))
         `)
         .order('created_at', { ascending: false });
 
@@ -143,9 +136,10 @@ const SuperAdminReceiptsManagement = () => {
 
   const generateReceiptHTML = (receipt: Receipt) => {
     const items = receipt.metadata?.items || [];
-    const tenantName = receipt.metadata?.tenant_name || 
-      `${receipt.invoice?.tenant?.first_name} ${receipt.invoice?.tenant?.last_name}`;
-    const propertyName = receipt.metadata?.property_name || 'Property';
+    const tenantName = receipt.metadata?.tenant_name || `${receipt.tenant?.first_name || ''} ${receipt.tenant?.last_name || ''}`.trim() || 'N/A';
+    const propertyName = receipt.metadata?.property_name || receipt.property?.name || 'N/A';
+    const houseNumber = receipt.metadata?.house_number || receipt.unit?.unit_number || 'N/A';
+    const houseType = receipt.metadata?.unit_type || receipt.unit?.property_unit_types?.unit_type_name || 'N/A';
     const transactionRef = receipt.metadata?.transaction_reference || receipt.id;
 
     const itemsHTML = items
@@ -202,6 +196,14 @@ const SuperAdminReceiptsManagement = () => {
             <div class="detail-item">
               <div class="detail-label">Tenant Name</div>
               <div class="detail-value">${tenantName}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">House Number</div>
+              <div class="detail-value">${houseNumber}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">House Type</div>
+              <div class="detail-value">${houseType}</div>
             </div>
             <div class="detail-item">
               <div class="detail-label">Payment Date</div>
@@ -271,9 +273,12 @@ const SuperAdminReceiptsManagement = () => {
   const filteredReceipts = receipts.filter(receipt => {
     const matchesSearch =
       receipt.receipt_number.toLowerCase().includes(search.toLowerCase()) ||
-      receipt.invoice?.tenant?.first_name.toLowerCase().includes(search.toLowerCase()) ||
-      receipt.invoice?.tenant?.last_name.toLowerCase().includes(search.toLowerCase()) ||
-      receipt.invoice?.tenant?.email.toLowerCase().includes(search.toLowerCase());
+      receipt.metadata?.tenant_name?.toLowerCase().includes(search.toLowerCase()) ||
+      receipt.tenant?.first_name?.toLowerCase().includes(search.toLowerCase()) ||
+      receipt.tenant?.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+      receipt.tenant?.email?.toLowerCase().includes(search.toLowerCase()) ||
+      receipt.metadata?.property_name?.toLowerCase().includes(search.toLowerCase()) ||
+      receipt.property?.name?.toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || receipt.status === statusFilter;
 
@@ -396,9 +401,10 @@ const SuperAdminReceiptsManagement = () => {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {receipt.invoice?.tenant?.first_name} {receipt.invoice?.tenant?.last_name}
+                          {receipt.metadata?.tenant_name || `${receipt.tenant?.first_name || ''} ${receipt.tenant?.last_name || ''}`.trim() || 'N/A'}
                         </span>
-                        <span className="text-xs text-gray-500">{receipt.invoice?.tenant?.email}</span>
+                        <span className="text-xs text-gray-500">{receipt.tenant?.email || 'N/A'}</span>
+                        <span className="text-xs text-gray-500">{receipt.metadata?.property_name || receipt.property?.name || 'N/A'} · House {receipt.metadata?.house_number || receipt.unit?.unit_number || 'N/A'} · {receipt.metadata?.unit_type || receipt.unit?.property_unit_types?.unit_type_name || 'N/A'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="font-bold">{formatCurrency(receipt.amount_paid)}</TableCell>
@@ -459,13 +465,21 @@ const SuperAdminReceiptsManagement = () => {
                 <div>
                   <p className="text-sm text-gray-600">Tenant</p>
                   <p className="font-semibold">
-                    {selectedReceipt.invoice?.tenant?.first_name} {selectedReceipt.invoice?.tenant?.last_name}
+                    {selectedReceipt.metadata?.tenant_name || `${selectedReceipt.tenant?.first_name || ''} ${selectedReceipt.tenant?.last_name || ''}`.trim() || 'N/A'}
                   </p>
-                  <p className="text-xs text-gray-500">{selectedReceipt.invoice?.tenant?.email}</p>
+                  <p className="text-xs text-gray-500">{selectedReceipt.tenant?.email || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Amount</p>
                   <p className="font-bold text-lg">{formatCurrency(selectedReceipt.amount_paid)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Property</p>
+                  <p className="font-semibold">{selectedReceipt.metadata?.property_name || selectedReceipt.property?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">House</p>
+                  <p className="font-semibold">{selectedReceipt.metadata?.house_number || selectedReceipt.unit?.unit_number || 'N/A'} · {selectedReceipt.metadata?.unit_type || selectedReceipt.unit?.property_unit_types?.unit_type_name || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Status</p>

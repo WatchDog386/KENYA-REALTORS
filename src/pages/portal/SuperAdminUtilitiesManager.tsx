@@ -23,11 +23,13 @@ import {
   Settings,
   Edit3,
   Send,
+  FileText,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { downloadReceiptPDF, formatReceiptData } from "@/utils/receiptGenerator";
 
 import {
   Card,
@@ -112,6 +114,7 @@ interface TenantWithReadings {
   status: 'pending' | 'paid';
   readings: UtilityReading[];
   latest_reading?: UtilityReading;
+  latest_receipt?: any;
 }
 
 interface PropertyOption {
@@ -163,6 +166,7 @@ const SuperAdminUtilitiesManager = () => {
   const [newUtilityIsMetered, setNewUtilityIsMetered] = useState(false);
   const [newUtilityPropertyId, setNewUtilityPropertyId] = useState('');
   const [updatingUtilityId, setUpdatingUtilityId] = useState<string | null>(null);
+  const [deletingUtilityId, setDeletingUtilityId] = useState<string | null>(null);
   const [utilityDrafts, setUtilityDrafts] = useState<Record<string, { constant: string; price: string }>>({});
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraft | null>(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
@@ -311,6 +315,71 @@ const SuperAdminUtilitiesManager = () => {
       setLoading(true);
       setError(null);
 
+      const { data: invoicesData } = await supabase
+        .from('invoices')
+        .select('tenant_id, status, issued_date, created_at')
+        .order('issued_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      const latestInvoiceStatusByTenant = new Map<string, 'pending' | 'paid'>();
+      (invoicesData || []).forEach((invoice: any) => {
+        if (!invoice?.tenant_id || latestInvoiceStatusByTenant.has(invoice.tenant_id)) return;
+        latestInvoiceStatusByTenant.set(
+          invoice.tenant_id,
+          String(invoice.status || '').toLowerCase() === 'paid' ? 'paid' : 'pending'
+        );
+      });
+
+      const { data: billsData } = await supabase
+        .from('bills_and_utilities')
+        .select('id, unit_id, amount, paid_amount, status, bill_type, created_at')
+        .order('created_at', { ascending: false });
+
+      const latestBillStatusByUnit = new Map<string, 'pending' | 'paid'>();
+      (billsData || []).forEach((bill: any) => {
+        if (!bill?.unit_id || latestBillStatusByUnit.has(bill.unit_id)) return;
+        latestBillStatusByUnit.set(
+          bill.unit_id,
+          String(bill.status || '').toLowerCase() === 'paid' ? 'paid' : 'pending'
+        );
+      });
+
+      const { data: rentPaymentsData } = await supabase
+        .from('rent_payments')
+        .select('id, unit_id, amount, amount_paid, status, created_at')
+        .order('created_at', { ascending: false });
+
+      const rentDueByUnit = new Map<string, number>();
+      (rentPaymentsData || []).forEach((payment: any) => {
+        if (!payment?.unit_id) return;
+        const previous = rentDueByUnit.get(payment.unit_id) || 0;
+        const amount = Number(payment.amount) || 0;
+        const amountPaid = Number(payment.amount_paid) || 0;
+        rentDueByUnit.set(payment.unit_id, previous + Math.max(0, amount - amountPaid));
+      });
+
+      const utilityDueByUnit = new Map<string, number>();
+      (billsData || []).forEach((bill: any) => {
+        if (!bill?.unit_id) return;
+        if (String(bill.bill_type || '').toLowerCase() === 'all') return;
+        const previous = utilityDueByUnit.get(bill.unit_id) || 0;
+        const amount = Number(bill.amount) || 0;
+        const paidAmount = Number(bill.paid_amount) || 0;
+        utilityDueByUnit.set(bill.unit_id, previous + Math.max(0, amount - paidAmount));
+      });
+
+      const { data: receiptsData } = await supabase
+        .from('receipts')
+        .select('id, tenant_id, unit_id, amount_paid, payment_method, payment_date, transaction_reference, status, metadata, created_at')
+        .order('payment_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      const latestReceiptByUnit = new Map<string, any>();
+      (receiptsData || []).forEach((receipt: any) => {
+        if (!receipt?.unit_id || latestReceiptByUnit.has(receipt.unit_id)) return;
+        latestReceiptByUnit.set(receipt.unit_id, receipt);
+      });
+
       const { data: readings, error: readingsError } = await supabase
         .from("utility_readings")
         .select("*")
@@ -395,7 +464,29 @@ const SuperAdminUtilitiesManager = () => {
             customUtilitiesTotal +
             Number(reading.other_charges || 0);
 
-          const totalDue = rentAmount + utilityTotal;
+          const billedRentAmount = Math.abs(Number((reading as any).rent_amount || unit.price || 0));
+          const billedUtilityTotal = utilityTotal;
+          const billedInvoiceTotal = billedRentAmount + billedUtilityTotal;
+
+          const calculatedRentDue = rentDueByUnit.get(reading.unit_id) ?? 0;
+          const calculatedUtilityDue = utilityDueByUnit.get(reading.unit_id) ?? 0;
+          const hasRentLedger = rentDueByUnit.has(reading.unit_id);
+          const hasUtilityLedger = utilityDueByUnit.has(reading.unit_id);
+          const outstandingRentDue = hasRentLedger ? calculatedRentDue : billedRentAmount;
+          const outstandingUtilityDue = hasUtilityLedger ? calculatedUtilityDue : billedUtilityTotal;
+          const outstandingTotalDue = Math.max(0, outstandingRentDue + outstandingUtilityDue);
+
+          const invoiceStatus = reading.tenant_id
+            ? latestInvoiceStatusByTenant.get(reading.tenant_id)
+            : undefined;
+          const billStatus = reading.unit_id
+            ? latestBillStatusByUnit.get(reading.unit_id)
+            : undefined;
+          const readingStatus = String(reading.status || '').toLowerCase() === 'paid' ? 'paid' : 'pending';
+          const resolvedStatus: 'pending' | 'paid' =
+            invoiceStatus === 'paid' || billStatus === 'paid' || readingStatus === 'paid'
+              ? 'paid'
+              : 'pending';
 
           const enrichedReading: UtilityReading = {
             ...reading,
@@ -420,22 +511,24 @@ const SuperAdminUtilitiesManager = () => {
               property_name: property.name,
               property_id: reading.property_id,
               unit_id: reading.unit_id,
-              rent_amount: rentAmount,
-              utility_total: utilityTotal,
-              total_due: totalDue,
-              status: reading.status,
+              rent_amount: billedRentAmount,
+              utility_total: billedUtilityTotal,
+              total_due: billedInvoiceTotal,
+              status: outstandingTotalDue <= 0 ? 'paid' : resolvedStatus,
               readings: [enrichedReading],
               latest_reading: enrichedReading,
+              latest_receipt: latestReceiptByUnit.get(reading.unit_id),
             });
           } else {
             const existing = tenantMap.get(key)!;
             existing.readings.push(enrichedReading);
             if (!existing.latest_reading || new Date(enrichedReading.reading_month) > new Date(existing.latest_reading.reading_month)) {
               existing.latest_reading = enrichedReading;
-              existing.utility_total = utilityTotal;
-              existing.rent_amount = rentAmount;
-              existing.total_due = totalDue;
-              existing.status = reading.status;
+              existing.utility_total = billedUtilityTotal;
+              existing.rent_amount = billedRentAmount;
+              existing.total_due = billedInvoiceTotal;
+              existing.status = outstandingTotalDue <= 0 ? 'paid' : resolvedStatus;
+              existing.latest_receipt = latestReceiptByUnit.get(reading.unit_id);
             }
           }
         } catch (itemError) {
@@ -778,6 +871,51 @@ const SuperAdminUtilitiesManager = () => {
     }
   };
 
+  const handleDeleteUtility = async (utility: UtilityConstant) => {
+    if (isRentUtility(utility.utility_name)) {
+      toast.info('Rent is derived from the assigned unit price and cannot be deleted here');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${utility.utility_name}" from billing constants? This removes it from property assignments.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingUtilityId(utility.id);
+
+      const { error: assignmentError } = await supabase
+        .from('property_utilities')
+        .delete()
+        .eq('utility_constant_id', utility.id);
+
+      if (assignmentError) throw assignmentError;
+
+      const { error: utilityError } = await supabase
+        .from('utility_constants')
+        .delete()
+        .eq('id', utility.id);
+
+      if (utilityError) throw utilityError;
+
+      setUtilityConstants((prev) => prev.filter((item) => item.id !== utility.id));
+      setUtilityDrafts((prev) => {
+        const next = { ...prev };
+        delete next[utility.id];
+        return next;
+      });
+
+      toast.success('Billing utility deleted successfully');
+    } catch (err: any) {
+      console.error('Error deleting utility:', err);
+      toast.error(err.message || 'Failed to delete utility');
+    } finally {
+      setDeletingUtilityId(null);
+    }
+  };
+
   const handleChange = (field: keyof UtilitySettings, value: string) => {
     const numValue = parseFloat(value);
     setSettings(prev => ({
@@ -1070,6 +1208,22 @@ const SuperAdminUtilitiesManager = () => {
     toast.success('Invoice PDF downloaded successfully');
   };
 
+  const downloadReceiptPdf = (tenant: TenantWithReadings) => {
+    if (!tenant.latest_receipt) {
+      toast.error('No receipt found yet for this tenant');
+      return;
+    }
+
+    const receiptData = formatReceiptData(tenant.latest_receipt, {
+      name: 'KENYA REALTORS',
+      address: 'Nairobi, Kenya',
+      phone: '+254 700 000 000',
+    });
+
+    downloadReceiptPDF(receiptData);
+    toast.success('Receipt downloaded successfully');
+  };
+
   const handleSendInvoice = async () => {
     if (!invoiceDraft) return;
     try {
@@ -1156,7 +1310,7 @@ const SuperAdminUtilitiesManager = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5" />
-              Manage Utility Constants
+              Manage Billing Constants
             </CardTitle>
             <CardDescription>
               Configure global prices/rates, then assign utilities to specific properties
@@ -1237,16 +1391,28 @@ const SuperAdminUtilitiesManager = () => {
                         </td>
                         <td className="py-3 px-4 text-slate-600 text-xs">{constant.description}</td>
                         <td className="py-3 px-4 text-center">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSaveUtility(constant)}
-                            disabled={updatingUtilityId === constant.id || rentUtility}
-                            className="h-8"
-                          >
-                            {updatingUtilityId === constant.id ? 'Saving...' : 'Save'}
-                          </Button>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleSaveUtility(constant)}
+                              disabled={updatingUtilityId === constant.id || deletingUtilityId === constant.id || rentUtility}
+                              className="h-8 bg-[#154279] text-white hover:bg-[#0f325e]"
+                            >
+                              {updatingUtilityId === constant.id ? 'Saving...' : 'Save'}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteUtility(constant)}
+                              disabled={updatingUtilityId === constant.id || deletingUtilityId === constant.id || rentUtility}
+                              className="h-8"
+                            >
+                              {deletingUtilityId === constant.id ? 'Deleting...' : 'Delete'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                         );
@@ -1259,17 +1425,17 @@ const SuperAdminUtilitiesManager = () => {
               <p className="text-slate-600">No utility constants found.</p>
             )}
 
-            {/* Add Custom Utility */}
+            {/* Add Custom Bill */}
             <div className="border-t pt-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-900">Add Custom Utility</h3>
+                <h3 className="font-semibold text-slate-900">Add Custom Bill</h3>
                 <Button
                   onClick={() => setShowAddUtility(!showAddUtility)}
                   size="sm"
                   className="gap-2"
                 >
                   <Plus size={16} />
-                  {showAddUtility ? 'Cancel' : 'Add Utility'}
+                  {showAddUtility ? 'Cancel' : 'Add Custom Bill'}
                 </Button>
               </div>
 
@@ -1381,7 +1547,7 @@ const SuperAdminUtilitiesManager = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Tenant Utility Summary
+              Tenant Billing Summary
             </CardTitle>
             <CardDescription>
               View all tenants with their utility readings and billing information
@@ -1536,10 +1702,19 @@ const SuperAdminUtilitiesManager = () => {
                                 if (!draft) return;
                                 downloadInvoicePdf(draft);
                               }}
-                              className="p-2 hover:bg-green-50 rounded text-green-600 transition"
-                              title="Download Invoice PDF"
+                              className="inline-flex items-center gap-1 px-2 py-1 hover:bg-green-50 rounded text-green-700 transition text-xs font-semibold"
+                              title="Download Invoice"
                             >
                               <FileDown size={16} />
+                              Invoice
+                            </button>
+                            <button
+                              onClick={() => downloadReceiptPdf(tenant)}
+                              className="inline-flex items-center gap-1 px-2 py-1 hover:bg-emerald-50 rounded text-emerald-700 transition text-xs font-semibold"
+                              title="Download Receipt"
+                            >
+                              <FileText size={16} />
+                              Receipt
                             </button>
                           </div>
                         </td>

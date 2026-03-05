@@ -26,12 +26,18 @@ import {
 interface ReceiptRecord {
   id: string;
   receipt_number: string;
+  tenant_id?: string;
+  property_id?: string;
+  unit_id?: string;
   amount_paid: number;
   payment_date: string;
   payment_method: string;
   status: string;
   created_at: string;
   metadata?: any;
+  tenant?: { first_name?: string; last_name?: string; email?: string };
+  property?: { name?: string; address?: string; location?: string };
+  unit?: { unit_number?: string; property_id?: string; property_unit_types?: { unit_type_name?: string } };
 }
 
 interface TenantReceiptsProps {
@@ -46,22 +52,382 @@ const TenantReceipts: React.FC<TenantReceiptsProps> = ({ tenantId }) => {
 
   useEffect(() => {
     fetchReceipts();
+
+    // Subscribe to real-time receipt updates
+    const generatedByChannel = supabase
+      .channel(`receipts_generated_by_${tenantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'receipts',
+          filter: `generated_by=eq.${tenantId}`
+        },
+        () => fetchReceipts()
+      )
+      .subscribe();
+
+    const tenantIdChannel = supabase
+      .channel(`receipts_tenant_id_${tenantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'receipts',
+          filter: `tenant_id=eq.${tenantId}`
+        },
+        () => fetchReceipts()
+      )
+      .subscribe();
+
+    return () => {
+      generatedByChannel.unsubscribe();
+      tenantIdChannel.unsubscribe();
+    };
   }, [tenantId]);
+
+  const createReceiptNumber = () => {
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `RCP-${timestamp}-${randomPart}`;
+  };
+
+  const ensureMissingReceipts = async () => {
+    try {
+      if (!tenantId) return;
+
+      const { data: tenantRow } = await supabase
+        .from('tenants')
+        .select('id, property_id, unit_id')
+        .eq('user_id', tenantId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (!tenantRow) return;
+
+      const [{ data: profile }, { data: property }, { data: unit }, { data: existingReceipts }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('first_name, last_name')
+          .eq('id', tenantId)
+          .maybeSingle(),
+        supabase
+          .from('properties')
+          .select('name')
+          .eq('id', tenantRow.property_id)
+          .maybeSingle(),
+        supabase
+          .from('units')
+          .select('unit_number, property_unit_types(unit_type_name)')
+          .eq('id', tenantRow.unit_id)
+          .maybeSingle(),
+        supabase
+          .from('receipts')
+          .select('id, metadata')
+          .eq('generated_by', tenantId),
+      ]);
+
+      const tenantName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
+      const propertyName = property?.name || null;
+      const unitNumber = unit?.unit_number || null;
+      // @ts-ignore
+      const unitType = unit?.property_unit_types?.unit_type_name || null;
+
+      const existingSourceKeys = new Set(
+        (existingReceipts || [])
+          .map((receipt: any) => {
+            const sourceType = receipt?.metadata?.source_type;
+            const sourceId = receipt?.metadata?.source_id;
+            return sourceType && sourceId ? `${sourceType}:${sourceId}` : null;
+          })
+          .filter(Boolean)
+      );
+
+      let rentPayments: any[] = [];
+      {
+        let { data, error } = await supabase
+          .from('rent_payments')
+          .select('id, amount_paid, paid_date, payment_method, transaction_id, status, property_id, unit_id')
+          .or(`tenant_id.eq.${tenantId},tenant_id.eq.${tenantRow.id}`)
+          .gt('amount_paid', 0);
+
+        // If payment_method or transaction_id fail, try without them
+        if (error && (String(error.message || '').toLowerCase().includes('payment_method') || String(error.message || '').toLowerCase().includes('transaction_id'))) {
+          ({ data, error } = await supabase
+            .from('rent_payments')
+            .select('id, amount_paid, paid_date, status, property_id, unit_id')
+            .or(`tenant_id.eq.${tenantId},tenant_id.eq.${tenantRow.id}`)
+            .gt('amount_paid', 0));
+        }
+
+        // If still failing, try minimal columns
+        if (error) {
+          ({ data, error } = await supabase
+            .from('rent_payments')
+            .select('id, amount_paid, status, unit_id, property_id')
+            .or(`tenant_id.eq.${tenantId},tenant_id.eq.${tenantRow.id}`)
+            .gt('amount_paid', 0));
+        }
+
+        if (error) {
+          console.warn('Could not fetch rent payments:', error);
+          rentPayments = [];
+        } else {
+          rentPayments = (data || []).map((row: any) => ({
+            id: row.id,
+            amount_paid: row.amount_paid,
+            paid_date: row.paid_date || null,
+            payment_method: row.payment_method || null,
+            transaction_id: row.transaction_id || null,
+            status: row.status,
+            property_id: row.property_id,
+            unit_id: row.unit_id,
+          }));
+        }
+      }
+
+      let billPayments: any[] = [];
+      {
+        // Try progressively simpler queries to handle schema variations
+        let { data, error } = await supabase
+          .from('bills_and_utilities')
+          .select('id, paid_amount, due_date, payment_method, payment_reference, status, property_id, unit_id, bill_type')
+          .eq('unit_id', tenantRow.unit_id)
+          .gt('paid_amount', 0);
+
+        // If payment_method fails, try without it
+        if (error && String(error.message || '').toLowerCase().includes('payment_method')) {
+          ({ data, error } = await supabase
+            .from('bills_and_utilities')
+            .select('id, paid_amount, due_date, payment_reference, status, property_id, unit_id, bill_type')
+            .eq('unit_id', tenantRow.unit_id)
+            .gt('paid_amount', 0));
+        }
+
+        // If payment_reference also fails, try without it
+        if (error && String(error.message || '').toLowerCase().includes('payment_reference')) {
+          ({ data, error } = await supabase
+            .from('bills_and_utilities')
+            .select('id, paid_amount, due_date, status, property_id, unit_id, bill_type')
+            .eq('unit_id', tenantRow.unit_id)
+            .gt('paid_amount', 0));
+        }
+
+        // If still failing, get minimal columns only
+        if (error) {
+          ({ data, error } = await supabase
+            .from('bills_and_utilities')
+            .select('id, paid_amount, status, unit_id, property_id')
+            .eq('unit_id', tenantRow.unit_id)
+            .gt('paid_amount', 0));
+        }
+
+        if (error) {
+          console.warn('Could not fetch bill payments:', error);
+          billPayments = [];
+        } else {
+          billPayments = (data || []).map((row: any) => ({
+            id: row.id,
+            paid_amount: row.paid_amount,
+            due_date: row.due_date || null,
+            payment_method: row.payment_method || null,
+            payment_reference: row.payment_reference || null,
+            status: row.status,
+            property_id: row.property_id,
+            unit_id: row.unit_id,
+            bill_type: row.bill_type || 'utility',
+          }));
+        }
+      }
+
+      const pendingCreations: Array<{
+        sourceType: 'rent_payment' | 'bill_payment';
+        sourceId: string;
+        amount: number;
+        paymentDate: string;
+        paymentMethod: string;
+        transactionReference: string;
+        items: any[];
+        propertyId?: string;
+        unitId?: string;
+      }> = [];
+
+      for (const rent of rentPayments || []) {
+        const sourceKey = `rent_payment:${rent.id}`;
+        const amount = Math.abs(Number(rent.amount_paid) || 0);
+        if (!amount || existingSourceKeys.has(sourceKey)) continue;
+
+        pendingCreations.push({
+          sourceType: 'rent_payment',
+          sourceId: rent.id,
+          amount,
+          paymentDate: rent.paid_date || new Date().toISOString(),
+          paymentMethod: rent.payment_method || 'paystack',
+          transactionReference: rent.transaction_id || `rent-backfill-${rent.id}`,
+          items: [{ description: 'Rent Payment', amount, type: 'rent' }],
+          propertyId: rent.property_id || tenantRow.property_id,
+          unitId: rent.unit_id || tenantRow.unit_id,
+        });
+      }
+
+      for (const bill of billPayments || []) {
+        const sourceKey = `bill_payment:${bill.id}`;
+        const amount = Math.abs(Number(bill.paid_amount) || 0);
+        if (!amount || existingSourceKeys.has(sourceKey)) continue;
+
+        const rawType = bill.bill_type || 'utility';
+        const label = rawType.charAt(0).toUpperCase() + rawType.slice(1);
+
+        pendingCreations.push({
+          sourceType: 'bill_payment',
+          sourceId: bill.id,
+          amount,
+          paymentDate: bill.due_date || new Date().toISOString(),
+          paymentMethod: bill.payment_method || 'paystack',
+          transactionReference: bill.payment_reference || `bill-backfill-${bill.id}`,
+          items: [{ description: `${label} Bill`, amount, type: rawType }],
+          propertyId: bill.property_id || tenantRow.property_id,
+          unitId: bill.unit_id || tenantRow.unit_id,
+        });
+      }
+
+      for (const payment of pendingCreations) {
+        const { data: createdReceipt, error: receiptError } = await supabase
+          .from('receipts')
+          .insert([
+            {
+              receipt_number: createReceiptNumber(),
+              tenant_id: tenantId,
+              generated_by: tenantId,
+              property_id: payment.propertyId,
+              unit_id: payment.unitId,
+              amount_paid: payment.amount,
+              payment_method: payment.paymentMethod,
+              payment_date: payment.paymentDate,
+              transaction_reference: payment.transactionReference,
+              status: 'generated',
+              metadata: {
+                items: payment.items,
+                tenant_name: tenantName || null,
+                property_name: propertyName,
+                unit_number: unitNumber,
+                house_number: unitNumber,
+                unit_type: unitType,
+                transaction_reference: payment.transactionReference,
+                source_type: payment.sourceType,
+                source_id: payment.sourceId,
+              },
+            },
+          ])
+          .select('id')
+          .single();
+
+        if (receiptError || !createdReceipt?.id) {
+          console.warn('Failed to backfill receipt:', payment.sourceType, payment.sourceId, receiptError);
+          continue;
+        }
+
+        // Optional linking if receipt_id columns exist in this deployment
+        try {
+          if (payment.sourceType === 'rent_payment') {
+            const { error: linkError } = await supabase
+              .from('rent_payments')
+              .update({ receipt_id: createdReceipt.id } as any)
+              .eq('id', payment.sourceId);
+            // Silently ignore if receipt_id column doesn't exist
+            if (linkError && !String(linkError.message || '').toLowerCase().includes('receipt_id')) {
+              console.warn('Unexpected error linking rent payment:', linkError);
+            }
+          } else {
+            const { error: linkError } = await supabase
+              .from('bills_and_utilities')
+              .update({ receipt_id: createdReceipt.id } as any)
+              .eq('id', payment.sourceId);
+            // Silently ignore if receipt_id column doesn't exist
+            if (linkError && !String(linkError.message || '').toLowerCase().includes('receipt_id')) {
+              console.warn('Unexpected error linking bill payment:', linkError);
+            }
+          }
+        } catch (err) {
+          // Ignore link failure on schemas without receipt_id columns
+          console.debug('Exception during receipt linking:', err);
+        }
+      }
+    } catch (error) {
+      console.error('Error generating missing receipts:', error);
+    }
+  };
 
   const fetchReceipts = async () => {
     try {
       setLoading(true);
+
+      await ensureMissingReceipts();
+
       const { data, error } = await supabase
         .from('receipts')
         .select('*')
-        .eq('generated_by', tenantId)
+        .or(`generated_by.eq.${tenantId},tenant_id.eq.${tenantId}`)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.warn('Could not fetch receipts:', error);
         setReceipts([]);
       } else {
-        setReceipts(data || []);
+        const receiptRows = data || [];
+
+        const tenantIds = [...new Set(receiptRows.map((row: any) => row.tenant_id).filter(Boolean))];
+        const propertyIds = [...new Set(receiptRows.map((row: any) => row.property_id).filter(Boolean))];
+        const unitIds = [...new Set(receiptRows.map((row: any) => row.unit_id).filter(Boolean))];
+
+        const [profilesRes, propertiesRes, unitsRes] = await Promise.all([
+          tenantIds.length
+            ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', tenantIds)
+            : Promise.resolve({ data: [], error: null } as any),
+          propertyIds.length
+            ? supabase.from('properties').select('id, name, location').in('id', propertyIds)
+            : Promise.resolve({ data: [], error: null } as any),
+          unitIds.length
+            ? supabase.from('units').select('id, unit_number, property_id, property_unit_types(unit_type_name)').in('id', unitIds)
+            : Promise.resolve({ data: [], error: null } as any),
+        ]);
+
+        const profileMap = new Map((profilesRes.data || []).map((profile: any) => [profile.id, profile]));
+        const propertyMap = new Map((propertiesRes.data || []).map((property: any) => [property.id, property]));
+        const unitMap = new Map((unitsRes.data || []).map((unit: any) => [unit.id, unit]));
+
+        const missingPropertyIds = [...new Set(
+          (unitsRes.data || [])
+            .map((unit: any) => unit.property_id)
+            .filter((id: string | undefined) => id && !propertyMap.has(id))
+        )] as string[];
+
+        if (missingPropertyIds.length > 0) {
+          const { data: additionalProperties } = await supabase
+            .from('properties')
+            .select('id, name, location')
+            .in('id', missingPropertyIds);
+
+          (additionalProperties || []).forEach((property: any) => {
+            propertyMap.set(property.id, property);
+          });
+        }
+
+        const enriched = receiptRows.map((row: any) => {
+          const unit = unitMap.get(row.unit_id) as any;
+          const property = propertyMap.get(row.property_id) || (unit?.property_id ? propertyMap.get(unit.property_id) : undefined);
+
+          return {
+            ...row,
+            tenant: profileMap.get(row.tenant_id),
+            property,
+            unit,
+          };
+        });
+
+        setReceipts(enriched);
       }
     } catch (err) {
       console.error('Error fetching receipts:', err);
@@ -79,8 +445,10 @@ const TenantReceipts: React.FC<TenantReceiptsProps> = ({ tenantId }) => {
       paymentDate: format(new Date(receipt.payment_date), 'PPp'),
       paymentMethod: receipt.payment_method,
       items: receipt.metadata?.items || [],
-      tenantName: receipt.metadata?.tenant_name || 'N/A',
-      propertyName: receipt.metadata?.property_name || 'N/A',
+      tenantName: receipt.metadata?.tenant_name || `${receipt.tenant?.first_name || ''} ${receipt.tenant?.last_name || ''}`.trim() || 'N/A',
+      propertyName: receipt.metadata?.property_name || receipt.property?.name || 'N/A',
+      houseNumber: receipt.metadata?.house_number || receipt.metadata?.unit_number || receipt.unit?.unit_number || 'N/A',
+      houseType: receipt.metadata?.unit_type || receipt.unit?.property_unit_types?.unit_type_name || 'N/A',
       transactionRef: receipt.metadata?.transaction_reference || 'N/A',
     };
 
@@ -126,6 +494,14 @@ const TenantReceipts: React.FC<TenantReceiptsProps> = ({ tenantId }) => {
               <div class="detail-item">
                 <div class="detail-label">Tenant Name</div>
                 <div class="detail-value">${receiptData.tenantName}</div>
+              </div>
+              <div class="detail-item">
+                <div class="detail-label">House Number</div>
+                <div class="detail-value">${receiptData.houseNumber}</div>
+              </div>
+              <div class="detail-item">
+                <div class="detail-label">House Type</div>
+                <div class="detail-value">${receiptData.houseType}</div>
               </div>
               <div class="detail-item">
                 <div class="detail-label">Payment Date</div>
@@ -325,6 +701,24 @@ const TenantReceipts: React.FC<TenantReceiptsProps> = ({ tenantId }) => {
                 <div>
                   <p className="text-sm text-slate-600">Payment Date</p>
                   <p className="font-semibold">{format(new Date(selectedReceipt.payment_date), 'PPp')}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Tenant</p>
+                  <p className="font-semibold">
+                    {selectedReceipt.metadata?.tenant_name || `${selectedReceipt.tenant?.first_name || ''} ${selectedReceipt.tenant?.last_name || ''}`.trim() || 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">Property</p>
+                  <p className="font-semibold">{selectedReceipt.metadata?.property_name || selectedReceipt.property?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">House Number</p>
+                  <p className="font-semibold">{selectedReceipt.metadata?.house_number || selectedReceipt.metadata?.unit_number || selectedReceipt.unit?.unit_number || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-600">House Type</p>
+                  <p className="font-semibold">{selectedReceipt.metadata?.unit_type || selectedReceipt.unit?.property_unit_types?.unit_type_name || 'N/A'}</p>
                 </div>
               </div>
 

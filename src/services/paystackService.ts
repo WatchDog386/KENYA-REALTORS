@@ -1,4 +1,5 @@
 // src/services/paystackService.ts
+import { supabase } from "@/integrations/supabase/client";
 
 export interface PaystackInitializeRequest {
   email: string;
@@ -42,7 +43,6 @@ export interface PaystackVerificationResponse {
 }
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 /**
  * Initialize a Paystack transaction using backend Edge Function
@@ -52,36 +52,22 @@ export const initializePaystackPayment = async (
   request: PaystackInitializeRequest
 ): Promise<PaystackResponse> => {
   try {
-    if (!SUPABASE_URL) {
-      throw new Error("Supabase URL is not configured");
-    }
-
     if (!request.email || !request.amount) {
       throw new Error("Email and amount are required");
     }
 
-    // Call the Supabase Edge Function for secure initialization
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/initialize-paystack-payment`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: request.email,
-          amount: request.amount,
-          reference: request.reference,
-          description: request.description,
-          metadata: request.metadata,
-        }),
-      }
-    );
+    const { data, error } = await supabase.functions.invoke("initialize-paystack-payment", {
+      body: {
+        email: request.email,
+        amount: request.amount,
+        reference: request.reference,
+        description: request.description,
+        metadata: request.metadata,
+      },
+    });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || `Initialization failed: ${response.status}`);
+    if (error) {
+      throw new Error(error.message || "Initialization failed");
     }
 
     return data as PaystackResponse;
@@ -99,26 +85,12 @@ export const verifyPaystackTransaction = async (
   reference: string
 ): Promise<PaystackVerificationResponse> => {
   try {
-    if (!SUPABASE_URL) {
-      throw new Error("Supabase URL is not configured");
-    }
+    const { data, error } = await supabase.functions.invoke("verify-paystack-transaction", {
+      body: { reference },
+    });
 
-    // Call the Supabase Edge Function for secure verification
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/verify-paystack-transaction`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reference }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || `Verification failed: ${response.status}`);
+    if (error) {
+      throw new Error(error.message || "Verification failed");
     }
 
     return data as PaystackVerificationResponse;
@@ -140,35 +112,21 @@ export const createRentPayment = async (
   tenantEmail: string
 ): Promise<PaystackResponse> => {
   try {
-    if (!SUPABASE_URL) {
-      throw new Error("Supabase URL is not configured");
-    }
-
     if (!tenantId || !invoiceId || !amount || !tenantEmail) {
       throw new Error("tenantId, invoiceId, amount, and tenantEmail are required");
     }
 
-    // Call the create-rent-payment Edge Function
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/create-rent-payment`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tenantId,
-          invoiceId,
-          amount,
-          tenantEmail,
-        }),
-      }
-    );
+    const { data, error } = await supabase.functions.invoke("create-rent-payment", {
+      body: {
+        tenantId,
+        invoiceId,
+        amount,
+        tenantEmail,
+      },
+    });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || `Payment creation failed: ${response.status}`);
+    if (error) {
+      throw new Error(error.message || "Payment creation failed");
     }
 
     return data as PaystackResponse;

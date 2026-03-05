@@ -61,9 +61,11 @@ import { formatCurrency } from "@/utils/formatCurrency";
 interface Payment {
   id: string;
   amount: number;
-  payment_date: string;
+  payment_date?: string;
+  paid_date?: string;
+  amount_paid?: number;
   due_date: string;
-  status: "pending" | "completed" | "overdue" | "failed";
+  status: "pending" | "completed" | "paid" | "overdue" | "partial" | "failed";
   payment_method: string;
   description?: string;
   created_at: string;
@@ -447,7 +449,7 @@ const TenantDashboard: React.FC = () => {
         .from("rent_payments")
         .select("*")
         .eq("tenant_id", user.id)
-        .order("payment_date", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(10);
 
       if (paymentsError) throw paymentsError;
@@ -458,7 +460,7 @@ const TenantDashboard: React.FC = () => {
         // Calculate stats
         const currentBalance = calculateCurrentBalance(payments);
         const totalPaid = payments
-          .filter((p) => p.status === "completed")
+          .filter((p) => p.status === "completed" || p.status === "paid")
           .reduce((sum, payment) => sum + (payment.amount_paid || payment.amount || 0), 0);
 
         setStats((prev) => ({

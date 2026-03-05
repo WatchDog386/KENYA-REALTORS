@@ -377,9 +377,13 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
     },
     {
       title: 'Billing and Invoicing',
-      href: '/portal/manager/utilities',
+      href: '/portal/manager/billing',
       icon: <Zap size={20} />,
-      description: 'Manage billing and invoicing'
+      description: 'Manage billing and invoicing',
+      children: [
+        { title: 'Utility Readings', href: '/portal/manager/utilities', icon: <Zap size={18} />, description: 'Track meter readings' },
+        { title: 'Receipts', href: '/portal/manager/receipts', icon: <FileText size={18} />, description: 'Payment receipts' },
+      ]
     },
     {
       title: 'Messages',

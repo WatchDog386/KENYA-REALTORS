@@ -487,6 +487,15 @@ const ManagerDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[
                     {
+                      title: "Receipts & Documents",
+                      icon: <FileText className="w-6 h-6 text-white" />,
+                      description: "View payment receipts",
+                      route: "/portal/manager/receipts",
+                      bgGradient: "from-indigo-500 via-indigo-600 to-indigo-700",
+                      borderColor: "border-indigo-300",
+                      iconBg: "bg-indigo-400"
+                    },
+                    {
                       title: "Manage Tenants",
                       icon: <Users className="w-6 h-6 text-white" />,
                       description: "Add, edit, view tenants",

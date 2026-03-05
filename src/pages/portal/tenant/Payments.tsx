@@ -1,6 +1,6 @@
 // src/pages/portal/tenant/Payments.tsx
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   CreditCard,
@@ -77,6 +77,7 @@ interface UtilityReading {
   garbage_fee: number;
   security_fee: number;
   service_fee?: number;
+  rent_amount?: number;
   custom_utilities?: Record<string, number>;
   other_charges: number;
   status: string;
@@ -87,17 +88,18 @@ interface UtilityReading {
 const PaymentsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [rentPayments, setRentPayments] = useState<Payment[]>([]);
   const [utilityBills, setUtilityBills] = useState<Payment[]>([]);
   const [utilityReadings, setUtilityReadings] = useState<UtilityReading[]>([]);
   const [utilitySettings, setUtilitySettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "all");
   const [selectedPaymentType, setSelectedPaymentType] = useState<string | null>(null);
-  const [exactMonthlyRent, setExactMonthlyRent] = useState<number>(0);
   const [paymentAmount, setPaymentAmount] = useState<string>("");
   const [selectedPaymentItems, setSelectedPaymentItems] = useState<Set<string>>(new Set());
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [tenantUnitMonthlyRent, setTenantUnitMonthlyRent] = useState<number>(0);
 
   useEffect(() => {
     fetchData();
@@ -138,11 +140,61 @@ const PaymentsPage: React.FC = () => {
       )
       .subscribe();
 
+    // Setup real-time subscriptions for bills/utilities
+    const billsChannel = supabase
+      .channel(`bills_utilities_tenant_${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bills_and_utilities',
+        },
+        (payload) => {
+          console.log('Real-time bill/utility change detected:', payload);
+          // Refetch data when bills change
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // Setup real-time subscriptions for receipts
+    const receiptsChannel = supabase
+      .channel(`receipts_tenant_${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'receipts',
+        },
+        (payload) => {
+          console.log('Real-time receipt change detected:', payload);
+          // Refetch data when receipts change
+          fetchData();
+        }
+      )
+      .subscribe();
+
     return () => {
       readingsChannel.unsubscribe();
       paymentsChannel.unsubscribe();
+      billsChannel.unsubscribe();
+      receiptsChannel.unsubscribe();
     };
   }, [user?.id]);
+
+  // Refetch data when user returns from payment page
+  useEffect(() => {
+    const hasTabParam = searchParams.has('tab');
+    if (hasTabParam) {
+      // User returned from payment, refetch data with a small delay
+      const timer = setTimeout(() => {
+        fetchData();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   // Build a payment-style bill entry from raw utility readings when invoices are missing
   function buildBillsFromReadings(readings: UtilityReading[]): Payment[] {
@@ -158,7 +210,8 @@ const PaymentsPage: React.FC = () => {
 
       const fixedFees = Math.abs(r.garbage_fee || 0) + Math.abs(r.security_fee || 0) + Math.abs(r.service_fee || 0);
       const otherCharges = Math.abs(r.other_charges || 0);
-      const total = electricityBill + waterBill + fixedFees + otherCharges;
+      const rentAmount = Math.abs(r.rent_amount || 0);
+      const total = rentAmount + electricityBill + waterBill + fixedFees + otherCharges;
 
       const status: Payment['status'] = ['pending', 'paid', 'overdue', 'partial', 'completed', 'open'].includes(r.status as Payment['status'])
         ? (r.status as Payment['status'])
@@ -175,33 +228,9 @@ const PaymentsPage: React.FC = () => {
         status,
         created_at: r.created_at || r.reading_month || new Date().toISOString(),
         bill_type: 'utility',
-        remarks: `Utility bill for ${monthLabel}`,
+        remarks: `Bills and utilities for ${monthLabel}`,
       };
     });
-  }
-
-  // Build a rent bill from lease info when no rent payment records exist
-  function buildRentBillFromLease(monthlyRent: number, dueDay?: number, startDate?: string): Payment[] {
-    if (!monthlyRent) return [];
-
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    const safeDay = Math.min(Math.max(dueDay || 1, 1), 28); // keep inside month
-    const dueDate = new Date(year, month, safeDay);
-    const dueISO = dueDate.toISOString();
-    const monthLabel = dueDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-    return [{
-      id: `lease-${month + 1}-${year}`,
-      amount: monthlyRent,
-      amount_paid: 0,
-      due_date: dueISO,
-      status: 'pending',
-      created_at: startDate || dueISO,
-      bill_type: 'rent',
-      remarks: `Rent for ${monthLabel}`,
-    }];
   }
 
   const fetchData = async () => {
@@ -209,67 +238,56 @@ const PaymentsPage: React.FC = () => {
     try {
       setLoading(true);
       let derivedUtilityBills: Payment[] = [];
-      let derivedRentBills: Payment[] = [];
 
       // 1. Get Tenant Unit Info
       const { data: tenantData } = await supabase
         .from('tenants')
-        .select('unit_id, property_id')
+        .select('id, unit_id, property_id')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .single();
       
       const unitId = tenantData?.unit_id;
       const propertyId = tenantData?.property_id;
-
-      // 1b. Fetch precise exact lease to get monthly rent
+      const tenantId = tenantData?.id;
       let leaseMonthlyRent = 0;
-      let leaseStartDate: string | undefined = undefined;
+      let latestReadingRent = 0;
 
-      const { data: activeLease } = await supabase
-        .from("tenant_leases")
-        .select(`
-            rent_amount,
-            start_date,
-            units:unit_id (
-              property_unit_types (
-                 price_per_unit
-              )
-            )
-        `)
-        .eq("tenant_id", user.id)
-        .eq("status", "active")
-        .maybeSingle();
-
-      if (activeLease) {
-        // @ts-ignore
-        leaseMonthlyRent = activeLease.rent_amount || activeLease.units?.property_unit_types?.price_per_unit || 0;
-        leaseStartDate = activeLease.start_date;
-      } else if (unitId) {
-        const { data: unitDetails } = await supabase
-          .from("units")
-          .select("property_unit_types(price_per_unit)")
-          .eq("id", unitId)
+      let unitMonthlyRent = 0;
+      if (unitId) {
+        const { data: unitData } = await supabase
+          .from('units')
+          .select('price, property_unit_types(price_per_unit)')
+          .eq('id', unitId)
           .maybeSingle();
+
         // @ts-ignore
-        if (unitDetails) leaseMonthlyRent = unitDetails.property_unit_types?.price_per_unit || 0;
+        unitMonthlyRent = Math.abs(Number(unitData?.price ?? unitData?.property_unit_types?.price_per_unit ?? 0));
+      }
+      if (tenantId) {
+        const { data: activeLease } = await supabase
+          .from('tenant_leases')
+          .select('rent_amount')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'active')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        leaseMonthlyRent = Math.abs(Number(activeLease?.rent_amount) || 0);
       }
 
-      setExactMonthlyRent(leaseMonthlyRent);
-
-      if (leaseMonthlyRent > 0) {
-        derivedRentBills = buildRentBillFromLease(
-          leaseMonthlyRent,
-          1, // default due day
-          leaseStartDate
-        );
+      if (leaseMonthlyRent <= 0 && unitMonthlyRent > 0) {
+        leaseMonthlyRent = unitMonthlyRent;
       }
+
+      setTenantUnitMonthlyRent(leaseMonthlyRent);
 
       // 2. Fetch Rent Payments
       const { data: rentData, error: rentError } = await supabase
         .from("rent_payments")
         .select("*")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .order("due_date", { ascending: false });
 
       if (rentError) throw rentError;
@@ -285,12 +303,6 @@ const PaymentsPage: React.FC = () => {
 
       let pureRentList = allPaymentsRaw.filter((p: any) => p.bill_type === 'rent');
       const triggerUtilityBills = allPaymentsRaw.filter((p: any) => p.bill_type === 'utility');
-
-      const hasRealRent = pureRentList.some((p: any) => (p.amount || 0) > 0);
-      if (!hasRealRent && derivedRentBills.length > 0) {
-        // Fallback to lease rent when rent_payments missing
-        pureRentList = derivedRentBills;
-      }
       setRentPayments(pureRentList);
 
       // 3. Fetch Utility Readings
@@ -306,6 +318,7 @@ const PaymentsPage: React.FC = () => {
             ...r,
             unit_number: tenantData?.unit_id
           }));
+          latestReadingRent = Math.abs(Number(readingsWithUnit[0]?.rent_amount) || 0);
           setUtilityReadings(readingsWithUnit);
           derivedUtilityBills = buildBillsFromReadings(readingsWithUnit);
         }
@@ -323,7 +336,14 @@ const PaymentsPage: React.FC = () => {
             console.warn("Tenant bills fetch failed, falling back to readings", billError);
           }
           // Map to common interface
-          let formattedBills: Payment[] = (billData || []).map((b: any) => ({
+          let formattedBills: Payment[] = (billData || [])
+            .filter((b: any) => {
+              // Exclude 'all' type bills to avoid duplication with individual rent/utility items
+              // If bill_type is 'all', it means it's a combined bill - we show separate items instead
+              if (b.bill_type === 'all') return false;
+              return true;
+            })
+            .map((b: any) => ({
              id: b.id,
              amount: b.amount,
              amount_paid: b.paid_amount ?? 0,
@@ -343,6 +363,36 @@ const PaymentsPage: React.FC = () => {
              finalUtilityBills = triggerUtilityBills;
           } else if (derivedUtilityBills.length > 0) {
              finalUtilityBills = derivedUtilityBills;
+          }
+
+          const hasPendingRentRecords = pureRentList.some((payment) =>
+            Math.max(0, (Number(payment.amount) || 0) - (Number(payment.amount_paid) || 0)) > 0
+          );
+
+          const hasRentInUtilityBills = finalUtilityBills.some((payment: any) =>
+            payment.bill_type === 'rent' ||
+            String(payment.remarks || '').toLowerCase().includes('rent')
+          );
+
+          if (
+            leaseMonthlyRent > 0 &&
+            !hasPendingRentRecords &&
+            !hasRentInUtilityBills &&
+            latestReadingRent <= 0
+          ) {
+            finalUtilityBills = [
+              {
+                id: `lease-rent-${tenantId || user.id}`,
+                amount: leaseMonthlyRent,
+                amount_paid: 0,
+                due_date: new Date().toISOString(),
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                bill_type: 'rent',
+                remarks: 'Monthly Rent',
+              },
+              ...finalUtilityBills,
+            ];
           }
 
           setUtilityBills(finalUtilityBills);
@@ -411,7 +461,8 @@ const PaymentsPage: React.FC = () => {
       case 'water': return 'Water Bill';
       case 'electricity': return 'Electricity';
       case 'garbage': return 'Garbage Collection';
-      case 'all': return 'Pay All';
+      case 'all':
+      case 'custom': return 'Lump Sum (Rent + Utilities)';
       default: return 'Payment';
     }
   };
@@ -422,7 +473,8 @@ const PaymentsPage: React.FC = () => {
       case 'water': return Droplets;
       case 'electricity': return Zap;
       case 'garbage': return Trash2;
-      case 'all': return DollarSign;
+      case 'all':
+      case 'custom': return DollarSign;
       default: return HelpCircle;
     }
   };
@@ -433,15 +485,16 @@ const PaymentsPage: React.FC = () => {
       case 'water': return 'bg-cyan-50 text-cyan-600 border-cyan-100 hover:border-cyan-300';
       case 'electricity': return 'bg-yellow-50 text-yellow-600 border-yellow-100 hover:border-yellow-300';
       case 'garbage': return 'bg-green-50 text-green-600 border-green-100 hover:border-green-300';
-      case 'all': return 'bg-purple-50 text-purple-600 border-purple-100 hover:border-purple-300';
+      case 'all':
+      case 'custom': return 'bg-purple-50 text-purple-600 border-purple-100 hover:border-purple-300';
       default: return 'bg-purple-50 text-purple-600 border-purple-100 hover:border-purple-300';
     }
   };
 
   const handlePaymentTypeClick = (type: string) => {
-    if (type === 'all') {
-      // For lump sum, navigate directly to payment with all amount
-      navigate(`/portal/tenant/payments/make?type=all&amount=${totalArrears}`);
+    if (type === 'all' || type === 'custom') {
+      // Lump sum should include rent + utilities, but tenant enters any amount they can pay.
+      navigate(`/portal/tenant/payments/make?type=custom`);
     } else {
       setSelectedPaymentType(type);
       setPaymentAmount("");
@@ -458,6 +511,22 @@ const PaymentsPage: React.FC = () => {
     
     if (utilityReadings && utilityReadings.length > 0) {
       const reading = utilityReadings[0]; // Latest reading
+
+      // Rent (from manager billing / meter reading form, with tenant unit fallback)
+      const rentAmount = Math.abs(Number(reading.rent_amount || 0)) || Math.abs(Number(tenantUnitMonthlyRent || 0));
+      if (rentAmount > 0) {
+        items.push({
+          id: `rent-${reading.id}`,
+          type: 'rent',
+          label: 'Rent',
+          icon: Home,
+          amount: rentAmount,
+          description: Number(reading.rent_amount || 0) > 0 ? 'Monthly rent from billing statement' : 'Monthly rent from tenant unit',
+          color: 'text-blue-700',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200'
+        });
+      }
       
       // Electricity
       if (reading.current_reading && reading.previous_reading) {
@@ -521,6 +590,41 @@ const PaymentsPage: React.FC = () => {
           });
         }
       });
+
+      // Custom utilities (manager-configured)
+      if (reading.custom_utilities) {
+        Object.entries(reading.custom_utilities).forEach(([name, value]) => {
+          const amount = Math.abs(Number(value) || 0);
+          if (amount <= 0) return;
+          items.push({
+            id: `custom-${name}-${reading.id}`,
+            type: 'custom_utility',
+            label: name.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
+            icon: HelpCircle,
+            amount,
+            description: 'Custom utility charge',
+            color: 'text-indigo-700',
+            bgColor: 'bg-indigo-50',
+            borderColor: 'border-indigo-200',
+          });
+        });
+      }
+
+      // Other charges
+      const otherCharges = Math.abs(reading.other_charges || 0);
+      if (otherCharges > 0) {
+        items.push({
+          id: `other-charges-${reading.id}`,
+          type: 'other',
+          label: 'Other Charges',
+          icon: DollarSign,
+          amount: otherCharges,
+          description: 'Additional charges',
+          color: 'text-slate-700',
+          bgColor: 'bg-slate-50',
+          borderColor: 'border-slate-200'
+        });
+      }
     }
     
     return items;
@@ -548,8 +652,8 @@ const PaymentsPage: React.FC = () => {
       toast.error("Please select at least one item to pay");
       return;
     }
-    // Navigate to payment with combined amount
-    navigate(`/portal/tenant/payments/make?type=custom&amount=${selectedItemsTotalAmount}&items=${Array.from(selectedPaymentItems).join(',')}`);
+    // Lump sum uses rent + utilities allocation logic; tenant chooses final amount on payment page.
+    navigate(`/portal/tenant/payments/make?type=custom`);
   };
 
   if (loading) {
@@ -580,6 +684,72 @@ const PaymentsPage: React.FC = () => {
   ) : 0;
 
   const totalArrears = rentDue + utilitiesDue;
+
+  const statementBreakdownItems = [
+    ...rentPayments
+      .map((payment) => ({
+        id: `rent-${payment.id}`,
+        label: payment.remarks || 'Rent',
+        dueDate: payment.due_date,
+        amount: Math.max(0, (Number(payment.amount) || 0) - (Number(payment.amount_paid) || 0)),
+      }))
+      .filter((item) => item.amount > 0),
+    ...utilityBills
+      .map((payment) => {
+        const rawType = payment.bill_type || 'utility';
+        const typeLabel = rawType === 'rent'
+          ? 'Rent'
+          : rawType.charAt(0).toUpperCase() + rawType.slice(1);
+        return {
+          id: `utility-${payment.id}`,
+          label: payment.remarks || `${typeLabel} Bill`,
+          dueDate: payment.due_date,
+          amount: Math.max(0, (Number(payment.amount) || 0) - (Number(payment.amount_paid) || 0)),
+        };
+      })
+      .filter((item) => item.amount > 0),
+  ].sort((left, right) => new Date(left.dueDate).getTime() - new Date(right.dueDate).getTime());
+
+  const statementBreakdownTotal = statementBreakdownItems.reduce((sum, item) => sum + item.amount, 0);
+  const managerBreakdownItems = utilityLineItems.map((item) => ({
+    id: `manager-${item.id}`,
+    label: item.label,
+    amount: Math.abs(Number(item.amount) || 0),
+  })).filter((item) => item.amount > 0);
+
+  const managerRentAmount = managerBreakdownItems
+    .filter((item) => item.label.toLowerCase().includes('rent'))
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  const rentFromUtilityBills = utilityBills
+    .filter((payment) => payment.bill_type === 'rent' || String(payment.remarks || '').toLowerCase().includes('rent'))
+    .reduce((sum, payment) => {
+      const due = Math.max(0, (Number(payment.amount) || 0) - (Number(payment.amount_paid) || 0));
+      return sum + due;
+    }, 0);
+
+  const expectedRentDue = Math.max(rentDue, rentFromUtilityBills);
+
+  const missingRentAmount = Math.max(0, expectedRentDue - managerRentAmount);
+  const rentFallbackItem = missingRentAmount > 0
+    ? [{ id: 'manager-rent-fallback', label: 'Monthly Rent', amount: missingRentAmount }]
+    : [];
+
+  const displayBreakdownItems = managerBreakdownItems.length > 0
+    ? [...rentFallbackItem, ...managerBreakdownItems]
+    : statementBreakdownItems;
+  const displayBreakdownTotal = displayBreakdownItems.reduce((sum, item) => sum + item.amount, 0);
+
+  const totalPaidRent = rentPayments.reduce((sum, payment) => sum + Math.abs(Number(payment.amount_paid) || 0), 0);
+  const totalPaidUtilities = utilityBills.reduce((sum, payment) => sum + Math.abs(Number(payment.amount_paid) || 0), 0);
+  const totalPaidAmount = totalPaidRent + totalPaidUtilities;
+
+  const billedTotal = displayBreakdownItems.length > 0
+    ? Math.max(displayBreakdownTotal, totalArrears)
+    : totalArrears;
+
+  const totalDueBalance = Math.max(0, billedTotal - totalPaidAmount);
+  const overpaymentBalance = Math.max(0, totalPaidAmount - billedTotal);
 
   if (!selectedPaymentType && selectedPaymentType !== null) {
     // Just show normal view if user deselects
@@ -646,15 +816,15 @@ const PaymentsPage: React.FC = () => {
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#154279] to-[#F96302]">
               My Payments
             </h1>
-            <p className="text-sm text-gray-500">Manage rent and all utility bills</p>
+            <p className="text-sm text-gray-500">Manage all bills and utilities in one place</p>
           </div>
         </div>
         <Button
-          onClick={() => setSelectedPaymentType('all')}
+          onClick={() => navigate('/portal/tenant/payments/make?type=custom')}
           className="bg-[#F96302] hover:bg-[#d85501] text-white shadow-md hover:shadow-lg transition-all"
         >
           <Plus size={18} className="mr-2" />
-          Make Payment
+          Lump Sum Payment
         </Button>
       </motion.div>
 
@@ -681,47 +851,18 @@ const PaymentsPage: React.FC = () => {
             </div>
             <div className="text-right">
               <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-2">Total Amount Due</p>
-              <p className="text-4xl font-bold text-[#F96302]">{formatCurrency(totalArrears)}</p>
+              <p className="text-4xl font-bold text-[#F96302]">{formatCurrency(totalDueBalance)}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Rent Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.15 }}
-              className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5 border border-blue-200"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-blue-200 text-blue-700 rounded-lg">
-                    <DollarSign size={18} />
-                  </div>
-                  <span className="font-semibold text-blue-900">Rent Payment</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-blue-700">Monthly Rent:</span>
-                  <span className="font-bold text-blue-900">{formatCurrency(exactMonthlyRent)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-blue-700">Paid:</span>
-                  <span className="font-bold text-green-600">{formatCurrency(rentPayments.reduce((sum, p) => sum + (p.amount_paid || 0), 0))}</span>
-                </div>
-                <div className="border-t border-blue-300 pt-2 flex justify-between">
-                  <span className="text-sm font-semibold text-blue-900">Due:</span>
-                  <span className="font-bold text-red-600">{formatCurrency(rentDue)}</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Utilities Card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Bills & Utilities Card (includes rent) */}
             {(() => {
               const totalUtility = utilityBills.reduce((sum, p) => sum + (p.amount || 0), 0);
-              const paidUtility = utilityBills.reduce((sum, p) => sum + (p.amount_paid || 0), 0);
-              return totalUtility > 0 ? (
+              const totalRent = rentPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+              const combinedAmount = totalUtility + totalRent;
+              const combinedPaid = totalPaidAmount;
+              return combinedAmount > 0 ? (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -733,21 +874,27 @@ const PaymentsPage: React.FC = () => {
                       <div className="p-2 bg-cyan-200 text-cyan-700 rounded-lg">
                         <Droplets size={18} />
                       </div>
-                      <span className="font-semibold text-cyan-900">Utilities & Bills</span>
+                      <span className="font-semibold text-cyan-900">Bills & Utilities</span>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-sm text-cyan-700">Amount:</span>
-                      <span className="font-bold text-cyan-900">{formatCurrency(totalUtility)}</span>
+                      <span className="text-sm text-cyan-700">Utility Due:</span>
+                      <span className="font-bold text-cyan-900">{formatCurrency(utilitiesDue)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-cyan-700">Paid:</span>
-                      <span className="font-bold text-green-600">{formatCurrency(paidUtility)}</span>
+                      <span className="font-bold text-green-600">{formatCurrency(combinedPaid)}</span>
                     </div>
+                    {overpaymentBalance > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-sm text-emerald-700">Overpayment B/F:</span>
+                        <span className="font-bold text-emerald-700">{formatCurrency(overpaymentBalance)}</span>
+                      </div>
+                    )}
                     <div className="border-t border-cyan-300 pt-2 flex justify-between">
-                      <span className="text-sm font-semibold text-cyan-900">Due:</span>
-                      <span className="font-bold text-red-600">{formatCurrency(totalUtility - paidUtility)}</span>
+                      <span className="text-sm font-semibold text-cyan-900">Total Due:</span>
+                      <span className="font-bold text-red-600">{formatCurrency(totalDueBalance)}</span>
                     </div>
                   </div>
                 </motion.div>
@@ -815,323 +962,64 @@ const PaymentsPage: React.FC = () => {
         <div className="bg-[#154279] p-6 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Total Current Statement</h2>
-            <p className="text-blue-100 mt-1">Itemized breakdown of your pending rent and utilities</p>
+            <p className="text-blue-100 mt-1">Summary of all charges due</p>
           </div>
           <div className="mt-4 sm:mt-0 text-center flex gap-4 items-center sm:text-right">
             <div className="text-right">
                <p className="text-xs text-blue-100 uppercase tracking-wide font-semibold mb-1">Total Due Balance</p>
                <p className="text-3xl font-extrabold text-[#F96302]">
-                 {formatCurrency(totalArrears)}
+                 {formatCurrency(totalDueBalance)}
                </p>
             </div>
-            {totalArrears > 0 && (
+            {totalDueBalance > 0 && (
                <Button 
-                 onClick={() => navigate(`/portal/tenant/payments/make?type=all&amount=${totalArrears}`)}
+                 onClick={() => navigate(`/portal/tenant/payments/make?type=custom`)}
                  className="bg-[#F96302] hover:bg-[#d85501] text-white h-12 px-6 shadow-md shadow-orange-900/20 transition-all font-bold tracking-wide"
                >
                  <DollarSign className="mr-2" size={18} />
-                 PAY LUMPSUM ({formatCurrency(totalArrears)})
+                 PAY LUMP SUM
                </Button>
             )}
           </div>
         </div>
 
-        <div className="p-0 overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-100 border-b border-slate-200">
-              <TableRow>
-                <TableHead className="font-bold text-slate-800">Charge Details</TableHead>
-                <TableHead className="font-bold text-slate-800">Due Date</TableHead>
-                <TableHead className="font-bold text-slate-800 text-right">Amount</TableHead>
-                <TableHead className="font-bold text-slate-800 text-right">Paid</TableHead>
-                <TableHead className="font-bold text-slate-800 text-right">Balance</TableHead>
-                <TableHead className="font-bold text-slate-800 text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-               {(() => {
-                  const pendingRentPayments = rentPayments.filter(p => !['paid', 'completed'].includes(p.status));
-                  const pendingUtilityBills = utilityBills.filter(p => !['paid', 'completed'].includes(p.status));
-                  const allPending = [...pendingRentPayments, ...pendingUtilityBills].sort((a,b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-                  
-                  if (allPending.length === 0) {
-                     return (
-                       <TableRow>
-                         <TableCell colSpan={6} className="text-center py-12 text-slate-500 text-base">
-                            <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-                            Good job! You have no outstanding balances.
-                            <br />
-                            <span className="text-sm">All caught up down to the last coin.</span>
-                         </TableCell>
-                       </TableRow>
-                     )
-                  }
+        <div className="p-6 space-y-6">
+          {/* Bills & Utilities Section (includes rent) */}
+          {displayBreakdownItems.length > 0 && (
+            <div className="border-b pb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Droplets className="text-cyan-600" size={18} />
+                <h3 className="font-bold text-slate-900">Bills & Utilities</h3>
+              </div>
+              <div className="space-y-2 ml-7">
+                {displayBreakdownItems.map((item) => (
+                  <div key={item.id} className="flex justify-between text-sm">
+                    <span className="text-slate-600">{item.label}</span>
+                    <span className="text-slate-900 font-medium">{formatCurrency(item.amount)}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-2 mt-2 flex justify-between">
+                  <span className="text-sm font-semibold text-slate-700">Total Bills & Utilities:</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(displayBreakdownTotal)}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
-                  return (
-                     <>
-                        {allPending.map(item => {
-                           const isUtilityItem = (item.bill_type && item.bill_type !== 'rent') || (item.remarks && item.remarks.toLowerCase().includes('utility'));
-                           const remainingAmount = Math.max(0, (Number(item.amount) || 0) - (item.amount_paid || 0));
-                           const icon = isUtilityItem ? <Droplets size={18}/> : <DollarSign size={18}/>;
-                           const iconBg = isUtilityItem ? "bg-cyan-50 text-cyan-600" : "bg-blue-50 text-blue-600";
-                           const title = isUtilityItem ? "Monthly Utility Bill" : "Rent Payment";
-                           
-                           // Try matching the reading
-                           let readingDetails = null;
-                           if (isUtilityItem) {
-                               const match = utilityReadings.find(r => {
-                                  const rMonthStr = new Date(r.reading_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                                  const rawMonth = r.reading_month.substring(0,7);
-                                  return item.remarks?.includes(rMonthStr) || item.due_date?.includes(rawMonth);
-                               });
-                               if (match) readingDetails = match;
-                           }
+          {/* Grand Total */}
+          <div className="bg-slate-50 p-4 rounded-lg flex justify-between items-center">
+            <span className="font-bold text-slate-900 text-lg">Grand Total Due:</span>
+            <span className="font-bold text-[#F96302] text-lg">{formatCurrency(totalDueBalance)}</span>
+          </div>
 
-                           return (
-                             <React.Fragment key={item.id}>
-                               <TableRow className={`border-slate-100 bg-white hover:bg-slate-50/50 ${readingDetails ? 'border-b-0' : 'border-b'}`}>
-                                  <TableCell>
-                                     <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${iconBg}`}>{icon}</div>
-                                        <div>
-                                          <p className="font-bold text-slate-900">{title}</p>
-                                          <p className="text-xs text-slate-500 max-w-[200px] truncate" title={item.remarks}>{item.remarks || 'Standard charge'}</p>
-                                        </div>
-                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-slate-600 font-medium text-sm">
-                                     <div className="flex flex-col">
-                                        <span>{formatDate(item.due_date)}</span>
-                                        <Badge variant="outline" className={cn("mt-1 w-fit text-[9px] uppercase tracking-wider", getStatusColor(item.status))}>
-                                           {item.status}
-                                        </Badge>
-                                     </div>
-                                  </TableCell>
-                                  <TableCell className="text-right font-medium">{formatCurrency(Number(item.amount) || 0)}</TableCell>
-                                  <TableCell className="text-right text-green-600 font-medium">{formatCurrency(item.amount_paid || 0)}</TableCell>
-                                  <TableCell className="text-right font-bold text-red-600">{formatCurrency(remainingAmount)}</TableCell>
-                                  <TableCell className="text-right">
-                                     <Button 
-                                       size="sm" 
-                                       className="bg-[#154279] hover:bg-[#103058] text-white h-8 text-[11px] font-bold uppercase tracking-wider shadow-sm"
-                                       onClick={() => {
-                                          const type = isUtilityItem ? 'water' : 'rent';
-                                          navigate(`/portal/tenant/payments/make?type=${type}&id=${item.id}&amount=${remainingAmount}`);
-                                       }}
-                                     >
-                                       Pay Bill
-                                     </Button>
-                                  </TableCell>
-                               </TableRow>
-                               
-                               {readingDetails && (
-                                  <TableRow className="border-b border-slate-100">
-                                     <TableCell colSpan={6} className="p-0 border-0">
-                                        <div className="pl-14 pr-6 py-4 border-l-4 border-cyan-400 ml-5 my-0.5 mb-4 bg-slate-50 shadow-inner rounded-r-xl border-y border-r border-[#e2e8f0]">
-                                           <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
-                                              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2"><Bell size={12}/> Itemized Breakdown</p>
-                                              <p className="text-xs font-semibold text-slate-500">{new Date(readingDetails.reading_month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
-                                           </div>
-                                           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                              <div>
-                                                 <span className="text-slate-500 block text-[11px] uppercase tracking-wider mb-0.5">Electricity</span>
-                                                 <span className="font-bold text-slate-800">{formatCurrency(Math.abs(readingDetails.current_reading - readingDetails.previous_reading) * readingDetails.electricity_rate)}</span>
-                                              </div>
-                                              <div>
-                                                 <span className="text-slate-500 block text-[11px] uppercase tracking-wider mb-0.5">Water</span>
-                                                 <span className="font-bold text-slate-800">{formatCurrency(Math.abs((readingDetails.water_current_reading || 0) - (readingDetails.water_previous_reading || 0)) * (readingDetails.water_rate || 0))}</span>
-                                              </div>
-                                              {(readingDetails.garbage_fee > 0 || readingDetails.security_fee > 0 || (readingDetails.service_fee && readingDetails.service_fee > 0)) && (
-                                                 <div>
-                                                    <span className="text-slate-500 block text-[11px] uppercase tracking-wider mb-0.5">Fixed Fees</span>
-                                                    <span className="font-bold text-slate-800">{formatCurrency(readingDetails.garbage_fee + readingDetails.security_fee + (readingDetails.service_fee || 0))}</span>
-                                                 </div>
-                                              )}
-                                              {readingDetails.other_charges > 0 && (
-                                                 <div>
-                                                    <span className="text-slate-500 block text-[11px] uppercase tracking-wider mb-0.5">Other Charges</span>
-                                                    <span className="font-bold text-slate-800">{formatCurrency(readingDetails.other_charges)}</span>
-                                                 </div>
-                                              )}
-                                           </div>
-                                        </div>
-                                     </TableCell>
-                                  </TableRow>
-                               )}
-                             </React.Fragment>
-                           );
-                        })}
-                     </>
-                  );
-               })()}
-            </TableBody>
-          </Table>
+          {overpaymentBalance > 0 && (
+            <div className="bg-emerald-50 p-4 rounded-lg flex justify-between items-center border border-emerald-200">
+              <span className="font-semibold text-emerald-900">Overpayment Balance Brought Forward:</span>
+              <span className="font-bold text-emerald-700">{formatCurrency(overpaymentBalance)}</span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Smart Payment Selector */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-8"
-      >
-        <div className="bg-gradient-to-r from-[#154279] to-[#1a5a96] p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <DollarSign size={24} />
-                Select Items to Pay
-              </h2>
-              <p className="text-blue-100 mt-1">Choose which bills to pay now - rent, utilities, or a custom combination</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowPaymentSelector(!showPaymentSelector)}
-              className="text-white hover:bg-white/20"
-            >
-              {showPaymentSelector ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-            </Button>
-          </div>
-        </div>
-
-        {showPaymentSelector && (
-          <div className="p-6 space-y-6">
-            {/* Rent Section */}
-            {rentDue > 0 && (
-              <div className="border-2 border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-                <div className="flex items-center gap-4">
-                  <Checkbox
-                    id="rent"
-                    checked={selectedPaymentItems.has('rent')}
-                    onCheckedChange={() => handleTogglePaymentItem('rent')}
-                    className="w-5 h-5"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                        <Home size={18} />
-                      </div>
-                      <div>
-                        <label htmlFor="rent" className="font-bold text-slate-900 cursor-pointer">Monthly Rent</label>
-                        <p className="text-sm text-slate-600">Due {formatDate(rentPayments[0]?.due_date || new Date().toISOString())}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600">{formatCurrency(rentDue)}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Utilities Breakdown */}
-            {utilityLineItems.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                  <Droplets size={20} className="text-cyan-600" />
-                  Utilities & Charges
-                </h3>
-                <div className="grid gap-3">
-                  {utilityLineItems.map((item) => {
-                    const Icon = item.icon;
-                    const isSelected = selectedPaymentItems.has(item.id);
-                    return (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          "border-2 rounded-lg p-4 transition-all cursor-pointer",
-                          isSelected
-                            ? `${item.borderColor} ${item.bgColor} border-2`
-                            : "border-slate-200 bg-slate-50 hover:border-slate-300"
-                        )}
-                        onClick={() => handleTogglePaymentItem(item.id)}
-                      >
-                        <div className="flex items-center gap-4">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => {}}
-                            className="w-5 h-5"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`p-2 ${item.bgColor} ${item.color} rounded-lg`}>
-                                <Icon size={18} />
-                              </div>
-                              <div>
-                                <p className="font-semibold text-slate-900">{item.label}</p>
-                                <p className="text-sm text-slate-600">{item.description}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xl font-bold text-slate-900">{formatCurrency(item.amount)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Quick Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4 border-t border-slate-200">
-              <Button
-                variant="outline"
-                className="border-2 border-blue-300 text-blue-600 hover:bg-blue-50 h-12 font-bold"
-                onClick={() => {
-                  setSelectedPaymentItems(new Set(['rent']));
-                }}
-              >
-                <Home size={18} className="mr-2" />
-                Rent Only
-              </Button>
-              <Button
-                variant="outline"
-                className="border-2 border-cyan-300 text-cyan-600 hover:bg-cyan-50 h-12 font-bold"
-                onClick={() => {
-                  setSelectedPaymentItems(new Set(utilityLineItems.map(u => u.id)));
-                }}
-              >
-                <Droplets size={18} className="mr-2" />
-                Utilities Only
-              </Button>
-              <Button
-                className="bg-[#F96302] hover:bg-[#d85501] text-white h-12 font-bold"
-                onClick={() => {
-                  setSelectedPaymentItems(new Set(['rent', ...utilityLineItems.map(u => u.id)]));
-                }}
-              >
-                <DollarSign size={18} className="mr-2" />
-                Pay All
-              </Button>
-            </div>
-
-            {/* Selected Total and Pay Button */}
-            {selectedPaymentItems.size > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="bg-gradient-to-r from-[#154279] to-[#F96302] p-6 rounded-lg text-white flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-blue-100 text-sm font-semibold">Total to Pay</p>
-                  <p className="text-3xl font-extrabold">{formatCurrency(selectedItemsTotalAmount)}</p>
-                </div>
-                <Button
-                  onClick={proceedWithSelectedItems}
-                  className="bg-white text-[#154279] hover:bg-blue-50 font-bold px-8 h-12 shadow-lg"
-                >
-                  <CreditCard size={18} className="mr-2" />
-                  Proceed to Payment
-                </Button>
-              </motion.div>
-            )}
-          </div>
-        )}
-      </motion.div>
 
       <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
         <div className="flex items-center justify-between mb-4">
@@ -1154,16 +1042,16 @@ const PaymentsPage: React.FC = () => {
                 <div className="text-right">
                    <p className="text-xs text-blue-100 uppercase tracking-wide font-semibold mb-1">Total Due Balance</p>
                    <p className="text-3xl font-extrabold text-[#F96302]">
-                     {formatCurrency(totalArrears)}
+                     {formatCurrency(totalDueBalance)}
                    </p>
                 </div>
-                {totalArrears > 0 && (
+                {totalDueBalance > 0 && (
                    <Button 
-                     onClick={() => navigate(`/portal/tenant/payments/make?type=all&amount=${totalArrears}`)}
+                     onClick={() => navigate(`/portal/tenant/payments/make?type=custom`)}
                      className="bg-[#F96302] hover:bg-[#d85501] text-white h-12 px-6 shadow-md shadow-orange-900/20 transition-all font-bold tracking-wide"
                    >
                      <DollarSign className="mr-2" size={18} />
-                     PAY ALL ({formatCurrency(totalArrears)})
+                     PAY LUMP SUM
                    </Button>
                 )}
               </div>
@@ -1196,7 +1084,18 @@ const PaymentsPage: React.FC = () => {
              </div>
            )}
            <PaymentsTable 
-              data={[...rentPayments, ...utilityBills].sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())}
+              data={[
+                {
+                  id: 'combined-monthly-bill',
+                  amount: billedTotal,
+                  amount_paid: Math.min(totalPaidAmount, billedTotal),
+                  due_date: rentPayments[0]?.due_date || new Date().toISOString(),
+                  status: totalDueBalance > 0 ? 'pending' : 'paid',
+                  created_at: new Date().toISOString(),
+                  bill_type: 'combined',
+                  remarks: 'Monthly bill including rent and utilities'
+                }
+              ]}
               formatCurrency={formatCurrency}
               formatDate={formatDate}
               getStatusColor={getStatusColor}
@@ -1233,9 +1132,12 @@ const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navig
         </TableHeader>
         <TableBody>
           {data.map((item: any) => {
-             const isUtilityItem = (item.bill_type && item.bill_type !== 'rent') || (item.remarks && item.remarks.toLowerCase().includes('utility'));
+             const isCombinedBill = item.bill_type === 'combined';
+             const isUtilityItem = (item.bill_type && item.bill_type !== 'rent' && !isCombinedBill) || (item.remarks && item.remarks.toLowerCase().includes('utility'));
              
-             const typeLabel = isUtilityItem 
+             const typeLabel = isCombinedBill
+                ? 'Monthly Bill'
+                : isUtilityItem 
                 ? (item.bill_type ? item.bill_type.charAt(0).toUpperCase() + item.bill_type.slice(1) + ' Bill' : 'Utility Bill')
                 : 'Rent Payment';
              
@@ -1243,15 +1145,21 @@ const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navig
              const remainingAmount = Math.max(0, (Number(item.amount) || 0) - (item.amount_paid || 0));
              
              const handlePayClick = () => {
-                const type = isUtilityItem ? 'water' : 'rent';
-                handleQuickPay(type, remainingAmount, item.id);
+                if (isCombinedBill) {
+                  handleQuickPay('custom', remainingAmount, item.id);
+                } else {
+                  const type = isUtilityItem ? 'water' : 'rent';
+                  handleQuickPay(type, remainingAmount, item.id);
+                }
              };
 
              return (
                <TableRow key={item.id} className="hover:bg-slate-50/50">
                  <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                        {isUtilityItem ? (
+                        {isCombinedBill ? (
+                            <div className="p-1.5 rounded-full bg-purple-100 text-purple-600"><DollarSign size={14}/></div>
+                        ) : isUtilityItem ? (
                             <div className="p-1.5 rounded-full bg-cyan-100 text-cyan-600"><Droplets size={14}/></div>
                         ) : (
                             <div className="p-1.5 rounded-full bg-blue-100 text-blue-600"><DollarSign size={14}/></div>
@@ -1277,7 +1185,9 @@ const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navig
                             onClick={handlePayClick}
                             className={cn(
                                 "h-8 px-3 text-xs font-bold uppercase tracking-wider shadow-sm", 
-                                isUtilityItem 
+                                isCombinedBill
+                                    ? "bg-purple-600 hover:bg-purple-700"
+                                    : isUtilityItem 
                                     ? "bg-cyan-600 hover:bg-cyan-700" 
                                     : "bg-blue-600 hover:bg-blue-700"
                             )}

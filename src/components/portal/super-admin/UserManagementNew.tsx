@@ -404,22 +404,22 @@ const UserManagementNew: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white pb-20 font-sans">
-      {/* Sharp Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-300 px-6 py-10 mb-8 shadow-none">
+      {/* Hero Header */}
+      <div className="bg-gradient-to-r from-navy via-navy to-cta px-6 py-10 mb-8 shadow-lg text-white">
         <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600">Realtors Kenya Directory</h4>
-            <h1 className="text-3xl sm:text-4xl font-black text-blue-900 tracking-tight drop-shadow-sm">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-white/80">Realtors Kenya Directory</h4>
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-sm">
               User Management
             </h1>
-            <p className="text-blue-700 text-sm max-w-2xl pt-1">
+            <p className="text-white/85 text-sm max-w-2xl pt-1">
               System directory and access control. Manage roles, statuses, and permissions across the platform.
             </p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg border border-blue-700 shadow-lg h-11 px-6 font-semibold transition-all">
+              <Button className="bg-white/10 hover:bg-white/20 text-white rounded-lg border border-white/30 shadow-lg h-11 px-6 font-semibold transition-all backdrop-blur-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 NEW USER
               </Button>

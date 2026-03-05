@@ -16,6 +16,8 @@ export interface ReceiptData {
   tenantName: string;
   propertyName: string;
   unitNumber: string;
+  houseNumber?: string;
+  houseType?: string;
   amount: number;
   paymentMethod: string;
   transactionReference: string;
@@ -236,15 +238,19 @@ export const formatReceiptData = (
     logo?: string;
   }
 ): ReceiptData => {
+  const metadata = receipt.metadata || {};
   return {
     receiptNumber: receipt.receipt_number,
-    tenantName: receipt.tenant_name,
-    propertyName: receipt.property_name,
-    unitNumber: receipt.unit_number,
-    amount: receipt.amount,
+    tenantName: metadata.tenant_name || receipt.tenant_name || 'N/A',
+    propertyName: metadata.property_name || receipt.property_name || 'N/A',
+    unitNumber: metadata.unit_number || receipt.unit_number || 'N/A',
+    houseNumber: metadata.house_number || metadata.unit_number || receipt.unit_number,
+    houseType: metadata.unit_type || 'N/A',
+    amount: receipt.amount_paid || receipt.amount || 0,
     paymentMethod: receipt.payment_method || 'Paystack',
-    transactionReference: receipt.transaction_reference,
-    paidDate: receipt.generated_at,
+    transactionReference: receipt.transaction_reference || metadata.transaction_reference || 'N/A',
+    paidDate: receipt.payment_date || receipt.generated_at || new Date().toISOString(),
+    items: metadata.items || [],
     companyName: companyInfo?.name || 'Property Management System',
     companyAddress: companyInfo?.address,
     companyPhone: companyInfo?.phone,
@@ -256,7 +262,7 @@ export const formatReceiptData = (
  * Create receipt record after payment succeeds
  */
 export const processPaymentWithReceipt = async (
-  tenantId: string,
+  userId: string,
   propertyId: string,
   unitId: string,
   paymentAmount: number,
@@ -266,7 +272,50 @@ export const processPaymentWithReceipt = async (
   rentPaymentId?: string,
   billPaymentId?: string
 ): Promise<any> => {
-  const receiptNumber = `RCP-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-6)}`;
+  // receipts.tenant_id references auth.users(id), so use the authenticated user ID
+  const tenantId = userId;
+
+  const [tenantProfileResult, propertyResult, unitResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', userId)
+      .maybeSingle(),
+    supabase
+      .from('properties')
+      .select('name')
+      .eq('id', propertyId)
+      .maybeSingle(),
+    supabase
+      .from('units')
+      .select('unit_number, property_unit_types(unit_type_name)')
+      .eq('id', unitId)
+      .maybeSingle(),
+  ]);
+
+  const tenantName = [tenantProfileResult.data?.first_name, tenantProfileResult.data?.last_name]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const propertyName = propertyResult.data?.name || null;
+  // @ts-ignore
+  const unitType = unitResult.data?.property_unit_types?.unit_type_name || null;
+  const unitNumber = unitResult.data?.unit_number || null;
+
+  // Generate a unique receipt number using timestamp + random component to avoid collisions
+  const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const receiptNumber = `RCP-${timestamp}-${randomPart}`;
+
+  console.log('💾 Inserting receipt into database:', {
+    receiptNumber,
+    tenantId,
+    userId,
+    propertyId,
+    unitId,
+    amount: paymentAmount,
+    method: paymentMethod
+  });
 
   const { data, error } = await supabase
     .from('receipts')
@@ -274,6 +323,7 @@ export const processPaymentWithReceipt = async (
       {
         receipt_number: receiptNumber,
         tenant_id: tenantId,
+        generated_by: userId,
         property_id: propertyId,
         unit_id: unitId,
         amount_paid: paymentAmount,
@@ -283,6 +333,12 @@ export const processPaymentWithReceipt = async (
         status: 'generated',
         metadata: {
           items,
+          tenant_name: tenantName || null,
+          property_name: propertyName,
+          unit_number: unitNumber,
+          house_number: unitNumber,
+          unit_type: unitType,
+          transaction_reference: transactionReference,
           rent_payment_id: rentPaymentId,
           bill_payment_id: billPaymentId,
         },
@@ -292,8 +348,16 @@ export const processPaymentWithReceipt = async (
     .single();
 
   if (error) {
+    console.error('❌ Receipt insert failed:', {
+      code: (error as any)?.code,
+      message: (error as any)?.message,
+      details: (error as any)?.details,
+      hint: (error as any)?.hint,
+      status: (error as any)?.status
+    });
     throw error;
   }
 
+  console.log('✅ Receipt inserted successfully:', data);
   return data;
 };

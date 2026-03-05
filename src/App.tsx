@@ -106,6 +106,9 @@ import ManagerCaretakerDuties from "@/components/portal/manager/ManagerCaretaker
 import ManagerProfile from "@/components/portal/manager/ManagerProfile";
 import ManagerApprovalRequests from "@/pages/portal/manager/ApprovalRequests";
 import ManagerUtilityReadings from "@/pages/portal/manager/UtilityReadings";
+import BillingAndInvoicing from "@/pages/portal/manager/BillingAndInvoicing";
+import ManagerReceipts from "@/pages/portal/manager/Receipts";
+import { managerRoutes } from "@/pages/portal/manager/routes";
 
 // Create a fallback component in case of import issues
 const GlobalLoader = () => (
@@ -821,6 +824,8 @@ const App = () => {
                   />
                   <Route path="caretaker-duties" element={<ManagerCaretakerDuties />} />
                   <Route path="utilities" element={<ManagerUtilityReadings />} />
+                  <Route path="billing" element={<BillingAndInvoicing />} />
+                  <Route path="receipts" element={<ManagerReceipts />} />
                 </Route>
 
                 {/* TENANT PORTAL ROUTES */}

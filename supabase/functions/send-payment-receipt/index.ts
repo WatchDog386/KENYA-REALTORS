@@ -9,7 +9,10 @@ const corsHeaders = {
 serve(async (req: Request) => {
   // Handle CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    })
   }
 
   try {

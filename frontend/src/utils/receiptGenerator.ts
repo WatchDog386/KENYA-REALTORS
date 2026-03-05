@@ -1,5 +1,5 @@
 // src/utils/receiptGenerator.ts
-// Receipt generation utility for Flutterwave payments
+// Receipt generation utility for payment transactions
 
 export interface ReceiptData {
   receiptNumber: string;

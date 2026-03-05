@@ -229,6 +229,52 @@ const ManagerUtilityReadings = () => {
     return Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
   }
 
+  async function buildLeaseRentByUnit(unitIds: string[]) {
+    if (!unitIds.length) return {} as Record<string, number>;
+
+    const { data: activeTenants, error: tenantError } = await supabase
+      .from('tenants')
+      .select('id, unit_id')
+      .in('unit_id', unitIds)
+      .eq('status', 'active');
+
+    if (tenantError || !activeTenants?.length) {
+      if (tenantError) {
+        console.warn('Unable to fetch active tenants for lease rent lookup:', tenantError);
+      }
+      return {} as Record<string, number>;
+    }
+
+    const tenantIds = activeTenants.map(t => t.id);
+    const tenantUnitMap = new Map(activeTenants.map(t => [t.id, t.unit_id]));
+
+    const { data: leaseRows, error: leaseError } = await supabase
+      .from('tenant_leases')
+      .select('tenant_id, unit_id, rent_amount, updated_at')
+      .in('tenant_id', tenantIds)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false });
+
+    if (leaseError || !leaseRows?.length) {
+      if (leaseError) {
+        console.warn('Unable to fetch active lease rent amounts:', leaseError);
+      }
+      return {} as Record<string, number>;
+    }
+
+    const leaseRentByUnit: Record<string, number> = {};
+    for (const lease of leaseRows) {
+      const unitId = (lease as any).unit_id || tenantUnitMap.get((lease as any).tenant_id);
+      if (!unitId || leaseRentByUnit[unitId] !== undefined) continue;
+      const amount = Math.abs(Number((lease as any).rent_amount) || 0);
+      if (amount > 0) {
+        leaseRentByUnit[unitId] = amount;
+      }
+    }
+
+    return leaseRentByUnit;
+  }
+
   function calculateBills(reading: UtilityReading) {
     const propertyId = reading.property_id || formData.property_id;
     const rentAmount = Math.abs(
@@ -544,6 +590,8 @@ const ManagerUtilityReadings = () => {
         }
 
         // Tenant details for each unit
+        const leaseRentByUnit = await buildLeaseRentByUnit((unitsData || []).map((u: any) => u.id));
+
         let enrichedUnits: Unit[] = [];
         if (unitsData) {
           enrichedUnits = unitsData.map((unit: any) => {
@@ -567,7 +615,7 @@ const ManagerUtilityReadings = () => {
               r => r.unit_id === unit.id
             );
             const latestReading = unitReadings.length > 0 ? unitReadings[0] : undefined;
-            const rentAmount = Math.abs(unit.price || unit.property_unit_types?.price_per_unit || 0);
+            const rentAmount = Math.abs(leaseRentByUnit[unit.id] ?? unit.price ?? unit.property_unit_types?.price_per_unit ?? 0);
             
             let totalBill = 0;
             if (latestReading) {
@@ -842,6 +890,7 @@ const ManagerUtilityReadings = () => {
         water_previous_reading: normalizedReading.water_previous_reading,
         water_current_reading: normalizedReading.water_current_reading,
         water_rate: normalizedReading.water_rate,
+        rent_amount: bills.rentAmount,
         water_bill: bills.waterBill,
         garbage_fee: bills.garbagePrice,
         security_fee: bills.securityPrice,
@@ -885,7 +934,8 @@ const ManagerUtilityReadings = () => {
                   customUtilitiesTotal += Math.abs(Number(val) || 0);
                 });
               }
-              const totalBill = rentAmount + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (updatedReading.other_charges || 0);
+              const readingRent = Math.abs(updatedReading.rent_amount ?? rentAmount);
+              const totalBill = readingRent + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (updatedReading.other_charges || 0);
               return { ...unit, latestReading: updatedReading, totalBill };
             }
             return unit;
@@ -941,7 +991,8 @@ const ManagerUtilityReadings = () => {
                     customUtilitiesTotal += Math.abs(Number(val) || 0);
                   });
                 }
-                const totalBill = rentAmount + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (overwrittenReading.other_charges || 0);
+                const readingRent = Math.abs(overwrittenReading.rent_amount ?? rentAmount);
+                const totalBill = readingRent + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (overwrittenReading.other_charges || 0);
                 return { ...unit, latestReading: overwrittenReading, totalBill };
               }
               return unit;
@@ -982,7 +1033,8 @@ const ManagerUtilityReadings = () => {
                     customUtilitiesTotal += Math.abs(Number(val) || 0);
                   });
                 }
-                const totalBill = rentAmount + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (newReading.other_charges || 0);
+                const readingRent = Math.abs(newReading.rent_amount ?? rentAmount);
+                const totalBill = readingRent + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + (newReading.other_charges || 0);
                 return { ...unit, latestReading: newReading, totalBill };
               }
               return unit;
@@ -1086,6 +1138,8 @@ const ManagerUtilityReadings = () => {
         .in('property_id', propertyIds)
         .order('reading_month', { ascending: false });
 
+      const leaseRentByUnit = await buildLeaseRentByUnit((unitsData || []).map((u: any) => u.id));
+
       let enrichedUnits: Unit[] = [];
       if (unitsData) {
         enrichedUnits = unitsData.map((unit: any) => {
@@ -1105,7 +1159,7 @@ const ManagerUtilityReadings = () => {
 
           const unitReadings = (readingsData || []).filter(r => r.unit_id === unit.id);
           const latestReading = unitReadings.length > 0 ? unitReadings[0] : undefined;
-          const rentAmount = Math.abs(unit.price || unit.property_unit_types?.price_per_unit || 0);
+          const rentAmount = Math.abs(leaseRentByUnit[unit.id] ?? unit.price ?? unit.property_unit_types?.price_per_unit ?? 0);
           
           let totalBill = 0;
           if (latestReading) {
