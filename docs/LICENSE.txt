@@ -1,0 +1,10 @@
+Copyright (c) 2025 Jeff Kamau Ndung'u. All rights reserved.
+
+This software and its source code are the exclusive property of Jeff.
+
+Permission is NOT granted to copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of this software, in whole or in part,
+without explicit written permission from the copyright holder.
+
+Unauthorized use of this code or any portion of it may result in civil
+and criminal penalties.
