@@ -33,6 +33,11 @@ const HomePage = () => {
           <TestimonialsSection />
         </div>
 
+        {/* FAQs Section */}
+        <div className="w-full">
+          <FaqSection />
+        </div>
+
         {/* Apartments Features */}
        
         

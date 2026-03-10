@@ -283,10 +283,10 @@ export default function FAQSection() {
     return (
         <>
         <GlobalStyles />
-        <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-slate-50 md:overflow-hidden font-brand pt-[60px] md:pt-[5rem]">
+        <div className="flex flex-col md:flex-row bg-slate-50 font-brand py-12 md:py-16">
             
             {/* --- SIDEBAR (Desktop Fixed / Mobile Horizontal) --- */}
-            <aside className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-sm md:h-full sticky top-[60px] md:static shrink-0">
+            <aside className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-sm md:h-auto shrink-0">
                 {/* Branding - Hidden on Mobile */}
                 <div className="hidden md:flex h-24 items-center px-8 border-b border-slate-100">
                     <div className="flex flex-col">

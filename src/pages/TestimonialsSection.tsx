@@ -183,7 +183,7 @@ export default function TestimonialsSleek() {
                <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
                  isDrawerOpen 
                  ? "bg-[#F96302]/20 text-white" 
-                 : "bg-[#F96302] text-[#F96302]"
+                 : "bg-white text-[#F96302]"
                }`}>
                  {isDrawerOpen ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                </div>
@@ -194,7 +194,7 @@ export default function TestimonialsSleek() {
 
              {/* Navigation */}
              <div className="flex gap-2">
-               <button onClick={prevSlide} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded border border-gray-200 bg-[#F96302] text-[#64748B] hover:text-[#154279] hover:border-[#F96302] transition-all">
+               <button onClick={prevSlide} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded border border-gray-200 bg-white text-[#64748B] hover:text-[#154279] hover:border-[#F96302] transition-all">
                     <ChevronLeft className="w-4 h-4" />
                </button>
                <button onClick={nextSlide} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded bg-[#154279] text-white hover:bg-[#0f325e] transition-all shadow-lg">
@@ -324,7 +324,7 @@ export default function TestimonialsSleek() {
                {currentPair.map((item) => (
                  <div 
                     key={item.id} 
-                    className="bg-[#F96302] p-5 md:p-8 rounded-lg border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.05)] transition-all duration-500 group relative overflow-hidden"
+                    className="bg-white p-5 md:p-8 rounded-lg border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.05)] transition-all duration-500 group relative overflow-hidden"
                  >
                    {/* Top Row */}
                    <div className="flex justify-between items-start mb-4 md:mb-5">

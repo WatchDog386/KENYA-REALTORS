@@ -562,20 +562,13 @@ export default function AydenTowersListing() {
                             initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            className="lg:col-span-7 h-[280px] lg:h-[380px] relative rounded-none overflow-hidden shadow-2xl border-2 border-slate-300"
+                            className="lg:col-span-7 h-[280px] lg:h-[380px] relative rounded-none overflow-hidden border border-slate-200"
                         >
                             <img
                                 src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1600"
                                 alt="Ayden Home Towers Exterior"
                                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#154279]/80 via-[#154279]/20 to-transparent"></div>
-                            <div className="absolute bottom-6 left-6 text-white z-20">
-                                <div className="text-xl lg:text-4xl font-semibold leading-tight tracking-tight">AYDEN HOME TOWERS</div>
-                                <div className="text-sm font-normal opacity-90 mt-2 flex items-center gap-2">
-                                    <MapPin size={14} className="text-[#F96302]" /> Nairobi West, Kenya
-                                </div>
-                            </div>
                         </motion.div>
 
                         {/* Text Content - No Card */}

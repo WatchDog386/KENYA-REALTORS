@@ -742,20 +742,13 @@ export default function AydenTowersListing() {
                             initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            className="lg:col-span-7 h-[280px] lg:h-[380px] relative rounded-none overflow-hidden shadow-2xl border-2 border-slate-300"
+                            className="lg:col-span-7 h-[280px] lg:h-[380px] relative rounded-none overflow-hidden"
                         >
                             <img
                                 src={heroImage}
                                 alt={heroDescName}
-                                className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                                className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#154279]/80 via-[#154279]/20 to-transparent"></div>
-                            <div className="absolute bottom-6 left-6 text-white z-20">
-                                <div className="text-xl lg:text-4xl font-semibold leading-tight tracking-tight">{heroTitle}</div>
-                                <div className="text-sm font-normal opacity-90 mt-2 flex items-center gap-2">
-                                    <MapPin size={14} className="text-[#F96302]" /> {heroLocation}
-                                </div>
-                            </div>
                         </motion.div>
 
                         {/* Text Content - No Card */}

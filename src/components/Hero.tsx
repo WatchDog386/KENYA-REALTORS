@@ -1185,17 +1185,7 @@ const HomePage = () => {
                 </div>
               )}
             </div>
-          ) : (
-            <div className="mb-6 text-center py-12 bg-white border border-slate-200 rounded-none shadow-md hidden md:block">
-              <div className="flex flex-col items-center gap-4">
-                <MapPin size={40} className="text-red-500" />
-                <div>
-                  <h3 className="text-lg font-bold text-[#154279] mb-2 uppercase tracking-widest">Apply Filters to Search</h3>
-                  <p className="text-sm text-slate-600 font-bold">Use the filters above to find properties by location, amenities, bedrooms, and price</p>
-                </div>
-              </div>
-            </div>
-          )}
+          ) : null}
         </main>
         
         {/* Ayden Design Detail Modal */}
