@@ -62,10 +62,7 @@ const ProtectedRoute = ({ children, role, requireProfile = true }: ProtectedRout
     // Determine user's actual role
     let userRole = user?.role || 'tenant';
     
-    // Special case: fanteskorri36@gmail.com is always admin
-    if (supabaseUser.email === 'fanteskorri36@gmail.com') {
-      userRole = 'admin';
-    }
+    // Role is determined from user profile
     
     console.log('🎯 Role check:', {
       requiredRole: role,
@@ -100,22 +97,22 @@ const ProtectedRoute = ({ children, role, requireProfile = true }: ProtectedRout
       userEmail: supabaseUser.email
     });
 
-    if (userRole === 'admin') {
-      return <Navigate to="/portal/admin" replace />;
+    if (userRole === 'super_admin') {
+      return <Navigate to="/portal/super-admin" replace />;
     } else {
       return <Navigate to="/portal/tenant" replace />;
     }
   }
 
-  // Special case: If admin tries to access tenant dashboard, redirect to admin dashboard
-  if (currentPath === '/portal/tenant' && supabaseUser.email === 'fanteskorri36@gmail.com') {
-    console.log('🔄 Admin trying to access tenant dashboard, redirecting to admin dashboard');
-    return <Navigate to="/portal/admin" replace />;
+  // Special case: If super_admin tries to access tenant dashboard, redirect to super-admin dashboard
+  if (currentPath === '/portal/tenant' && user?.role === 'super_admin') {
+    console.log('🔄 Super admin trying to access tenant dashboard, redirecting to super-admin dashboard');
+    return <Navigate to="/portal/super-admin" replace />;
   }
 
-  // Special case: If tenant tries to access admin dashboard, redirect to tenant dashboard
-  if (currentPath === '/portal/admin' && supabaseUser.email !== 'fanteskorri36@gmail.com' && user?.role !== 'admin') {
-    console.log('🔄 Non-admin trying to access admin dashboard, redirecting to tenant dashboard');
+  // Special case: If tenant tries to access super-admin dashboard, redirect to tenant dashboard
+  if (currentPath === '/portal/super-admin' && user?.role !== 'super_admin') {
+    console.log('🔄 Non-super-admin trying to access super-admin dashboard, redirecting to tenant dashboard');
     return <Navigate to="/portal/tenant" replace />;
   }
 

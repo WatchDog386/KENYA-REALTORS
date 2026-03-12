@@ -25,7 +25,7 @@ const AuthWrapper: React.FC<AuthWrapperProps> = ({ children, requiredRole }) => 
 
   if (requiredRole && user.role !== requiredRole) {
     // Redirect based on user's actual role
-    const redirectPath = user.role === 'admin' ? '/portal/admin' : '/portal/tenant';
+    const redirectPath = user.role === 'super_admin' ? '/portal/super-admin' : '/portal/tenant';
     return <Navigate to={redirectPath} replace />;
   }
 

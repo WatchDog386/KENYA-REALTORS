@@ -69,6 +69,36 @@ const AccountingDashboard = () => {
     await loadDashboardData();
   };
 
+  const handleApprove = async (transactionId: string) => {
+    try {
+      await approveTransaction(transactionId);
+      await loadDashboardData();
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error('Error approving transaction:', error);
+    }
+  };
+
+  const handleReject = async (transactionId: string) => {
+    try {
+      await rejectTransaction(transactionId);
+      await loadDashboardData();
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error('Error rejecting transaction:', error);
+    }
+  };
+
+  const handleProcess = async (transactionId: string) => {
+    try {
+      await processTransaction(transactionId);
+      await loadDashboardData();
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error('Error processing transaction:', error);
+    }
+  };
+
   const filteredTransactions = allTransactions.filter((transaction) => {
     const matchesType = filterType === 'all' || transaction.transaction_type === filterType;
     const matchesSearch =

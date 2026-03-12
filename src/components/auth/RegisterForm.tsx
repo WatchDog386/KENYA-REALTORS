@@ -63,7 +63,7 @@ const RegisterForm: React.FC = () => {
     try {
       await signUp(formData.email, formData.password, {
         full_name: formData.full_name,
-        phone: formData.phone,
+        phone: formData.phone || '',
         role: formData.role,
       });
       
