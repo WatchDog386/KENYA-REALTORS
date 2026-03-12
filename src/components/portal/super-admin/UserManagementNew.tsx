@@ -31,6 +31,7 @@ import {
   Handshake,
   Users2,
   ClipboardList,
+  UserMinus,
 } from "lucide-react";
 import {
   Dialog,
@@ -593,47 +594,52 @@ const UserManagementNew: React.FC = () => {
                           </span>
                         </TableCell>
                         <TableCell className="py-4 text-right pr-6">
-                          <div className="flex items-center justify-end gap-1">
-                            {user.status === 'active' ? (
+                          <div className="flex items-center justify-end gap-2">
+                              {user.status === 'active' ? (
+                                <Button
+                                  onClick={() => handleStatusChange(user.id, 'inactive')}
+                                  className="bg-[#f97316] hover:bg-[#ea580c] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
+                                  title="Suspend Account"
+                                >
+                                  <Ban className="h-3.5 w-3.5" /> Suspend
+                                </Button>
+                              ) : (
+                                <Button
+                                  onClick={() => handleStatusChange(user.id, 'active')}
+                                  className="bg-[#10b981] hover:bg-[#059669] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
+                                  title="Activate Account"
+                                >
+                                  <Play className="h-3.5 w-3.5" /> Activate
+                                </Button>
+                              )}
                               <Button
-                                size="icon"
-                                onClick={() => handleStatusChange(user.id, 'inactive')}
-                                className="h-9 w-9 rounded-lg border border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 hover:border-amber-400 hover:text-amber-700 transition-all shadow-sm"
-                                title="Suspend Account"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setIsAssignDialogOpen(true);
+                                }}
+                                className="bg-[#3b82f6] hover:bg-[#2563eb] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
+                                title="Modify Role"
                               >
-                                <Ban className="h-4 w-4" />
+                                <Edit2 className="h-3.5 w-3.5" /> Edit Role
                               </Button>
-                            ) : (
+                              {user.role && user.role !== 'super_admin' && (
+                                <Button
+                                  onClick={() => handleUnassignUser(user.id, user.role)}
+                                  className="bg-[#eab308] hover:bg-[#ca8a04] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
+                                  title="Unassign"
+                                >
+                                  <UserMinus className="h-3.5 w-3.5" /> Unassign
+                                </Button>
+                              )}
                               <Button
-                                size="icon"
-                                onClick={() => handleStatusChange(user.id, 'active')}
-                                className="h-9 w-9 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:border-emerald-400 hover:text-emerald-700 transition-all shadow-sm"
-                                title="Activate Account"
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="bg-[#ef4444] hover:bg-[#dc2626] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
+                                title="Purge Identity"
                               >
-                                <Play className="h-4 w-4" />
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
                               </Button>
-                            )}
-                            <Button
-                              size="icon"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setIsAssignDialogOpen(true);
-                              }}
-                              className="h-9 w-9 rounded-lg border border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-400 hover:text-blue-700 transition-all shadow-sm"
-                              title="Modify Role"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="h-9 w-9 rounded-lg border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-400 hover:text-red-700 transition-all shadow-sm"
-                              title="Purge Identity"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                            </div>
+                          </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

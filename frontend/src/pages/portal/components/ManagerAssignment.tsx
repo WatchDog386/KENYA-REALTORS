@@ -412,12 +412,13 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
             
             <div className="space-y-2">
                 <Label>Assignment Type</Label>
+                
                 <div className="flex flex-wrap gap-2">
                     <Button
                         type="button"
                         variant={assignmentType === 'property_manager' ? 'default' : 'outline'}
                         onClick={() => setAssignmentType('property_manager')}
-                        className="flex items-center gap-2"
+                        className={`flex items-center gap-2 ${assignmentType !== 'property_manager' ? 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200 border' : ''}`}
                     >
                         <UserPlus className="h-4 w-4" /> Manager
                     </Button>
@@ -425,7 +426,7 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
                         type="button"
                         variant={assignmentType === 'technician' ? 'default' : 'outline'}
                         onClick={() => setAssignmentType('technician')}
-                        className="flex items-center gap-2"
+                        className={`flex items-center gap-2 ${assignmentType !== 'technician' ? 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200 border' : ''}`}
                     >
                         <Wrench className="h-4 w-4" /> Technician
                     </Button>
@@ -433,7 +434,7 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
                         type="button"
                         variant={assignmentType === 'proprietor' ? 'default' : 'outline'}
                         onClick={() => setAssignmentType('proprietor')}
-                        className="flex items-center gap-2"
+                        className={`flex items-center gap-2 ${assignmentType !== 'proprietor' ? 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200 border' : ''}`}
                     >
                         <Building className="h-4 w-4" /> Proprietor
                     </Button>
@@ -441,7 +442,7 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
                         type="button"
                         variant={assignmentType === 'caretaker' ? 'default' : 'outline'}
                         onClick={() => setAssignmentType('caretaker')}
-                        className="flex items-center gap-2"
+                        className={`flex items-center gap-2 ${assignmentType !== 'caretaker' ? 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200 border' : ''}`}
                     >
                         <UserCheck className="h-4 w-4" /> Caretaker
                     </Button>
@@ -452,15 +453,15 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
               <div className="space-y-2">
                 <Label htmlFor="property">Select Property</Label>
                 <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white text-black border-slate-200 focus:ring-blue-100 focus:border-blue-500 border-slate-200">
                     <SelectValue placeholder="Choose a property" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-black">
                     {properties.map((property) => (
-                      <SelectItem key={property.id} value={property.id}>
+                      <SelectItem key={property.id} value={property.id} className="hover:bg-slate-100 cursor-pointer">
                         <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4" />
-                          {property.name}
+                          <Building className="h-4 w-4 text-blue-500" />
+                          <span>{property.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -471,10 +472,10 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
               <div className="space-y-2">
                 <Label htmlFor="user">Select {assignmentType.replace('_', ' ')}</Label>
                 <Select value={selectedUser} onValueChange={setSelectedUser}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white text-black border-slate-200 focus:ring-blue-100 focus:border-blue-500 border-slate-200">
                     <SelectValue placeholder={`Choose a ${assignmentType.replace('_', ' ')}`} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white text-black">
                     {users.length === 0 ? (
                         <div className="p-2 text-sm text-gray-500 text-center">
                           {assignmentType === 'property_manager' ? 'No active property managers found' :
@@ -484,10 +485,10 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
                         </div>
                     ) : (
                         users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
+                        <SelectItem key={user.id} value={user.id} className="hover:bg-slate-100 cursor-pointer">
                             <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            {user.first_name} {user.last_name}
+                            <Users className="h-4 w-4 text-slate-500" />
+                            <span>{user.first_name} {user.last_name}</span>
                             </div>
                         </SelectItem>
                         ))
@@ -500,12 +501,12 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="category">Technician Category</Label>
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white text-black border-slate-200 focus:ring-blue-100 focus:border-blue-500 border-slate-200">
                         <SelectValue placeholder="Select Category" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white text-black">
                         {technicianCategories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
+                          <SelectItem key={cat.id} value={cat.id} className="hover:bg-slate-100 cursor-pointer">
                             {cat.name}
                           </SelectItem>
                         ))}
@@ -520,6 +521,7 @@ const ManagerAssignment: React.FC<ManagerAssignmentProps> = ({
               <Label htmlFor="reason">Assignment Note (Optional)</Label>
               <Textarea
                 id="reason"
+                className="bg-white text-black border-slate-200 focus:ring-blue-100 focus:border-blue-500 border-slate-200 placeholder:text-slate-400"
                 placeholder="Add any notes about this assignment..."
                 value={assignmentReason}
                 onChange={(e) => setAssignmentReason(e.target.value)}

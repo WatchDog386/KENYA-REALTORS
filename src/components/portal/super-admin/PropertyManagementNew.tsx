@@ -55,6 +55,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { Textarea } from "@/components/ui/textarea";
+
 interface Property {
   id: string;
   name: string;
@@ -558,14 +560,14 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
             />
           </div>
           <div className="sm:col-span-2 space-y-2">
-            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-widest text-slate-700">Structural Details</Label>
-            <Input
-              id="description"
-              className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 h-11"
-              placeholder="Operational description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
+            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-widest text-slate-700">Property Details & Notes</Label>
+              <Textarea
+                id="description"
+                className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 min-h-[100px]"
+                placeholder="Enter detailed property information here (e.g. Bank Account details for rent, Paybill number, policies, etc.)"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
           </div>
           <div className="space-y-2">
             <Label htmlFor="type" className="text-xs font-bold uppercase tracking-widest text-slate-700">Classification</Label>

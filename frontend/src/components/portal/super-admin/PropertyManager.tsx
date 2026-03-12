@@ -923,7 +923,7 @@ const PropertyManager: React.FC = () => {
                 <ManagerAssignment propertyId={selectedProperty?.id} showForm={true} />
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAssignManagerDialog(false)}>Close</Button>
+                <Button variant="outline" className="bg-white text-slate-700 hover:bg-slate-50 border border-slate-200" onClick={() => setShowAssignManagerDialog(false)}>Close</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1112,39 +1112,51 @@ const PropertyManager: React.FC = () => {
                                                 Manage Units
                                             </Button>
                                             
-                                            <div className="flex gap-2">
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => handleEditProperty(property)}
-                                                    className="h-9 w-9 text-slate-400 hover:text-[#154279] hover:bg-blue-50 rounded-xl"
-                                                    title="Edit Property"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => {
-                                                        setSelectedProperty(property);
-                                                        setSelectedManagerId(""); // reset selection
-                                                        setShowAssignManagerDialog(true);
-                                                    }}
-                                                    className="h-9 w-9 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl"
-                                                    title="Assign Staff"
-                                                >
-                                                    <UserPlus className="w-4 h-4" />
-                                                </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => handleDeleteProperty(property.id)} 
-                                                    className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl"
-                                                    title="Delete Property"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleEditProperty(property)}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <Pencil className="w-4 h-4 mr-2" />
+                                                Edit Property
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => {
+                                                    setSelectedProperty(property);
+                                                    setSelectedManagerId(""); // reset selection
+                                                    setShowAssignManagerDialog(true);
+                                                }}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <UserPlus className="w-4 h-4 mr-2" />
+                                                Assign Staff
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => {
+                                                    handleViewProperty(property);
+                                                    setTimeout(() => {
+                                                        toast.info("Manage staff inside View Details to unassign specific members");
+                                                    }, 500);
+                                                }}
+                                                className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <UserMinus className="w-4 h-4 mr-2" />
+                                                Unassign Staff
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleDeleteProperty(property.id)} 
+                                                className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Delete Property
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>

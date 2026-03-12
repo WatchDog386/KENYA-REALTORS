@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser, Provider } from "@supabase/supabase-js";
 import { useNavigate, useLocation } from "react-router-dom";
+import { loginActivityService } from "@/services/loginActivityService";
 
 // Available roles
 const AVAILABLE_ROLES = [
@@ -501,6 +502,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (error) {
         console.error("❌ Auth error:", error.message);
+        // Record failed login attempt
+        console.log("📝 [AuthContext] About to call recordFailedLogin with:", {
+          email: trimmedEmail,
+          reason: error.message
+        });
+        const result = await loginActivityService.recordFailedLogin(trimmedEmail, error.message);
+        console.log("📝 [AuthContext] recordFailedLogin returned:", result);
         return {
           success: false,
           error:
@@ -511,10 +519,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (data.user) {
-        console.log("✅ Sign in successful");
+        console.log("✅ Sign in successful for user:", data.user.id, "Email:", data.user.email);
 
         const profile = await fetchUserProfileFromDB(data.user.id);
         setUser(profile);
+
+        // Record successful login
+        if (profile) {
+          console.log("📝 [AuthContext] About to call recordLogin with:", {
+            userId: data.user.id,
+            email: trimmedEmail,
+            role: profile.role
+          });
+          const result = await loginActivityService.recordLogin(
+            data.user.id,
+            trimmedEmail,
+            profile.role || "user"
+          );
+          console.log("📝 [AuthContext] recordLogin returned:", result);
+        } else {
+          console.warn("⚠️ No profile found for user, skipping login record");
+        }
 
         if (profile) {
           handlePostLoginRedirect(profile);
@@ -523,9 +548,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return { success: true };
       }
 
+      // Record authentication failure
+      console.log("📝 Recording authentication failure...");
+      await loginActivityService.recordFailedLogin(trimmedEmail, "Authentication failed");
       return { success: false, error: "Authentication failed" };
     } catch (err: any) {
       console.error("❌ Sign in error:", err);
+      // Record login error
+      await loginActivityService.recordFailedLogin(
+        email.trim().toLowerCase(),
+        err.message || "Sign in failed"
+      );
       return { success: false, error: err.message || "Sign in failed" };
     } finally {
       setIsLoading(false);
@@ -656,6 +689,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signOut = async () => {
     try {
       setIsLoading(true);
+      
+      // Record logout if user exists
+      if (supabaseUser) {
+        console.log("📝 [AuthContext] About to call recordLogout for user:", supabaseUser.id);
+        const result = await loginActivityService.recordLogout(supabaseUser.id);
+        console.log("📝 [AuthContext] recordLogout returned:", result);
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 

@@ -52,6 +52,7 @@ import PropertyDetailsPage from "@/pages/marketplace/PropertyDetailsPage";
    PORTAL PAGES
 ====================== */
 import SuperAdminDashboard from "@/pages/portal/SuperAdminDashboard";
+import SuperAdminReceiptsManagement from "@/pages/portal/super-admin/ReceiptsManagement";
 import SuperAdminUtilities from "@/pages/portal/SuperAdminUtilities";
 import SuperAdminUtilitiesManager from "@/pages/portal/SuperAdminUtilitiesManager";
 import SuperAdminProfilePage from "@/pages/portal/SuperAdminProfilePage";
@@ -750,6 +751,7 @@ const App = () => {
                   <Route path="leases" element={<LeasesManagement />} />
                   <Route path="leases/:id" element={<TenantDetails />} />
                   <Route path="payments" element={<PaymentsManagement />} />
+                  <Route path="receipts" element={<SuperAdminReceiptsManagement />} />
                   <Route path="profile" element={<SuperAdminProfilePage />} />
                   <Route path="refunds" element={<RefundStatusPage />} />
                   <Route path="applications" element={<Applications />} />

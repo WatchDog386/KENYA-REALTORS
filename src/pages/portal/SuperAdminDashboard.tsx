@@ -65,6 +65,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
+import LoginActivityTracker from "@/components/portal/super-admin/LoginActivityTracker";
 
 interface DashboardStats {
   totalProperties: number;
@@ -1014,6 +1015,8 @@ const SuperAdminDashboard = () => {
                   ))}
                 </CardContent>
               </Card>
+
+              <LoginActivityTracker />
 
               <Card className="border-navy/15 overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between">

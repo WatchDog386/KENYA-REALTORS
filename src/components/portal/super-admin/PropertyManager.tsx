@@ -18,6 +18,7 @@ import {
   Calculator,
   ImageIcon,
   UserPlus,
+  UserMinus,
   LayoutGrid,
   Users,
   Eye,
@@ -75,10 +76,10 @@ const PropertyManager: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   // assignedStaff maps propertyId to lists of names
   const [assignedStaff, setAssignedStaff] = useState<Record<string, {
-      managers: string[],
-      technicians: string[],
-      proprietors: string[],
-      caretakers: string[]
+      managers: {id: string, name: string}[],
+      technicians: {id: string, name: string}[],
+      proprietors: {id: string, name: string}[],
+      caretakers: {id: string, name: string}[]
   }>>({});
   const [occupiedUnitsCount, setOccupiedUnitsCount] = useState(0);
   
@@ -121,7 +122,7 @@ const PropertyManager: React.FC = () => {
 
   const fetchAssignedStaff = async () => {
     try {
-      const staffMap: Record<string, { managers: string[], technicians: string[], proprietors: string[], caretakers: string[] }> = {};
+      const staffMap: Record<string, { managers: {id: string, name: string}[], technicians: {id: string, name: string}[], proprietors: {id: string, name: string}[], caretakers: {id: string, name: string}[] }> = {};
 
       const initMap = (propId: string) => {
           if (!staffMap[propId]) {
@@ -138,7 +139,7 @@ const PropertyManager: React.FC = () => {
               const p = profiles?.find((prof: any) => prof.id === m.property_manager_id);
               if (p && m.property_id) {
                   initMap(m.property_id);
-                  staffMap[m.property_id].managers.push(`${p.first_name} ${p.last_name}`);
+                  staffMap[m.property_id].managers.push({ id: m.property_manager_id, name: `${p.first_name} ${p.last_name}` });
               }
           });
       }
@@ -159,7 +160,7 @@ const PropertyManager: React.FC = () => {
                       if (p && t.property_id) {
                           initMap(t.property_id);
                           const cat = (tech.technician_categories as any)?.name || 'Tech';
-                          staffMap[t.property_id].technicians.push(`${p.first_name} ${p.last_name} (${cat})`);
+                          staffMap[t.property_id].technicians.push({ id: t.technician_id, name: `${p.first_name} ${p.last_name} (${cat})` });
                       }
                   }
               });
@@ -182,7 +183,7 @@ const PropertyManager: React.FC = () => {
                        const p = profiles?.find((prof: any) => prof.id === prop.user_id);
                        if (p && pa.property_id) {
                            initMap(pa.property_id);
-                           staffMap[pa.property_id].proprietors.push(`${p.first_name} ${p.last_name}`);
+                           staffMap[pa.property_id].proprietors.push({ id: pa.proprietor_id, name: `${p.first_name} ${p.last_name}` });
                        }
                    }
               });
@@ -198,7 +199,7 @@ const PropertyManager: React.FC = () => {
                const p = profiles?.find((prof: any) => prof.id === c.user_id);
                if (p && c.property_id) {
                    initMap(c.property_id);
-                   staffMap[c.property_id].caretakers.push(`${p.first_name} ${p.last_name}`);
+                   staffMap[c.property_id].caretakers.push({ id: c.user_id, name: `${p.first_name} ${p.last_name}` });
                }
           });
       }
@@ -280,6 +281,30 @@ const PropertyManager: React.FC = () => {
     } finally {
       setSavingProperty(false);
     }
+  };
+
+  const handleUnassignStaff = async (propertyId: string, roleType: 'manager' | 'technician' | 'proprietor' | 'caretaker', recordId: string) => {
+      if (!confirm('Are you sure you want to unassign this staff member?')) return;
+      try {
+          if (roleType === 'manager') {
+              const { error } = await supabase.from('property_manager_assignments').delete().eq('property_id', propertyId).eq('property_manager_id', recordId);
+              if (error) throw error;
+          } else if (roleType === 'technician') {
+              const { error } = await supabase.from('technician_property_assignments').delete().eq('property_id', propertyId).eq('technician_id', recordId);
+              if (error) throw error;
+          } else if (roleType === 'proprietor') {
+              const { error } = await supabase.from('proprietor_properties').delete().eq('property_id', propertyId).eq('proprietor_id', recordId);
+              if (error) throw error;
+          } else if (roleType === 'caretaker') {
+              const { error } = await supabase.from('caretakers').delete().eq('property_id', propertyId).eq('user_id', recordId);
+              if (error) throw error;
+          }
+          toast.success('Staff unassigned successfully');
+          fetchAssignedStaff();
+      } catch (err: any) {
+          console.error('Error unassigning staff:', err);
+          toast.error(err.message || 'Failed to unassign staff');
+      }
   };
 
   const handleDeleteProperty = async (id: string) => {
@@ -830,16 +855,32 @@ const PropertyManager: React.FC = () => {
                   <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 mb-2">Assigned Staff</h3>
                   <div className="space-y-1">
                       {assignedStaff[selectedProperty.id]?.managers?.length > 0 && (
-                          <div className="text-sm text-blue-900"><span className="font-semibold">Managers:</span> {assignedStaff[selectedProperty.id].managers.join(', ')}</div>
+                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Managers:</span> 
+                            {assignedStaff[selectedProperty.id].managers.map((m, i) => (
+                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{m.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'manager', m.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                            ))}
+                          </div>
                       )}
                       {assignedStaff[selectedProperty.id]?.technicians?.length > 0 && (
-                          <div className="text-sm text-blue-900"><span className="font-semibold">Technicians:</span> {assignedStaff[selectedProperty.id].technicians.join(', ')}</div>
+                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Technicians:</span>
+                            {assignedStaff[selectedProperty.id].technicians.map((t, i) => (
+                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{t.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'technician', t.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                            ))}
+                          </div>
                       )}
                       {assignedStaff[selectedProperty.id]?.proprietors?.length > 0 && (
-                          <div className="text-sm text-blue-900"><span className="font-semibold">Proprietors:</span> {assignedStaff[selectedProperty.id].proprietors.join(', ')}</div>
+                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Proprietors:</span>
+                            {assignedStaff[selectedProperty.id].proprietors.map((p, i) => (
+                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{p.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'proprietor', p.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                            ))}
+                          </div>
                       )}
                        {assignedStaff[selectedProperty.id]?.caretakers?.length > 0 && (
-                          <div className="text-sm text-blue-900"><span className="font-semibold">Caretakers:</span> {assignedStaff[selectedProperty.id].caretakers.join(', ')}</div>
+                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Caretakers:</span>
+                            {assignedStaff[selectedProperty.id].caretakers.map((c, i) => (
+                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{c.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'caretaker', c.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                            ))}
+                          </div>
                       )}
                       {(!assignedStaff[selectedProperty.id] || (
                           !assignedStaff[selectedProperty.id].managers.length && 
@@ -1035,7 +1076,7 @@ const PropertyManager: React.FC = () => {
                 <ManagerAssignment propertyId={selectedProperty?.id} showForm={true} />
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setShowAssignManagerDialog(false)}>Close</Button>
+                <Button variant="outline" className="bg-white text-slate-700 hover:bg-slate-50 border border-slate-200" onClick={() => setShowAssignManagerDialog(false)}>Close</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1149,24 +1190,36 @@ const PropertyManager: React.FC = () => {
                                         </CardDescription>
                                     </div>
                                     <div className="flex flex-col gap-1 items-end">
-                                        {assignedStaff[property.id]?.managers?.map((name, i) => (
-                                            <Badge key={`m-${i}`} variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1 w-fit">
-                                                <UserPlus className="w-3 h-3" /> {name}
+                                        {assignedStaff[property.id]?.managers?.map((staff, i) => (
+                                            <Badge key={`m-${i}`} variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center w-fit gap-1 pr-1">
+                                                <UserPlus className="w-3 h-3" /> <span className="mr-1">{staff.name}</span>
+                                                <button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(property.id, 'manager', staff.id); }} className='text-emerald-500 hover:text-emerald-700 hover:bg-emerald-100 rounded p-0.5 transition-colors' title='Unassign'>
+                                                    <UserMinus className="w-3 h-3" />
+                                                </button>
                                             </Badge>
                                         ))}
-                                        {assignedStaff[property.id]?.technicians?.map((name, i) => (
-                                            <Badge key={`t-${i}`} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 w-fit">
-                                                <Users className="w-3 h-3" /> {name}
+                                        {assignedStaff[property.id]?.technicians?.map((staff, i) => (
+                                            <Badge key={`t-${i}`} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center w-fit gap-1 pr-1">
+                                                <Users className="w-3 h-3" /> <span className="mr-1">{staff.name}</span>
+                                                <button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(property.id, 'technician', staff.id); }} className='text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded p-0.5 transition-colors' title='Unassign'>
+                                                    <UserMinus className="w-3 h-3" />
+                                                </button>
                                             </Badge>
                                         ))}
-                                          {assignedStaff[property.id]?.proprietors?.map((name, i) => (
-                                            <Badge key={`p-${i}`} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1 w-fit">
-                                                <Building className="w-3 h-3" /> {name}
+                                          {assignedStaff[property.id]?.proprietors?.map((staff, i) => (
+                                            <Badge key={`p-${i}`} variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 flex items-center w-fit gap-1 pr-1">
+                                                <Building className="w-3 h-3" /> <span className="mr-1">{staff.name}</span>
+                                                <button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(property.id, 'proprietor', staff.id); }} className='text-purple-500 hover:text-purple-700 hover:bg-purple-100 rounded p-0.5 transition-colors' title='Unassign'>
+                                                    <UserMinus className="w-3 h-3" />
+                                                </button>
                                             </Badge>
                                         ))}
-                                        {assignedStaff[property.id]?.caretakers?.map((name, i) => (
-                                            <Badge key={`c-${i}`} variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex items-center gap-1 w-fit">
-                                                <UserPlus className="w-3 h-3" /> {name}
+                                        {assignedStaff[property.id]?.caretakers?.map((staff, i) => (
+                                            <Badge key={`c-${i}`} variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 flex items-center w-fit gap-1 pr-1">
+                                                <UserPlus className="w-3 h-3" /> <span className="mr-1">{staff.name}</span>
+                                                <button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(property.id, 'caretaker', staff.id); }} className='text-orange-500 hover:text-orange-700 hover:bg-orange-100 rounded p-0.5 transition-colors' title='Unassign'>
+                                                    <UserMinus className="w-3 h-3" />
+                                                </button>
                                             </Badge>
                                         ))}
                                         {(!assignedStaff[property.id] || (
@@ -1224,39 +1277,52 @@ const PropertyManager: React.FC = () => {
                                                 Manage Units
                                             </Button>
                                             
-                                            <div className="flex gap-2">
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => handleEditProperty(property)}
-                                                    className="h-9 w-9 text-slate-400 hover:text-[#154279] hover:bg-blue-50 rounded-xl"
-                                                    title="Edit Property"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => {
-                                                        setSelectedProperty(property);
-                                                        setSelectedManagerId(""); // reset selection
-                                                        setShowAssignManagerDialog(true);
-                                                    }}
-                                                    className="h-9 w-9 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl"
-                                                    title="Assign Staff"
-                                                >
-                                                    <UserPlus className="w-4 h-4" />
-                                                </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    onClick={() => handleDeleteProperty(property.id)} 
-                                                    className="h-9 w-9 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl"
-                                                    title="Delete Property"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            </div>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleEditProperty(property)}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <Pencil className="w-4 h-4 mr-2" />
+                                                Edit Property
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => {
+                                                    setSelectedProperty(property);
+                                                    setSelectedManagerId(""); // reset selection
+                                                    setShowAssignManagerDialog(true);
+                                                }}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <UserPlus className="w-4 h-4 mr-2" />
+                                                Assign Staff
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => {
+                                                    handleViewProperty(property);
+                                                    setTimeout(() => {
+                                                        // Inform the user since specific unassignments happen in the staff list
+                                                        toast.info("Manage staff inside View Details to unassign specific members");
+                                                    }, 500);
+                                                }}
+                                                className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <UserMinus className="w-4 h-4 mr-2" />
+                                                Unassign Staff
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                onClick={() => handleDeleteProperty(property.id)} 
+                                                className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl border-none mb-1 h-9"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Delete Property
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>

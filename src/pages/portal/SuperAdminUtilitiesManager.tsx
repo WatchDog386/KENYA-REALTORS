@@ -1,3 +1,4 @@
+import { saveAs } from "file-saver";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
@@ -370,8 +371,8 @@ const SuperAdminUtilitiesManager = () => {
 
       const { data: receiptsData } = await supabase
         .from('receipts')
-        .select('id, tenant_id, unit_id, amount_paid, payment_method, payment_date, transaction_reference, status, metadata, created_at')
-        .order('payment_date', { ascending: false })
+        .select('id, tenant_id, unit_id, amount_paid, payment_method, payment_date, transaction_reference, status, metadata, created_at, receipt_number')
+        .order('payment_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       const latestReceiptByUnit = new Map<string, any>();
@@ -380,167 +381,158 @@ const SuperAdminUtilitiesManager = () => {
         latestReceiptByUnit.set(receipt.unit_id, receipt);
       });
 
-      const { data: readings, error: readingsError } = await supabase
-        .from("utility_readings")
-        .select("*")
-        .order("reading_month", { ascending: false });
-
-      if (readingsError) {
-        if (readingsError.code === 'PGRST116') {
-          setTenantsWithReadings([]);
-          setProperties([]);
-          return;
+            // 1. Fetch all tenants with their units
+      const { data: allTenants, error: tenantsError } = await supabase
+        .from('tenant_leases')
+        .select(`
+          id,
+          user_id:tenant_id,
+          unit_id,
+          status,
+          units:unit_id(unit_number, price, property_id, properties:property_id(name))
+        `)
+        .eq('status', 'active');
+        
+      // Also fetch profiles manually since foreign key from tenants to profiles might not exist directly
+      let profilesMap = new Map();
+      if (allTenants && allTenants.length > 0) {
+        const userIds = [...new Set(allTenants.map(t => t.user_id).filter(Boolean))];
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email, phone')
+            .in('id', userIds);
+          (profiles || []).forEach(p => profilesMap.set(p.id, p));
         }
-        throw readingsError;
       }
 
-      if (!readings || readings.length === 0) {
-        setTenantsWithReadings([]);
-        setProperties([]);
-        return;
+      // 2. Fetch all properties for the filter list
+      const { data: allProperties } = await supabase.from('properties').select('name').order('name');
+      const propertyNamesList = allProperties ? allProperties.map(p => p.name) : [];
+      setProperties(propertyNamesList);
+
+      const { data: readings, error: readingsError } = await supabase
+        .from('utility_readings')
+        .select('*')
+        .order('reading_month', { ascending: false });
+
+      if (readingsError && readingsError.code !== 'PGRST116') {
+        throw readingsError;
       }
 
       const tenantMap = new Map<string, TenantWithReadings>();
 
-      for (const reading of readings) {
-        try {
-          const { data: unit, error: unitError } = await supabase
-            .from("units")
-            .select("unit_number, property_id, price")
-            .eq("id", reading.unit_id)
-            .single();
+      // Initialize all active tenants in the map first
+      if (allTenants) {
+        for (const tenant of allTenants) {
+          if (!tenant.units) continue;
+          
+          const profile = profilesMap.get(tenant.user_id) || {};
+          const unit = Array.isArray(tenant.units) ? tenant.units[0] : tenant.units;
+          const propertyName = unit.properties ? (Array.isArray(unit.properties) ? unit.properties[0].name : unit.properties.name) : 'Unknown Property';
+          if (propertyName === 'Unknown Property') continue;
 
-          if (unitError || !unit) continue;
-
-          const { data: property, error: propertyError } = await supabase
-            .from("properties")
-            .select("name")
-            .eq("id", reading.property_id)
-            .single();
-
-          if (propertyError || !property) continue;
-
-          let tenantName = 'Unknown';
-          let tenantEmail = '';
-          let tenantPhone = '';
-
-          if (reading.tenant_id) {
-            const { data: tenant } = await supabase
-              .from("profiles")
-              .select("first_name, last_name, email, phone")
-              .eq("id", reading.tenant_id)
-              .single();
-
-            if (tenant) {
-              tenantName = tenant.first_name && tenant.last_name
-                ? `${tenant.first_name} ${tenant.last_name}`
-                : 'Unknown Tenant';
-              tenantEmail = tenant.email || '';
-              tenantPhone = tenant.phone || '';
-            }
-          }
-
-          const key = `${reading.tenant_id}-${reading.unit_id}`;
+          const key = `${tenant.user_id}-${tenant.unit_id}`;
           const rentAmount = Number(unit.price || 0);
 
-          const electricityUsage = Math.abs(reading.current_reading - reading.previous_reading);
-          const electricityBill = Number(reading.electricity_bill || (electricityUsage * reading.electricity_rate));
-          const waterUsage = Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0));
-          const waterBill = Number(reading.water_bill || (waterUsage * (reading.water_rate || 0)));
-
-          let customUtilitiesTotal = 0;
-          if (reading.custom_utilities) {
-            Object.values(reading.custom_utilities).forEach((val) => {
-              customUtilitiesTotal += Number(val) || 0;
-            });
-          }
-
-          const utilityTotal =
-            electricityBill +
-            waterBill +
-            Number(reading.garbage_fee || 0) +
-            Number(reading.security_fee || 0) +
-            Number(reading.service_fee || 0) +
-            customUtilitiesTotal +
-            Number(reading.other_charges || 0);
-
-          const billedRentAmount = Math.abs(Number((reading as any).rent_amount || unit.price || 0));
-          const billedUtilityTotal = utilityTotal;
-          const billedInvoiceTotal = billedRentAmount + billedUtilityTotal;
-
-          const calculatedRentDue = rentDueByUnit.get(reading.unit_id) ?? 0;
-          const calculatedUtilityDue = utilityDueByUnit.get(reading.unit_id) ?? 0;
-          const hasRentLedger = rentDueByUnit.has(reading.unit_id);
-          const hasUtilityLedger = utilityDueByUnit.has(reading.unit_id);
-          const outstandingRentDue = hasRentLedger ? calculatedRentDue : billedRentAmount;
-          const outstandingUtilityDue = hasUtilityLedger ? calculatedUtilityDue : billedUtilityTotal;
-          const outstandingTotalDue = Math.max(0, outstandingRentDue + outstandingUtilityDue);
-
-          const invoiceStatus = reading.tenant_id
-            ? latestInvoiceStatusByTenant.get(reading.tenant_id)
-            : undefined;
-          const billStatus = reading.unit_id
-            ? latestBillStatusByUnit.get(reading.unit_id)
-            : undefined;
-          const readingStatus = String(reading.status || '').toLowerCase() === 'paid' ? 'paid' : 'pending';
-          const resolvedStatus: 'pending' | 'paid' =
-            invoiceStatus === 'paid' || billStatus === 'paid' || readingStatus === 'paid'
-              ? 'paid'
-              : 'pending';
-
-          const enrichedReading: UtilityReading = {
-            ...reading,
-            electricity_usage: electricityUsage,
-            electricity_bill: electricityBill,
-            water_bill: waterBill,
-            total_bill: utilityTotal,
-            tenant_name: tenantName,
-            tenant_email: tenantEmail,
-            tenant_phone: tenantPhone,
+          const calculatedRentDue = rentDueByUnit.get(tenant.unit_id) ?? 0;
+          const calculatedUtilityDue = utilityDueByUnit.get(tenant.unit_id) ?? 0;
+          const hasRentLedger = rentDueByUnit.has(tenant.unit_id);
+          const outstandingRentDue = hasRentLedger ? calculatedRentDue : rentAmount;
+          
+          tenantMap.set(key, {
+            tenant_id: tenant.user_id,
+            tenant_name: profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : 'Unknown Tenant',
+            tenant_email: profile.email || '',
+            tenant_phone: profile.phone || '',
             unit_number: unit.unit_number,
-            property_name: property.name,
-          };
+            property_name: propertyName,
+            property_id: unit.property_id,
+            unit_id: tenant.unit_id,
+            rent_amount: rentAmount,
+            utility_total: 0,
+            total_due: rentAmount,
+            status: calculatedRentDue <= 0 && calculatedUtilityDue <= 0 ? 'paid' : 'pending',
+            readings: [],
+            latest_reading: undefined,
+            latest_receipt: latestReceiptByUnit.get(tenant.unit_id),
+          });
+        }
+      }
 
-          if (!tenantMap.has(key)) {
-            tenantMap.set(key, {
-              tenant_id: reading.tenant_id,
-              tenant_name: tenantName,
-              tenant_email: tenantEmail,
-              tenant_phone: tenantPhone,
-              unit_number: unit.unit_number,
-              property_name: property.name,
-              property_id: reading.property_id,
-              unit_id: reading.unit_id,
-              rent_amount: billedRentAmount,
-              utility_total: billedUtilityTotal,
-              total_due: billedInvoiceTotal,
-              status: outstandingTotalDue <= 0 ? 'paid' : resolvedStatus,
-              readings: [enrichedReading],
-              latest_reading: enrichedReading,
-              latest_receipt: latestReceiptByUnit.get(reading.unit_id),
-            });
-          } else {
-            const existing = tenantMap.get(key)!;
-            existing.readings.push(enrichedReading);
-            if (!existing.latest_reading || new Date(enrichedReading.reading_month) > new Date(existing.latest_reading.reading_month)) {
-              existing.latest_reading = enrichedReading;
-              existing.utility_total = billedUtilityTotal;
-              existing.rent_amount = billedRentAmount;
-              existing.total_due = billedInvoiceTotal;
-              existing.status = outstandingTotalDue <= 0 ? 'paid' : resolvedStatus;
-              existing.latest_receipt = latestReceiptByUnit.get(reading.unit_id);
+      if (readings) {
+        for (const reading of readings) {
+          try {
+            const key = `${reading.tenant_id}-${reading.unit_id}`;
+            
+            const electricityUsage = Math.abs(reading.current_reading - reading.previous_reading);
+            const electricityBill = Number(reading.electricity_bill || (electricityUsage * reading.electricity_rate));
+            const waterUsage = Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0));
+            const waterBill = Number(reading.water_bill || (waterUsage * (reading.water_rate || 0)));
+
+            let customUtilitiesTotal = 0;
+            if (reading.custom_utilities) {
+              Object.values(reading.custom_utilities).forEach((val) => {
+                customUtilitiesTotal += Number(val) || 0;
+              });
             }
+
+            const utilityTotal =
+              electricityBill +
+              waterBill +
+              Number(reading.garbage_fee || 0) +
+              Number(reading.security_fee || 0) +
+              Number(reading.service_fee || 0) +
+              customUtilitiesTotal +
+              Number(reading.other_charges || 0);
+
+            const invoiceStatus = reading.tenant_id
+              ? latestInvoiceStatusByTenant.get(reading.tenant_id)
+              : undefined;
+            const billStatus = reading.unit_id
+              ? latestBillStatusByUnit.get(reading.unit_id)
+              : undefined;
+            const readingStatus = String(reading.status || '').toLowerCase() === 'paid' ? 'paid' : 'pending';
+            const resolvedStatus =
+              invoiceStatus === 'paid' || billStatus === 'paid' || readingStatus === 'paid'
+                ? 'paid'
+                : 'pending';
+
+            const enrichedReading: UtilityReading = {
+              ...reading,
+              electricity_usage: electricityUsage,
+              electricity_bill: electricityBill,
+              water_bill: waterBill,
+              total_bill: utilityTotal,
+            };
+
+            const existing = tenantMap.get(key);
+            if (existing) {
+              existing.readings.push(enrichedReading);
+              if (!existing.latest_reading || new Date(enrichedReading.reading_month) > new Date(existing.latest_reading.reading_month)) {
+                existing.latest_reading = enrichedReading;
+                existing.utility_total = utilityTotal;
+                existing.total_due = existing.rent_amount + utilityTotal;
+                // Calculate outstanding if applicable
+                const calculatedRentDue = rentDueByUnit.get(reading.unit_id) ?? 0;
+                const calculatedUtilityDue = utilityDueByUnit.get(reading.unit_id) ?? 0;
+                const outstandingTotalDue = Math.max(0, calculatedRentDue + calculatedUtilityDue);
+                existing.status = outstandingTotalDue <= 0 ? 'paid' : resolvedStatus;
+              }
+            } else {
+              // Ignore old readings without active tenants
+            }
+          } catch (itemError) {
+            console.error('Error processing reading item:', itemError);
+            continue;
           }
-        } catch (itemError) {
-          console.error("Error processing reading item:", itemError);
-          continue;
         }
       }
 
       const tenantList = Array.from(tenantMap.values());
-      const propertyNames = [...new Set(tenantList.map((t) => t.property_name))];
+      const propertyNames = propertyNamesList;
       setTenantsWithReadings(tenantList);
-      setProperties(propertyNames.sort());
+      // setProperties is already called;
     } catch (err: any) {
       console.error("Error fetching readings:", err);
       setError(err.message || "Failed to load utility readings. Please check your database setup.");
@@ -1210,18 +1202,61 @@ const SuperAdminUtilitiesManager = () => {
 
   const downloadReceiptPdf = (tenant: TenantWithReadings) => {
     if (!tenant.latest_receipt) {
-      toast.error('No receipt found yet for this tenant');
+      toast.error("No receipt found yet for this tenant");
       return;
     }
 
-    const receiptData = formatReceiptData(tenant.latest_receipt, {
-      name: 'KENYA REALTORS',
-      address: 'Nairobi, Kenya',
-      phone: '+254 700 000 000',
+    // Attempt to pull exact breakdown from latest reading
+    const items = [];
+    if (tenant.rent_amount > 0) {
+      items.push({ description: "Rent (Fixed from Unit Price)", amount: tenant.rent_amount, type: "rent" });
+    }
+    if (tenant.latest_reading?.electricity_bill !== undefined) {
+      items.push({ description: "Electricity", amount: tenant.latest_reading.electricity_bill, type: "electricity" });
+    }
+    if (tenant.latest_reading?.water_bill !== undefined) {
+      items.push({ description: "Water", amount: tenant.latest_reading.water_bill, type: "water" });
+    }
+    if (tenant.latest_reading?.garbage_fee !== undefined) {
+      items.push({ description: "Garbage", amount: tenant.latest_reading.garbage_fee, type: "garbage" });
+    }
+    if (tenant.latest_reading?.security_fee !== undefined) {
+      items.push({ description: "Security", amount: tenant.latest_reading.security_fee, type: "security" });
+    }
+    if (tenant.latest_reading?.service_fee !== undefined) {
+      items.push({ description: "Service", amount: tenant.latest_reading.service_fee, type: "service" });
+    }
+    if (tenant.latest_reading?.other_charges !== undefined) {
+      items.push({ description: "Other Charges", amount: tenant.latest_reading.other_charges, type: "other" });
+    }
+
+    // Embed missing metadata directly from the tenant object
+    const enrichedReceipt = {
+      ...tenant.latest_receipt,
+      metadata: {
+        ...(tenant.latest_receipt.metadata || {}),
+        items: items, // <--- Injection of items
+        tenant_name: tenant.tenant_name,
+        property_name: tenant.property_name,
+        unit_number: tenant.unit_number || "N/A"
+      }
+    };
+
+    const receiptData = formatReceiptData(enrichedReceipt, {
+      name: "KENYA REALTORS",
+      address: "Nairobi, Kenya",
+      phone: "+254 700 000 000",
     });
 
-    downloadReceiptPDF(receiptData);
-    toast.success('Receipt downloaded successfully');
+    try {
+        const pBlob = generateReceiptPDF(receiptData);
+        const name = tenant.tenant_name ? tenant.tenant_name.replace(/\s+/g, "_") : "N_A";
+        saveAs(pBlob, "Receipt_" + name + "_" + new Date().toISOString().split("T")[0] + ".pdf");
+        toast.success("Receipt downloaded successfully");
+    } catch(err) {
+        console.error("Using fallback download Receipt PDF");
+        downloadReceiptPDF(receiptData);
+    }
   };
 
   const handleSendInvoice = async () => {

@@ -1,0 +1,177 @@
+diff --git a/frontend/src/components/portal/proprietor/ProprietorDashboard.tsx b/frontend/src/components/portal/proprietor/ProprietorDashboard.tsx
+--- a/frontend/src/components/portal/proprietor/ProprietorDashboard.tsx
++++ b/frontend/src/components/portal/proprietor/ProprietorDashboard.tsx
+@@ -19,6 +19,7 @@ import {
+ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+ import { Badge } from '../../../components/ui/badge';
+ import { cn } from "../../../lib/utils";
++import { proprietorService } from "../../../services/proprietorService";
+ 
+ interface ProprietorProfile {
+   id: string;
+@@ -76,28 +77,17 @@ export const ProprietorDashboard: React.FC = () => {
+     try {
+       setLoading(true);
+ 
+-      // Get proprietor profile
+-      const { data: propData, error: propError } = await supabase
+-        .from('proprietors')
+-        .select(`
+-          id,
+-          user_id,
+-          business_name,
+-          status,
+-          properties_count,
+-          profiles:user_id(first_name, last_name, email, phone, avatar_url)
+-        `)
+-        .eq('user_id', authUser?.id)
+-        .single();
+-
+-      if (propError) throw propError;
++      if (!authUser?.id) return;
+ 
+-      const mappedProp = {
+-        ...propData,
+-        profile: propData.profiles
+-      };
++      // Get proprietor profile safely
++      const propData = await proprietorService.getProprietorByUserId(authUser.id);
++      
++      if (!propData) {
++        setLoading(false);
++        return;
++      }
+ 
+-      setProprietor(mappedProp);
++      setProprietor(propData as ProprietorProfile);
+ 
+       // Get owned properties
+       const { data: propsData, error: propsError } = await supabase
+@@ -108,14 +98,16 @@ export const ProprietorDashboard: React.FC = () => {
+           property_id,
+           ownership_percentage,
+           assigned_at,
+-          properties(
+-            id,
+-            name,
+-            location,
+-            status,
+-            total_monthly_rental_expected,
+-            image_url,
+-            units(id, status)
++          property:properties(
++            *,
++            units(*)
+           )
+         `)
+         .eq('proprietor_id', propData.id)
+@@ -124,11 +116,10 @@ export const ProprietorDashboard: React.FC = () => {
+       if (propsError) throw propsError;
+ 
+       const mappedProps = (propsData || []).map((p: any) => {
+-        const property = p.properties;
+-        const allUnits = property?.units || [];
+-        const total_units = allUnits.length;
+-        const occupied_units = allUnits.filter((u: any) => u.status === 'occupied').length;
+-        const monthly_rent = property?.total_monthly_rental_expected || 0;
++        const property = p.property;
++        const total_units = property?.total_units || 0;
++        const occupied_units = property?.occupied_units || 0;
++        const monthly_rent = property?.monthly_rent || property?.total_monthly_rental_expected || 0;
+ 
+         return {
+           ...p,
+diff --git a/frontend/src/pages/portal/proprietor/ProprietorDashboard.tsx b/frontend/src/pages/portal/proprietor/ProprietorDashboard.tsx
+--- a/frontend/src/pages/portal/proprietor/ProprietorDashboard.tsx
++++ b/frontend/src/pages/portal/proprietor/ProprietorDashboard.tsx
+@@ -19,6 +19,7 @@ import {
+ import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+ import { Badge } from '../../../components/ui/badge';
+ import { cn } from "../../../lib/utils";
++import { proprietorService } from "../../../services/proprietorService";
+ 
+ interface ProprietorProfile {
+   id: string;
+@@ -76,28 +77,17 @@ export const ProprietorDashboard: React.FC = () => {
+     try {
+       setLoading(true);
+ 
+-      // Get proprietor profile
+-      const { data: propData, error: propError } = await supabase
+-        .from('proprietors')
+-        .select(`
+-          id,
+-          user_id,
+-          business_name,
+-          status,
+-          properties_count,
+-          profiles:user_id(first_name, last_name, email, phone, avatar_url)
+-        `)
+-        .eq('user_id', authUser?.id)
+-        .single();
++      if (!authUser?.id) return;
+ 
+-      if (propError) throw propError;
+-
+-      const mappedProp = {
+-        ...propData,
+-        profile: propData.profiles
+-      };
++      // Get proprietor profile safely
++      const propData = await proprietorService.getProprietorByUserId(authUser.id);
++      
++      if (!propData) {
++        setLoading(false);
++        return;
++      }
+ 
+-      setProprietor(mappedProp);
++      setProprietor(propData as ProprietorProfile);
+ 
+       // Get owned properties
+       const { data: propsData, error: propsError } = await supabase
+@@ -108,27 +98,33 @@ export const ProprietorDashboard: React.FC = () => {
+           property_id,
+           ownership_percentage,
+           assigned_at,
+-          properties(
+-            id,
+-            name,
+-            location,
+-            status,
+-            total_monthly_rental_expected,
+-            image_url,
+-            units(id, status)
++          property:properties(
++            *,
++            units(*)
+           )
+         `)
+-        .eq('proprietor_id', propData.id)
+-        .eq('is_active', true);
++        .eq('proprietor_id', propData.id);
++
++      console.log("propsData:", propsData, "propsError:", propsError, "proprietorId:", propData.id);
+ 
+       if (propsError) throw propsError;
+ 
+       const mappedProps = (propsData || []).map((p: any) => {
+-        const property = p.properties;
+-        const allUnits = property?.units || [];
+-        const total_units = allUnits.length;
+-        const occupied_units = allUnits.filter((u: any) => u.status === 'occupied').length;
+-        const monthly_rent = property?.total_monthly_rental_expected || 0;
++        const property = p.property;
++        
++        let total_units = 0;
++        let occupied_units = 0;
++        let monthly_rent = 0;
++        
++        if (property?.units && Array.isArray(property.units)) {
++          total_units = property.units.length;
++          occupied_units = property.units.filter((u: any) => u.status === 'occupied').length;
++          monthly_rent = property.units.reduce((sum: number, u: any) => sum + (Number(u.price) || 0), 0);
++        }
+ 
+         return {
+           ...p,

@@ -54,6 +54,7 @@ interface Receipt {
   payment_method: string;
   status: string;
   metadata?: any;
+  pending_balance?: number;
   generated_by: string;
   created_at: string;
   tenant?: { first_name?: string; last_name?: string; email?: string };
@@ -93,8 +94,31 @@ const SuperAdminReceiptsManagement = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      const { data: rentData } = await supabase.from('rent_payments').select('unit_id, amount, amount_paid, status').neq('status', 'paid');
+      const { data: utilityData } = await supabase.from('bills_and_utilities').select('unit_id, amount, paid_amount, status').neq('status', 'paid');
+      
+      const balances = new Map();
+      
+      (rentData || []).forEach(r => {
+         if (!r.unit_id) return;
+         const amt = Number(r.amount) || 0;
+         const paid = Number(r.amount_paid) || 0;
+         balances.set(r.unit_id, (balances.get(r.unit_id) || 0) + Math.max(0, amt - paid));
+      });
+      (utilityData || []).forEach(u => {
+         if (!u.unit_id) return;
+         const amt = Number(u.amount) || 0;
+         const paid = Number(u.paid_amount) || 0;
+         balances.set(u.unit_id, (balances.get(u.unit_id) || 0) + Math.max(0, amt - paid));
+      });
 
-      setReceipts(data || []);
+      const enhancedData = (data || []).map(r => ({
+          ...r,
+          pending_balance: (r.metadata?.balance_due != null ? Number(r.metadata?.balance_due) : balances.get(r.unit_id)) || 0
+      }));
+
+      setReceipts(enhancedData);
 
       // Calculate stats
       const stats = {
@@ -230,9 +254,15 @@ const SuperAdminReceiptsManagement = () => {
               <tbody>
                 ${itemsHTML}
                 <tr class="total-row">
-                  <td>Total Amount</td>
+                  <td>Total Amount Paid</td>
                   <td style="text-align: right;" class="total-amount">
                     KSh ${parseFloat(receipt.amount_paid.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+                <tr style="background-color: #fff1f2; font-weight: bold; color: #e11d48;">
+                  <td>Pending Arrears / Balance Due</td>
+                  <td style="text-align: right;">
+                    KSh ${parseFloat((receipt.pending_balance || 0).toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               </tbody>
@@ -484,6 +514,10 @@ const SuperAdminReceiptsManagement = () => {
                 <div>
                   <p className="text-sm text-gray-600">Status</p>
                   {getStatusBadge(selectedReceipt.status)}
+                </div>
+                <div>
+                  <p className="text-sm text-red-600 font-semibold">Arrears / Pending</p>
+                  <p className="font-bold text-red-600">{formatCurrency(selectedReceipt.pending_balance || 0)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Payment Date</p>

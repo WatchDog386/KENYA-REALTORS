@@ -131,11 +131,11 @@ export const useSuperAdmin = () => {
           .select("*")
           .order("created_at", { ascending: false }),
 
-        // Recent activities from audit logs
+        // Recent activities from login_activity
         supabase
-          .from("audit_logs")
+          .from("login_activity")
           .select("*")
-          .order("created_at", { ascending: false })
+          .order("login_timestamp", { ascending: false })
           .limit(10),
 
         // Maintenance requests
@@ -216,10 +216,10 @@ export const useSuperAdmin = () => {
       const activities: RecentActivity[] = (activitiesData.data || []).map(
         (log) => ({
           id: log.id,
-          action: log.action,
-          user: log.user_id ? `User ${log.user_id.substring(0, 8)}` : "System",
-          time: formatRelativeTime(log.created_at),
-          type: mapEntityToType(log.resource_type),
+          action: `${log.login_status === 'success' ? 'Successful' : 'Failed'} Login (${log.role || 'user'})`,
+          user: log.email || (log.user_id ? `User ${log.user_id.substring(0, 8)}` : "System"),
+          time: formatRelativeTime(log.login_timestamp || log.created_at || new Date().toISOString()),
+          type: "system",
         })
       );
 

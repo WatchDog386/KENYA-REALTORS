@@ -2,7 +2,6 @@
 // Utility for generating PDF receipts for successful payments
 
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ReceiptItem {
@@ -38,169 +37,102 @@ export interface ReceiptData {
  */
 export const generateReceiptPDF = (data: ReceiptData): Blob => {
   const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 20;
-  let yPosition = margin;
+  const receiptNumber = data.receiptNumber || "RCP-" + new Date().getFullYear();
+  const paidDate = new Date(data.paidDate || new Date()).toLocaleDateString();
+  const primaryColor = [21, 66, 121];
 
-  // Set default font
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(0, 0, 210, 50, "F");
 
-  // Header section
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.companyName || 'PROPERTY MANAGEMENT SYSTEM', margin, yPosition);
-  
-  yPosition += 8;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  
-  if (data.companyAddress) {
-    doc.text(data.companyAddress, margin, yPosition);
-    yPosition += 5;
-  }
-  
-  if (data.companyPhone) {
-    doc.text(`Phone: ${data.companyPhone}`, margin, yPosition);
-    yPosition += 5;
-  }
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.8);
+  doc.rect(12, 10, 30, 30);
 
-  // Receipt title
-  yPosition += 5;
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('PAYMENT RECEIPT', margin, yPosition);
-
-  // Receipt number and date
-  yPosition += 10;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  
-  doc.text(`Receipt #: ${data.receiptNumber}`, margin, yPosition);
-  yPosition += 5;
-  doc.text(`Date: ${new Date(data.paidDate).toLocaleDateString()}`, margin, yPosition);
-
-  // Separator line
-  yPosition += 8;
-  doc.setDrawColor(100, 100, 100);
-  doc.line(margin, yPosition, pageWidth - margin, yPosition);
-
-  // Tenant information section
-  yPosition += 8;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('TENANT INFORMATION', margin, yPosition);
-
-  yPosition += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(`Name: ${data.tenantName}`, margin, yPosition);
-
-  yPosition += 5;
-  doc.text(`Property: ${data.propertyName}`, margin, yPosition);
-
-  yPosition += 5;
-  doc.text(`Unit: ${data.unitNumber}`, margin, yPosition);
-
-  // Payment details section
-  yPosition += 8;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('PAYMENT DETAILS', margin, yPosition);
-
-  // Create table for payment details
-  const tableData = [
-    ['Description', 'Amount'],
-    ['Rent Payment', `KES ${parseFloat(data.amount.toString()).toFixed(2)}`],
-  ];
-
-  (doc as any).autoTable({
-    startY: yPosition + 6,
-    head: [tableData[0]],
-    body: [tableData[1]],
-    margin: { left: margin, right: margin },
-    styles: {
-      fontSize: 9,
-      cellPadding: 4,
-    },
-    headStyles: {
-      fillColor: [66, 139, 202],
-      textColor: 255,
-      fontStyle: 'bold',
-    },
-  });
-
-  yPosition = (doc as any).lastAutoTable.finalY + 10;
-
-  // Total amount (highlighted)
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  const totalText = `TOTAL PAID: KES ${parseFloat(data.amount.toString()).toFixed(2)}`;
-  const textWidth = doc.getTextWidth(totalText);
-  
-  doc.setDrawColor(66, 139, 202);
-  doc.rect(
-    pageWidth - margin - textWidth - 8,
-    yPosition - 5,
-    textWidth + 8,
-    8,
-    'F'
-  );
-  
   doc.setTextColor(255, 255, 255);
-  doc.text(totalText, pageWidth - margin - textWidth - 4, yPosition);
-  
-  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(17);
+  doc.setFont(undefined, "bold");
+  doc.text(data.companyName || "KENYA REALTORS", 48, 18);
+  doc.setFontSize(10);
+  doc.setFont(undefined, "normal");
+  doc.text("Billing and Invoicing Department", 48, 25);
+  doc.text(data.companyAddress || "Nairobi, Kenya", 48, 31);
 
-  // Additional details
-  yPosition += 12;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(22);
+  doc.text("RECEIPT", 154, 20);
+  doc.setFontSize(9.5);
+  doc.setFont(undefined, "normal");
+  doc.text("Receipt #: " + receiptNumber, 144, 29);
+  doc.text("Payment Date: " + paidDate, 144, 34.5);
+  doc.text("Ref: " + (data.transactionReference || "N/A"), 144, 40);
 
-  const detailsStartY = yPosition;
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(9.5);
+  doc.text("Received From", 16, 66);
+  doc.text("Payment Details", 112, 66);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(8.5);
+  doc.text(data.tenantName || "N/A", 16, 73);
+  doc.text("Unit " + (data.unitNumber || "N/A") + " • " + (data.propertyName || "N/A"), 16, 78);
+  doc.text("Method: " + (data.paymentMethod || "N/A"), 112, 73);
+  doc.text("Currency: KES", 112, 78);
+
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(12, 90, 186, 10, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, "bold");
+  doc.text("Description", 16, 97);
+  doc.text("Amount", 180, 97, { align: "right" });
+
+  let y = 108;
+  doc.setTextColor(30, 41, 59);
+  doc.setFont(undefined, "normal");
   
-  if (data.invoiceDate) {
-    doc.text(`Invoice Date: ${new Date(data.invoiceDate).toLocaleDateString()}`, margin, yPosition);
-    yPosition += 5;
+  const formatAmount = (amt: number) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES" }).format(amt || 0);
+
+  if (data.items && data.items.length > 0) {
+    data.items.forEach((item: any) => {
+      doc.text(item.description, 16, y);
+      doc.text(formatAmount(item.amount), 180, y, { align: "right" });
+      doc.setDrawColor(226, 232, 240);
+      doc.line(12, y + 4, 198, y + 4);
+      y += 10;
+    });
+    // add small padding buffer
+    y += 5;
+  } else {
+    doc.text("Payment Received", 16, y);
+    doc.text(formatAmount(Number(data.amount)), 180, y, { align: "right" });
+    doc.setDrawColor(226, 232, 240);
+    doc.line(12, y + 4, 198, y + 4);
+    y += 15;
   }
 
-  if (data.dueDate) {
-    doc.text(`Due Date: ${new Date(data.dueDate).toLocaleDateString()}`, margin, yPosition);
-    yPosition += 5;
-  }
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(120, y + 6, 78, 22, 2, 2, "F");
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFontSize(11);
+  doc.setFont(undefined, "bold");
+  doc.text("TOTAL PAID:", 124, y + 20);
+  doc.text(amountStr, 194, y + 20, { align: "right" });
 
-  doc.text(`Payment Method: ${data.paymentMethod}`, margin, yPosition);
-  yPosition += 5;
-  
-  doc.text(`Transaction Reference: ${data.transactionReference}`, margin, yPosition);
+  const footerY = 270;
+  doc.setDrawColor(226, 232, 240);
+  doc.line(12, footerY - 5, 198, footerY - 5);
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("KENYA REALTORS", 105, footerY, { align: "center" });
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Thank you for your payment!", 105, footerY + 6, { align: "center" });
+  doc.text("Generated: " + new Date().toLocaleDateString(), 105, footerY + 12, { align: "center" });
 
-  // Footer
-  yPosition = pageHeight - margin - 15;
-  doc.setDrawColor(100, 100, 100);
-  doc.line(margin, yPosition, pageWidth - margin, yPosition);
-
-  yPosition += 5;
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.text(
-    'This is a receipt for your rent payment. Keep it for your records.',
-    margin,
-    yPosition,
-    { align: 'center', maxWidth: pageWidth - 2 * margin }
-  );
-
-  yPosition += 5;
-  doc.text(
-    `Generated on ${new Date().toLocaleString()}`,
-    margin,
-    yPosition,
-    { align: 'center', maxWidth: pageWidth - 2 * margin }
-  );
-
-  // Return as blob
-  return doc.output('blob');
+  return doc.output("blob");
 };
 
 /**
