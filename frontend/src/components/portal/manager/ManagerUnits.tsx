@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Search, Loader2, Plus, X, Check, Users, Camera, Upload, Edit, FileText, Image as ImageIcon, Building2, Layers, Maximize, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Building, Search, Loader2, Plus, X, Check, Users, Camera, Upload, Edit, FileText, Image as ImageIcon, Building2, Layers, Maximize, AlertTriangle, CheckCircle2, ArrowRight, LayoutGrid, List, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +57,7 @@ interface UnitType {
   name: string;
   price_per_unit: number;
   unit_category: string;
+  property_id?: string;
 }
 
 interface TenantProfile {
@@ -75,8 +76,14 @@ const ManagerUnits = () => {
   const [tenants, setTenants] = useState<TenantProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterProperty, setFilterProperty] = useState<string>('all');
+  const [filterUnitType, setFilterUnitType] = useState<string>('all');
+  const [filterPriceRange, setFilterPriceRange] = useState<string>('all');
   const [propertyId, setPropertyId] = useState<string>('');
   const [propertyName, setPropertyName] = useState<string>('');
+  const [properties, setProperties] = useState<{id: string, name: string}[]>([]);
+  const [expandedProps, setExpandedProps] = useState<Record<string, boolean>>({});
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -254,12 +261,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     loadUnits();
   }, [user?.id, id]);
 
-  const fetchUnitTypes = async (propId: string) => {
+  const fetchUnitTypes = async (propIds: string[]) => {
     try {
         const { data: types, error } = await supabase
         .from('property_unit_types')
         .select('*')
-        .eq('property_id', propId);
+        .in('property_id', propIds);
         
         if (error) {
             console.error('Error fetching unit types:', error);
@@ -271,7 +278,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 id: t.id,
                 name: t.name || t.unit_type_name || 'Unknown Type',
                 price_per_unit: t.price_per_unit || 0,
-                unit_category: t.unit_category || 'residential'
+                unit_category: t.unit_category || 'residential',
+                property_id: t.property_id
             }));
             setUnitTypes(mappedTypes);
         }
@@ -353,44 +361,51 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     try {
       setLoading(true);
       
-      let targetPropertyId = id;
+      let targetPropertyIds: string[] = [];
 
-      // If no ID in URL, get the first assigned property
-      if (!targetPropertyId) {
-        const { data: assignment, error: assignError } = await supabase
+      // If no ID in URL, get all assigned properties
+      if (id) {
+        targetPropertyIds = [id];
+      } else {
+        const { data: assignments, error: assignError } = await supabase
           .from('property_manager_assignments')
           .select('property_id')
-          .eq('property_manager_id', user.id)
-          .single();
+          .eq('property_manager_id', user.id);
 
         if (assignError && assignError.code !== 'PGRST116') {
           console.error("Assignment error:", assignError);
         }
         
-        if (assignment) {
-          targetPropertyId = assignment.property_id;
+        if (assignments && assignments.length > 0) {
+          targetPropertyIds = assignments.map(a => a.property_id);
         }
       }
 
-      if (!targetPropertyId) {
+      if (targetPropertyIds.length === 0) {
         toast.info('No property assigned to you yet');
         setLoading(false);
         return;
       }
 
-      setPropertyId(targetPropertyId);
-      fetchUnitTypes(targetPropertyId);
-
-      // Fetch property name
+      // Fetch property names
       const { data: propData } = await supabase
         .from('properties')
-        .select('name')
-        .eq('id', targetPropertyId)
-        .single();
+        .select('id, name')
+        .in('id', targetPropertyIds);
       
       if (propData) {
-        setPropertyName(propData.name);
+        setProperties(propData);
+        const expandedState: Record<string, boolean> = {};
+        propData.forEach(p => { expandedState[p.id] = true; });
+        setExpandedProps(expandedState);
+
+        if (propData.length > 0) {
+          setPropertyId(propData[0].id);
+          setPropertyName(propData[0].name);
+        }
       }
+
+      fetchUnitTypes(targetPropertyIds);
 
       // Fetch tenants
       const { data: tenantData } = await supabase
@@ -412,7 +427,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 status
             )
         `)
-        .eq('property_id', targetPropertyId)
+        .in('property_id', targetPropertyIds)
         .order('unit_number', { ascending: true });
 
       if (error) {
@@ -420,7 +435,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       }
 
       // Re-fetch types to manually join if needed (more robust against schema naming issues)
-      const { data: typeData } = await supabase.from('property_unit_types').select('*').eq('property_id', targetPropertyId);
+      const { data: typeData } = await supabase.from('property_unit_types').select('*').in('property_id', targetPropertyIds);
       
       if (data) {
         // Map leases and types
@@ -442,7 +457,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 id: uType.id,
                 name: uType.name || uType.unit_type_name || 'Standard',
                 price_per_unit: uType.price_per_unit || 0,
-                unit_category: uType.unit_category || 'residential'
+                unit_category: uType.unit_category || 'residential',
+                property_id: uType.property_id
             } : undefined;
 
             return { 
@@ -451,6 +467,18 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 property_unit_types: u.property_unit_types || mappedType // Use join from DB if it worked, or manual fallback
             };
         });
+        
+        // Sort units by floor then by unit number (natural sort)
+        unitsWithDetails.sort((a: any, b: any) => {
+          const aFloor = String(a.floor_number || 'G');
+          const bFloor = String(b.floor_number || 'G');
+          const floorOrder: { [key: string]: number } = { 'B5': -5, 'B4': -4, 'B3': -3, 'B2': -2, 'B1': -1, 'B': -1, 'G': 0, 'M': 0.5 };
+          const aFloorNum = floorOrder[aFloor] ?? parseInt(aFloor) ?? 0;
+          const bFloorNum = floorOrder[bFloor] ?? parseInt(bFloor) ?? 0;
+          if (aFloorNum !== bFloorNum) return aFloorNum - bFloorNum;
+          return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
         setUnits(unitsWithDetails);
       }
     } catch (err) {
@@ -580,9 +608,98 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       }
   };
 
-  const filteredUnits = units.filter(unit =>
-    unit.unit_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Handle Unassign Tenant from Unit
+  const handleUnassignTenant = async () => {
+      if(!selectedUnit || !selectedUnit.active_lease) {
+          toast.error("No tenant assigned to this unit");
+          return;
+      }
+      
+      if (!window.confirm("Are you sure you want to unassign this tenant from the unit? This will end their lease.")) {
+          return;
+      }
+      
+      try {
+          setSavingUnit(true);
+          const tenantId = selectedUnit.active_lease.tenant_id;
+          const leaseId = selectedUnit.active_lease.id;
+          
+          console.log("🔹 Starting tenant unassignment...", { tenantId, unitId: selectedUnit.id, leaseId });
+          
+          // 1. Update the lease status to 'terminated' instead of deleting
+          console.log("📝 Terminating lease...");
+          const { error: leaseError } = await supabase
+              .from('tenant_leases')
+              .update({ 
+                  status: 'terminated',
+                  end_date: new Date().toISOString()
+              })
+              .eq('id', leaseId);
+          
+          if(leaseError) throw leaseError;
+          console.log("✅ Lease terminated");
+          
+          // 2. Clear the tenant's unit assignment
+          console.log("📝 Clearing tenant unit assignment...");
+          const { error: tenantError } = await supabase
+              .from('tenants')
+              .update({
+                  unit_id: null,
+                  status: 'inactive',
+                  move_out_date: new Date().toISOString()
+              })
+              .eq('user_id', tenantId);
+          
+          if(tenantError) {
+              console.warn("Warning: Could not update tenant record:", tenantError);
+          } else {
+              console.log("✅ Tenant record updated");
+          }
+          
+          // 3. Update unit status back to 'vacant'
+          console.log("🔄 Updating unit status to vacant...");
+          const { error: unitError } = await supabase
+              .from('units')
+              .update({ status: 'vacant' })
+              .eq('id', selectedUnit.id);
+          
+          if(unitError) throw unitError;
+          console.log("✅ Unit status updated to vacant");
+          
+          toast.success("Tenant unassigned successfully");
+          setIsDetailsOpen(false);
+          loadUnits();
+      } catch(e: any) {
+          console.error("❌ Unassignment error:", e);
+          toast.error("Failed to unassign tenant: " + (e.message || JSON.stringify(e)));
+      } finally {
+          setSavingUnit(false);
+      }
+  };
+
+  const filteredUnits = units.filter(unit => {
+    const matchesSearch = unit.unit_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesProperty = filterProperty === 'all' || unit.property_id === filterProperty;
+    const matchesUnitType = filterUnitType === 'all' || unit.unit_type_id === filterUnitType;
+    
+    let matchesPrice = true;
+    if (filterPriceRange !== 'all') {
+      const price = unit.price || unitTypes.find(t => t.id === unit.unit_type_id)?.price_per_unit || 0;
+      if (filterPriceRange === '0-10000') matchesPrice = price < 10000;
+      else if (filterPriceRange === '10000-20000') matchesPrice = price >= 10000 && price <= 20000;
+      else if (filterPriceRange === '20000-50000') matchesPrice = price > 20000 && price <= 50000;
+      else if (filterPriceRange === '50000+') matchesPrice = price > 50000;
+    }
+
+    return matchesSearch && matchesProperty && matchesUnitType && matchesPrice;
+  });
+
+  const toggleProperty = (propId: string) => {
+    setExpandedProps(prev => ({
+      ...prev,
+      [propId]: !prev[propId]
+    }));
+  };
 
   const getStatusColor = (status: string) => {
     const s = status?.toLowerCase();
@@ -603,14 +720,32 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               <div className="p-2 bg-blue-100 rounded-lg">
                   <Building className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-4xl font-bold text-slate-800">Units {propertyName && `- ${propertyName}`}</h1>
+              <h1 className="text-4xl font-bold text-slate-800">Properties & Units</h1>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200" onClick={() => setIsAddUnitOpen(true)}>
-              <Plus size={16} className="mr-2" />
-              Add Unit
-            </Button>
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center bg-white border border-slate-200 rounded-lg p-1">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-slate-100 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-100 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  title="List View"
+                >
+                  <List size={18} />
+                </button>
+              </div>
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200" onClick={() => setIsAddUnitOpen(true)}>
+                <Plus size={16} className="mr-2" />
+                Add Unit
+              </Button>
+            </div>
           </div>
-          <p className="text-slate-500 ml-1">Manage all units in your property</p>
+          <p className="text-slate-500 ml-1">Manage all units across your properties</p>
         </div>
 
         {/* Add Unit Dialog */}
@@ -623,6 +758,24 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="property_id" className="text-slate-700">Property <span className="text-red-500">*</span></Label>
+                <Select 
+                    value={propertyId} 
+                    onValueChange={(val) => setPropertyId(val)}
+                >
+                  <SelectTrigger className="bg-white border-slate-200 focus:ring-blue-500">
+                    <SelectValue placeholder="Select property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {properties.map((prop) => (
+                      <SelectItem key={prop.id} value={prop.id}>
+                        {prop.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="unit_number" className="text-slate-700">Unit Number <span className="text-red-500">*</span></Label>
@@ -657,14 +810,14 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                     <SelectValue placeholder="Select unit type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {unitTypes.map((type) => (
+                    {unitTypes.filter(t => !propertyId || t.property_id === propertyId).map((type) => (
                       <SelectItem key={type.id} value={type.id}>
                         {type.name} ({type.unit_category}) - {type.price_per_unit?.toLocaleString()} KES
                       </SelectItem>
                     ))}
-                    {unitTypes.length === 0 && (
+                    {unitTypes.filter(t => !propertyId || t.property_id === propertyId).length === 0 && (
                         <div className="p-2 text-sm text-slate-500 text-center">
-                            No unit types found. Please ask admin to create property unit types first.
+                            No unit types found for this property.
                         </div>
                     )}
                   </SelectContent>
@@ -1102,7 +1255,16 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             }}
                                             className="w-full bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 font-semibold"
                                         >
-                                            Manage Lease
+                                            Reassign Tenant
+                                        </Button>
+                                        
+                                        <Button 
+                                            variant="outline" 
+                                            onClick={handleUnassignTenant}
+                                            disabled={savingUnit}
+                                            className="w-full bg-white text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-semibold"
+                                        >
+                                            {savingUnit ? 'Unassigning...' : 'Unassign Tenant'}
                                         </Button>
                                     </div>
                                 ) : ( // Vacant State
@@ -1128,15 +1290,56 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             </DialogContent>
         </Dialog>
 
-        {/* Search Bar */}
-        <div className="mb-6 relative">
-          <Search size={16} className="text-slate-400 absolute left-3 top-3" />
-          <Input
-            className="pl-9"
-            placeholder="Search units by number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+{/* Search & Filters */}
+        <div className="mb-6 flex flex-col xl:flex-row gap-4">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={16} className="text-slate-400 absolute left-3 top-3" /> 
+            <Input
+              className="pl-9 w-full bg-white"
+              placeholder="Search units by number..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 overflow-x-auto pb-1">
+              <Select value={filterProperty} onValueChange={setFilterProperty}>
+                <SelectTrigger className="w-full sm:w-[180px] bg-white text-slate-700">
+                  <SelectValue placeholder="All Properties" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Properties</SelectItem>
+                  {properties.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterUnitType} onValueChange={setFilterUnitType}>
+                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {unitTypes.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterPriceRange} onValueChange={setFilterPriceRange}>
+                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                  <SelectValue placeholder="Price Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any Price</SelectItem>
+                  <SelectItem value="0-10000">Under 10,000</SelectItem>
+                  <SelectItem value="10000-20000">10,000 - 20,000</SelectItem>
+                  <SelectItem value="20000-50000">20,000 - 50,000</SelectItem>
+                  <SelectItem value="50000+">50,000+</SelectItem>
+                </SelectContent>
+              </Select>
+          </div>
         </div>
 
         {loading ? (
@@ -1147,6 +1350,140 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <Building className="w-16 h-16 mx-auto mb-4 opacity-30 text-slate-400" />
             <p className="text-slate-600 text-lg">No units found</p>
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px] font-bold">
+                  <tr>
+                    <th className="px-6 py-4">Unit</th>
+                    <th className="px-6 py-4">Type & Category</th>
+                    <th className="px-6 py-4">Floor</th>
+                    <th className="px-6 py-4">Rent (KES)</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredUnits.map(unit => {
+                    const unitType = unitTypes.find(t => t.id === unit.unit_type_id);
+                    const displayStatus = (unit.active_lease ? 'occupied' : unit.status)?.toLowerCase() || 'vacant';
+                    const isOccupied = displayStatus === 'occupied';
+                    const isVacant = displayStatus === 'vacant' || displayStatus === 'available';
+
+                    return (
+                      <tr key={unit.id} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => openDetails(unit)}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                {unit.image_url ? (
+                                    <img src={unit.image_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <Building2 className="w-5 h-5 text-slate-400" />
+                                )}
+                            </div>
+                            <span className="font-extrabold text-slate-800 text-base">{unit.unit_number}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-700">{unitType?.name || 'Unknown Type'}</span>
+                            <span className="text-xs text-slate-500">{unitType?.unit_category || 'Std'}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge variant="outline" className="bg-slate-50 text-slate-600 font-medium">
+                            {unit.floor_number ? `Floor ${unit.floor_number}` : 'Ground'}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-blue-600">{(unit.price || unitType?.price_per_unit || 0).toLocaleString()}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {isOccupied ? (
+                              <Badge className="bg-blue-100 text-blue-700 border-none font-semibold px-2.5 py-0.5">
+                                  Occupied
+                              </Badge>
+                          ) : isVacant ? (
+                              <Badge className="bg-emerald-100 text-emerald-700 border-none font-semibold px-2.5 py-0.5">
+                                  Vacant
+                              </Badge>
+                          ) : (
+                              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-none font-semibold px-2.5 py-0.5">
+                                  {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                              </Badge>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                            {isOccupied && unit.active_lease ? (
+                                <>
+                                    <Button 
+                                        variant="outline" size="sm"
+                                        className="h-8 text-xs bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                        onClick={() => openDetails(unit)}
+                                    >
+                                        View
+                                    </Button>
+                                    <Button 
+                                        size="sm"
+                                        className="h-8 text-xs bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm border-b-2 border-emerald-700 active:translate-y-[1px] active:border-b-0"
+                                        onClick={() => { 
+                                            setSelectedUnit(unit);
+                                            setSelectedTenant(unit.active_lease!.tenant_id);
+                                            setIsAssignOpen(true);
+                                        }}
+                                    >
+                                        Manage
+                                    </Button>
+                                </>
+                            ) : displayStatus === 'maintenance' ? (
+                                <>
+                                    <Button 
+                                        variant="outline" size="sm"
+                                        className="h-8 text-xs bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
+                                        onClick={() => openDetails(unit)}
+                                    >
+                                        Details
+                                    </Button>
+                                    <Button 
+                                        size="sm"
+                                        className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
+                                        onClick={() => openDetails(unit)}
+                                    >
+                                        Resolve
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <Button 
+                                        variant="outline" size="sm"
+                                        className="h-8 text-xs bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
+                                        onClick={() => openDetails(unit)}
+                                    >
+                                        Details
+                                    </Button>
+                                    <Button 
+                                        size="sm"
+                                        className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
+                                        onClick={() => { 
+                                            setSelectedUnit(unit);
+                                            setIsAssignOpen(true);
+                                        }}
+                                    >
+                                        Assign
+                                    </Button>
+                                </>
+                             )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">

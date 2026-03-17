@@ -1,5 +1,6 @@
 // src/pages/HomePage.tsx
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
   Star,
@@ -788,13 +789,13 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                 
                 <div className="w-8 md:w-12 h-1 bg-[#F96302] mb-3 md:mb-4"></div>
                 
-                <p className="text-xs md:text-sm text-white/80 font-medium mb-4 md:mb-6 leading-relaxed max-w-[550px] hidden md:block line-clamp-1">
-                  {currentSlide.description.substring(0, 80)}...
+                <p className="text-xs md:text-sm text-white/80 font-medium mb-4 md:mb-6 leading-relaxed max-w-[550px] ">
+                  {currentSlide.description}
                 </p>
                 
                 <button 
                   className="bg-[#F96302] text-white font-bold py-2 px-5 md:py-3 md:px-8 hover:bg-[#d85502] transition-all shadow-lg flex items-center justify-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.2em]" 
-                  onClick={() => onCardClick(currentSlide)}
+                  onClick={() => navigate('/features')}
                 >
                   View This Listing <ChevronRight size={14} className="md:w-4 md:h-4" />
                 </button>
@@ -811,6 +812,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
 // MAIN COMPONENT
 // ==========================================
 const HomePage = () => {
+  const navigate = useNavigate();
   const [previewListing, setPreviewListing] = useState<any>(null);
   const [activeSlideId, setActiveSlideId] = useState<number>(0);
   const [activeListingId, setActiveListingId] = useState<number | null>(null);
@@ -916,11 +918,10 @@ const HomePage = () => {
           status,
           property_id,
           unit_type_id,
-          property_unit_types!units_unit_type_id_fkey(
+          property_unit_types(
             id,
             unit_type_name,
-            price_per_unit,
-            unit_category
+            price_per_unit
           )
         `);
 

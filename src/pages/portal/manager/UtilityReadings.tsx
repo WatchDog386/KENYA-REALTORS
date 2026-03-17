@@ -890,7 +890,6 @@ const ManagerUtilityReadings = () => {
         water_previous_reading: normalizedReading.water_previous_reading,
         water_current_reading: normalizedReading.water_current_reading,
         water_rate: normalizedReading.water_rate,
-        rent_amount: bills.rentAmount,
         water_bill: bills.waterBill,
         garbage_fee: bills.garbagePrice,
         security_fee: bills.securityPrice,

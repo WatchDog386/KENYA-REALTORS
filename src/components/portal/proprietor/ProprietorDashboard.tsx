@@ -106,14 +106,14 @@ export const ProprietorDashboard: React.FC = () => {
           property_id,
           ownership_percentage,
           assigned_at,
-          properties(
+          property:properties(
             id,
             name,
             location,
             status,
-            total_monthly_rental_expected,
+            
             image_url,
-            units(id, status)
+            units(id, status, price)
           )
         `)
         .eq('proprietor_id', propData.id)
@@ -122,11 +122,12 @@ export const ProprietorDashboard: React.FC = () => {
       if (propsError) throw propsError;
 
       const mappedProps = (propsData || []).map((p: any) => {
-        const property = p.properties;
+        const property = p.property;
         const allUnits = property?.units || [];
         const total_units = allUnits.length;
         const occupied_units = allUnits.filter((u: any) => u.status === 'occupied').length;
-        const monthly_rent = property?.total_monthly_rental_expected || 0;
+        const monthly_rent = property?.total_monthly_rental_expected || 
+          allUnits.reduce((sum: number, u: any) => sum + (Number(u.price) || 0), 0);
 
         return {
           ...p,

@@ -28,7 +28,8 @@ import {
   KeyRound,
   Hash,
   Layers,
-  ChevronUp
+  ChevronUp,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,21 @@ interface PropertyUnit {
   property_unit_types?: { unit_type_name?: string; name?: string; price_per_unit?: number };
 }
 
+interface FilterOptions {
+  unitTypes: string[];
+  unitNumbers: string[];
+  priceRanges: { label: string; min: number; max: number }[];
+  properties: string[];
+}
+
+const PRICE_RANGES = [
+  { label: 'Under 10,000', min: 0, max: 10000 },
+  { label: '10,000 - 20,000', min: 10000, max: 20000 },
+  { label: '20,000 - 30,000', min: 20000, max: 30000 },
+  { label: '30,000 - 50,000', min: 30000, max: 50000 },
+  { label: 'Over 50,000', min: 50000, max: Infinity }
+];
+
 const ManagerProperties = () => {
   const [properties, setProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +95,20 @@ const ManagerProperties = () => {
   // Track expanded properties in hierarchy view
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [propertyUnitsCache, setPropertyUnitsCache] = useState<{ [propertyId: string]: PropertyUnit[] }>({});
+
+  // Advanced filter state
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    unitTypes: [],
+    unitNumbers: [],
+    priceRanges: [],
+    properties: []
+  });
+  const [selectedFilters, setSelectedFilters] = useState({
+    unitTypes: [] as string[],
+    unitNumbers: [] as string[],
+    priceRanges: [] as string[],
+    propertyNames: [] as string[]
+  });
 
   const [stats, setStats] = useState({
     totalProperties: 0,
@@ -99,6 +129,47 @@ const ManagerProperties = () => {
   useEffect(() => {
     fetchProperties();
     fetchMaintenanceCount();
+  }, []);
+
+  // Build filter options from properties and their units
+  const buildFilterOptions = useCallback(async (propertiesData: any[]) => {
+    const unitTypes = new Set<string>();
+    const unitNumbers = new Set<string>();
+    const propertyNames = new Set<string>();
+
+    for (const property of propertiesData) {
+      propertyNames.add(property.name);
+
+      // Fetch units for this property to extract unit types and numbers
+      try {
+        const { data: units, error } = await supabase
+          .from('property_units')
+          .select('unit_number, property_unit_types(unit_type_name)')
+          .eq('property_id', property.id);
+
+        if (!error && units) {
+          units.forEach((unit: any) => {
+            unitNumbers.add(unit.unit_number);
+            if ((unit.property_unit_types as any)?.unit_type_name) {
+              unitTypes.add((unit.property_unit_types as any).unit_type_name);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching units for filter options:', err);
+      }
+    }
+
+    setFilterOptions({
+      unitTypes: Array.from(unitTypes).sort(),
+      unitNumbers: Array.from(unitNumbers).sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      }),
+      priceRanges: PRICE_RANGES,
+      properties: Array.from(propertyNames).sort()
+    });
   }, []);
 
   const fetchUnitsForProperty = useCallback(async (propertyId: string) => {
@@ -228,8 +299,11 @@ const ManagerProperties = () => {
       const data = await getAssignedProperties();
       setProperties(data || []);
 
-      // Calculate stats
+      // Build filter options from the fetched properties
       if (data && data.length > 0) {
+        await buildFilterOptions(data);
+
+        // Calculate stats
         const totalProperties = data.length;
         const totalUnits = data.reduce((sum, prop) => sum + (prop.total_units || 0), 0);
         const occupiedUnits = data.reduce((sum, prop) => sum + (prop.occupied_units || 0), 0);
@@ -269,11 +343,64 @@ const ManagerProperties = () => {
     }
   };
 
-  const filteredProperties = properties.filter(property => 
-    property.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    property.city?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProperties = properties.filter(property => {
+    // Basic search query filter
+    const matchesSearch = property.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      property.city?.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    // Property name filter
+    if (selectedFilters.propertyNames.length > 0 && 
+        !selectedFilters.propertyNames.includes(property.name)) {
+      return false;
+    }
+
+    // If no unit filters applied, show the property
+    if (selectedFilters.unitTypes.length === 0 && 
+        selectedFilters.unitNumbers.length === 0 && 
+        selectedFilters.priceRanges.length === 0) {
+      return true;
+    }
+
+    // Unit filters are applied - check if property has matching units
+    const cachedUnits = propertyUnitsCache[property.id];
+    
+    // If units are cached, check for matches
+    if (cachedUnits && cachedUnits.length > 0) {
+      const hasMatchingUnit = cachedUnits.some(unit => {
+        // Check unit type
+        if (selectedFilters.unitTypes.length > 0) {
+          const unitType = (unit.property_unit_types as any)?.unit_type_name;
+          if (!selectedFilters.unitTypes.includes(unitType)) return false;
+        }
+
+        // Check unit number
+        if (selectedFilters.unitNumbers.length > 0) {
+          if (!selectedFilters.unitNumbers.includes(unit.unit_number)) return false;
+        }
+
+        // Check price range
+        if (selectedFilters.priceRanges.length > 0) {
+          const price = unit.price || (unit.property_unit_types as any)?.price_per_unit || 0;
+          const matchesPrice = selectedFilters.priceRanges.some(rangeName => {
+            const range = PRICE_RANGES.find(r => r.label === rangeName);
+            return range && price >= range.min && price <= range.max;
+          });
+          if (!matchesPrice) return false;
+        }
+
+        return true;
+      });
+
+      return hasMatchingUnit;
+    }
+
+    // No cached units yet - show property (will be filtered once user expands or caches load)
+    // This allows showing all properties until user interacts with filters
+    return true;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -289,6 +416,26 @@ const ManagerProperties = () => {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const toggleFilter = (filterType: keyof typeof selectedFilters, value: string) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      [filterType]: prev[filterType].includes(value)
+        ? prev[filterType].filter(v => v !== value)
+        : [...prev[filterType], value]
+    }));
+  };
+
+  const clearAllFilters = () => {
+    setSelectedFilters({
+      unitTypes: [],
+      unitNumbers: [],
+      priceRanges: [],
+      propertyNames: []
+    });
+  };
+
+  const hasActiveFilters = Object.values(selectedFilters).some(filter => filter.length > 0);
 
   const deleteProperty = async (propertyId: string) => {
     if (!confirm('Are you sure you want to deactivate this property?')) return;
@@ -547,11 +694,6 @@ const ManagerProperties = () => {
   /* ──────────────────────────────────────────────
      PROPERTIES LIST VIEW (top-level)
   ────────────────────────────────────────────── */
-  const filteredProperties = properties.filter(property =>
-    property.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    property.address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    property.city?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -722,6 +864,187 @@ const ManagerProperties = () => {
             </div>
           </div>
         </CardHeader>
+
+        {/* Advanced Filters Section */}
+        {(filterOptions.unitTypes.length > 0 || filterOptions.unitNumbers.length > 0 || filterOptions.properties.length > 0) && (
+          <div className="px-6 pb-4 border-b bg-gray-50/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-4 h-4 text-gray-600" />
+              <h3 className="font-semibold text-sm text-gray-700">Filter Properties</h3>
+              {hasActiveFilters && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={clearAllFilters}
+                  className="ml-auto h-7 text-xs text-[#00356B]"
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {/* Property Name Filter */}
+              {filterOptions.properties.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">Property</label>
+                  <select
+                    multiple
+                    size={1}
+                    onClick={(e) => {
+                      const target = e.target as HTMLSelectElement;
+                      Array.from(target.options).forEach(option => {
+                        if (option.selected) {
+                          toggleFilter('propertyNames', option.value);
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-[#00356B]"
+                  >
+                    {filterOptions.properties.map(prop => (
+                      <option key={prop} value={prop}>
+                        {prop}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Unit Type Filter */}
+              {filterOptions.unitTypes.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">Unit Type</label>
+                  <select
+                    multiple
+                    size={1}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-[#00356B]"
+                    onChange={(e) => {
+                      Array.from(e.target.options).forEach(option => {
+                        if (option.selected && !selectedFilters.unitTypes.includes(option.value)) {
+                          toggleFilter('unitTypes', option.value);
+                        } else if (!option.selected && selectedFilters.unitTypes.includes(option.value)) {
+                          toggleFilter('unitTypes', option.value);
+                        }
+                      });
+                    }}
+                    value={selectedFilters.unitTypes}
+                  >
+                    {filterOptions.unitTypes.map(type => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Unit Number Filter */}
+              {filterOptions.unitNumbers.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">Unit Number</label>
+                  <select
+                    multiple
+                    size={1}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-[#00356B]"
+                    onChange={(e) => {
+                      Array.from(e.target.options).forEach(option => {
+                        if (option.selected && !selectedFilters.unitNumbers.includes(option.value)) {
+                          toggleFilter('unitNumbers', option.value);
+                        } else if (!option.selected && selectedFilters.unitNumbers.includes(option.value)) {
+                          toggleFilter('unitNumbers', option.value);
+                        }
+                      });
+                    }}
+                    value={selectedFilters.unitNumbers}
+                  >
+                    {filterOptions.unitNumbers.map(num => (
+                      <option key={num} value={num}>
+                        Unit {num}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Price Range Filter */}
+              <div>
+                <label className="text-xs font-medium text-gray-600 block mb-2">Price Range</label>
+                <select
+                  multiple
+                  size={1}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-[#00356B]"
+                  onChange={(e) => {
+                    Array.from(e.target.options).forEach(option => {
+                      if (option.selected && !selectedFilters.priceRanges.includes(option.value)) {
+                        toggleFilter('priceRanges', option.value);
+                      } else if (!option.selected && selectedFilters.priceRanges.includes(option.value)) {
+                        toggleFilter('priceRanges', option.value);
+                      }
+                    });
+                  }}
+                  value={selectedFilters.priceRanges}
+                >
+                  {PRICE_RANGES.map(range => (
+                    <option key={range.label} value={range.label}>
+                      {range.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Active Filter Tags */}
+            {hasActiveFilters && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedFilters.propertyNames.map(prop => (
+                  <Badge key={prop} variant="outline" className="text-xs">
+                    {prop}
+                    <button
+                      onClick={() => toggleFilter('propertyNames', prop)}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {selectedFilters.unitTypes.map(type => (
+                  <Badge key={type} variant="outline" className="text-xs">
+                    {type}
+                    <button
+                      onClick={() => toggleFilter('unitTypes', type)}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {selectedFilters.unitNumbers.map(num => (
+                  <Badge key={num} variant="outline" className="text-xs">
+                    Unit {num}
+                    <button
+                      onClick={() => toggleFilter('unitNumbers', num)}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {selectedFilters.priceRanges.map(range => (
+                  <Badge key={range} variant="outline" className="text-xs">
+                    {range}
+                    <button
+                      onClick={() => toggleFilter('priceRanges', range)}
+                      className="ml-1 hover:text-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <CardContent>
           {filteredProperties.length === 0 ? (
             <div className="text-center py-12">
@@ -1196,294 +1519,6 @@ const ManagerProperties = () => {
           open={selectedPropertyForCaretaker !== null}
           onOpenChange={(open) => { if (!open) setSelectedPropertyForCaretaker(null); }}
           onAssignmentChanged={() => { setSelectedPropertyForCaretaker(null); fetchProperties(); }}
-        />
-      )}
-    </div>
-  );
-};
-
-export default ManagerProperties;
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Properties</CardTitle>
-            <Building className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProperties}</div>
-            <p className="text-xs text-gray-500">Assigned</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Units</CardTitle>
-            <Home className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalUnits}</div>
-            <p className="text-xs text-gray-500">All units</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Occupied</CardTitle>
-            <Users className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.occupiedUnits}</div>
-            <p className="text-xs text-gray-500">Currently occupied</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
-            <p className="text-xs text-gray-500">From occupied units</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Occupancy</CardTitle>
-            <BarChart3 className="h-4 w-4 text-indigo-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.occupancyRate.toFixed(1)}%</div>
-            <p className="text-xs text-gray-500">Current rate</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Maintenance</CardTitle>
-            <Wrench className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.maintenanceCount}</div>
-            <p className="text-xs text-gray-500">Pending requests</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle>Properties List</CardTitle>
-              <CardDescription>
-                {filteredProperties.length} of {properties.length} properties
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search properties..."
-                  className="pl-9 w-full sm:w-64"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredProperties.length > 0 ? (
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[300px]">Property</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="text-center">Units</TableHead>
-                    <TableHead>Rent</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProperties.map((property) => (
-                    <TableRow key={property.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <Building className="w-6 h-6 text-blue-600" />
-                          </div>
-                          <div>
-                            <Link to={`/portal/manager/properties/${property.id}`} className="font-medium hover:text-blue-600">
-                              {property.name}
-                            </Link>
-                            <p className="text-sm text-gray-500">
-                              {property.property_type} • {property.tenants?.length || 0} tenants
-                            </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          <div>
-                            <p className="font-medium">{property.city}</p>
-                            <p className="text-sm text-gray-500 truncate max-w-[150px]">{property.address}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="font-bold">{property.occupied_units || 0}/{property.total_units || 0}</span>
-                          <span className="text-xs text-gray-500">occupied/total</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-bold">{formatCurrency(property.monthly_rent || 0)}</div>
-                        <p className="text-xs text-gray-500">per unit/month</p>
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(property.status)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button size="sm" variant="ghost" asChild>
-                            <Link to={`/portal/manager/properties/${property.id}`}>
-                              <Eye className="w-4 h-4" />
-                            </Link>
-                          </Button>
-                          <Button size="sm" variant="ghost" asChild>
-                            <Link to={`/portal/manager/properties/${property.id}/edit`}>
-                              <Edit className="w-4 h-4" />
-                            </Link>
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem asChild>
-                                <Link to={`/portal/manager/properties/${property.id}/tenants`}>
-                                  View Tenants
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link to={`/portal/manager/properties/${property.id}/maintenance`}>
-                                  View Maintenance
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link to={`/portal/manager/properties/${property.id}/payments`}>
-                                  View Payments
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuLabel className="text-xs">Assign Staff</DropdownMenuLabel>
-                              <DropdownMenuItem 
-                                onClick={() => setSelectedPropertyForProprietor(property.id)}
-                              >
-                                <Briefcase className="w-4 h-4 mr-2" />
-                                Assign Proprietor
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => setSelectedPropertyForTechnician(property.id)}
-                              >
-                                <Wrench className="w-4 h-4 mr-2" />
-                                Assign Technician
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => setSelectedPropertyForCaretaker(property.id)}
-                              >
-                                <Hammer className="w-4 h-4 mr-2" />
-                                Assign Caretaker
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {property.is_active ? (
-                                <DropdownMenuItem 
-                                  onClick={() => deleteProperty(property.id)}
-                                  className="text-red-600"
-                                >
-                                  Deactivate Property
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem 
-                                  onClick={() => activateProperty(property.id)}
-                                  className="text-green-600"
-                                >
-                                  Activate Property
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No properties found</h3>
-              <p className="text-gray-500 mb-6">
-                {searchQuery ? 'Try a different search term' : 'No properties assigned to you yet'}
-              </p>
-              <Button asChild>
-                <Link to="/portal/manager/properties/new">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Your First Property
-                </Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Assignment Dialogs */}
-      {selectedPropertyForProprietor !== null && (
-        <ProprietorAssignmentDialog
-          propertyId={selectedPropertyForProprietor}
-          open={selectedPropertyForProprietor !== null}
-          onOpenChange={(open) => {
-            if (!open) setSelectedPropertyForProprietor(null);
-          }}
-          onAssignmentChanged={() => {
-            setSelectedPropertyForProprietor(null);
-            fetchProperties();
-          }}
-        />
-      )}
-
-      {selectedPropertyForTechnician !== null && (
-        <TechnicianAssignmentDialog
-          propertyId={selectedPropertyForTechnician}
-          open={selectedPropertyForTechnician !== null}
-          onOpenChange={(open) => {
-            if (!open) setSelectedPropertyForTechnician(null);
-          }}
-          onAssignmentChanged={() => {
-            setSelectedPropertyForTechnician(null);
-            fetchProperties();
-          }}
-        />
-      )}
-
-      {selectedPropertyForCaretaker !== null && (
-        <CaretakerAssignmentDialog
-          propertyId={selectedPropertyForCaretaker}
-          open={selectedPropertyForCaretaker !== null}
-          onOpenChange={(open) => {
-            if (!open) setSelectedPropertyForCaretaker(null);
-          }}
-          onAssignmentChanged={() => {
-            setSelectedPropertyForCaretaker(null);
-            fetchProperties();
-          }}
         />
       )}
     </div>

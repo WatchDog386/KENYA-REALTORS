@@ -1192,7 +1192,7 @@ const SuperAdminUtilitiesManager = () => {
     doc.setFontSize(8);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(100, 116, 139);
-    doc.text('support@kenyarealtors.com  •  +254 700 000 000  •  www.kenyarealtors.com', 105, footerY + 6, { align: 'center' });
+    doc.text('support@kenyarealtors.com  •  0711493222  •  www.kenyarealtors.com', 105, footerY + 6, { align: 'center' });
     doc.text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 105, footerY + 12, { align: 'center' });
 
     const fileName = `Invoice_${draft.tenant.tenant_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -1245,7 +1245,7 @@ const SuperAdminUtilitiesManager = () => {
     const receiptData = formatReceiptData(enrichedReceipt, {
       name: "KENYA REALTORS",
       address: "Nairobi, Kenya",
-      phone: "+254 700 000 000",
+      phone: "0711493222",
     });
 
     try {

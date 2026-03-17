@@ -420,12 +420,10 @@ export default function AydenTowersListing() {
                         status,
                         property_id,
                         unit_type_id,
-                        property_unit_types!units_unit_type_id_fkey(
+                        property_unit_types(
                             id,
                             unit_type_name,
-                            unit_category,
-                            price_per_unit,
-                            property_id
+                            price_per_unit
                         )
                     `)
                     .eq('status', 'available')

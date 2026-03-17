@@ -47,7 +47,7 @@ export const TechniciansList: React.FC<TechniciansListProps> = ({ propertyId }) 
             status,
             average_rating,
             total_jobs_completed,
-            category:technician_categories(name),
+            category:technician_categories:category_id(name),
             profile:profiles(first_name, last_name, email, phone, avatar_url)
           )
         `)

@@ -106,10 +106,11 @@ export const ProprietorDashboard: React.FC = () => {
           property_id,
           ownership_percentage,
           assigned_at,
-          properties(
+          property:properties(
             id,
             name,
             location,
+            type,
             status,
             image_url,
             units(id, status, price)
@@ -121,7 +122,7 @@ export const ProprietorDashboard: React.FC = () => {
       if (propsError) throw propsError;
 
       const mappedProps = (propsData || []).map((p: any) => {
-        const property = p.properties;
+        const property = p.property;
         const allUnits = property?.units || [];
         const total_units = allUnits.length;
         const occupied_units = allUnits.filter((u: any) => u.status === 'occupied').length;

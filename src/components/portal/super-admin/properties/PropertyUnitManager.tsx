@@ -79,7 +79,7 @@ interface PropertyUnitManagerProps {
 interface Unit {
   id: string;
   unit_number: string;
-  floor_number: number;
+  floor_number: string | number;
   unit_type_id: string;
   price: number | null;
   status: string;
@@ -160,7 +160,17 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       toast.error("Failed to fetch units");
       console.error(error);
     } else {
-      setUnits(data || []);
+      const parsed = data || [];
+        parsed.sort((a: any, b: any) => {
+          const aFloor = String(a.floor_number || 'G');
+          const bFloor = String(b.floor_number || 'G');
+          const floorOrder: { [key: string]: number } = { 'B5': -5, 'B4': -4, 'B3': -3, 'B2': -2, 'B1': -1, 'B': -1, 'G': 0, 'M': 0.5 };
+          const aFloorNum = floorOrder[aFloor] ?? parseInt(aFloor) ?? 0;
+          const bFloorNum = floorOrder[bFloor] ?? parseInt(bFloor) ?? 0;
+          if (aFloorNum !== bFloorNum) return aFloorNum - bFloorNum;
+          return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true, sensitivity: 'base' });
+        });
+        setUnits(parsed);
     }
     setLoading(false);
   };
@@ -495,7 +505,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
      setEditingUnit({
          id: '',
          unit_number: '',
-         floor_number: 1,
+         floor_number: '1',
          unit_type_id: '',
          price: 0,
          status: 'available',
@@ -1183,12 +1193,34 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                      </div>
                      <div className="space-y-2">
                             <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Floor</Label>
-                            <Input 
-                                type="number" 
-                                value={editingUnit?.floor_number ?? ''} 
-                                onChange={(e) => setEditingUnit(prev => ({...prev!, floor_number: Number(e.target.value)}))} 
-                                className="font-bold bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg h-10"
-                            />
+                            <Select 
+                                value={String(editingUnit?.floor_number ?? '')} 
+                                onValueChange={(val) => setEditingUnit(prev => ({...prev!, floor_number: val}))}
+                            >
+                                <SelectTrigger className="font-bold bg-slate-50 border-slate-200 focus:ring-[#154279] rounded-lg h-10">
+                                    <SelectValue placeholder="Select floor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="G">Ground Floor (G)</SelectItem>
+                                    <SelectItem value="M">Mezzanine (M)</SelectItem>
+                                    <SelectItem value="1">Floor 1</SelectItem>
+                                    <SelectItem value="2">Floor 2</SelectItem>
+                                    <SelectItem value="3">Floor 3</SelectItem>
+                                    <SelectItem value="4">Floor 4</SelectItem>
+                                    <SelectItem value="5">Floor 5</SelectItem>
+                                    <SelectItem value="6">Floor 6</SelectItem>
+                                    <SelectItem value="7">Floor 7</SelectItem>
+                                    <SelectItem value="8">Floor 8</SelectItem>
+                                    <SelectItem value="9">Floor 9</SelectItem>
+                                    <SelectItem value="10">Floor 10</SelectItem>
+                                    <SelectItem value="B">Basement (Select Level Below)</SelectItem>
+                                    <SelectItem value="B1">Basement 1 (B1)</SelectItem>
+                                    <SelectItem value="B2">Basement 2 (B2)</SelectItem>
+                                    <SelectItem value="B3">Basement 3 (B3)</SelectItem>
+                                    <SelectItem value="B4">Basement 4 (B4)</SelectItem>
+                                    <SelectItem value="B5">Basement 5 (B5)</SelectItem>
+                                </SelectContent>
+                            </Select>
                      </div>
                      <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Type Name</Label>

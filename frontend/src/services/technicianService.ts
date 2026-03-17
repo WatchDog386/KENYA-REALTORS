@@ -373,7 +373,7 @@ export const technicianService = {
             *,
             property:properties(id, name, location),
             tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-            category:technician_categories(name)
+            category:technician_categories:category_id(name)
         `)
         .eq('assigned_to_technician_id', technicianId);
 
@@ -387,7 +387,7 @@ export const technicianService = {
                 *,
                 property:properties(id, name, location),
                 tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-                category:technician_categories(name)
+                category:technician_categories:category_id(name)
             `)
             .is('assigned_to_technician_id', null)
             .eq('category_id', tech.category_id)
@@ -402,7 +402,7 @@ export const technicianService = {
             *,
             property:properties(id, name, location),
             tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-            category:technician_categories(name)
+            category:technician_categories:category_id(name)
         `)
         .is('assigned_to_technician_id', null)
         .eq('category_id', tech.category_id);
@@ -415,7 +415,7 @@ export const technicianService = {
             *,
             property:properties(id, name, location),
             tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-            category:technician_categories(name)
+            category:technician_categories:category_id(name)
         `)
         .is('assigned_to_technician_id', null)
         .is('category_id', null);

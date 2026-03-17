@@ -1,0 +1,281 @@
+const fs = require('fs');
+const content = \import React, { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Info, User, Briefcase, Users, MapPin, Building } from "lucide-react";
+
+export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const propertyId = searchParams.get("propertyId") || "";
+  const unitId = searchParams.get("unitId") || "";
+  const propertyName = searchParams.get("propertyName") || "";
+  const unitNumber = searchParams.get("unitNumber") || "";
+  const locationParam = searchParams.get("location") || "";
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [form, setForm] = useState({
+    property_to_let: propertyName && unitNumber ? \\\\ - Unit \\\\ : "",
+    applicant_name: "",
+    physical_address: "",
+    po_box: "",
+    applicant_email: "",
+    employer_details: "",
+    telephone_numbers: "",
+    marital_status: "",
+    children_count: "",
+    age_bracket: "",
+    occupants_count: "",
+    next_of_kin: "",
+    nationality: "",
+    house_staff: false,
+    home_address: "",
+    location: locationParam,
+    sub_location: "",
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.applicant_name || !form.applicant_email || !form.telephone_numbers) {
+      toast.error("Please fill in the required fields: Name, Email, and Phone.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from("lease_applications").insert([
+        {
+          applicant_id: user?.id || null,
+          property_id: propertyId || null,
+          unit_id: unitId || null,
+          status: "pending",
+          applicant_name: form.applicant_name,
+          physical_address: form.physical_address,
+          po_box: form.po_box,
+          applicant_email: form.applicant_email,
+          employer_details: form.employer_details,
+          telephone_numbers: form.telephone_numbers,
+          marital_status: form.marital_status,
+          children_count: form.children_count ? parseInt(form.children_count) : 0,
+          age_bracket: form.age_bracket,
+          occupants_count: form.occupants_count ? parseInt(form.occupants_count) : 1,
+          next_of_kin: form.next_of_kin,
+          nationality: form.nationality,
+          house_staff: form.house_staff,
+          home_address: form.home_address,
+          location: form.location,
+          sub_location: form.sub_location,
+        }
+      ]);
+
+      if (error) {
+        console.error("Error:", error);
+        toast.error("Failed to submit app.");
+        return;
+      }
+      
+      toast.success("Submitted!");
+      onSuccess();
+
+    } catch (error: any) {
+      toast.error("An error occurred");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const inputClass = "bg-white border border-gray-200 text-gray-900 focus:border-[#F96302] focus:ring-2 focus:ring-[#F96302]/20 transition-all rounded-lg h-11";
+  const textareaClass = "bg-white border border-gray-200 text-gray-900 focus:border-[#F96302] focus:ring-2 focus:ring-[#F96302]/20 transition-all rounded-lg min-h-[100px] p-3 resize-y";
+  const labelClass = "text-sm font-medium text-slate-700 mb-1.5 block";
+  const sectionTitleClass = "text-lg font-semibold text-[#154279] flex items-center gap-2 pb-3 mb-2 border-b border-gray-100";
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in duration-500">
+      <div className="bg-blue-50/70 p-5 rounded-xl border border-blue-100 flex gap-4 text-[#154279] shadow-sm">
+        <Info className="w-6 h-6 flex-shrink-0 mt-0.5 text-[#F96302]" />
+        <div>
+          <p className="text-lg font-semibold">Tenant's Particulars</p>
+          <p className="text-sm opacity-80 mt-1">Please provide accurate and clear information to help us process your background check seamlessly.</p>
+        </div>
+      </div>
+
+      <div className="space-y-4 bg-white p-6 rounded-xl border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <h3 className={sectionTitleClass}>
+          <Building className="w-5 h-5 text-[#F96302]" />
+          Unit Selected
+        </h3>
+        <div>
+          <Label className={labelClass}>Property / Unit To Let</Label>
+          <Input 
+            name="property_to_let" 
+            value={form.property_to_let} 
+            readOnly 
+            className="bg-slate-50 border-gray-300 text-slate-500 font-medium cursor-not-allowed h-12 shadow-inner" 
+          />
+        </div>
+      </div>
+      
+      <div className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <h3 className={sectionTitleClass}>
+          <User className="w-5 h-5 text-[#F96302]" />
+          Personal Information
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Label className={labelClass}>Full Name <span className="text-red-500">*</span></Label>
+            <Input name="applicant_name" value={form.applicant_name} onChange={handleChange} required placeholder="John Doe" className={inputClass} />
+          </div>
+          <div>
+             <Label className={labelClass}>Email Address <span className="text-red-500">*</span></Label>
+             <Input type="email" name="applicant_email" value={form.applicant_email} onChange={handleChange} required placeholder="john.doe@example.com" className={inputClass} />
+          </div>
+          <div>
+            <Label className={labelClass}>Telephone Number(s) <span className="text-red-500">*</span></Label>
+            <Input name="telephone_numbers" value={form.telephone_numbers} onChange={handleChange} required placeholder="e.g. +254 712 345 678" className={inputClass} />
+          </div>
+          <div>
+             <Label className={labelClass}>Nationality</Label>
+             <Input name="nationality" value={form.nationality} onChange={handleChange} placeholder="e.g., Kenyan" className={inputClass} />
+          </div>
+          <div>
+             <Label className={labelClass}>Marital Status</Label>
+             <Select value={form.marital_status} onValueChange={(val) => setForm(prev => ({...prev, marital_status: val}))}>
+                <SelectTrigger className={inputClass}><SelectValue placeholder="Select Status" /></SelectTrigger>
+                <SelectContent className="bg-white border-gray-100 shadow-xl">
+                  <SelectItem value="Single">Single</SelectItem>
+                  <SelectItem value="Married">Married</SelectItem>
+                  <SelectItem value="Divorced">Divorced</SelectItem>
+                  <SelectItem value="Widowed">Widowed</SelectItem>
+                </SelectContent>
+             </Select>
+          </div>
+          <div>
+             <Label className={labelClass}>Age Bracket</Label>
+             <Select value={form.age_bracket} onValueChange={(val) => setForm(prev => ({...prev, age_bracket: val}))}>
+                <SelectTrigger className={inputClass}><SelectValue placeholder="Select Bracket" /></SelectTrigger>
+                <SelectContent className="bg-white border-gray-100 shadow-xl">
+                  <SelectItem value="18-25">18-25</SelectItem>
+                  <SelectItem value="26-35">26-35</SelectItem>
+                  <SelectItem value="36-45">36-45</SelectItem>
+                  <SelectItem value="46-55">46-55</SelectItem>
+                  <SelectItem value="55+">55+</SelectItem>
+                </SelectContent>
+             </Select>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <h3 className={sectionTitleClass}>
+          <Briefcase className="w-5 h-5 text-[#F96302]" />
+          Employment & Contact Address
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Label className={labelClass}>Current Physical Address</Label>
+            <Input name="physical_address" value={form.physical_address} onChange={handleChange} placeholder="Apartment/House, Street, Area" className={inputClass} />
+          </div>
+          <div>
+            <Label className={labelClass}>P.O. Box</Label>
+            <Input name="po_box" value={form.po_box} onChange={handleChange} placeholder="P.O. Box 12345-00100" className={inputClass} />
+          </div>
+          <div className="md:col-span-2">
+            <Label className={labelClass}>Employer's Name & Address (If self-employed, indicate business)</Label>
+            <Textarea name="employer_details" value={form.employer_details} onChange={handleChange} placeholder="Company Name, Office Building, Department..." className={textareaClass} />
+          </div>
+          <div className="md:col-span-2">
+             <Label className={labelClass}>Name & Contact of Next of Kin</Label>
+             <Input name="next_of_kin" value={form.next_of_kin} onChange={handleChange} placeholder="Jane Doe - +254 756 789 012 (Sister)" className={inputClass} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <h3 className={sectionTitleClass}>
+          <Users className="w-5 h-5 text-[#F96302]" />
+          Occupancy Details
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+             <Label className={labelClass}>Total persons to live in residence</Label>
+             <Input type="number" min="1" name="occupants_count" value={form.occupants_count} onChange={handleChange} placeholder="e.g. 2" className={inputClass} />
+          </div>
+          <div>
+            <Label className={labelClass}>No. of Children</Label>
+            <Input type="number" min="0" name="children_count" value={form.children_count} onChange={handleChange} placeholder="e.g. 0" className={inputClass} />
+          </div>
+          <div className="md:col-span-2 mt-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+             <div className="flex items-center space-x-3">
+               <Checkbox 
+                 id="house_staff" 
+                 checked={form.house_staff} 
+                 onCheckedChange={(c) => setForm(prev => ({...prev, house_staff: !!c}))} 
+                 className="data-[state=checked]:bg-[#F96302] border-gray-300 w-5 h-5 shadow-sm"
+               />
+               <Label htmlFor="house_staff" className="text-gray-700 cursor-pointer font-medium text-base">
+                 Will you have live-in house staff? (Check if Yes)
+               </Label>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm transition-all hover:shadow-md">
+        <h3 className={sectionTitleClass}>
+          <MapPin className="w-5 h-5 text-[#F96302]" />
+          Local Residence Details <span className="text-sm font-normal text-slate-500 ml-2">(If applicable)</span>
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+             <Label className={labelClass}>Home Address</Label>
+             <Input name="home_address" value={form.home_address} onChange={handleChange} placeholder="Village / Estate" className={inputClass} />
+          </div>
+          <div>
+             <Label className={labelClass}>Location (County/City)</Label>
+             <Input name="location" value={form.location} onChange={handleChange} placeholder="e.g. Nairobi" className={inputClass} />
+          </div>
+          <div>
+             <Label className={labelClass}>Sub-Location (Ward/Area)</Label>
+             <Input name="sub_location" value={form.sub_location} onChange={handleChange} placeholder="e.g. Westlands" className={inputClass} />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-4 pb-2">
+        <Button 
+          type="submit" 
+          disabled={isSubmitting} 
+          className="w-full bg-gradient-to-r from-[#154279] to-[#0f3260] hover:from-[#10305a] hover:to-[#0b2446] text-white h-14 text-lg font-bold shadow-lg shadow-blue-900/20 transition-all rounded-xl"
+        >
+          {isSubmitting ? (
+            <><Loader2 className="w-6 h-6 mr-2 animate-spin" /> Submitting Application...</>
+          ) : (
+            "Complete & Submit Application"
+          )}
+        </Button>
+        <p className="text-center text-sm text-gray-500 mt-4">
+          By submitting, you agree to our verification and screening process. All information is securely stored.
+        </p>
+      </div>
+    </form>
+  );
+};
+\;
+fs.writeFileSync('src/components/UnitApplicationForm.tsx', content);
+console.log('UnitApplicationForm explicitly overwritten!');

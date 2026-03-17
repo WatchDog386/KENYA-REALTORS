@@ -144,7 +144,7 @@ const PropertyManager: React.FC = () => {
       const { data: techAssigns } = await supabase.from('technician_property_assignments').select('property_id, technician_id');
       if (techAssigns?.length) {
           const techIds = techAssigns.map((t: any) => t.technician_id);
-          const { data: technicians } = await supabase.from('technicians').select('id, user_id, technician_categories(name)').in('id', techIds); 
+          const { data: technicians } = await supabase.from('technicians').select('id, user_id, technician_categories:category_id(name)').in('id', techIds); 
           if (technicians?.length) {
               const userIds = technicians.map((t: any) => t.user_id);
               const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', userIds);

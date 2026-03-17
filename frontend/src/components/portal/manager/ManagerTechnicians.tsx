@@ -74,7 +74,7 @@ const ManagerTechnicians = () => {
               phone,
               avatar_url
             ),
-            category:technician_categories(name)
+            category:technician_categories:category_id(name)
           ),
           property:properties(
             id,

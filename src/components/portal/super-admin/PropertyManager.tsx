@@ -148,7 +148,7 @@ const PropertyManager: React.FC = () => {
       const { data: techAssigns } = await supabase.from('technician_property_assignments').select('property_id, technician_id');
       if (techAssigns?.length) {
           const techIds = techAssigns.map((t: any) => t.technician_id);
-          const { data: technicians } = await supabase.from('technicians').select('id, user_id, technician_categories(name)').in('id', techIds); 
+          const { data: technicians } = await supabase.from('technicians').select('id, user_id, technician_categories:category_id(name)').in('id', techIds); 
           if (technicians?.length) {
               const userIds = technicians.map((t: any) => t.user_id);
               const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', userIds);
@@ -287,16 +287,16 @@ const PropertyManager: React.FC = () => {
       if (!confirm('Are you sure you want to unassign this staff member?')) return;
       try {
           if (roleType === 'manager') {
-              const { error } = await supabase.from('property_manager_assignments').delete().eq('property_id', propertyId).eq('property_manager_id', recordId);
+              const { error } = await supabase.from('property_manager_assignments').update({ status: 'inactive' }).eq('property_id', propertyId).eq('property_manager_id', recordId);
               if (error) throw error;
           } else if (roleType === 'technician') {
-              const { error } = await supabase.from('technician_property_assignments').delete().eq('property_id', propertyId).eq('technician_id', recordId);
+              const { error } = await supabase.from('technician_property_assignments').update({ is_active: false }).eq('property_id', propertyId).eq('technician_id', recordId);
               if (error) throw error;
           } else if (roleType === 'proprietor') {
-              const { error } = await supabase.from('proprietor_properties').delete().eq('property_id', propertyId).eq('proprietor_id', recordId);
+              const { error } = await supabase.from('proprietor_properties').update({ is_active: false }).eq('property_id', propertyId).eq('proprietor_id', recordId);
               if (error) throw error;
           } else if (roleType === 'caretaker') {
-              const { error } = await supabase.from('caretakers').delete().eq('property_id', propertyId).eq('user_id', recordId);
+              const { error } = await supabase.from('caretakers').update({ status: 'inactive' }).eq('property_id', propertyId).eq('user_id', recordId);
               if (error) throw error;
           }
           toast.success('Staff unassigned successfully');

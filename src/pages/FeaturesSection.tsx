@@ -477,12 +477,10 @@ export default function AydenTowersListing() {
                         status,
                         property_id,
                         unit_type_id,
-                        property_unit_types!units_unit_type_id_fkey(
+                        property_unit_types(
                             id,
-                            name,
                             unit_type_name,
-                            price_per_unit,
-                            property_id
+                            price_per_unit
                         )
                     `)
                     .in('status', ['available', 'vacant'])
@@ -909,12 +907,29 @@ export default function AydenTowersListing() {
                                                         <span className={cn("text-xl font-bold tracking-tight", getCardTheme(item.type).price)}>{item.price.toLocaleString()}</span>
                                                     </div>
                                                 </div>
-                                                <button 
-                                                    onClick={() => setSelectedItem(item)}
-                                                    className="px-3 py-2 bg-[#154279] hover:bg-[#F96302] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-lg"
-                                                >
-                                                    View <ChevronRight size={12}/>
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <button 
+                                                        onClick={() => {
+                                                            const params = new URLSearchParams({
+                                                                propertyId: item.propertyId || '',
+                                                                unitId: item.id || '',
+                                                                propertyName: item.propertyName || '',
+                                                                unitNumber: item.unitNumber || '',
+                                                                location: item.location || ''
+                                                            });
+                                                            window.location.href = `/applications?${params.toString()}`;
+                                                        }}
+                                                        className="px-3 py-2 bg-[#F96302] hover:bg-[#e55a00] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-lg"
+                                                    >
+                                                        Apply <ArrowRight size={12}/>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setSelectedItem(item)}
+                                                        className="px-3 py-2 bg-[#154279] hover:bg-[#11325c] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-lg"
+                                                    >
+                                                        View <ChevronRight size={12}/>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="flex gap-4 text-[10px] text-[#154279] font-bold mt-2">
                                                 <span className="flex items-center gap-1"><BedDouble size={14} className="text-[#F96302]"/> {item.beds} Beds</span>

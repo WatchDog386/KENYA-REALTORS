@@ -1316,7 +1316,7 @@ const TenantDashboard: React.FC = () => {
                    <div className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-red-100">
                       <div className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">Emergency Maintenance</div>
                       <div className="text-red-600 font-black text-xl">
-                         {tenantInfo?.emergency_phone || "+254 700 000 000"}
+                         {tenantInfo?.emergency_phone || "0711493222"}
                       </div>
                    </div>
                    <p className="text-xs text-red-400 font-medium leading-relaxed">

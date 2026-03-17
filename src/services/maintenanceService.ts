@@ -53,7 +53,7 @@ export const maintenanceService = {
         *,
         property:properties(id, name, location),
         tenant:profiles(id, first_name, last_name, email),
-        category:technician_categories(id, name)
+        category:technician_categories:category_id(id, name)
       `)
       .single();
 
@@ -104,7 +104,7 @@ export const maintenanceService = {
       .select(`
         *,
         property:properties(id, name, location),
-        category:technician_categories(id, name)
+        category:technician_categories:category_id(id, name)
       `)
       .single();
 
@@ -119,7 +119,7 @@ export const maintenanceService = {
       .select(`
         *,
         property:properties(id, name, location),
-        category:technician_categories(id, name)
+        category:technician_categories:category_id(id, name)
       `)
       .eq('caretaker_id', caretakerId)
       .order('created_at', { ascending: false });
@@ -195,7 +195,7 @@ export const maintenanceService = {
           *,
           property:properties(id, name, location),
           tenant:profiles(id, first_name, last_name, email),
-          category:technician_categories(id, name),
+          category:technician_categories:category_id(id, name),
           technician:technicians(
             id,
             profile:profiles(id, first_name, last_name, email, phone)
@@ -223,7 +223,7 @@ export const maintenanceService = {
         *,
         property:properties(id, name, location),
         tenant:profiles(id, first_name, last_name, email, phone),
-        category:technician_categories(id, name),
+        category:technician_categories:category_id(id, name),
         technician:technicians(
           id,
           profile:profiles(id, first_name, last_name, email, phone, avatar_url),
@@ -245,7 +245,7 @@ export const maintenanceService = {
       .select(`
         *,
         property:properties(id, name, location),
-        category:technician_categories(id, name),
+        category:technician_categories:category_id(id, name),
         technician:technicians(
           id,
           profile:profiles(id, first_name, last_name, email, phone)
@@ -328,7 +328,7 @@ export const maintenanceService = {
         *,
         property:properties(id, name, location),
         tenant:profiles(id, first_name, last_name, email),
-        category:technician_categories(id, name)
+        category:technician_categories:category_id(id, name)
       `)
       .single();
 
@@ -368,7 +368,7 @@ export const maintenanceService = {
       .select(`
         *,
         tenant:profiles(id, first_name, last_name, email, phone),
-        category:technician_categories(id, name),
+        category:technician_categories:category_id(id, name),
         technician:technicians(
           id,
           profile:profiles(id, first_name, last_name, email, phone)

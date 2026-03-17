@@ -81,29 +81,30 @@ const ManagerApplications = () => {
         .from('lease_applications')
         .select(`
           *,
-          profiles:applicant_id (
-            first_name,
-            last_name,
-            email,
-            phone
-          ),
           properties:property_id (
              name,
              location
-          ),
-          units:unit_id (
-             unit_number,
-             price,
-             status
           )
         `)
         .eq('property_id', propertyId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      setApplications(data || []);
 
+      const { data: unitsData } = await supabase
+        .from('units')
+        .select('id, unit_number, price, status')
+        .eq('property_id', propertyId);
+
+      const applicationsWithUnits = (data || []).map(app => {
+        const unit = unitsData?.find(u => u.id === app.unit_id);
+        return {
+          ...app,
+          units: unit || null
+        };
+      });
+
+      setApplications(applicationsWithUnits);
     } catch (err) {
       console.error('Error loading applications:', err);
       toast.error('Failed to load applications');
@@ -160,17 +161,20 @@ const ManagerApplications = () => {
   const filteredApplications = applications.filter(app => {
     const searchString = searchTerm.toLowerCase();
     const profile = app.profiles || {};
-    const searchMatch = 
-      (profile.email?.toLowerCase().includes(searchString)) ||
-      (profile.first_name?.toLowerCase().includes(searchString)) ||
-      (profile.last_name?.toLowerCase().includes(searchString));
-    
-    const statusMatch = filterStatus === 'all' || app.status === filterStatus;
+      const unit = app.units || {};
+      
+      const searchMatch = 
+        (app.applicant_name?.toLowerCase().includes(searchString)) ||
+        (app.applicant_email?.toLowerCase().includes(searchString)) ||
+        (profile.email?.toLowerCase().includes(searchString)) ||
+        (unit.unit_name?.toLowerCase().includes(searchString));
+        
+      const statusMatch = filterStatus === 'all' || app.status === filterStatus;
 
-    return searchMatch && statusMatch;
-  });
+      return searchMatch && statusMatch;
+    });
 
-  const stats = {
+    const stats = {
     total: applications.length,
     pending: applications.filter(a => a.status === 'pending').length,
     approved: applications.filter(a => a.status === 'approved').length,
@@ -275,17 +279,17 @@ const ManagerApplications = () => {
                        </span>
                     </div>
                     <CardTitle className="text-lg font-bold text-slate-800">
-                      {app.profiles?.first_name} {app.profiles?.last_name}
+                      {app.applicant_name || (app.profiles ? `${app.profiles.first_name} ${app.profiles.last_name}` : "Unknown")}
                     </CardTitle>
                     <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-600">
                          <div className="flex items-center gap-1.5">
                              <Mail className="w-3.5 h-3.5" />
-                             {app.profiles?.email}
+                             {app.applicant_email || app.profiles?.email || "N/A"}
                          </div>
-                         {app.profiles?.phone && (
+                         {(app.telephone_numbers || app.profiles?.phone) && (
                             <div className="flex items-center gap-1.5">
                                 <Phone className="w-3.5 h-3.5" />
-                                {app.profiles?.phone}
+                                {app.telephone_numbers || app.profiles?.phone || "N/A"}
                             </div>
                          )}
                     </div>
@@ -357,3 +361,4 @@ const ManagerApplications = () => {
 };
 
 export default ManagerApplications;
+

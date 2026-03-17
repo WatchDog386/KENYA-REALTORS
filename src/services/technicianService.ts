@@ -352,7 +352,7 @@ export const technicianService = {
         *,
         property:properties(id, name, location),
         tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email),
-        category:technician_categories(name)
+        category:technician_categories:category_id(name)
       `)
       .eq('assigned_to_technician_id', technicianId);
     

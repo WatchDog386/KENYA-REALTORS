@@ -328,7 +328,7 @@ export default function Contact() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        placeholder="+254 700 000 000"
+                        placeholder="0711493222"
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all placeholder:text-gray-400"
                       />
                     </div>

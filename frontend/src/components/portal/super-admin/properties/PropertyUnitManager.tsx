@@ -79,7 +79,7 @@ interface PropertyUnitManagerProps {
 interface Unit {
   id: string;
   unit_number: string;
-  floor_number: number;
+  floor_number: string | number;
   unit_type_id: string;
   price: number | null;
   status: string;
@@ -160,7 +160,17 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       toast.error("Failed to fetch units");
       console.error(error);
     } else {
-      setUnits(data || []);
+      const parsed = data || [];
+        parsed.sort((a: any, b: any) => {
+          const aFloor = String(a.floor_number || 'G');
+          const bFloor = String(b.floor_number || 'G');
+          const floorOrder: { [key: string]: number } = { 'B5': -5, 'B4': -4, 'B3': -3, 'B2': -2, 'B1': -1, 'B': -1, 'G': 0, 'M': 0.5 };
+          const aFloorNum = floorOrder[aFloor] ?? parseInt(aFloor) ?? 0;
+          const bFloorNum = floorOrder[bFloor] ?? parseInt(bFloor) ?? 0;
+          if (aFloorNum !== bFloorNum) return aFloorNum - bFloorNum;
+          return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true, sensitivity: 'base' });
+        });
+        setUnits(parsed);
     }
     setLoading(false);
   };
@@ -495,7 +505,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
      setEditingUnit({
          id: '',
          unit_number: '',
-         floor_number: 1,
+         floor_number: '1',
          unit_type_id: '',
          price: 0,
          status: 'available',

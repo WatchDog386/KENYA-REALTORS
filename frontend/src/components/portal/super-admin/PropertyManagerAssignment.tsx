@@ -269,7 +269,7 @@ const PropertyManagerAssignment: React.FC = () => {
       // Delete the assignment
       const { error: deleteError } = await supabase
         .from("property_manager_assignments")
-        .delete()
+        .update({ status: 'inactive' })
         .eq("id", id);
 
       if (deleteError) throw deleteError;

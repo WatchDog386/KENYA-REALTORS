@@ -50,7 +50,7 @@ const MaintenancePage: React.FC = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("maintenance_requests")
-        .select("*, category:technician_categories(name)")
+        .select("*, category:technician_categories:category_id(name)")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
