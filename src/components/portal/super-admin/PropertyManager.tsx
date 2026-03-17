@@ -250,6 +250,8 @@ const PropertyManager: React.FC = () => {
     setFormData({ ...formData, units: newUnits });
   };
 
+  const [unassignConfig, setUnassignConfig] = useState<{ propertyId: string, roleType: 'manager' | 'technician' | 'proprietor' | 'caretaker', recordId: string } | null>(null);
+
   const handleSaveProperty = async () => {
     if (!formData.name || !formData.location) {
         toast.error("Please fill in property name and location");
@@ -283,8 +285,14 @@ const PropertyManager: React.FC = () => {
     }
   };
 
-  const handleUnassignStaff = async (propertyId: string, roleType: 'manager' | 'technician' | 'proprietor' | 'caretaker', recordId: string) => {
-      if (!confirm('Are you sure you want to unassign this staff member?')) return;
+  const handleUnassignStaff = (propertyId: string, roleType: 'manager' | 'technician' | 'proprietor' | 'caretaker', recordId: string) => {
+      setUnassignConfig({ propertyId, roleType, recordId });
+  };
+
+  const executeUnassignStaff = async () => {
+      if (!unassignConfig) return;
+      const { propertyId, roleType, recordId } = unassignConfig;
+      setUnassignConfig(null);
       try {
           if (roleType === 'manager') {
               const { error } = await supabase.from('property_manager_assignments').delete().eq('property_id', propertyId).eq('property_manager_id', recordId);
@@ -1060,7 +1068,53 @@ const PropertyManager: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ASSIGN MANAGER DIALOG */}
+      
+        {/* UNASSIGN CONFIRM DIALOG */}
+        <Dialog open={!!unassignConfig} onOpenChange={(open) => !open && setUnassignConfig(null)}>
+          <DialogContent className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" /> Confirm Unassign
+              </DialogTitle>
+              <DialogDescription className="text-slate-600 pt-2">
+                Are you sure you want to unassign this staff member from the property? This action will immediately revoke their access.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4 gap-2 sm:justify-start">
+              <Button variant="outline" className="bg-white text-slate-700 hover:bg-slate-50 border border-slate-200" onClick={() => setUnassignConfig(null)}>
+                  Cancel
+              </Button>
+              <Button className="bg-red-600 text-white hover:bg-red-700" onClick={executeUnassignStaff}>
+                  Yes, Unassign
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        
+        {/* UNASSIGN CONFIRM DIALOG */}
+        <Dialog open={!!unassignConfig} onOpenChange={(open) => !open && setUnassignConfig(null)}>
+          <DialogContent className="sm:max-w-[400px] bg-white rounded-xl border border-slate-200">
+            <DialogHeader>
+              <DialogTitle className="text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5" /> Confirm Unassign
+              </DialogTitle>
+              <DialogDescription className="text-slate-600 pt-2">
+                Are you sure you want to unassign this staff member from the property? This action will immediately revoke their access.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4 gap-2 sm:justify-start">
+              <Button variant="outline" className="bg-white text-slate-700 hover:bg-slate-50 border border-slate-200" onClick={() => setUnassignConfig(null)}>
+                  Cancel
+              </Button>
+              <Button className="bg-red-600 text-white hover:bg-red-700" onClick={executeUnassignStaff}>
+                  Yes, Unassign
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ASSIGN MANAGER DIALOG */}
       <Dialog open={showAssignManagerDialog} onOpenChange={(open) => {
         setShowAssignManagerDialog(open);
         if (!open) fetchAssignedStaff();
