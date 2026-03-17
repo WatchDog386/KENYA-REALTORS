@@ -122,19 +122,88 @@ const ManagerApplications = () => {
         .eq('id', applicationId);
 
       if (error) throw error;
+      
+      if (newStatus === 'approved') {
+        const app = applications.find(a => a.id === applicationId);
+        if (app && app.applicant_id && app.unit_id && app.property_id) {
+            const now = new Date().toISOString();
+            
+            // Check for existing tenant record
+            const { data: existingTenant, error: checkError } = await supabase
+                .from('tenants')
+                .select('id')
+                .eq('user_id', app.applicant_id)
+                .limit(1)
+                .maybeSingle();
+
+            if (checkError && checkError.code !== 'PGRST116') {
+                throw new Error(`Database check failed: ${checkError.message}`);
+            }
+
+            if (existingTenant) {
+                const { error: updateError } = await supabase
+                    .from('tenants')
+                    .update({
+                        property_id: app.property_id,
+                        unit_id: app.unit_id,
+                        move_in_date: now,
+                        status: 'active'
+                    })
+                    .eq('user_id', app.applicant_id);
+
+                if (updateError) throw updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('tenants')
+                    .insert({
+                        user_id: app.applicant_id,
+                        property_id: app.property_id,
+                        unit_id: app.unit_id,
+                        move_in_date: now,
+                        status: 'active'
+                    });
+
+                if (insertError) throw insertError;
+            }
+
+            // Create lease
+            const rentAmount = app.units?.price || 0;
+            const { error: leaseError } = await supabase.from('tenant_leases').insert({
+                unit_id: app.unit_id,
+                tenant_id: app.applicant_id,
+                start_date: now,
+                rent_amount: rentAmount,
+                status: 'active'
+            });
+
+            if (leaseError) throw leaseError;
+
+            // Update unit status to 'occupied'
+            const { error: unitError } = await supabase.from('units').update({ status: 'occupied' }).eq('id', app.unit_id);
+            if (unitError) throw unitError;
+            
+            toast.success(`Application approved and tenant automatically assigned to unit`);
+        } else {
+            toast.error("Application data missing. Tenant could not be auto-assigned.");
+        }
+      } else {
+        toast.success(`Application marked as ${newStatus}`);
+      }
 
       setApplications(
         applications.map((app) =>
-          app.id === applicationId 
-            ? { ...app, status: newStatus } 
+          app.id === applicationId
+            ? { ...app, status: newStatus }
             : app
         )
       );
-
-      toast.success(`Application marked as ${newStatus}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating status:', err);
-      toast.error('Failed to update status');
+      if (err.message?.includes("409") || err.code === "409" || (typeof err === 'object' && JSON.stringify(err).includes("409"))) {
+        toast.error("User is already a tenant elsewhere. Cannot assign.");
+      } else {
+        toast.error('Failed to update status');
+      }
     } finally {
       setUpdatingId(null);
     }
