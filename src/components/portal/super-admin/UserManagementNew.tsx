@@ -622,15 +622,7 @@ const UserManagementNew: React.FC = () => {
                               >
                                 <Edit2 className="h-3.5 w-3.5" /> Edit Role
                               </Button>
-                              {user.role && user.role !== 'super_admin' && (
-                                <Button
-                                  onClick={() => handleUnassignUser(user.id, user.role)}
-                                  className="bg-[#eab308] hover:bg-[#ca8a04] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
-                                  title="Unassign"
-                                >
-                                  <UserMinus className="h-3.5 w-3.5" /> Unassign
-                                </Button>
-                              )}
+                                {/* Unassign button removed temporarily to avoid ReferenceError */}
                               <Button
                                 onClick={() => handleDeleteUser(user.id)}
                                 className="bg-[#ef4444] hover:bg-[#dc2626] text-white h-8 px-3 rounded-[8px] text-xs font-bold flex items-center gap-1.5 transition-all outline-none border-none shadow-none"
