@@ -140,6 +140,13 @@ const PaymentsManagement = () => {
         };
       }) || [];
 
+      // Sort tenants numerically by unit_type then unit_number
+      formattedTenants.sort((a, b) => {
+        const typeCompare = a.unit_type.localeCompare(b.unit_type, undefined, { numeric: true, sensitivity: 'base' });
+        if (typeCompare !== 0) return typeCompare;
+        return a.unit_number.localeCompare(b.unit_number, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
       setTenants(formattedTenants);
     } catch (error) {
       console.error("Error fetching tenants:", error);
