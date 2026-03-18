@@ -123,68 +123,12 @@ const ManagerApplications = () => {
 
       if (error) throw error;
       
-      if (newStatus === 'approved') {
+      if (newStatus === 'manager_approved') {
         const app = applications.find(a => a.id === applicationId);
-        if (app && app.applicant_id && app.unit_id && app.property_id) {
-            const now = new Date().toISOString();
-            
-            // Check for existing tenant record
-            const { data: existingTenant, error: checkError } = await supabase
-                .from('tenants')
-                .select('id')
-                .eq('user_id', app.applicant_id)
-                .limit(1)
-                .maybeSingle();
-
-            if (checkError && checkError.code !== 'PGRST116') {
-                throw new Error(`Database check failed: ${checkError.message}`);
-            }
-
-            if (existingTenant) {
-                const { error: updateError } = await supabase
-                    .from('tenants')
-                    .update({
-                        property_id: app.property_id,
-                        unit_id: app.unit_id,
-                        move_in_date: now,
-                        status: 'active'
-                    })
-                    .eq('user_id', app.applicant_id);
-
-                if (updateError) throw updateError;
-            } else {
-                const { error: insertError } = await supabase
-                    .from('tenants')
-                    .insert({
-                        user_id: app.applicant_id,
-                        property_id: app.property_id,
-                        unit_id: app.unit_id,
-                        move_in_date: now,
-                        status: 'active'
-                    });
-
-                if (insertError) throw insertError;
-            }
-
-            // Create lease
-            const rentAmount = app.units?.price || 0;
-            const { error: leaseError } = await supabase.from('tenant_leases').insert({
-                unit_id: app.unit_id,
-                tenant_id: app.applicant_id,
-                start_date: now,
-                rent_amount: rentAmount,
-                status: 'active'
-            });
-
-            if (leaseError) throw leaseError;
-
-            // Update unit status to 'occupied'
-            const { error: unitError } = await supabase.from('units').update({ status: 'occupied' }).eq('id', app.unit_id);
-            if (unitError) throw unitError;
-            
-            toast.success(`Application approved and tenant automatically assigned to unit`);
+        if (app && app.applicant_id && app.unit_id && app.property_id) {        
+            toast.success('Application approved by manager. Pending Superadmin approval.');
         } else {
-            toast.error("Application data missing. Tenant could not be auto-assigned.");
+            toast.error('Application data missing. Cannot process.');
         }
       } else {
         toast.success(`Application marked as ${newStatus}`);
@@ -247,6 +191,7 @@ const ManagerApplications = () => {
     total: applications.length,
     pending: applications.filter(a => a.status === 'pending').length,
     approved: applications.filter(a => a.status === 'approved').length,
+    manager_approved: applications.filter(a => a.status === 'manager_approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
   };
 
@@ -272,6 +217,7 @@ const ManagerApplications = () => {
         {[
           { label: 'Total Applications', value: stats.total, color: 'from-blue-500 to-blue-600' },
           { label: 'Pending Review', value: stats.pending, color: 'from-orange-400 to-orange-500' },
+          { label: 'Manager Approved', value: stats.manager_approved, color: 'from-blue-400 to-blue-500' },
           { label: 'Approved', value: stats.approved, color: 'from-green-500 to-green-600' },
           { label: 'Rejected', value: stats.rejected, color: 'from-red-500 to-red-600' },
         ].map((stat, idx) => (
@@ -307,6 +253,7 @@ const ManagerApplications = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Applications</SelectItem>
+              <SelectItem value="manager_approved">Manager Approved</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
@@ -409,7 +356,7 @@ const ManagerApplications = () => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="pending">Mark Pending</SelectItem>
-                                <SelectItem value="approved">Approve Application</SelectItem>
+                                <SelectItem value="manager_approved">Approve Application</SelectItem>
                                 <SelectItem value="rejected">Reject Application</SelectItem>
                             </SelectContent>
                         </Select>
@@ -430,4 +377,9 @@ const ManagerApplications = () => {
 };
 
 export default ManagerApplications;
+
+
+
+
+
 
