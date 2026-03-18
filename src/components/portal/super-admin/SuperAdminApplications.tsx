@@ -97,7 +97,25 @@ const SuperAdminApplications = () => {
     }
   };
 
-  const handleDelete = async (id: string) => { if (!confirm('Are you sure you want to delete this application?')) return; setUpdatingId(id); try { const { error } = await supabase.from('lease_applications').delete().eq('id', id); if (error) throw error; toast.success('Application deleted successfully'); loadApplications(); } catch (error) { console.error('Error:', error); toast.error('Failed to delete application'); } finally { setUpdatingId(null); } };
+  const handleDelete = async (id: string) => { 
+    if (!confirm('Are you sure you want to delete this application?')) return; 
+    setUpdatingId(id); 
+    try { 
+      const { data, error } = await supabase.from('lease_applications').delete().eq('id', id).select(); 
+      if (error) throw error; 
+      if (!data || data.length === 0) {
+        toast.error('Deletion failed: Permission denied or record not found.');
+        return;
+      }
+      toast.success('Application deleted successfully'); 
+      setApplications(prev => prev.filter(a => a.id !== id));
+    } catch (error: any) { 
+      console.error('Error:', error); 
+      toast.error('Failed to delete application: ' + error.message); 
+    } finally { 
+      setUpdatingId(null); 
+    } 
+  };
 
   const handleStatusChange = async (applicationId: string, newStatus: string) => {
     setUpdatingId(applicationId);
