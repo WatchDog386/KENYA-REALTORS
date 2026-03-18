@@ -105,6 +105,13 @@ const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
       permission: "manage_properties",
     },
     {
+      title: "Applications",
+      path: "/portal/super-admin/applications",
+      icon: "file-text",
+      description: "Manage lease applications",
+      permission: "manage_properties",
+    },
+    {
       title: "Users",
       path: "/portal/super-admin/users",
       icon: "users",

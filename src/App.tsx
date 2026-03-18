@@ -177,6 +177,7 @@ import PropertyManager from "@/components/portal/super-admin/PropertyManager";
 import UserManagementNew from "@/components/portal/super-admin/UserManagementNew";
 import SystemSettings from "@/components/portal/super-admin/SystemSettings";
 import Reports from "@/components/portal/super-admin/Reports"; // Fixed import name
+import SuperAdminApplications from "@/components/portal/super-admin/SuperAdminApplications";
 
 /* ======================
    NEW ROLE DASHBOARDS
@@ -754,7 +755,7 @@ const App = () => {
                   <Route path="receipts" element={<SuperAdminReceiptsManagement />} />
                   <Route path="profile" element={<SuperAdminProfilePage />} />
                   <Route path="refunds" element={<RefundStatusPage />} />
-                  <Route path="applications" element={<Applications />} />
+                  <Route path="applications" element={<SuperAdminApplications />} />
                   <Route path="rental-applications" element={<RentalApplications />} />
                   <Route
                     path="create-users"

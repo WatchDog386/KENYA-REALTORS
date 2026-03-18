@@ -781,7 +781,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em]">Unit #</TableHead>
                                 <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em]">Type</TableHead>
                                 <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-center">Floor</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Price</TableHead>
+                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Rent</TableHead>
                                 <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-center">Status</TableHead>
                                 <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Actions</TableHead>
                             </TableRow>
