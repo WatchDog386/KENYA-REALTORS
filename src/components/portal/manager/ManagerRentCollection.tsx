@@ -221,6 +221,11 @@ const ManagerRentCollection = () => {
         };
       });
 
+      // Sort chronologically/numerically by unit number
+      processedRows.sort((a,b) => {
+        return String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'});
+      });
+
       setRows(processedRows);
 
     } catch (err) {

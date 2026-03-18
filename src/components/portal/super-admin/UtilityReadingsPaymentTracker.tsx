@@ -201,6 +201,10 @@ export const UtilityReadingsPaymentTracker: React.FC = () => {
         })
       );
 
+      // Sort numeric unit numbers
+      enrichedReadings.sort((a,b) => {
+        return String(a.unit?.unit_number || '').localeCompare(String(b.unit?.unit_number || ''), undefined, {numeric: true, sensitivity: 'base'});
+      });
       setReadings(enrichedReadings);
 
       // Calculate total pending

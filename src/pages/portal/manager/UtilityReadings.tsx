@@ -660,7 +660,9 @@ const ManagerUtilityReadings = () => {
           });
         }
 
-        setUnits(enrichedUnits);
+        // Sort chronologically/numerically by unit number
+        enrichedUnits.sort((a,b) => String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'}));
+        enrichedUnits.sort((a,b) => String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'}));\n      setUnits(enrichedUnits);
         setReadings(readingsData || []);
 
         // Setup real-time subscription for utility readings
@@ -1194,7 +1196,7 @@ const ManagerUtilityReadings = () => {
         });
       }
 
-      setUnits(enrichedUnits);
+      enrichedUnits.sort((a,b) => String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'}));\n      setUnits(enrichedUnits);
       setReadings(readingsData || []);
       toast.success('Data refreshed successfully');
     } catch (err: any) {

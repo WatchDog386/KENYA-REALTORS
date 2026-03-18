@@ -215,6 +215,11 @@ const BillingAndInvoicing = () => {
         };
       });
 
+      // Sort chronologically/numerically by unit number
+      billingRecords.sort((a, b) => {
+        return String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'});
+      });
+
       setBillings(billingRecords);
 
       // Calculate stats
