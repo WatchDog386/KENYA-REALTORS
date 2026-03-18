@@ -140,11 +140,9 @@ const PaymentsManagement = () => {
         };
       }) || [];
 
-      // Sort tenants numerically by unit_type then unit_number
+      // Sort tenants numerically by unit_number 
       formattedTenants.sort((a, b) => {
-        const typeCompare = a.unit_type.localeCompare(b.unit_type, undefined, { numeric: true, sensitivity: 'base' });
-        if (typeCompare !== 0) return typeCompare;
-        return a.unit_number.localeCompare(b.unit_number, undefined, { numeric: true, sensitivity: 'base' });
+        return String(a.unit_number).localeCompare(String(b.unit_number), undefined, { numeric: true, sensitivity: 'base' });
       });
 
       setTenants(formattedTenants);
