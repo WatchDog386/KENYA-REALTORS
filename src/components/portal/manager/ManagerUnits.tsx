@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Search, Loader2, Plus, X, Check, Users, Camera, Upload, Edit, FileText, Image as ImageIcon, Building2, Layers, Maximize, AlertTriangle, CheckCircle2, ArrowRight, LayoutGrid, List, ChevronDown, ChevronUp } from 'lucide-react';
+import { Building, Search, Loader2, Plus, X, Check, Users, Camera, Upload, Edit, FileText, Image as ImageIcon, Building2, Layers, Maximize, AlertTriangle, CheckCircle2, ArrowRight, LayoutGrid, List, ChevronDown, ChevronUp, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +49,7 @@ interface Unit {
       id: string;
       tenant_id: string;
       tenant_name: string;
+      status?: string;
   }
 }
 
@@ -67,6 +68,14 @@ interface TenantProfile {
     email: string;
 }
 
+interface ApplicantCandidate {
+  application_id: string;
+  applicant_id: string;
+  name: string;
+  email: string;
+  status: string;
+}
+
 const ManagerUnits = () => {
   const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
@@ -83,7 +92,7 @@ const ManagerUnits = () => {
   const [propertyName, setPropertyName] = useState<string>('');
   const [properties, setProperties] = useState<{id: string, name: string}[]>([]);
   const [expandedProps, setExpandedProps] = useState<Record<string, boolean>>({});
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -244,9 +253,21 @@ const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 // Add/Edit Unit State
 const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isAddTenantOpen, setIsAddTenantOpen] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<string>('');
   const [savingUnit, setSavingUnit] = useState(false);
+  const [isCreatingTenantUser, setIsCreatingTenantUser] = useState(false);
+  const [addTenantMode, setAddTenantMode] = useState<'create_user' | 'from_applicants'>('create_user');
+  const [applicantCandidates, setApplicantCandidates] = useState<ApplicantCandidate[]>([]);
+  const [selectedApplicantId, setSelectedApplicantId] = useState('');
+  const [newTenantForm, setNewTenantForm] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    password: '',
+  });
   const [newUnit, setNewUnit] = useState({
     unit_number: '',
     unit_type_id: '',
@@ -260,6 +281,16 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   useEffect(() => {
     loadUnits();
   }, [user?.id, id]);
+
+  useEffect(() => {
+    if (!isAssignOpen) return;
+    setSelectedTenant(selectedUnit?.active_lease?.tenant_id || '');
+  }, [isAssignOpen, selectedUnit?.id]);
+
+  useEffect(() => {
+    if (!isAddTenantOpen) return;
+    void loadApplicantCandidates();
+  }, [isAddTenantOpen, selectedUnit?.id, propertyId]);
 
   const fetchUnitTypes = async (propIds: string[]) => {
     try {
@@ -424,7 +455,10 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             tenant_leases(
                 id,
                 tenant_id,
-                status
+            status,
+            start_date,
+            end_date,
+            created_at
             )
         `)
         .in('property_id', targetPropertyIds)
@@ -440,14 +474,29 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       if (data) {
         // Map leases and types
         const unitsWithDetails = data.map((u: any) => {
-            const activeLease = u.tenant_leases?.find((l: any) => l.status === 'active');
+            const now = Date.now();
+            const leases = Array.isArray(u.tenant_leases) ? u.tenant_leases : [];
+            const activeCandidates = leases
+              .filter((l: any) => {
+                const status = String(l?.status || '').toLowerCase();
+                const isEndedStatus = ['terminated', 'ended', 'inactive', 'cancelled', 'expired'].includes(status);
+                const endDatePassed = l?.end_date ? new Date(l.end_date).getTime() <= now : false;
+                return !isEndedStatus && !endDatePassed;
+              })
+              .sort((a: any, b: any) => {
+                const aDate = new Date(a?.start_date || a?.created_at || 0).getTime();
+                const bDate = new Date(b?.start_date || b?.created_at || 0).getTime();
+                return bDate - aDate;
+              });
+            const activeLease = activeCandidates[0];
             let leaseInfo = undefined;
             if (activeLease) {
                  const tenant = tenantData?.find(t => t.id === activeLease.tenant_id);
                  leaseInfo = {
                      id: activeLease.id,
                      tenant_id: activeLease.tenant_id,
-                     tenant_name: tenant ? `${tenant.first_name} ${tenant.last_name}` : 'Unknown Tenant'
+                     tenant_name: tenant ? `${tenant.first_name} ${tenant.last_name}` : 'Unknown Tenant',
+                     status: activeLease.status
                  };
             }
             
@@ -495,8 +544,49 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       try {
           setSavingUnit(true);
           const now = new Date().toISOString();
+          const targetPropertyId = selectedUnit.property_id;
+
+          const { data: selectedTenantProfile, error: selectedTenantProfileError } = await supabase
+            .from('profiles')
+            .select('id, status, role')
+            .eq('id', selectedTenant)
+            .maybeSingle();
+
+          if (selectedTenantProfileError) throw selectedTenantProfileError;
+
+          if (!selectedTenantProfile) {
+            toast.error('Selected tenant profile not found');
+            return;
+          }
+
+          const tenantStatus = String(selectedTenantProfile.status || '').toLowerCase();
+          if (tenantStatus !== 'active') {
+            toast.error('This tenant is pending superadmin approval and cannot be assigned yet.');
+            return;
+          }
+
+          const activeStatuses = ['active', 'approved', 'manager_approved', 'ongoing', 'current'];
+          let conflictQuery = supabase
+            .from('tenant_leases')
+            .select('id, unit_id, status, units(unit_number)')
+            .eq('tenant_id', selectedTenant)
+            .in('status', activeStatuses);
+
+          if (selectedUnit.active_lease?.id) {
+            conflictQuery = conflictQuery.neq('id', selectedUnit.active_lease.id);
+          }
+
+          const { data: conflictingLeases, error: conflictError } = await conflictQuery.limit(1);
+          if (conflictError) throw conflictError;
+
+          if (conflictingLeases && conflictingLeases.length > 0) {
+            const conflict: any = conflictingLeases[0];
+            const conflictUnit = conflict?.units?.unit_number || 'another unit';
+            toast.error(`This tenant is already assigned to unit ${conflictUnit}. Unassign first.`);
+            return;
+          }
           
-          console.log("🔹 Starting tenant assignment...", { selectedTenant, propertyId, unitId: selectedUnit.id });
+          console.log("🔹 Starting tenant assignment...", { selectedTenant, propertyId: targetPropertyId, unitId: selectedUnit.id });
           
           if (selectedUnit.active_lease) {
                // Update existing assignment
@@ -514,7 +604,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                const { error: tenantsError } = await supabase
                   .from('tenants')
                   .update({
-                      property_id: propertyId,
+                    property_id: targetPropertyId,
                       unit_id: selectedUnit.id,
                       move_in_date: now,
                       status: 'active'
@@ -545,7 +635,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   const { error: updateError } = await supabase
                       .from('tenants')
                       .update({
-                          property_id: propertyId,
+                        property_id: targetPropertyId,
                           unit_id: selectedUnit.id,
                           move_in_date: now,
                           status: 'active'
@@ -561,7 +651,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                       .from('tenants')
                       .insert({
                           user_id: selectedTenant,
-                          property_id: propertyId,
+                        property_id: targetPropertyId,
                           unit_id: selectedUnit.id,
                           move_in_date: now,
                           status: 'active'
@@ -603,9 +693,222 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             toast.error("Failed to save assignment: " + (e.message || JSON.stringify(e)));
           }
       } finally {
-          setIsAssignOpen(false);
           setSavingUnit(false);
       }
+  };
+
+  const loadApplicantCandidates = async () => {
+    try {
+      const targetPropertyId = selectedUnit?.property_id || propertyId;
+      if (!targetPropertyId) {
+        setApplicantCandidates([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('lease_applications')
+        .select(`
+          id,
+          applicant_id,
+          status,
+          profiles:applicant_id (first_name, last_name, email)
+        `)
+        .eq('property_id', targetPropertyId)
+        .in('status', ['pending', 'manager_approved', 'approved'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const assignedTenantIds = new Set(
+        units
+          .map((unit) => unit.active_lease?.tenant_id)
+          .filter((tenantId): tenantId is string => Boolean(tenantId))
+      );
+
+      const uniqueByApplicant = new Map<string, ApplicantCandidate>();
+      (data || []).forEach((row: any) => {
+        if (!row?.applicant_id) return;
+        if (assignedTenantIds.has(row.applicant_id)) return;
+
+        const profile = row.profiles || {};
+        if (!uniqueByApplicant.has(row.applicant_id)) {
+          uniqueByApplicant.set(row.applicant_id, {
+            application_id: row.id,
+            applicant_id: row.applicant_id,
+            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Applicant',
+            email: profile.email || 'No email',
+            status: row.status || 'pending',
+          });
+        }
+      });
+
+      setApplicantCandidates(Array.from(uniqueByApplicant.values()));
+    } catch (error) {
+      console.error('Error loading applicant candidates:', error);
+      toast.error('Failed to load applicants');
+      setApplicantCandidates([]);
+    }
+  };
+
+  const createTenantApprovalRequest = async (tenantUserId: string, source: 'create_user' | 'from_applicants') => {
+    const targetPropertyId = selectedUnit?.property_id || propertyId;
+    if (!selectedUnit || !targetPropertyId) {
+      throw new Error('Please choose a target unit before creating tenant request');
+    }
+
+    const metadata: Record<string, any> = {
+      user_id: tenantUserId,
+      property_id: targetPropertyId,
+      unit_id: selectedUnit.id,
+      move_in_date: new Date().toISOString(),
+      source,
+      requested_role: 'tenant',
+    };
+
+    if (source === 'from_applicants' && selectedApplicantId) {
+      const selectedApplicant = applicantCandidates.find((a) => a.applicant_id === selectedApplicantId);
+      metadata.application_id = selectedApplicant?.application_id;
+    }
+
+    const { error: approvalError } = await supabase
+      .from('approvals')
+      .insert({
+        approval_type: 'tenant_addition',
+        user_id: user?.id,
+        status: 'in_progress',
+        metadata,
+        notes: `Tenant addition request from manager for unit ${selectedUnit.unit_number}`,
+      });
+
+    if (approvalError) {
+      throw new Error(`Failed to create approval request: ${approvalError.message}`);
+    }
+  };
+
+  const handleAddTenantFromApplicants = async () => {
+    if (!selectedApplicantId) {
+      toast.error('Please select an applicant');
+      return;
+    }
+
+    try {
+      setIsCreatingTenantUser(true);
+      const candidate = applicantCandidates.find((a) => a.applicant_id === selectedApplicantId);
+      if (!candidate) {
+        toast.error('Selected applicant not found');
+        return;
+      }
+
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .update({
+          role: 'tenant',
+          user_type: 'tenant',
+          status: 'pending',
+          is_active: false,
+          property_id: selectedUnit?.property_id || propertyId,
+          unit_id: selectedUnit?.id || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', candidate.applicant_id);
+
+      if (profileUpdateError) {
+        throw new Error(`Failed to update applicant profile: ${profileUpdateError.message}`);
+      }
+
+      await createTenantApprovalRequest(candidate.applicant_id, 'from_applicants');
+
+      setSelectedTenant(candidate.applicant_id);
+      setIsAddTenantOpen(false);
+      setIsAssignOpen(true);
+      toast.success('Applicant submitted for superadmin approval and ready for assignment');
+    } catch (error: any) {
+      console.error('Error adding tenant from applicants:', error);
+      toast.error(error.message || 'Failed to add tenant from applicants');
+    } finally {
+      setIsCreatingTenantUser(false);
+    }
+  };
+
+  const handleCreateTenantUser = async () => {
+    const email = newTenantForm.email.trim().toLowerCase();
+    const firstName = newTenantForm.first_name.trim();
+    const lastName = newTenantForm.last_name.trim();
+    const password = newTenantForm.password;
+
+    if (!email || !firstName || !lastName || !password) {
+      toast.error('Please complete first name, last name, email and password');
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error('Please provide a valid email address');
+      return;
+    }
+
+    try {
+      setIsCreatingTenantUser(true);
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            phone: newTenantForm.phone?.trim() || null,
+            role: 'tenant',
+            status: 'pending',
+          },
+        },
+      });
+
+      if (authError || !authData.user?.id) {
+        throw new Error(authError?.message || 'Failed to create tenant user');
+      }
+
+      const tenantUserId = authData.user.id;
+
+      const { error: profileUpsertError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: tenantUserId,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          phone: newTenantForm.phone?.trim() || null,
+          role: 'tenant',
+          user_type: 'tenant',
+          status: 'pending',
+          is_active: false,
+          property_id: selectedUnit?.property_id || propertyId,
+          unit_id: selectedUnit?.id || null,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (profileUpsertError) {
+        throw new Error(`Failed to save tenant profile: ${profileUpsertError.message}`);
+      }
+
+      await createTenantApprovalRequest(tenantUserId, 'create_user');
+
+      setSelectedTenant(tenantUserId);
+      setNewTenantForm({ first_name: '', last_name: '', email: '', phone: '', password: '' });
+      setIsAddTenantOpen(false);
+      setIsAssignOpen(true);
+      toast.success('Tenant created and sent to superadmin for approval. Continue assignment when approved.');
+    } catch (error: any) {
+      console.error('Error creating tenant user:', error);
+      toast.error(error.message || 'Failed to create tenant user');
+    } finally {
+      setIsCreatingTenantUser(false);
+    }
   };
 
   // Handle Unassign Tenant from Unit
@@ -694,6 +997,17 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     return matchesSearch && matchesProperty && matchesUnitType && matchesPrice;
   });
 
+  const assignedTenantIds = new Set(
+    units
+      .map((unit) => unit.active_lease?.tenant_id)
+      .filter((tenantId): tenantId is string => Boolean(tenantId))
+  );
+
+  const selectableTenants = tenants.filter((tenant) => {
+    const isCurrentAssigned = selectedUnit?.active_lease?.tenant_id === tenant.id;
+    return isCurrentAssigned || !assignedTenantIds.has(tenant.id);
+  });
+
   const toggleProperty = (propId: string) => {
     setExpandedProps(prev => ({
       ...prev,
@@ -739,9 +1053,15 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   <List size={18} />
                 </button>
               </div>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200" onClick={() => setIsAddUnitOpen(true)}>
-                <Plus size={16} className="mr-2" />
-                Add Unit
+              <Button
+                onClick={() => {
+                  setAddTenantMode('create_user');
+                  setSelectedApplicantId('');
+                  setIsAddTenantOpen(true);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              >
+                <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
               </Button>
             </div>
           </div>
@@ -985,6 +1305,114 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         </Dialog>
 
         {/* Assign Tenant Dialog */}
+        <Dialog open={isAddTenantOpen} onOpenChange={setIsAddTenantOpen}>
+           <DialogContent className="bg-white border-slate-100 shadow-xl">
+               <DialogHeader>
+                   <DialogTitle className="text-slate-800">Add Tenant</DialogTitle>
+                   <DialogDescription className="text-slate-500">
+                       Choose how you want to add tenant access before assignment.
+                   </DialogDescription>
+               </DialogHeader>
+
+               <div className="space-y-4 py-2">
+                  <div>
+                    <Label className="text-slate-700 mb-2 block">Add Method</Label>
+                    <Select value={addTenantMode} onValueChange={(val: 'create_user' | 'from_applicants') => setAddTenantMode(val)}>
+                      <SelectTrigger className="bg-white border-slate-200">
+                        <SelectValue placeholder="Choose method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="create_user">Create User</SelectItem>
+                        <SelectItem value="from_applicants">Add From Applicants</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {addTenantMode === 'create_user' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">First Name</Label>
+                        <Input
+                          value={newTenantForm.first_name}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, first_name: e.target.value }))}
+                          placeholder="First name"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Last Name</Label>
+                        <Input
+                          value={newTenantForm.last_name}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, last_name: e.target.value }))}
+                          placeholder="Last name"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Email</Label>
+                        <Input
+                          type="email"
+                          value={newTenantForm.email}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, email: e.target.value }))}
+                          placeholder="tenant@example.com"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Phone</Label>
+                        <Input
+                          value={newTenantForm.phone}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, phone: e.target.value }))}
+                          placeholder="Phone"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Password</Label>
+                        <Input
+                          type="password"
+                          value={newTenantForm.password}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, password: e.target.value }))}
+                          placeholder="At least 6 characters"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <Label className="text-slate-700 mb-2 block">Select Applicant</Label>
+                      <Select value={selectedApplicantId} onValueChange={setSelectedApplicantId}>
+                        <SelectTrigger className="bg-white border-slate-200">
+                          <SelectValue placeholder="Choose applicant" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {applicantCandidates.map((candidate) => (
+                            <SelectItem key={candidate.applicant_id} value={candidate.applicant_id}>
+                              {candidate.name} ({candidate.email})
+                            </SelectItem>
+                          ))}
+                          {applicantCandidates.length === 0 && (
+                            <div className="p-2 text-sm text-center text-slate-500">No unassigned applicants found</div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs p-3">
+                    New tenants are created with pending approval so they appear in superadmin user management before activation.
+                  </div>
+               </div>
+
+               <DialogFooter>
+                   <Button variant="outline" onClick={() => setIsAddTenantOpen(false)} className="border-slate-200 hover:bg-slate-50 text-slate-600">Cancel</Button>
+                   <Button
+                     onClick={addTenantMode === 'create_user' ? handleCreateTenantUser : handleAddTenantFromApplicants}
+                     disabled={isCreatingTenantUser}
+                     className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold"
+                   >
+                     {isCreatingTenantUser ? 'Processing...' : 'Submit For Approval'}
+                   </Button>
+               </DialogFooter>
+           </DialogContent>
+        </Dialog>
+
+        {/* Assign Tenant Dialog */}
         <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
            <DialogContent className="bg-white border-slate-100 shadow-xl">
                <DialogHeader>
@@ -998,12 +1426,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                    <Select value={selectedTenant} onValueChange={setSelectedTenant}>
                        <SelectTrigger className="bg-white border-slate-200 focus:ring-blue-500"><SelectValue placeholder="Search tenant..." /></SelectTrigger>
                        <SelectContent>
-                           {tenants.map(t => (
+                       {selectableTenants.map(t => (
                                <SelectItem key={t.id} value={t.id}>
                                    {t.first_name} {t.last_name} ({t.email})
                                </SelectItem>
                            ))}
-                           {tenants.length === 0 && <div className="p-2 text-sm text-center text-slate-500">No tenants found</div>}
+                       {selectableTenants.length === 0 && <div className="p-2 text-sm text-center text-slate-500">No unassigned tenants found</div>}
                        </SelectContent>
                    </Select>
                </div>
@@ -1352,10 +1780,10 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             <p className="text-slate-600 text-lg">No units found</p>
           </div>
         ) : viewMode === 'list' ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px] font-bold">
+                <thead className="bg-slate-50/80 border-b border-slate-200/60 text-slate-500 uppercase tracking-widest text-[11px] font-extrabold">
                   <tr>
                     <th className="px-6 py-4">Unit</th>
                     <th className="px-6 py-4">Type & Category</th>
@@ -1373,7 +1801,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                     const isVacant = displayStatus === 'vacant' || displayStatus === 'available';
 
                     return (
-                      <tr key={unit.id} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => openDetails(unit)}>
+                      <tr key={unit.id} className="hover:bg-slate-50/80 hover:shadow-[inset_4px_0_0_0_rgba(59,130,246,0.5)] transition-all duration-200 group cursor-pointer" onClick={() => openDetails(unit)}>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
@@ -1486,7 +1914,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {filteredUnits.map(unit => {
               const unitType = unitTypes.find(t => t.id === unit.unit_type_id);
               const displayStatus = (unit.active_lease ? 'occupied' : unit.status)?.toLowerCase() || 'vacant';
@@ -1544,7 +1972,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 <div className={`absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 bg-gradient-to-br transition-all duration-300 z-20 ${theme.accent}`} style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
 
                 {/* Image / Header Section - Professional Style */}
-                <div className="h-40 bg-slate-100 relative border-b border-slate-50">
+                <div className="h-28 bg-slate-100 relative border-b border-slate-50">
                      {unit.image_url ? (
                          <>
                            <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-slate-900/0 transition-colors z-10" />
@@ -1556,8 +1984,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                          </>
                      ) : (
                          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-                             <div className="bg-white p-3 rounded-full shadow-sm mb-2 relative z-10">
-                                <Building2 className={`w-6 h-6 ${theme.icon}`} strokeWidth={2} />
+                             <div className="bg-white p-2 rounded-full shadow-sm mb-1 relative z-10">
+                                <Building2 className={`w-5 h-5 ${theme.icon}`} strokeWidth={2} />
                              </div>
                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">No Image</p>
                          </div>
@@ -1582,18 +2010,18 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 </div>
                 
                 {/* Body Content */}
-                <div className="p-5 flex flex-col flex-1 gap-4">
+                <div className="p-3 flex flex-col flex-1 gap-2.5">
                     
                     {/* Header: Unit # and Price */}
                     <div className="flex justify-between items-start">
                          <div>
-                             <h3 className="text-xl font-extrabold text-blue-900 group-hover:text-blue-700 transition-colors">Unit {unit.unit_number}</h3>
-                             <p className="text-sm text-blue-500 font-semibold truncate max-w-[150px]" title={unitType?.name}>
+                             <h3 className="text-base font-extrabold text-blue-900 group-hover:text-blue-700 transition-colors">Unit {unit.unit_number}</h3>
+                             <p className="text-xs text-blue-500 font-semibold truncate max-w-[120px]" title={unitType?.name}>
                                 {unitType?.name || 'Unknown Type'}
                              </p>
                          </div>
                          <div className="text-right">
-                             <span className="block text-xl font-bold text-blue-600">
+                             <span className="block text-base font-bold text-blue-600">
                                KES {(unit.price || unitType?.price_per_unit || 0).toLocaleString()}
                              </span>
                              <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wide">/ month</span>
@@ -1604,19 +2032,19 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                     <div className="h-px bg-slate-100 w-full" />
 
                     {/* Quick Specs */}
-                    <div className="grid grid-cols-2 gap-3 text-sm mt-1">
-                         <div className="flex items-center gap-2.5 bg-slate-50 p-2 rounded-lg border border-slate-100 group-hover:border-indigo-100 transition-colors" title="Floor Number">
-                             <div className="p-2 rounded-md bg-indigo-600 text-white shadow-sm shrink-0">
-                                <Layers size={16} strokeWidth={2.5} />
+                    <div className="grid grid-cols-2 gap-2 text-xs mt-1">
+                         <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100 group-hover:border-indigo-100 transition-colors" title="Floor Number">
+                             <div className="p-1.5 rounded-md bg-indigo-600 text-white shadow-sm shrink-0">
+                                <Layers size={14} strokeWidth={2.5} />
                              </div>
                              <div>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-0.5">Floor</p>
                                 <span className="font-bold text-slate-700 leading-none">{unit.floor_number ? `${unit.floor_number}` : 'G'}</span>
                              </div>
                          </div>
-                         <div className="flex items-center gap-2.5 bg-slate-50 p-2 rounded-lg border border-slate-100 group-hover:border-violet-100 transition-colors" title="Unit Category">
-                             <div className="p-2 rounded-md bg-violet-600 text-white shadow-sm shrink-0">
-                                <Maximize size={16} strokeWidth={2.5} />
+                         <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100 group-hover:border-violet-100 transition-colors" title="Unit Category">
+                             <div className="p-1.5 rounded-md bg-violet-600 text-white shadow-sm shrink-0">
+                                <Maximize size={14} strokeWidth={2.5} />
                              </div>
                              <div className="overflow-hidden">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-0.5">Type</p>
@@ -1626,7 +2054,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                     </div>
                     
                     {/* Footer Actions */}
-                    <div className="mt-auto pt-3 grid grid-cols-2 gap-3">
+                    <div className="mt-auto pt-2 grid grid-cols-2 gap-2">
                          {isOccupied && unit.active_lease ? ( // Occupied
                             <>
                                 <Button 

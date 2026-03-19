@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ClipboardCheck, Search, Loader2, CheckCircle, Clock, XCircle, Home, MapPin, DollarSign, User, Phone, Mail } from 'lucide-react';
+import { ClipboardCheck, Search, Loader2, CheckCircle, Clock, XCircle, Home, Phone, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -23,6 +22,9 @@ interface LeaseApplication {
   status: string;
   notes?: string;
   created_at: string;
+  applicant_name?: string;
+  applicant_email?: string;
+  telephone_numbers?: string;
   profiles?: {
     first_name: string;
     last_name: string;
@@ -47,6 +49,12 @@ const ManagerApplications = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const sortByNewest = (items: LeaseApplication[]) => {
+    return [...items].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  };
 
   useEffect(() => {
     loadApplications();
@@ -104,7 +112,7 @@ const ManagerApplications = () => {
         };
       });
 
-      setApplications(applicationsWithUnits);
+      setApplications(sortByNewest(applicationsWithUnits));
     } catch (err) {
       console.error('Error loading applications:', err);
       toast.error('Failed to load applications');
@@ -134,11 +142,11 @@ const ManagerApplications = () => {
         toast.success(`Application marked as ${newStatus}`);
       }
 
-      setApplications(
-        applications.map((app) =>
-          app.id === applicationId
-            ? { ...app, status: newStatus }
-            : app
+      setApplications((prev) =>
+        sortByNewest(
+          prev.map((app) =>
+            app.id === applicationId ? { ...app, status: newStatus } : app
+          )
         )
       );
     } catch (err: any) {
@@ -158,7 +166,7 @@ const ManagerApplications = () => {
       case 'approved': return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'rejected': return <XCircle className="w-4 h-4 text-red-500" />;
-      default: return <Clock className="w-4 h-4 text-blue-500" />;
+      default: return <Clock className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -167,27 +175,30 @@ const ManagerApplications = () => {
       case 'approved': return 'bg-green-100 text-green-800 border-green-200';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'manager_approved': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      default: return 'bg-slate-100 text-slate-800 border-slate-200';
     }
   };
 
-  const filteredApplications = applications.filter(app => {
+  const filteredApplications = sortByNewest(applications).filter(app => {
     const searchString = searchTerm.toLowerCase();
     const profile = app.profiles || {};
-      const unit = app.units || {};
+    const unit = app.units || {};
       
-      const searchMatch = 
-        (app.applicant_name?.toLowerCase().includes(searchString)) ||
-        (app.applicant_email?.toLowerCase().includes(searchString)) ||
-        (profile.email?.toLowerCase().includes(searchString)) ||
-        (unit.unit_name?.toLowerCase().includes(searchString));
+    const searchMatch = 
+      (app.applicant_name?.toLowerCase().includes(searchString)) ||
+      (app.applicant_email?.toLowerCase().includes(searchString)) ||
+      (profile.email?.toLowerCase().includes(searchString)) ||
+      (profile.first_name?.toLowerCase().includes(searchString)) ||
+      (profile.last_name?.toLowerCase().includes(searchString)) ||
+      (unit.unit_number?.toLowerCase().includes(searchString));
         
-      const statusMatch = filterStatus === 'all' || app.status === filterStatus;
+    const statusMatch = filterStatus === 'all' || app.status === filterStatus;
 
-      return searchMatch && statusMatch;
-    });
+    return searchMatch && statusMatch;
+  });
 
-    const stats = {
+  const stats = {
     total: applications.length,
     pending: applications.filter(a => a.status === 'pending').length,
     approved: applications.filter(a => a.status === 'approved').length,
@@ -197,55 +208,70 @@ const ManagerApplications = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
+      <div className="flex items-center justify-center min-h-[60vh] rounded-2xl border border-slate-200 bg-white">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-            <h1 className="text-3xl font-bold text-slate-900">Lease Applications</h1>
-            <p className="text-slate-500">Manage incoming tenant applications</p>
+    <div className="space-y-6 p-4 md:p-6 min-h-screen bg-gradient-to-b from-zinc-100 via-slate-50 to-stone-100/70">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/95 p-5 md:p-6 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.35)]">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                <ClipboardCheck className="w-5 h-5" />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Lease Applications</h1>
+            </div>
+            <p className="text-slate-600">Manage incoming tenant applications in newest-first order.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm font-medium">
+              {stats.total} Total
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold">
+              Latest On Top
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Total Applications', value: stats.total, color: 'from-blue-500 to-blue-600' },
-          { label: 'Pending Review', value: stats.pending, color: 'from-orange-400 to-orange-500' },
-          { label: 'Manager Approved', value: stats.manager_approved, color: 'from-blue-400 to-blue-500' },
-          { label: 'Approved', value: stats.approved, color: 'from-green-500 to-green-600' },
-          { label: 'Rejected', value: stats.rejected, color: 'from-red-500 to-red-600' },
+          { label: 'Total', value: stats.total, tone: 'text-slate-800 bg-slate-50 border-slate-200' },
+          { label: 'Pending', value: stats.pending, tone: 'text-amber-800 bg-amber-50 border-amber-200' },
+          { label: 'Manager Approved', value: stats.manager_approved, tone: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+          { label: 'Approved', value: stats.approved, tone: 'text-green-800 bg-green-50 border-green-200' },
+          { label: 'Rejected', value: stats.rejected, tone: 'text-red-800 bg-red-50 border-red-200' },
         ].map((stat, idx) => (
-          <Card key={idx} className={`bg-gradient-to-br ${stat.color} text-white border-none shadow-md`}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium opacity-90">{stat.label}</CardTitle>
+          <Card key={idx} className={`border shadow-[0_10px_25px_-20px_rgba(15,23,42,0.45)] ${stat.tone}`}>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-medium">{stat.label}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stat.value}</div>
+              <div className="text-3xl font-bold leading-none">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-lg shadow-sm border">
+      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.45)]">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             placeholder="Search by name, email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white border-slate-300 focus-visible:ring-emerald-500"
           />
         </div>
 
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[220px] border-slate-300">
              <div className="flex items-center gap-2"> 
                 <ClipboardCheck className="w-4 h-4" />
                 <SelectValue placeholder="All Status" />
@@ -264,7 +290,7 @@ const ManagerApplications = () => {
       {/* Applications List */}
       <div className="space-y-4">
         {filteredApplications.length === 0 ? (
-          <Card className="bg-slate-50 border-dashed">
+          <Card className="bg-slate-50 border-dashed border-slate-300">
             <CardContent className="pt-6">
               <div className="text-center py-12">
                 <div className="bg-white p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center shadow-sm mb-4">
@@ -281,17 +307,17 @@ const ManagerApplications = () => {
           </Card>
         ) : (
           filteredApplications.map((app) => (
-            <Card key={app.id} className="hover:shadow-md transition-shadow cursor-pointer border-slate-200">
-              <CardHeader className="pb-3 border-b bg-slate-50/50">
+            <Card key={app.id} className="transition-shadow border-slate-200/90 hover:shadow-[0_14px_28px_-22px_rgba(15,23,42,0.65)]">
+              <CardHeader className="pb-3 border-b bg-slate-50/70">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                       <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                       <Badge variant="outline" className="bg-white text-emerald-700 border-emerald-200">
                           {app.units?.unit_number ? `Unit ${app.units.unit_number}` : 'General Application'}
                        </Badge>
                        <span className="text-xs text-slate-400 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {new Date(app.created_at).toLocaleDateString()}
+                          {new Date(app.created_at).toLocaleString('en-GB')}
                        </span>
                     </div>
                     <CardTitle className="text-lg font-bold text-slate-800">
@@ -328,15 +354,15 @@ const ManagerApplications = () => {
                         <p className="text-xs font-medium text-slate-500 uppercase">Property</p>
                         <p className="font-semibold text-slate-800 flex items-center gap-1">
                             <Home className="w-4 h-4 text-slate-400" />
-                            {app.properties?.name}
+                          {app.properties?.name || 'Unknown Property'}
                         </p>
-                        <p className="text-sm text-slate-500 pl-5">{app.properties?.location}</p>
+                        <p className="text-sm text-slate-500 pl-5">{app.properties?.location || '-'}</p>
                     </div>
 
                     <div className="space-y-1">
                          <p className="text-xs font-medium text-slate-500 uppercase">Unit Details</p>
                          <p className="font-semibold text-slate-800">
-                            {app.units?.unit_number}
+                          {app.units?.unit_number || 'Not assigned'}
                          </p>
                          <p className="text-sm text-slate-600 font-medium">
                             {app.units?.price ? `KSh ${app.units.price.toLocaleString()}` : 'Price not set'} 
@@ -351,7 +377,7 @@ const ManagerApplications = () => {
                             onValueChange={(value) => handleStatusChange(app.id, value)}
                             disabled={updatingId === app.id}
                             >
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full border-slate-300 focus:ring-emerald-500">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

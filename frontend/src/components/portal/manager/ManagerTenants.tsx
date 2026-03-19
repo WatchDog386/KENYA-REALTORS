@@ -7,9 +7,6 @@ import { toast } from 'sonner';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Dialog,
@@ -17,25 +14,24 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { 
   Users, 
   Search, 
   Mail, 
   Phone, 
   Calendar, 
-  MapPin, 
-  User, 
+  User,
   FileText, 
-  MoreVertical,
   Filter,
   Download,
   Loader2,
   MessageSquare,
   LayoutGrid,
-  List
+  List,
+  Building2,
+  Eye,
+  Hash,
 } from 'lucide-react';
 import {
   Table,
@@ -48,15 +44,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface Tenant {
   id: string;
@@ -71,6 +59,16 @@ interface Tenant {
   lease_end_date?: string;
 }
 
+interface TenantDetails {
+  tenant: Tenant;
+  property_name?: string;
+  floor_name?: string;
+  lease_id?: string;
+  lease_created_at?: string;
+  profile_created_at?: string;
+  account_status?: string;
+}
+
 const ManagerTenants: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -81,7 +79,9 @@ const ManagerTenants: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [tenantDetails, setTenantDetails] = useState<TenantDetails | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isDetailsLoading, setIsDetailsLoading] = useState(false);
 
   useEffect(() => {
     loadTenants();
@@ -206,9 +206,90 @@ const ManagerTenants: React.FC = () => {
     });
   };
 
+  const formatDate = (date?: string, fallback = '-') => {
+    return date ? new Date(date).toLocaleDateString('en-GB') : fallback;
+  };
+
+  const formatStatus = (status?: string) => {
+    if (!status) return 'Unknown';
+    return status.replace('_', ' ');
+  };
+
+  const loadTenantDetails = async (tenant: Tenant) => {
+    setIsDetailsLoading(true);
+    try {
+      const [leaseRes, profileRes] = await Promise.all([
+        supabase
+          .from('tenant_leases')
+          .select(`
+            id,
+            status,
+            start_date,
+            end_date,
+            created_at,
+            units (
+              id,
+              unit_number,
+              floor,
+              properties (
+                name
+              )
+            )
+          `)
+          .eq('tenant_id', tenant.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, phone, status, created_at')
+          .eq('id', tenant.id)
+          .maybeSingle(),
+      ]);
+
+      if (leaseRes.error) throw leaseRes.error;
+      if (profileRes.error) throw profileRes.error;
+
+      const lease = leaseRes.data as any;
+      const profile = profileRes.data as any;
+      const leaseUnit = lease?.units || {};
+      const leaseProperty = leaseUnit?.properties as any;
+
+      const mergedTenant: Tenant = {
+        ...tenant,
+        first_name: profile?.first_name || tenant.first_name,
+        last_name: profile?.last_name || tenant.last_name,
+        email: profile?.email || tenant.email,
+        phone: profile?.phone || tenant.phone,
+        lease_status: lease?.status || tenant.lease_status,
+        move_in_date: lease?.start_date || tenant.move_in_date,
+        lease_end_date: lease?.end_date || tenant.lease_end_date,
+        unit_name: leaseUnit?.unit_number || tenant.unit_name,
+      };
+
+      setTenantDetails({
+        tenant: mergedTenant,
+        property_name: leaseProperty?.name || propertyName,
+        floor_name: leaseUnit?.floor || undefined,
+        lease_id: lease?.id,
+        lease_created_at: lease?.created_at,
+        profile_created_at: profile?.created_at,
+        account_status: profile?.status || undefined,
+      });
+    } catch (error) {
+      console.error('Error loading tenant details:', error);
+      toast.error('Failed to fetch full tenant details');
+      setTenantDetails({ tenant, property_name: propertyName });
+    } finally {
+      setIsDetailsLoading(false);
+    }
+  };
+
   const handleViewProfile = (tenant: Tenant) => {
     setSelectedTenant(tenant);
+    setTenantDetails(null);
     setIsProfileOpen(true);
+    void loadTenantDetails(tenant);
   };
 
   if (loading) {
@@ -345,104 +426,99 @@ const ManagerTenants: React.FC = () => {
               )}
             </div>
         ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-10">
-                {filteredTenants.map((tenant) => {
-                    const isActive = tenant.lease_status === 'active';
-                    const gradientClass = isActive 
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-600" 
-                        : "bg-gradient-to-r from-amber-500 to-orange-600";
-                    const avatarBg = isActive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700";
-                    const buttonClass = isActive
-                         ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200"
-                         : "bg-orange-500 hover:bg-orange-600 shadow-orange-200";
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
+            {filteredTenants.map((tenant) => {
+              const isActive = tenant.lease_status === 'active';
+              const gradientClass = isActive
+                ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600'
+                : 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500';
+              const badgeClass = isActive
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border border-amber-200';
 
-                    return (
-                        <div key={tenant.id} className="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 overflow-visible flex flex-col h-full sticky-card relative">
-                            {/* Card Header */}
-                            <div className={`h-24 ${gradientClass} rounded-t-xl relative overflow-hidden`}>
-                                <div className="absolute top-3 right-3 z-10">
-                                    <Badge className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm">
-                                        {tenant.lease_status === 'active' ? 'Active Lease' : tenant.lease_status.replace('_', ' ')}
-                                    </Badge>
-                                </div>
-                                <div className="absolute inset-0 bg-black/5 mix-blend-overlay"></div>
-                            </div>
-                            
-                            {/* Card Body */}
-                            <div className="px-6 relative flex-1 flex flex-col bg-white rounded-b-xl">
-                                <div className="-mt-12 mb-4 flex justify-between items-end relative z-10">
-                                    <Avatar className="h-24 w-24 border-4 border-white shadow-md bg-white">
-                                        <AvatarFallback className={`${avatarBg} text-2xl font-bold`}>
-                                            {getInitials(tenant.first_name, tenant.last_name)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="mb-1 text-right max-w-[50%]">
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Unit</span>
-                                        <span className="text-2xl font-bold text-slate-800 truncate block" title={tenant.unit_name}>{tenant.unit_name}</span>
-                                    </div>
-                                </div>
-                                
-                                <div className="mb-6">
-                                    <h3 className="text-xl font-bold text-slate-900 leading-tight truncate" title={`${tenant.first_name} ${tenant.last_name}`}>
-                                        {tenant.first_name} {tenant.last_name}
-                                    </h3>
-                                    <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-1">
-                                        <Mail size={14} className="shrink-0" />
-                                        <span className="truncate" title={tenant.email}>{tenant.email}</span>
-                                    </div>
-                                </div>
+              return (
+                <div key={tenant.id} className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden">
+                  <div className={`${gradientClass} p-5 relative`}>
+                    <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/10" />
+                    <div className="flex items-start justify-between gap-4 relative z-10">
+                      <Avatar className="h-14 w-14 border-2 border-white/50 shadow-sm">
+                        <AvatarFallback className="bg-white/90 text-slate-900 text-base font-bold">
+                          {getInitials(tenant.first_name, tenant.last_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-right">
+                        <p className="text-[11px] uppercase tracking-widest text-white/80 font-semibold">Unit</p>
+                        <p className="text-2xl font-bold text-white leading-tight break-words">{tenant.unit_name || 'Unassigned'}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 relative z-10">
+                      <h3 className="text-xl font-bold text-white break-words">{tenant.first_name} {tenant.last_name}</h3>
+                      <p className="text-sm text-white/90 break-all mt-1">{tenant.email || 'No email provided'}</p>
+                    </div>
+                  </div>
 
-                                <div className="space-y-3 mb-6 flex-1">
-                                    <div className="flex items-center justify-between text-sm py-2 border-b border-slate-50">
-                                        <span className="text-slate-500 flex items-center gap-2"><Phone size={14} /> Phone</span>
-                                        <span className="font-medium text-slate-700">{tenant.phone || 'N/A'}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm py-2 border-b border-slate-50">
-                                        <span className="text-slate-500 flex items-center gap-2"><Calendar size={14} /> Move In</span>
-                                        <span className="font-medium text-slate-700">{tenant.move_in_date ? new Date(tenant.move_in_date).toLocaleDateString() : 'N/A'}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-sm py-2 border-b border-slate-50">
-                                        <span className="text-slate-500 flex items-center gap-2"><FileText size={14} /> Lease End</span>
-                                        <span className="font-medium text-slate-700">{tenant.lease_end_date ? new Date(tenant.lease_end_date).toLocaleDateString() : 'Month-to-Month'}</span>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex gap-2 pb-6 mt-auto">
-                                    <Button 
-                                        onClick={() => handleViewProfile(tenant)}
-                                        className="flex-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all h-9"
-                                    >
-                                        <User size={16} className="mr-2" /> Profile
-                                    </Button>
-                                    <Button 
-                                        onClick={() => handleMessage(tenant)}
-                                        className={`flex-1 text-white shadow-sm h-9 ${buttonClass}`}
-                                    >
-                                        <MessageSquare size={16} className="mr-2" /> Message
-                                    </Button>
-                                </div>
-                            </div>
+                  <div className="p-5 space-y-4 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge className={badgeClass}>{formatStatus(tenant.lease_status)}</Badge>
+                      <span className="text-xs text-slate-500">ID: {tenant.id.slice(0, 8)}</span>
+                    </div>
+
+                    <div className="space-y-3 flex-1">
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                        <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5" /> Phone
+                        </p>
+                        <p className="text-sm font-semibold text-slate-800 break-words">{tenant.phone || 'Not provided'}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-slate-100 p-3">
+                          <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Move In</p>
+                          <p className="text-sm font-semibold text-slate-800">{formatDate(tenant.move_in_date)}</p>
                         </div>
-                    );
-                })}
-            </div>
+                        <div className="rounded-xl border border-slate-100 p-3">
+                          <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Lease End</p>
+                          <p className="text-sm font-semibold text-slate-800">{formatDate(tenant.lease_end_date, 'Month-to-Month')}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mt-auto">
+                      <Button
+                        onClick={() => handleViewProfile(tenant)}
+                        variant="outline"
+                        className="h-10 border-slate-300 text-slate-700 hover:bg-slate-100"
+                      >
+                        <Eye size={16} className="mr-2" /> View Details
+                      </Button>
+                      <Button
+                        onClick={() => handleMessage(tenant)}
+                        className="h-10 bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        <MessageSquare size={16} className="mr-2" /> Message
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
             <Card className="border-slate-200 shadow-sm overflow-hidden">
              <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50/50">
+            <TableHeader className="bg-slate-50/80">
                 <TableRow>
-                  <TableHead className="w-[300px]">Tenant</TableHead>
-                  <TableHead>Contact Info</TableHead>
-                  <TableHead>Unit / Property</TableHead>
-                  <TableHead>Lease Period</TableHead>
+              <TableHead className="w-[280px]">Tenant</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Unit</TableHead>
+              <TableHead>Lease</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTenants.map((tenant) => (
-                  <TableRow key={tenant.id} className="group hover:bg-slate-50/50 transition-colors">
+              <TableRow key={tenant.id} className="group hover:bg-slate-50/60 transition-colors">
                     <TableCell>
                         <div className="flex items-center gap-3">
                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
@@ -457,36 +533,35 @@ const ManagerTenants: React.FC = () => {
                         </div>
                     </TableCell>
                     <TableCell>
-                        <div className="space-y-1">
+                      <div className="space-y-1 max-w-[260px]">
                             <div className="flex items-center gap-2 text-sm text-slate-600">
                                 <Mail size={14} className="text-slate-400" />
-                                <span className="truncate max-w-[180px]" title={tenant.email}>{tenant.email}</span>
+                          <span className="break-all">{tenant.email}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-slate-600">
                                 <Phone size={14} className="text-slate-400" />
-                                <span>{tenant.phone || 'N/A'}</span>
+                          <span>{tenant.phone || 'Not provided'}</span>
                             </div>
                         </div>
                     </TableCell>
                     <TableCell>
-                        <div className="flex items-center gap-2">
-                             <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-700 font-bold text-sm">
-                                 {tenant.unit_name}
-                             </div>
-                             <span className="text-sm font-medium text-slate-600">{propertyName}</span>
+                      <div className="space-y-1">
+                         <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-blue-700">
+                           <Building2 className="h-4 w-4" />
+                           Unit {tenant.unit_name}
+                         </div>
+                         <p className="text-xs text-slate-500">{propertyName || 'Property'}</p>
                         </div>
                     </TableCell>
                     <TableCell>
                         <div className="space-y-1">
                             <div className="flex items-center gap-2 text-sm text-slate-700">
                                 <Calendar size={14} className="text-slate-400" />
-                                <span>In: {tenant.move_in_date ? new Date(tenant.move_in_date).toLocaleDateString() : '-'}</span>
+                                <span>In: {formatDate(tenant.move_in_date)}</span>
                             </div>
-                            {tenant.lease_end_date && (
-                                <div className="text-xs text-slate-500 pl-6">
-                                    Ends: {new Date(tenant.lease_end_date).toLocaleDateString()}
-                                </div>
-                            )}
+                              <div className="text-xs text-slate-500 pl-6">
+                                Ends: {formatDate(tenant.lease_end_date, 'Month-to-Month')}
+                              </div>
                         </div>
                     </TableCell>
                     <TableCell>
@@ -495,30 +570,27 @@ const ManagerTenants: React.FC = () => {
                             ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100'
                             : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-100'
                         }>
-                            {tenant.lease_status.replace('_', ' ')}
+                            {formatStatus(tenant.lease_status)}
                         </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-700">
-                                    <MoreVertical size={16} />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-[160px]">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                    <User className="w-4 h-4 mr-2" /> View Profile
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <FileText className="w-4 h-4 mr-2" /> Lease Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <MessageSquare className="w-4 h-4 mr-2" /> Message
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="inline-flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewProfile(tenant)}
+                            className="border-slate-300"
+                          >
+                            <Eye className="w-4 h-4 mr-1.5" /> View Details
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleMessage(tenant)}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-1.5" /> Message
+                          </Button>
+                        </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -530,57 +602,94 @@ const ManagerTenants: React.FC = () => {
       </div>
 
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Tenant Profile</DialogTitle>
-            <DialogDescription>
-              Details for {selectedTenant?.first_name} {selectedTenant?.last_name}
-            </DialogDescription>
+            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-6 py-5 text-white">
+              <DialogTitle className="text-xl">Tenant Details</DialogTitle>
+              <DialogDescription className="text-blue-100 mt-1">
+                Full tenant profile aligned with super admin detail view
+              </DialogDescription>
+            </div>
           </DialogHeader>
           {selectedTenant && (
-            <div className="space-y-6 py-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 border-2 border-slate-200">
-                    <AvatarFallback className="bg-slate-100 text-slate-700 text-xl font-bold">
-                        {getInitials(selectedTenant.first_name, selectedTenant.last_name)}
-                    </AvatarFallback>
-                </Avatar>
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900">{selectedTenant.first_name} {selectedTenant.last_name}</h3>
-                    <p className="text-sm text-slate-500">{selectedTenant.email}</p>
-                    <Badge variant="secondary" className="mt-1">{selectedTenant.lease_status.replace('_', ' ')}</Badge>
+            <div className="p-6 space-y-6">
+              {isDetailsLoading ? (
+                <div className="py-10 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-[#154279]" />
+                  <p className="text-sm text-slate-500 mt-3">Fetching full tenant details...</p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <Avatar className="h-16 w-16 border-2 border-slate-200">
+                      <AvatarFallback className="bg-slate-100 text-slate-700 text-xl font-bold">
+                        {getInitials(tenantDetails?.tenant.first_name || selectedTenant.first_name, tenantDetails?.tenant.last_name || selectedTenant.last_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-bold text-slate-900 break-words">
+                        {tenantDetails?.tenant.first_name || selectedTenant.first_name} {tenantDetails?.tenant.last_name || selectedTenant.last_name}
+                      </h3>
+                      <p className="text-sm text-slate-500 break-all">{tenantDetails?.tenant.email || selectedTenant.email || 'No email'}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {formatStatus(tenantDetails?.tenant.lease_status || selectedTenant.lease_status)}
+                        </Badge>
+                        <Badge variant="outline">{tenantDetails?.account_status || 'active'}</Badge>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 uppercase tracking-wider">Phone</Label>
-                      <div className="font-medium">{selectedTenant.phone || 'N/A'}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Phone</p>
+                      <p className="font-semibold text-slate-800">{tenantDetails?.tenant.phone || selectedTenant.phone || 'Not provided'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Property</p>
+                      <p className="font-semibold text-slate-800 break-words">{tenantDetails?.property_name || propertyName || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Unit</p>
+                      <p className="font-semibold text-slate-800">{tenantDetails?.tenant.unit_name || selectedTenant.unit_name || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1">Floor</p>
+                      <p className="font-semibold text-slate-800">{tenantDetails?.floor_name || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><Calendar className="h-3.5 w-3.5 inline-block mr-1" /> Move In</p>
+                      <p className="font-semibold text-slate-800">{formatDate(tenantDetails?.tenant.move_in_date || selectedTenant.move_in_date)}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><FileText className="h-3.5 w-3.5 inline-block mr-1" /> Lease End</p>
+                      <p className="font-semibold text-slate-800">{formatDate(tenantDetails?.tenant.lease_end_date || selectedTenant.lease_end_date, 'Month-to-Month')}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 uppercase tracking-wider">Unit</Label>
-                      <div className="font-medium text-indigo-600">{selectedTenant.unit_name}</div>
+
+                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
+                    <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">Audit Information</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <p className="text-slate-600">Tenant ID: <span className="font-medium text-slate-800 break-all">{selectedTenant.id}</span></p>
+                      <p className="text-slate-600">Lease ID: <span className="font-medium text-slate-800 break-all">{tenantDetails?.lease_id || 'N/A'}</span></p>
+                      <p className="text-slate-600">Profile Created: <span className="font-medium text-slate-800">{formatDate(tenantDetails?.profile_created_at)}</span></p>
+                      <p className="text-slate-600">Lease Created: <span className="font-medium text-slate-800">{formatDate(tenantDetails?.lease_created_at)}</span></p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 uppercase tracking-wider">Move In Date</Label>
-                      <div className="font-medium">{selectedTenant.move_in_date ? new Date(selectedTenant.move_in_date).toLocaleDateString() : 'N/A'}</div>
-                  </div>
-                  <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 uppercase tracking-wider">Lease End</Label>
-                      <div className="font-medium">{selectedTenant.lease_end_date ? new Date(selectedTenant.lease_end_date).toLocaleDateString() : 'Month-to-month'}</div>
-                  </div>
+                </>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button variant="outline" onClick={() => setIsProfileOpen(false)}>Close</Button>
+                <Button onClick={() => {
+                  setIsProfileOpen(false);
+                  if (selectedTenant) handleMessage(selectedTenant);
+                }}>
+                  <MessageSquare className="w-4 h-4 mr-2" /> Message Tenant
+                </Button>
               </div>
             </div>
           )}
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-             <Button variant="outline" onClick={() => setIsProfileOpen(false)}>Close</Button>
-             <Button onClick={() => {
-                setIsProfileOpen(false);
-                if(selectedTenant) handleMessage(selectedTenant);
-             }}>
-                <MessageSquare className="w-4 h-4 mr-2" /> Send Message
-             </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

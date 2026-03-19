@@ -19,6 +19,7 @@ import { formatCurrency } from "@/utils/formatCurrency";
 interface BillingRow {
   unit_id: string;
   unit_number: string;
+  floor_number?: number | string | null;
   unit_type: string;
   monthly_rent: number;
   
@@ -51,6 +52,38 @@ const ManagerRentCollection = () => {
   const [propertyName, setPropertyName] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [searchTerm, setSearchTerm] = useState('');
+
+  const getFloorSortValue = (floor: number | string | null | undefined) => {
+    if (floor === null || floor === undefined || floor === '') return 0;
+    const normalized = String(floor).trim().toUpperCase();
+    const floorOrder: Record<string, number> = {
+      B5: -5,
+      B4: -4,
+      B3: -3,
+      B2: -2,
+      B1: -1,
+      B: -1,
+      G: 0,
+      M: 0.5,
+    };
+    if (Object.prototype.hasOwnProperty.call(floorOrder, normalized)) {
+      return floorOrder[normalized];
+    }
+
+    const parsed = Number(normalized);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const sortRowsLikeUnitManagement = (items: BillingRow[]) => {
+    return [...items].sort((a, b) => {
+      const floorDiff = getFloorSortValue(a.floor_number) - getFloorSortValue(b.floor_number);
+      if (floorDiff !== 0) return floorDiff;
+      return String(a.unit_number).localeCompare(String(b.unit_number), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    });
+  };
 
   useEffect(() => {
     loadBillingData();
@@ -120,7 +153,7 @@ const ManagerRentCollection = () => {
       const { data: units, error: unitsError } = await supabase
         .from('units')
         .select(`
-          id, unit_number, status, property_id,
+          id, unit_number, floor_number, status, property_id,
           property_unit_types (name, price_per_unit),
           leases:tenant_leases (tenant_id, rent_amount, status)
         `)
@@ -199,6 +232,7 @@ const ManagerRentCollection = () => {
         return {
           unit_id: unit.id,
           unit_number: unit.unit_number,
+          floor_number: unit.floor_number,
           unit_type: unitType,
           monthly_rent: monthlyRent,
           
@@ -221,7 +255,7 @@ const ManagerRentCollection = () => {
         };
       });
 
-      setRows(processedRows);
+      setRows(sortRowsLikeUnitManagement(processedRows));
 
     } catch (err) {
       console.error('Error loading billing data:', err);

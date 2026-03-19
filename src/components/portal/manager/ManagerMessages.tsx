@@ -166,40 +166,80 @@ const ManagerMessages = () => {
     msg.recipient?.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const getPartyName = (party?: any) => {
+    if (!party) return 'Unknown User';
+    const full = `${party.first_name || ''} ${party.last_name || ''}`.trim();
+    return full || party.email || 'Unknown User';
+  };
+
+  const getPartyInitials = (party?: any) => {
+    const name = getPartyName(party);
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+  };
+
+  const unreadCount = filteredMessages.filter((msg) => !msg.is_read && msg.recipient_id === user?.id).length;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <MessageSquare className="w-8 h-8 text-blue-600" />
-            <h1 className="text-4xl font-bold text-slate-900">Messages</h1>
+    <div className="min-h-screen bg-gradient-to-b from-zinc-100 via-slate-50 to-stone-100/70">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+        <div className="mb-6 md:mb-8 rounded-2xl border border-slate-200/80 bg-white/95 p-5 md:p-6 shadow-[0_10px_30px_-20px_rgba(15,23,42,0.35)]">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Message Center</h1>
+              </div>
+              <p className="text-slate-600">Review conversations, reply quickly, and send new messages.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm font-medium">
+                {filteredMessages.length} Conversations
+              </span>
+              <span className="px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold">
+                {unreadCount} Unread
+              </span>
+            </div>
           </div>
-          <p className="text-slate-600">Communicate with tenants, staff, and other managers</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
           {/* Messages List */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 border-b border-slate-200">
+          <aside>
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.45)] overflow-hidden h-full">
+              <div className="p-4 border-b border-slate-200 bg-slate-50/70">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-700">Conversation List</p>
+                  <span className="text-xs font-medium text-slate-500">{filteredMessages.length} total</span>
+                </div>
                 <div className="flex gap-2 mb-4">
                   <Input
                     placeholder="Search messages..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     prefix={<Search size={16} className="text-slate-400" />}
+                    className="bg-white border-slate-300 focus-visible:ring-emerald-500"
                   />
                 </div>
-                <Button onClick={() => setShowCompose(true)} className="w-full bg-blue-600 hover:bg-blue-700">
+                <Button
+                  onClick={() => {
+                    setShowCompose(true);
+                    setSelectedMessage(null);
+                  }}
+                  className="w-full h-11 bg-[#0f766e] hover:bg-[#0b5e59] text-white font-semibold"
+                >
                   <Send size={16} className="mr-2" />
                   New Message
                 </Button>
               </div>
 
-              <div className="max-h-[600px] overflow-y-auto">
+              <div className="max-h-[650px] overflow-y-auto">
                 {loading ? (
                   <div className="p-8 flex justify-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                    <Loader2 className="w-6 h-6 animate-spin text-emerald-700" />
                   </div>
                 ) : filteredMessages.length === 0 ? (
                   <div className="p-8 text-center text-slate-500">
@@ -209,42 +249,55 @@ const ManagerMessages = () => {
                 ) : (
                   filteredMessages.map(msg => {
                     const otherParty = msg.sender_id === user?.id ? msg.recipient : msg.sender;
+                    const isSelected = selectedMessage?.id === msg.id;
+                    const shouldShowUnread = !msg.is_read && msg.recipient_id === user?.id;
                     return (
                       <button
                         key={msg.id}
                         onClick={() => {
                           setSelectedMessage(msg);
-                          markAsRead(msg.id);
+                          setShowCompose(false);
+                          if (shouldShowUnread) {
+                            void markAsRead(msg.id);
+                          }
                         }}
                         className={`w-full text-left p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors ${
-                          selectedMessage?.id === msg.id ? 'bg-blue-50' : ''
-                        } ${!msg.is_read ? 'bg-blue-50' : ''}`}
+                          isSelected ? 'bg-emerald-50/70 border-l-4 border-l-emerald-700 pl-3' : ''
+                        } ${shouldShowUnread ? 'bg-emerald-50/40' : ''}`}
                       >
-                        <div className="flex items-start justify-between mb-1">
-                          <p className="font-semibold text-slate-900 truncate">
-                            {otherParty?.first_name} {otherParty?.last_name}
-                          </p>
-                          {!msg.is_read && (
-                            <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-2" />
-                          )}
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {getPartyInitials(otherParty)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="font-semibold text-slate-900 truncate">
+                                {getPartyName(otherParty)}
+                              </p>
+                              {shouldShowUnread && (
+                                <div className="w-2 h-2 bg-emerald-700 rounded-full flex-shrink-0 mt-2" />
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-600 truncate">{msg.subject}</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {new Date(msg.created_at).toLocaleDateString('en-GB')}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-sm text-slate-600 truncate">{msg.subject}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {new Date(msg.created_at).toLocaleDateString()}
-                        </p>
                       </button>
                     );
                   })
                 )}
               </div>
             </div>
-          </div>
+          </aside>
 
           {/* Message Detail */}
-          <div className="lg:col-span-2">
+          <section>
             {showCompose ? (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h2 className="text-2xl font-bold text-slate-900 mb-4">New Message</h2>
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.45)] p-5 md:p-6">
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-1">Compose Message</h2>
+                <p className="text-sm text-slate-600 mb-5">Enter recipient email, subject, and your message below.</p>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">To (Email)</label>
@@ -252,6 +305,7 @@ const ManagerMessages = () => {
                       placeholder="recipient@example.com"
                       value={newMessage.to}
                       onChange={(e) => setNewMessage({ ...newMessage, to: e.target.value })}
+                      className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500"
                     />
                   </div>
                   <div>
@@ -260,6 +314,7 @@ const ManagerMessages = () => {
                       placeholder="Message subject"
                       value={newMessage.subject}
                       onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+                      className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500"
                     />
                   </div>
                   <div>
@@ -269,61 +324,80 @@ const ManagerMessages = () => {
                       value={newMessage.content}
                       onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
                       rows={8}
+                      className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500 min-h-[220px] resize-y"
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={handleSendNewMessage} disabled={sendingReply} className="bg-blue-600 hover:bg-blue-700">
+                    <Button onClick={handleSendNewMessage} disabled={sendingReply} className="bg-[#0f766e] hover:bg-[#0b5e59] text-white font-semibold">
                       {sendingReply ? 'Sending...' : 'Send Message'}
                     </Button>
-                    <Button onClick={() => setShowCompose(false)} variant="outline">
+                    <Button onClick={() => setShowCompose(false)} variant="outline" className="border-slate-300">
                       Cancel
                     </Button>
                   </div>
                 </div>
               </div>
             ) : selectedMessage ? (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="mb-6 pb-6 border-b border-slate-200">
-                  <div className="flex items-start justify-between mb-4">
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.45)] overflow-hidden">
+                <div className="px-5 md:px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-900">{selectedMessage.subject}</h2>
-                      <p className="text-slate-600 mt-1">
+                      <h2 className="text-xl md:text-2xl font-bold text-slate-900">{selectedMessage.subject}</h2>
+                      <p className="text-slate-600 mt-1 text-sm md:text-base">
                         {selectedMessage.sender_id === user?.id ? 'To: ' : 'From: '}
                         {selectedMessage.sender_id === user?.id 
                           ? `${selectedMessage.recipient?.first_name} ${selectedMessage.recipient?.last_name}`
                           : `${selectedMessage.sender?.first_name} ${selectedMessage.sender?.last_name}`}
                       </p>
                     </div>
-                    <p className="text-sm text-slate-500">
-                      {new Date(selectedMessage.created_at).toLocaleString()}
+                    <p className="text-xs md:text-sm text-slate-500 text-right">
+                      {new Date(selectedMessage.created_at).toLocaleString('en-GB')}
                     </p>
                   </div>
-                  <p className="text-slate-700 whitespace-pre-wrap">{selectedMessage.content}</p>
+                </div>
+
+                <div className="px-5 md:px-6 py-6">
+                  <div className="max-w-3xl rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+                    <p className="text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedMessage.content}</p>
+                  </div>
                 </div>
 
                 {/* Reply Box */}
-                <div>
+                <div className="px-5 md:px-6 pb-6">
                   <label className="block text-sm font-medium text-slate-700 mb-2">Reply</label>
                   <Textarea
                     placeholder="Type your reply..."
                     value={replyContent}
                     onChange={(e) => setReplyContent(e.target.value)}
                     rows={4}
+                    className="bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus-visible:ring-emerald-500 min-h-[140px] resize-y"
                   />
                   <div className="flex gap-2 mt-4">
-                    <Button onClick={handleSendReply} disabled={sendingReply} className="bg-blue-600 hover:bg-blue-700">
+                    <Button onClick={handleSendReply} disabled={sendingReply} className="bg-[#0f766e] hover:bg-[#0b5e59] text-white font-semibold">
                       {sendingReply ? 'Sending...' : 'Send Reply'}
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                <MessageSquare className="w-16 h-16 mx-auto mb-4 opacity-30 text-slate-400" />
-                <p className="text-slate-600 text-lg">Select a message to view details</p>
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_10px_25px_-20px_rgba(15,23,42,0.45)] p-10 md:p-14 text-center">
+                <div className="h-16 w-16 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8" />
+                </div>
+                <p className="text-slate-700 text-lg font-semibold mb-1">No conversation selected</p>
+                <p className="text-slate-500 mb-5">Choose a message from the list or start a new conversation.</p>
+                <Button
+                  onClick={() => {
+                    setShowCompose(true);
+                    setSelectedMessage(null);
+                  }}
+                  className="bg-[#0f766e] hover:bg-[#0b5e59] text-white"
+                >
+                  <Send className="w-4 h-4 mr-2" /> Start New Message
+                </Button>
               </div>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </div>

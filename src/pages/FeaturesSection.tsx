@@ -166,6 +166,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
 
 const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
     const [manager, setManager] = React.useState<any>(null);
+    const [activeImageIndex, setActiveImageIndex] = React.useState(0);
 
     React.useEffect(() => {
         const fetchManager = async () => {
@@ -248,13 +249,49 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                     </div>
                 </div>
 
-                {/* 2. Gallery Section - Removed per latest request */}
+                {/* 2. Main Image Section */}
                 <div className="p-6 md:p-10 pt-4">
-                    <div className="w-full bg-[#154279]/5 rounded-xl border border-[#154279]/10 p-6 flex items-center justify-center h-24">
-                         <span className="text-[#154279] font-medium text-sm flex items-center gap-2">
-                            <FileText size={18} className="text-[#F96302]" /> Detailed Unit Information Below
-                         </span>
-                    </div>
+                    {item.gallery && item.gallery.length > 0 ? (
+                        <div className="flex flex-col gap-3">
+                            <div className="w-full h-[300px] md:h-[400px] rounded-xl overflow-hidden shadow-sm relative group">
+                                <img 
+                                    src={item.gallery[activeImageIndex]} 
+                                    alt={item.title}
+                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none"></div>
+                                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+                                    <span className="bg-white/90 text-[#154279] text-xs px-3 py-1.5 rounded-full font-bold backdrop-blur-sm">
+                                        {item.propertyName}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            {/* Thumbnail Gallery Navigation */}
+                            {item.gallery.length > 1 && (
+                                <div className="flex gap-3 overflow-x-auto pb-2 custom-scroll">
+                                    {item.gallery.map((img: string, idx: number) => (
+                                        <button 
+                                            key={idx}
+                                            onClick={() => setActiveImageIndex(idx)}
+                                            className={cn(
+                                                "w-24 h-20 rounded-lg overflow-hidden shrink-0 border-2 transition-all",
+                                                activeImageIndex === idx ? "border-[#F96302] opacity-100 ring-2 ring-[#F96302]/30" : "border-transparent opacity-60 hover:opacity-100"
+                                            )}
+                                        >
+                                            <img src={img} alt={`Thumbnail ${idx+1}`} className="w-full h-full object-cover"/>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="w-full bg-[#154279]/5 rounded-xl border border-[#154279]/10 p-6 flex items-center justify-center h-24">
+                             <span className="text-[#154279] font-medium text-sm flex items-center gap-2">
+                                <FileText size={18} className="text-[#F96302]" /> Detailed Unit Information Below
+                             </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* 3. Main Content & Sidebar */}
@@ -266,29 +303,11 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                         <div className="bg-slate-50 p-6 rounded-xl flex flex-wrap gap-8 md:gap-12 mb-10 border border-slate-200/60">
                             <div className="flex items-center gap-4">
                                 <div className="bg-[#154279]/5 p-3 rounded-lg">
-                                    <BedDouble size={24} className="text-[#F96302]"/>
-                                </div>
-                                <div>
-                                    <span className="block font-bold text-2xl text-[#154279] leading-none">{item.beds}</span>
-                                    <span className="text-xs text-slate-500 font-medium">Bedrooms</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="bg-[#154279]/5 p-3 rounded-lg">
                                     <Bath size={24} className="text-[#F96302]"/>
                                 </div>
                                 <div>
                                     <span className="block font-bold text-2xl text-[#154279] leading-none">{item.baths}</span>
-                                    <span className="text-xs text-slate-500 font-medium">Bathrooms</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="bg-[#154279]/5 p-3 rounded-lg">
-                                    <Maximize size={24} className="text-[#F96302]"/>
-                                </div>
-                                <div>
-                                    <span className="block font-bold text-2xl text-[#154279] leading-none">{item.sqft}</span>
-                                    <span className="text-xs text-slate-500 font-medium">Sq Ft</span>
+                                    <span className="text-xs text-slate-500 font-medium">Bathroom(s)</span>
                                 </div>
                             </div>
                         </div>
@@ -359,10 +378,6 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                                 <div className="flex justify-between bg-slate-50 rounded-lg p-3">
                                     <span className="font-medium text-slate-500 text-sm">Monthly Fee</span>
                                     <span className="font-semibold text-[#F96302]">KES {item.price.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
-                                    <span className="font-medium text-slate-500 text-sm">Floor Space</span>
-                                    <span className="font-semibold text-[#154279]">{item.sqft} Sq Ft</span>
                                 </div>
                                 <div className="flex justify-between bg-slate-50 rounded-lg p-3">
                                     <span className="font-medium text-slate-500 text-sm">Unit Type</span>
@@ -477,6 +492,7 @@ export default function AydenTowersListing() {
                         status,
                         property_id,
                         unit_type_id,
+                        image_url,
                         property_unit_types(
                             id,
                             unit_type_name,
@@ -502,7 +518,6 @@ export default function AydenTowersListing() {
                 // Transform database data into listing format
                 const listings = (unitsData || []).map((unit: any) => {
                     const prop = propertiesMap.get(unit.property_id) || {};
-                    const unitType = unit.property_unit_types || {};
                     
                     // Parse amenities if it's a string
                     let amenities: string[] = [];
@@ -516,15 +531,22 @@ export default function AydenTowersListing() {
                         amenities = prop.amenities;
                     }
                     
-                    const typeName = unitType.unit_type_name || unitType.name || "Unit";
+                    // Fallback to our mapped unit types if the embedded object is incomplete or an array
+                    let ut = unit.property_unit_types;
+                    if (Array.isArray(ut)) ut = ut[0];
+                    if (!ut || (!ut.unit_type_name && !ut.name)) {
+                        ut = unitTypesMap.get(unit.unit_type_id) || ut || {};
+                    }
+
+                    const typeName = ut.unit_type_name || ut.name || "Unit";
 
                     return {
                         id: unit.id,
                         unitNumber: unit.unit_number,
-                        title: `${typeName} at ${prop.name}`,
+                        title: prop.name || "Property",
                         type: typeName,
-                        typeId: unitType.id,
-                        price: unitType.price_per_unit || 0,
+                        typeId: ut.id || unit.unit_type_id,
+                        price: ut.price_per_unit || 0,
                         floor: "Available",
                         rating: 4.5,
                         location: prop.location || "Not specified",
@@ -536,11 +558,22 @@ export default function AydenTowersListing() {
                         featured: false,
                         amenities: amenities.slice(0, 5),
                         description: prop.description || 'Premium rental unit with modern amenities and excellent facilities.',
-                        gallery: prop.image_url ? [prop.image_url, "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?q=80&w=800", "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=800"] : [
-                            "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=1200",
-                            "https://images.unsplash.com/photo-1512918760383-eda2723ad6e1?q=80&w=800",
-                            "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=800"
-                        ]
+                        gallery: (() => {
+                            let imgs = [];
+                            try {
+                                if (unit.image_url) imgs = Array.isArray(JSON.parse(unit.image_url)) ? JSON.parse(unit.image_url) : [unit.image_url];
+                            } catch {
+                                if (unit.image_url) imgs = [unit.image_url];
+                            }
+                            if (imgs.length === 0) {
+                                try {
+                                    if (prop.image_url) imgs = Array.isArray(JSON.parse(prop.image_url)) ? JSON.parse(prop.image_url) : [prop.image_url];
+                                } catch {
+                                    if (prop.image_url) imgs = [prop.image_url];
+                                }
+                            }
+                            return imgs.filter(Boolean);
+                        })()
                     };
                 });
                 
@@ -857,7 +890,7 @@ export default function AydenTowersListing() {
                                           <div className={cn("p-4 cursor-pointer", getCardTheme(item.type).header)} onClick={() => setSelectedItem(item)}>
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className={cn("text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] inline-block", getCardTheme(item.type).tag)}>
-                                                    {item.type}
+                                                    AVAILABLE
                                                 </div>
                                                 {item.featured && (
                                                     <div className="bg-[#F96302] text-white text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] inline-block">
@@ -872,7 +905,7 @@ export default function AydenTowersListing() {
                                             className={cn("font-bold text-sm cursor-pointer transition-colors leading-tight mb-2 line-clamp-1 uppercase tracking-tight", getCardTheme(item.type).title)}
                                             onClick={() => setSelectedItem(item)}
                                         >
-                                            {item.title}
+                                            {item.propertyName}
                                         </h4>
 
                                         <div className="text-[10px] text-slate-500 mb-4 flex items-center gap-2 font-semibold uppercase tracking-wide">
@@ -887,7 +920,7 @@ export default function AydenTowersListing() {
                                             </div>
                                             <div className={cn("flex items-center gap-2 p-2 rounded-lg", getCardTheme(item.type).innerBox)}>
                                                 <BedDouble size={14} className={getCardTheme(item.type).icon} />
-                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider w-20">Type:</span>
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider w-20">Unit Type:</span>
                                                 <span className="text-xs font-semibold text-[#154279]">{item.type}</span>
                                             </div>
                                             <div className={cn("flex items-center gap-2 p-2 rounded-lg", getCardTheme(item.type).innerBox)}>
@@ -901,7 +934,7 @@ export default function AydenTowersListing() {
                                         <div className={cn("pt-4 mt-auto -mx-5 -mb-5 p-4", getCardTheme(item.type).priceBg)}>
                                             <div className="flex justify-between items-center">
                                                 <div className="flex flex-col">
-                                                    <span className={cn("text-[9px] font-bold uppercase tracking-[0.15em]", getCardTheme(item.type).price)}>Price/Month</span>
+                                                    <span className={cn("text-[9px] font-bold uppercase tracking-[0.15em]", getCardTheme(item.type).price)}>Rent</span>
                                                     <div className="flex items-baseline leading-none mt-1">
                                                         <span className={cn("text-[10px] font-bold mr-1", getCardTheme(item.type).price)}>KES</span>
                                                         <span className={cn("text-xl font-bold tracking-tight", getCardTheme(item.type).price)}>{item.price.toLocaleString()}</span>
@@ -930,10 +963,6 @@ export default function AydenTowersListing() {
                                                         View <ChevronRight size={12}/>
                                                     </button>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-4 text-[10px] text-[#154279] font-bold mt-2">
-                                                <span className="flex items-center gap-1"><BedDouble size={14} className="text-[#F96302]"/> {item.beds} Beds</span>
-                                                <span className="flex items-center gap-1"><Maximize size={14} className="text-[#F96302]"/> {item.sqft} sqft</span>
                                             </div>
                                         </div>
                                     </div>

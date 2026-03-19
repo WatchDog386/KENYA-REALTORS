@@ -1,30 +1,37 @@
 const fs = require('fs');
 let code = fs.readFileSync('src/components/portal/manager/ManagerApplications.tsx', 'utf8');
 
-code = code.replace(
-  '(profile.email?.toLowerCase().includes(searchString)) ||',
-  '(profile.email?.toLowerCase().includes(searchString)) ||\n      (app.applicant_name?.toLowerCase().includes(searchString)) ||'
-);
+const regex = /const handleStatusChange = async[^{]+{([^]+?)} catch/s;
 
-code = code.replace(
-                    '{app.profiles?.first_name} {app.profiles?.last_name}',
-                    '{app.applicant_name || (app.profiles ? \\ \\ : "Unknown")}'
-);
-code = code.replace(
-                    '<a href={\mailto:\\} className="flex items-center gap-2 hover:text-[#154279] transition-colors">',
-                    '<a href={\mailto:\\} className="flex items-center gap-2 hover:text-[#154279] transition-colors">'
-);
-code = code.replace(
-                      '{app.profiles?.email}',
-                      '{app.applicant_email || app.profiles?.email || "N/A"}'
-);
-code = code.replace(
-                      '<a href={\	el:\\} className="flex items-center gap-2 hover:text-[#154279] transition-colors">',
-                      '<a href={\	el:\\} className="flex items-center gap-2 hover:text-[#154279] transition-colors">'
-);
-code = code.replace(
-                      '{app.profiles?.phone}',
-                      '{app.telephone_numbers || app.profiles?.phone || "N/A"}'
-);
+const replacement = \const handleStatusChange = async (applicationId: string, newStatus: string) => {
+    setUpdatingId(applicationId);
+    try {
+      const { error } = await supabase
+        .from('lease_applications')
+        .update({ status: newStatus })
+        .eq('id', applicationId);
 
+      if (error) throw error;
+
+      if (newStatus === 'manager_approved') {
+        const app = applications.find(a => a.id === applicationId);
+        if (app && app.applicant_id && app.unit_id && app.property_id) {        
+            toast.success('Application approved by manager. Pending Superadmin approval.');
+        } else {
+            toast.error('Application data missing. Cannot process.');
+        }
+      } else {
+        toast.success(\\\Application marked as \\\\);
+      }
+
+      setApplications(
+        applications.map((app) =>
+          app.id === applicationId
+            ? { ...app, status: newStatus }
+            : app
+        )
+      );
+    } catch\;
+
+code = code.replace(regex, replacement);
 fs.writeFileSync('src/components/portal/manager/ManagerApplications.tsx', code);
