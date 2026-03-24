@@ -127,6 +127,13 @@ const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
       badge: stats?.pendingApprovals?.toString(),
     },
     {
+      title: "Leave Requests",
+      path: "/portal/super-admin/leave-requests",
+      icon: "calendar",
+      description: "Review staff leave submissions",
+      permission: "manage_approvals",
+    },
+    {
       title: "Analytics",
       path: "/portal/super-admin/analytics",
       icon: "bar-chart",

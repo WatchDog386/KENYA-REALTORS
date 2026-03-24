@@ -28,6 +28,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Interface Definitions
 interface Property {
@@ -59,6 +63,28 @@ interface RecentActivity {
   action?: string;
 }
 
+interface VacancyNoticeSummary {
+  id: string;
+  unit_id: string;
+  unit_number?: string;
+  tenant_name?: string;
+  move_out_date?: string;
+  status?: string;
+}
+
+interface ManagerDamageEntry {
+  id: string;
+  vacancyNoticeId: string;
+  unitId: string;
+  unitNumber: string;
+  item: string;
+  unitCost: number;
+  quantity: number;
+  labourCost: number;
+  total: number;
+  createdAt: string;
+}
+
 const ManagerDashboard: React.FC = () => {
     const { user } = useAuth();
     const { id } = useParams<{ id: string }>();
@@ -78,6 +104,14 @@ const ManagerDashboard: React.FC = () => {
     });
     const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
     const [userName, setUserName] = useState('');
+    const [vacancyNotices, setVacancyNotices] = useState<VacancyNoticeSummary[]>([]);
+    const [damageEntries, setDamageEntries] = useState<ManagerDamageEntry[]>([]);
+    const [selectedVacancyId, setSelectedVacancyId] = useState('');
+    const [damageItem, setDamageItem] = useState('');
+    const [damageUnitCost, setDamageUnitCost] = useState('0');
+    const [damageQuantity, setDamageQuantity] = useState('1');
+    const [damageLabourCost, setDamageLabourCost] = useState('0');
+    const [damageMemory, setDamageMemory] = useState<Record<string, { unitCost: number; labourCost: number }>>({});
   
     // System Status Mock (to match Super Admin aesthetics)
     // In a real app, this might come from a prop or context
@@ -168,6 +202,49 @@ const ManagerDashboard: React.FC = () => {
             if (monthlyPayments) {
                revenueMonth = monthlyPayments.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
             }
+
+            const { data: vacancyRows } = await supabase
+              .from('vacancy_notices')
+              .select('id, unit_id, tenant_id, move_out_date, status, units(unit_number), profiles:tenant_id(first_name, last_name)')
+              .eq('property_id', propertyId)
+              .in('status', ['pending', 'inspection_scheduled', 'approved'])
+              .order('created_at', { ascending: false });
+
+            const mappedVacancies: VacancyNoticeSummary[] = (vacancyRows || []).map((row: any) => ({
+              id: row.id,
+              unit_id: row.unit_id,
+              unit_number: row.units?.unit_number || '-',
+              tenant_name: `${row.profiles?.first_name || ''} ${row.profiles?.last_name || ''}`.trim() || 'Tenant',
+              move_out_date: row.move_out_date,
+              status: row.status,
+            }));
+
+            setVacancyNotices(mappedVacancies);
+            if (!selectedVacancyId && mappedVacancies.length > 0) {
+              setSelectedVacancyId(mappedVacancies[0].id);
+            }
+
+            const damageStorageKey = `manager-vacancy-damages:${propertyId}`;
+            const rawDamageEntries = typeof window !== 'undefined' ? window.localStorage.getItem(damageStorageKey) : null;
+            if (rawDamageEntries) {
+              try {
+                const parsed = JSON.parse(rawDamageEntries) as ManagerDamageEntry[];
+                setDamageEntries(parsed || []);
+              } catch {
+                setDamageEntries([]);
+              }
+            } else {
+              setDamageEntries([]);
+            }
+
+            const rawMemory = typeof window !== 'undefined' ? window.localStorage.getItem('damage-cost-memory:v1') : null;
+            if (rawMemory) {
+              try {
+                setDamageMemory(JSON.parse(rawMemory) || {});
+              } catch {
+                setDamageMemory({});
+              }
+            }
   
             setStats({
               totalUnits,
@@ -218,6 +295,67 @@ const ManagerDashboard: React.FC = () => {
     const handleRefresh = async () => {
         setRefreshing(true);
         await loadManagerData();
+    };
+
+    const handleDamageItemChange = (value: string) => {
+      setDamageItem(value);
+      const remembered = damageMemory[value.trim().toLowerCase()];
+      if (remembered) {
+        setDamageUnitCost(String(remembered.unitCost));
+        setDamageLabourCost(String(remembered.labourCost));
+      }
+    };
+
+    const saveDamageEntry = () => {
+      if (!assignedProperty) return;
+      const selectedVacancy = vacancyNotices.find((row) => row.id === selectedVacancyId);
+      if (!selectedVacancy) {
+        toast.error('Please select a vacancy notice');
+        return;
+      }
+
+      const item = damageItem.trim();
+      if (!item) {
+        toast.error('Enter a damage item');
+        return;
+      }
+
+      const unitCost = Number(damageUnitCost) || 0;
+      const quantity = Math.max(1, Number(damageQuantity) || 1);
+      const labourCost = Number(damageLabourCost) || 0;
+      const total = (unitCost * quantity) + labourCost;
+
+      const newEntry: ManagerDamageEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        vacancyNoticeId: selectedVacancy.id,
+        unitId: selectedVacancy.unit_id,
+        unitNumber: selectedVacancy.unit_number || '-',
+        item,
+        unitCost,
+        quantity,
+        labourCost,
+        total,
+        createdAt: new Date().toISOString(),
+      };
+
+      const nextEntries = [newEntry, ...damageEntries];
+      setDamageEntries(nextEntries);
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(`manager-vacancy-damages:${assignedProperty.id}`, JSON.stringify(nextEntries));
+        const nextMemory = {
+          ...damageMemory,
+          [item.toLowerCase()]: { unitCost, labourCost },
+        };
+        setDamageMemory(nextMemory);
+        window.localStorage.setItem('damage-cost-memory:v1', JSON.stringify(nextMemory));
+      }
+
+      setDamageItem('');
+      setDamageUnitCost('0');
+      setDamageQuantity('1');
+      setDamageLabourCost('0');
+      toast.success('Damage entry saved and added to refund deductions');
     };
 
     const getGreeting = () => {
@@ -582,6 +720,72 @@ const ManagerDashboard: React.FC = () => {
               </div>
   
               {/* RECENT ACTIVITY & SHORTCUTS GRID */}
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-[#154279]">Vacated Unit Damage Entry</CardTitle>
+                  <CardDescription>
+                    Add damage deductions directly from manager dashboard. Utility/billing rates remain super admin controlled.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div className="md:col-span-2">
+                      <Label className="text-xs font-semibold">Vacancy Notice</Label>
+                      <select
+                        value={selectedVacancyId}
+                        onChange={(e) => setSelectedVacancyId(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md bg-white text-sm"
+                      >
+                        {vacancyNotices.map((notice) => (
+                          <option key={notice.id} value={notice.id}>
+                            Unit {notice.unit_number} - {notice.tenant_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold">Damage Item</Label>
+                      <Input list="dashboard-damage-memory" value={damageItem} onChange={(e) => handleDamageItemChange(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold">Unit Cost</Label>
+                      <Input type="number" min="0" step="0.01" value={damageUnitCost} onChange={(e) => setDamageUnitCost(e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold">Qty / Labour</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <Input type="number" min="1" step="1" value={damageQuantity} onChange={(e) => setDamageQuantity(e.target.value)} />
+                        <Input type="number" min="0" step="0.01" value={damageLabourCost} onChange={(e) => setDamageLabourCost(e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                  <datalist id="dashboard-damage-memory">
+                    {Object.keys(damageMemory).map((label) => (
+                      <option key={label} value={label} />
+                    ))}
+                  </datalist>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-slate-600">Formula: (Unit Cost x Quantity) + Labour Cost</p>
+                    <Button onClick={saveDamageEntry} className="bg-[#154279] hover:bg-[#0f325e]">Save Damage</Button>
+                  </div>
+                  <div className="rounded-md border border-slate-200 p-3 bg-slate-50">
+                    <p className="text-xs font-semibold text-slate-600 mb-2">Recent Saved Entries</p>
+                    {damageEntries.length === 0 ? (
+                      <p className="text-xs text-slate-500">No saved damage entries yet.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {damageEntries.slice(0, 8).map((entry) => (
+                          <div key={entry.id} className="flex items-center justify-between text-xs">
+                            <span className="text-slate-700">Unit {entry.unitNumber} - {entry.item}</span>
+                            <span className="font-semibold text-red-700">KES {entry.total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* RECENT ACTIVITY - LEFT */}
                 <div className="lg:col-span-2">

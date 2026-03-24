@@ -295,12 +295,12 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             normalizedRow[key.toString().toLowerCase().trim()] = row[key];
         });
 
-        // Expected columns: Unit Number, Floor, Type, Price (optional)
+        // Expected columns: Unit Number, Floor, Type, Rent (optional)
         // Check various likely column names
         const unitNumber = normalizedRow['unit number'] || normalizedRow['unit_number'] || normalizedRow['unit'] || normalizedRow['unit #'] || normalizedRow['unit#'];
         const floorNumber = normalizedRow['floor'] || normalizedRow['floor_number'] || normalizedRow['floor number'] || 1;
         const typeName = normalizedRow['type'] || normalizedRow['unit type'] || normalizedRow['unit_type'] || 'Standard';
-        const price = normalizedRow['price'] || normalizedRow['price (kes)'] || normalizedRow['amount'] || null;
+        const rent = normalizedRow['rent'] || normalizedRow['rent (kes)'] || normalizedRow['price'] || normalizedRow['price (kes)'] || normalizedRow['amount'] || null;
         
         // Handle "status" or "availability"
         // Also map 'vacant' -> 'available'
@@ -334,7 +334,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
               .insert({
                 property_id: property.id,
                 name: String(typeName).trim(),
-                price_per_unit: price ? Number(price) : 0
+                                price_per_unit: rent ? Number(rent) : 0
               })
               .select()
               .single();
@@ -352,7 +352,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             unit_number: unitNumberStr,
             floor_number: Number(floorNumber),
             unit_type_id: typeId,
-            price: price ? Number(price) : null,
+            price: rent ? Number(rent) : null,
             status: status,
             description: description,
             features: features
@@ -389,7 +389,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       toast.success(`Processed units: ${importedCount} created, ${updatedCount} updated`);
       
       if (importedCount === 0 && updatedCount === 0) {
-          toast.warning("No units were processed. Please check your Excel column headers. Expected: 'Unit Number', 'Floor', 'Type', 'Price'.", { duration: 6000 });
+          toast.warning("No units were processed. Please check your Excel column headers. Expected: 'Unit Number', 'Floor', 'Type', 'Rent'.", { duration: 6000 });
           console.warn("First row keys found:", Object.keys(jsonData[0] || {}));
       }
 
@@ -1016,7 +1016,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                  <div className="p-6 space-y-5 bg-gradient-to-b from-white to-slate-50">
                     <div className="text-xs text-slate-500 mb-4">
                         Upload an Excel file (.xlsx, .xls) with columns: <br/>
-                        <span className="font-mono bg-slate-100 px-1 rounded">Unit Number, Floor, Type, Price, Status, Description, Features</span>
+                        <span className="font-mono bg-slate-100 px-1 rounded">Unit Number, Floor, Type, Rent, Status, Description, Features</span>
                     </div>
 
                     <div className="relative">

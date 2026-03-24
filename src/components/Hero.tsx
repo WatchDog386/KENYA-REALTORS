@@ -416,7 +416,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
        // Uses "John Kamau" ID if not logged in (fallback for demo)
        const applicantId = user?.id || 'f5b2f858-9319-4bd4-9e9d-8cd421ba1829';
        
-       // Ayden Home Towers ID for Property (Demo)
+      // Demo property ID
        const propertyId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
        // Unit A2 ID (Demo)
        const unitId = 'de7b8d75-8292-4fee-9f4e-ff6d20fd1560';

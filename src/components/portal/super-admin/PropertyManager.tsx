@@ -62,6 +62,15 @@ import { propertyImageService } from '@/services/propertyImageService';
 import { PropertyUnitManager } from "./properties/PropertyUnitManager";
 import ManagerAssignment from '@/pages/portal/components/ManagerAssignment';
 
+type PropertyFormData = Omit<CreatePropertyDTO, 'units'> & {
+  units: Array<{
+    id?: string;
+    name: string;
+    units_count: number;
+    price_per_unit: number;
+  }>;
+};
+
 const PropertyManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -89,7 +98,7 @@ const PropertyManager: React.FC = () => {
   const [selectedManagerId, setSelectedManagerId] = useState<string>("");
 
   // Form State
-  const [formData, setFormData] = useState<CreatePropertyDTO>({
+  const [formData, setFormData] = useState<PropertyFormData>({
     name: '',
     location: '',
     image_url: '',
@@ -252,6 +261,12 @@ const PropertyManager: React.FC = () => {
 
   const [unassignConfig, setUnassignConfig] = useState<{ propertyId: string, roleType: 'manager' | 'technician' | 'proprietor' | 'caretaker', recordId: string } | null>(null);
 
+  const parseFloorCount = (value: string | number) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 1) return 1;
+    return Math.floor(parsed);
+  };
+
   const handleSaveProperty = async () => {
     if (!formData.name || !formData.location) {
         toast.error("Please fill in property name and location");
@@ -272,6 +287,7 @@ const PropertyManager: React.FC = () => {
         type: 'Apartment',
         description: '',
         amenities: '',
+        number_of_floors: 1,
         units: [{ name: '', units_count: 0, price_per_unit: 0 }]
       });
       setImagePreview(null);
@@ -318,12 +334,11 @@ const PropertyManager: React.FC = () => {
   const handleDeleteProperty = async (id: string) => {
       if(!confirm("Are you sure? This will delete the property and all its units.")) return;
       try {
-          const { error } = await supabase.from('properties').delete().eq('id', id);
-          if(error) throw error;
+        await propertyService.deleteProperty(id);
           toast.success("Property deleted");
           fetchProperties();
-      } catch (err) {
-          toast.error("Failed to delete property");
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to delete property");
           console.error(err);
       }
   }
@@ -349,7 +364,7 @@ const PropertyManager: React.FC = () => {
       const publicUrl = await propertyImageService.uploadPropertyImage(file, tempId);
       
       // Update form data with the image URL
-      setFormData({...formData, image_url: publicUrl});
+      setFormData((prev) => ({ ...prev, image_url: publicUrl }));
       
       // Set preview
       setImagePreview(publicUrl);
@@ -367,10 +382,12 @@ const PropertyManager: React.FC = () => {
 
   const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
-    setFormData({...formData, image_url: url});
+    setFormData((prev) => ({ ...prev, image_url: url }));
     // Only set preview if it's a valid URL
     if (url.startsWith('http')) {
       setImagePreview(url);
+    } else if (!url) {
+      setImagePreview(null);
     }
   };
 
@@ -390,11 +407,13 @@ const PropertyManager: React.FC = () => {
       amenities: property.amenities || '',
       number_of_floors: property.number_of_floors || 1,
       units: property.property_unit_types?.map((u: any) => ({
+        id: u.id,
         name: u.name,
         units_count: u.units_count,
         price_per_unit: u.price_per_unit
       })) || [{ name: '', units_count: 0, price_per_unit: 0 }]
     });
+    setImagePreview(property.image_url || null);
     setShowEditProperty(true);
   }
 
@@ -422,6 +441,42 @@ const PropertyManager: React.FC = () => {
 
       if (error) throw error;
 
+      const validUnits = formData.units
+        .filter((unit) => unit.name.trim())
+        .map((unit) => ({
+          id: unit.id,
+          property_id: selectedProperty.id,
+          name: unit.name.trim(),
+          units_count: Number(unit.units_count) || 0,
+          price_per_unit: Number(unit.price_per_unit) || 0,
+        }));
+
+      for (const unit of validUnits) {
+        if (unit.id) {
+          const { error: unitUpdateError } = await supabase
+            .from('property_unit_types')
+            .update({
+              name: unit.name,
+              units_count: unit.units_count,
+              price_per_unit: unit.price_per_unit,
+            })
+            .eq('id', unit.id);
+
+          if (unitUpdateError) throw unitUpdateError;
+        } else {
+          const { error: unitInsertError } = await supabase
+            .from('property_unit_types')
+            .insert({
+              property_id: unit.property_id,
+              name: unit.name,
+              units_count: unit.units_count,
+              price_per_unit: unit.price_per_unit,
+            });
+
+          if (unitInsertError) throw unitInsertError;
+        }
+      }
+
       toast.success("Property updated successfully");
       setShowEditProperty(false);
       setSelectedProperty(null);
@@ -444,7 +499,7 @@ const PropertyManager: React.FC = () => {
   const formExpectedIncome = formData.units.reduce((sum: number, u: any) => sum + (Number(u.units_count || 0) * Number(u.price_per_unit || 0)), 0);
 
   const unitTypeOptions = [
-    "Bedsitter", "Studio", "One Bedroom", "Two Bedroom", "Three Bedroom", "Shop", "Office", "Penthouse", "Maisonette", "Villa", "Other"
+    "Bedsitter", "Studio", "One Bedroom", "Two Bedroom", "Three Bedroom", "Shop", "Office", "Rooftop", "Penthouse", "Maisonette", "Villa", "Other"
   ];
 
   return (
@@ -566,7 +621,7 @@ const PropertyManager: React.FC = () => {
                                     type="number"
                                     min="1"
                                     value={formData.number_of_floors} 
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, number_of_floors: Number(e.target.value)})}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, number_of_floors: parseFloorCount(e.target.value)})}
                                     placeholder="Number of floors"
                                     className="h-10 border-blue-300 focus:border-blue-600 focus:ring-blue-600 rounded-lg bg-white"
                                 />
@@ -802,133 +857,238 @@ const PropertyManager: React.FC = () => {
 
       {/* VIEW PROPERTY DIALOG */}
       <Dialog open={showViewProperty} onOpenChange={setShowViewProperty}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto p-0 gap-0 bg-white rounded-lg shadow-2xl border border-blue-300">
+        <DialogContent className="w-[96vw] max-w-[1400px] h-[92vh] p-0 gap-0 overflow-hidden bg-white shadow-2xl rounded-xl border border-slate-200">
           <DialogTitle className="sr-only">Property Details</DialogTitle>
           <DialogDescription className="sr-only">Full details of the selected property</DialogDescription>
           {selectedProperty && (
             <>
-              {/* Header with Image */}
-              <div className="relative h-80 bg-blue-200 rounded-t-lg overflow-hidden">
-                {selectedProperty.image_url ? (
-                  <img 
-                    src={selectedProperty.image_url} 
-                    alt={selectedProperty.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/900x300?text=Property+Image';
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400">
-                    <Building className="w-24 h-24 text-slate-500 opacity-50" />
+              <div className="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-20">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg border border-blue-200">
+                      <Eye className="w-5 h-5 text-blue-700" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Property Overview</h2>
+                      <p className="text-slate-600 text-sm mt-1">Full profile, staff assignment, and unit breakdown.</p>
+                    </div>
                   </div>
-                )}
-                <button 
-                  onClick={() => setShowViewProperty(false)}
-                  className="absolute top-4 right-4 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-all"
-                >
-                  <span className="text-2xl">&times;</span>
-                </button>
+                  <div className="text-right text-xs text-slate-500">
+                    <p className="uppercase tracking-wider font-semibold">Viewing</p>
+                    <p className="text-slate-700 font-bold mt-1">{selectedProperty.name}</p>
+                  </div>
+                </div>
               </div>
 
-              {/* Content */}
-              <div className="p-8 space-y-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-blue-900 mb-2">{selectedProperty.name}</h2>
-                  <div className="flex items-center gap-2 text-blue-700">
-                    <MapPin className="w-5 h-5" />
-                    <span className="font-medium">{selectedProperty.location}</span>
-                  </div>
-                  <Badge className="mt-3 bg-blue-100 text-blue-800 px-3 py-1">{selectedProperty.type || 'Apartment'}</Badge>
-                </div>
+              <div className="h-[calc(92vh-145px)] overflow-y-auto p-6 bg-slate-50">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                  <div className="xl:col-span-5 space-y-6">
+                    <Card className="border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="h-60 bg-slate-200">
+                        {selectedProperty.image_url ? (
+                          <img
+                            src={selectedProperty.image_url}
+                            alt={selectedProperty.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/900x400?text=Property+Image';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-200 to-slate-300">
+                            <Building className="w-16 h-16 text-slate-400" />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-5 space-y-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-slate-900">{selectedProperty.name}</h3>
+                          <div className="mt-2 flex items-center gap-2 text-slate-700">
+                            <MapPin className="w-4 h-4 text-slate-500" />
+                            <span className="font-medium">{selectedProperty.location}</span>
+                          </div>
+                          <Badge className="mt-3 bg-blue-100 text-blue-800 px-3 py-1">{selectedProperty.type || 'Apartment'}</Badge>
+                        </div>
 
-                {/* Description */}
-                {selectedProperty.description && (
-                  <div>
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-blue-600 mb-2">Description</h3>
-                    <p className="text-blue-900 leading-relaxed">{selectedProperty.description}</p>
-                  </div>
-                )}
+                        {selectedProperty.description && (
+                          <div className="pt-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Description</p>
+                            <p className="text-slate-800 leading-relaxed">{selectedProperty.description}</p>
+                          </div>
+                        )}
 
-                {/* Amenities */}
-                {selectedProperty.amenities && (
-                  <div>
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-blue-600 mb-2">Amenities</h3>
-                    <p className="text-blue-900 leading-relaxed">{selectedProperty.amenities}</p>
-                  </div>
-                )}
+                        {selectedProperty.amenities && (
+                          <div className="pt-1">
+                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Amenities</p>
+                            <p className="text-slate-800 leading-relaxed">{selectedProperty.amenities}</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                {/* Assigned Staff */}
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 mb-2">Assigned Staff</h3>
-                  <div className="space-y-1">
-                      {assignedStaff[selectedProperty.id]?.managers?.length > 0 && (
-                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Managers:</span> 
+                    <Card className="border border-slate-200 shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg font-bold text-slate-900">Property Metrics</CardTitle>
+                        <CardDescription>Quick operational and revenue indicators.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 mb-1">Floors</p>
+                            <p className="text-2xl font-bold text-indigo-900">{selectedProperty.number_of_floors || 1}</p>
+                          </div>
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 mb-1">Total Units</p>
+                            <p className="text-2xl font-bold text-emerald-900">{selectedProperty.total_units || 0}</p>
+                          </div>
+                        </div>
+                        <div className="bg-orange-50 border border-orange-100 rounded-lg p-3">
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-orange-900 mb-1">Expected Monthly Income</p>
+                          <p className="text-2xl font-bold text-orange-900">KES {(selectedProperty.expected_income || 0).toLocaleString()}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="xl:col-span-7 space-y-6">
+                    <Card className="border border-slate-200 shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg font-bold text-slate-900">Assigned Staff</CardTitle>
+                        <CardDescription>Current workforce assignments for this property.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {assignedStaff[selectedProperty.id]?.managers?.length > 0 && (
+                          <div className="text-sm text-slate-800 flex flex-wrap gap-2 items-center">
+                            <span className="font-semibold text-slate-900">Managers:</span>
                             {assignedStaff[selectedProperty.id].managers.map((m, i) => (
-                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{m.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'manager', m.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                              <span key={i} className="bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                                {m.name}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnassignStaff(selectedProperty.id, 'manager', m.id);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 ml-1"
+                                  title="Unassign"
+                                >
+                                  <UserMinus className="w-3 h-3" />
+                                </button>
+                              </span>
                             ))}
                           </div>
-                      )}
-                      {assignedStaff[selectedProperty.id]?.technicians?.length > 0 && (
-                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Technicians:</span>
+                        )}
+                        {assignedStaff[selectedProperty.id]?.technicians?.length > 0 && (
+                          <div className="text-sm text-slate-800 flex flex-wrap gap-2 items-center">
+                            <span className="font-semibold text-slate-900">Technicians:</span>
                             {assignedStaff[selectedProperty.id].technicians.map((t, i) => (
-                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{t.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'technician', t.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                              <span key={i} className="bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                                {t.name}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnassignStaff(selectedProperty.id, 'technician', t.id);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 ml-1"
+                                  title="Unassign"
+                                >
+                                  <UserMinus className="w-3 h-3" />
+                                </button>
+                              </span>
                             ))}
                           </div>
-                      )}
-                      {assignedStaff[selectedProperty.id]?.proprietors?.length > 0 && (
-                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Proprietors:</span>
+                        )}
+                        {assignedStaff[selectedProperty.id]?.proprietors?.length > 0 && (
+                          <div className="text-sm text-slate-800 flex flex-wrap gap-2 items-center">
+                            <span className="font-semibold text-slate-900">Proprietors:</span>
                             {assignedStaff[selectedProperty.id].proprietors.map((p, i) => (
-                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{p.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'proprietor', p.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                              <span key={i} className="bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                                {p.name}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnassignStaff(selectedProperty.id, 'proprietor', p.id);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 ml-1"
+                                  title="Unassign"
+                                >
+                                  <UserMinus className="w-3 h-3" />
+                                </button>
+                              </span>
                             ))}
                           </div>
-                      )}
-                       {assignedStaff[selectedProperty.id]?.caretakers?.length > 0 && (
-                          <div className="text-sm text-blue-900 flex flex-wrap gap-2 items-center"><span className="font-semibold">Caretakers:</span>
+                        )}
+                        {assignedStaff[selectedProperty.id]?.caretakers?.length > 0 && (
+                          <div className="text-sm text-slate-800 flex flex-wrap gap-2 items-center">
+                            <span className="font-semibold text-slate-900">Caretakers:</span>
                             {assignedStaff[selectedProperty.id].caretakers.map((c, i) => (
-                                <span key={i} className='bg-white px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1'>{c.name}<button onClick={(e) => { e.stopPropagation(); handleUnassignStaff(selectedProperty.id, 'caretaker', c.id); }} className='text-red-500 hover:text-red-700 ml-1' title='Unassign'><UserMinus className='w-3 h-3' /></button></span>
+                              <span key={i} className="bg-white px-2 py-0.5 rounded border border-slate-200 inline-flex items-center gap-1">
+                                {c.name}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnassignStaff(selectedProperty.id, 'caretaker', c.id);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 ml-1"
+                                  title="Unassign"
+                                >
+                                  <UserMinus className="w-3 h-3" />
+                                </button>
+                              </span>
                             ))}
                           </div>
-                      )}
-                      {(!assignedStaff[selectedProperty.id] || (
-                          !assignedStaff[selectedProperty.id].managers.length && 
+                        )}
+                        {(!assignedStaff[selectedProperty.id] || (
+                          !assignedStaff[selectedProperty.id].managers.length &&
                           !assignedStaff[selectedProperty.id].technicians.length &&
                           !assignedStaff[selectedProperty.id].proprietors.length &&
                           !assignedStaff[selectedProperty.id].caretakers.length
-                      )) && (
-                          <span className="text-slate-500 italic text-sm">No staff assigned</span>
-                      )}
-                  </div>
-                </div>
+                        )) && (
+                          <p className="text-slate-500 italic text-sm">No staff assigned</p>
+                        )}
+                      </CardContent>
+                    </Card>
 
-                {/* Units Overview */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-1">Total Units</p>
-                    <p className="text-2xl font-bold text-emerald-900">{selectedProperty.total_units}</p>
-                  </div>
-                  <div className="bg-orange-50 border border-orange-100 rounded-lg p-4">
-                    <p className="text-xs font-bold uppercase tracking-wider text-orange-900 mb-1">Monthly Income</p>
-                    <p className="text-2xl font-bold text-orange-900">KES {(selectedProperty.expected_income || 0).toLocaleString()}</p>
+                    {selectedProperty.property_unit_types && selectedProperty.property_unit_types.length > 0 && (
+                      <Card className="border border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-3 border-b border-slate-200 bg-slate-50">
+                          <CardTitle className="text-lg font-bold text-slate-900">Unit Type Breakdown</CardTitle>
+                          <CardDescription>Unit mix and average rent by type.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-0 divide-y divide-slate-100">
+                          {selectedProperty.property_unit_types.map((unitType, idx) => (
+                            <div key={`${unitType.id || unitType.name}-${idx}`} className="px-5 py-4 flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-slate-900">{unitType.name}</p>
+                                <p className="text-xs text-slate-500">{unitType.units_count} units</p>
+                              </div>
+                              <p className="font-bold text-slate-900">KES {(Number(unitType.price_per_unit) || 0).toLocaleString()}</p>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="p-6 border-t border-blue-200 flex gap-3 justify-end bg-blue-50 rounded-b-lg">
-                <Button onClick={() => setShowViewProperty(false)} className="font-semibold border border-blue-300 text-blue-700 hover:bg-blue-100 rounded-lg">
+              <DialogFooter className="px-6 py-4 border-t border-slate-200 bg-white sticky bottom-0 z-20">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowViewProperty(false)}
+                  className="font-semibold text-slate-700 border-slate-300 hover:bg-slate-100"
+                >
                   Close
                 </Button>
-                <Button 
+                <Button
                   onClick={() => {
                     setShowViewProperty(false);
                     handleEditProperty(selectedProperty);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg"
+                  className="bg-[#154279] hover:bg-[#0f325e] text-white font-bold"
                 >
                   Edit Property
                 </Button>
-              </div>
+              </DialogFooter>
             </>
           )}
         </DialogContent>
@@ -936,133 +1096,321 @@ const PropertyManager: React.FC = () => {
 
       {/* EDIT PROPERTY DIALOG */}
       <Dialog open={showEditProperty} onOpenChange={setShowEditProperty}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 gap-0 overflow-hidden bg-white shadow-xl rounded-lg border border-blue-300">
+        <DialogContent className="w-[96vw] max-w-[1400px] h-[92vh] p-0 gap-0 overflow-hidden bg-white shadow-2xl rounded-xl border border-slate-200">
           {/* Header */}
-          <div className="bg-blue-50 border-b border-blue-200 p-6">
-            <DialogHeader className="p-0 space-y-1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Building className="w-5 h-5 text-blue-600" />
+          <div className="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-20">
+            <DialogHeader className="p-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg border border-blue-200">
+                    <Building className="w-5 h-5 text-blue-700" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-2xl font-extrabold text-slate-900 tracking-tight">Edit Property</DialogTitle>
+                    <DialogDescription className="text-slate-600 text-sm mt-1">
+                      Full editor for property profile, media, and unit setup.
+                    </DialogDescription>
+                  </div>
                 </div>
-                <div>
-                  <DialogTitle className="text-xl font-bold text-blue-900 tracking-tight">Edit Property</DialogTitle>
-                  <DialogDescription className="text-blue-600 text-sm font-medium">
-                    Update property details and unit information.
-                  </DialogDescription>
+                <div className="text-right text-xs text-slate-500">
+                  <p className="uppercase tracking-wider font-semibold">Now Editing</p>
+                  <p className="text-slate-700 font-bold mt-1">{selectedProperty?.name || formData.name || 'Property'}</p>
                 </div>
               </div>
             </DialogHeader>
           </div>
 
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-8 bg-white">
-            {/* Section 1: Property Details */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
-                Property Information
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="col-span-1 md:col-span-2 space-y-2">
-                  <Label className="text-slate-700 font-semibold text-sm">Property Name</Label>
-                  <Input 
-                    value={formData.name} 
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, name: e.target.value})}
-                    placeholder="e.g. Sunrise Apartments"
-                    className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-semibold text-sm">Location</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <Input 
-                      value={formData.location} 
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, location: e.target.value})}
-                      placeholder="e.g. Westlands, Nairobi"
-                      className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-semibold text-sm">Type</Label>
-                  <Select 
-                    value={formData.type} 
-                    onValueChange={(val: string) => setFormData({...formData, type: val})}
-                  >
-                    <SelectTrigger className="h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Apartment">Apartment</SelectItem>
-                      <SelectItem value="Commercial">Commercial</SelectItem>
-                      <SelectItem value="Mixed">Mixed Use</SelectItem>
-                      <SelectItem value="Villa">Villa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="col-span-1 md:col-span-2 space-y-2">
-                  <Label className="text-slate-700 font-semibold text-sm">Cover Image URL</Label>
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <Input 
-                        value={formData.image_url} 
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, image_url: e.target.value})}
-                        placeholder="https://example.com/image.jpg"
-                        className="pl-9 h-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400 rounded-lg bg-white"
+          <div className="h-[calc(92vh-145px)] overflow-y-auto p-6 bg-slate-50">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+              {/* Left Panel */}
+              <div className="xl:col-span-5 space-y-6">
+                <Card className="border border-slate-200 shadow-sm">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-bold text-slate-900">Property Profile</CardTitle>
+                    <CardDescription>Core identity and location details.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold text-sm">Property Name</Label>
+                      <Input
+                        value={formData.name}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. Sunrise Apartments"
+                        className="h-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
                       />
                     </div>
-                    {formData.image_url && (
-                      <div className="rounded-lg overflow-hidden border border-slate-200">
-                        <img 
-                          src={formData.image_url} 
-                          alt="Preview"
-                          className="w-full h-40 object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x160?text=Invalid+Image';
-                          }}
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold text-sm">Location</Label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <Input
+                          value={formData.location}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, location: e.target.value })}
+                          placeholder="e.g. Westlands, Nairobi"
+                          className="pl-9 h-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-slate-700 font-semibold text-sm">Property Type</Label>
+                        <Select value={formData.type} onValueChange={(val: string) => setFormData({ ...formData, type: val })}>
+                          <SelectTrigger className="h-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500 bg-white">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Apartment">Apartment</SelectItem>
+                            <SelectItem value="Commercial">Commercial</SelectItem>
+                            <SelectItem value="Mixed">Mixed Use</SelectItem>
+                            <SelectItem value="Villa">Villa</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-slate-700 font-semibold text-sm">Floors</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={formData.number_of_floors || 1}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, number_of_floors: parseFloorCount(e.target.value) })}
+                          className="h-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold text-sm">Description</Label>
+                      <textarea
+                        value={formData.description || ''}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Property description..."
+                        className="w-full min-h-[96px] p-3 border border-slate-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold text-sm">Amenities</Label>
+                      <textarea
+                        value={formData.amenities || ''}
+                        onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
+                        placeholder="e.g. Gym, Swimming Pool, Security..."
+                        className="w-full min-h-[96px] p-3 border border-slate-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-slate-200 shadow-sm">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-bold text-slate-900">Media</CardTitle>
+                    <CardDescription>Upload or paste a cover image URL.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(imagePreview || formData.image_url) ? (
+                      <div className="relative h-56 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                        <img
+                          src={imagePreview || formData.image_url}
+                          alt="Property preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/900x400?text=Invalid+Image';
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImagePreview(null);
+                            setFormData((prev) => ({ ...prev, image_url: '' }));
+                          }}
+                          className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold"
+                          aria-label="Clear selected image"
+                        >
+                          x
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="h-56 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-slate-400">
+                        <div className="text-center">
+                          <ImageIcon className="w-8 h-8 mx-auto mb-2" />
+                          <p className="text-sm font-semibold">No image selected</p>
+                        </div>
+                      </div>
                     )}
-                  </div>
-                </div>
 
-                <div className="col-span-1 md:col-span-2 space-y-2">
-                  <Label className="text-slate-700 font-semibold text-sm">Description</Label>
-                  <textarea
-                    value={formData.description || ''}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Property description..."
-                    className="w-full min-h-[80px] p-3 border-slate-200 border rounded-lg focus:border-slate-400 focus:ring-slate-400 bg-white"
-                  />
-                </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
+                      className="hidden"
+                      id="property-image-input-edit"
+                    />
+                    <label
+                      htmlFor="property-image-input-edit"
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50 hover:bg-blue-100 cursor-pointer transition-all text-blue-700 font-semibold text-sm"
+                    >
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          Upload New Cover
+                        </>
+                      )}
+                    </label>
 
-                <div className="col-span-1 md:col-span-2 space-y-2">
-                  <Label className="text-slate-700 font-semibold text-sm">Amenities</Label>
-                  <textarea
-                    value={formData.amenities || ''}
-                    onChange={(e) => setFormData({...formData, amenities: e.target.value})}
-                    placeholder="e.g. Gym, Swimming Pool, Security..."
-                    className="w-full min-h-[80px] p-3 border-slate-200 border rounded-lg focus:border-slate-400 focus:ring-slate-400 bg-white"
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold text-xs uppercase tracking-wider">Paste Image URL</Label>
+                      <Input
+                        value={formData.image_url}
+                        onChange={handleImageInputChange}
+                        placeholder="https://example.com/image.jpg"
+                        className="h-10 border-slate-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Panel */}
+              <div className="xl:col-span-7 space-y-6">
+                <Alert className="bg-blue-50 border-blue-200">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 text-sm">
+                    Keep this page as your full editing workspace. Update unit mix and pricing, then save once.
+                  </AlertDescription>
+                </Alert>
+
+                <Card className="border border-slate-200 shadow-sm">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-lg font-bold text-slate-900">Unit Configuration</CardTitle>
+                        <CardDescription>Define unit types, counts, and rental values.</CardDescription>
+                      </div>
+                      <Button size="sm" onClick={handleAddUnit} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-1.5 text-xs font-bold">
+                        <Plus className="w-3.5 h-3.5" /> Add Unit Type
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {formData.units.map((unit: any, index: number) => (
+                      <div
+                        key={unit.id || `edit-unit-${index}`}
+                        className="grid grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-lg border border-slate-200"
+                      >
+                        <div className="col-span-12 md:col-span-5 space-y-1.5">
+                          <Label className="text-xs font-semibold text-slate-700">Unit Type</Label>
+                          <Input
+                            list={`edit-unit-types-${index}`}
+                            placeholder="Select or type..."
+                            value={unit.name}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'name', e.target.value)}
+                            className="h-9 border-slate-300 bg-white text-sm font-medium"
+                          />
+                          <datalist id={`edit-unit-types-${index}`}>
+                            {unitTypeOptions.map(opt => <option key={opt} value={opt} />)}
+                          </datalist>
+                        </div>
+
+                        <div className="col-span-4 md:col-span-2 space-y-1.5">
+                          <Label className="text-xs font-semibold text-slate-700">Count</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={unit.units_count}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'units_count', Number(e.target.value))}
+                            className="h-9 border-slate-300 bg-white text-sm font-medium text-center"
+                          />
+                        </div>
+
+                        <div className="col-span-7 md:col-span-4 space-y-1.5">
+                          <Label className="text-xs font-semibold text-slate-700">Rent (KES)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={unit.price_per_unit}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'price_per_unit', Number(e.target.value))}
+                            className="h-9 border-slate-300 bg-white text-sm font-medium text-right"
+                          />
+                        </div>
+
+                        <div className="col-span-1 flex justify-center pb-1">
+                          <Button
+                            size="icon"
+                            onClick={() => handleRemoveUnit(index)}
+                            className="h-8 w-8 text-red-600 bg-red-50 hover:text-red-700 hover:bg-red-100 border border-red-200"
+                            disabled={formData.units.length === 1}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-blue-200 bg-blue-50 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-white border border-blue-200 rounded-full shadow-sm">
+                          <Calculator className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-blue-700 font-bold uppercase tracking-wider mb-0.5">Projected Monthly Income</p>
+                          <p className="text-2xl font-bold text-blue-900 tracking-tight">
+                            <span className="text-sm text-blue-700 mr-1 font-medium">KES</span>
+                            {formExpectedIncome.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 text-sm">
+                        <div className="px-4 py-2 bg-white rounded-lg border border-blue-200">
+                          <span className="text-blue-700 text-xs font-semibold uppercase mr-2">Units:</span>
+                          <span className="font-bold text-blue-900">{formTotalUnits}</span>
+                        </div>
+                        <div className="px-4 py-2 bg-white rounded-lg border border-blue-200">
+                          <span className="text-blue-700 text-xs font-semibold uppercase mr-2">Types:</span>
+                          <span className="font-bold text-blue-900">{formData.units.length}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="p-4 border-t border-slate-100 bg-white">
-            <Button variant="ghost" onClick={() => setShowEditProperty(false)} disabled={savingProperty} className="font-semibold text-slate-600 hover:bg-slate-50 hover:text-[#154279] rounded-lg">
+          <DialogFooter className="px-6 py-4 border-t border-slate-200 bg-white sticky bottom-0 z-20">
+            <Button
+              variant="outline"
+              onClick={() => setShowEditProperty(false)}
+              disabled={savingProperty}
+              className="font-semibold text-slate-700 border-slate-300 hover:bg-slate-100"
+            >
               Cancel
             </Button>
-            <Button 
-              onClick={handleUpdateProperty} 
-              disabled={savingProperty || !formData.name} 
-              className="bg-[#154279] hover:bg-[#0f325e] text-white px-6 font-bold rounded-lg shadow-sm"
+            <Button
+              onClick={handleUpdateProperty}
+              disabled={savingProperty || !formData.name}
+              className="bg-[#154279] hover:bg-[#0f325e] text-white px-8 font-bold"
             >
-              {savingProperty ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <span>Update Property</span>}
+              {savingProperty ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving Changes...
+                </>
+              ) : (
+                'Update Property'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

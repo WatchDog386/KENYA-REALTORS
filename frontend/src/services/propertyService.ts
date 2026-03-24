@@ -156,12 +156,52 @@ export const propertyService = {
   },
 
   async deleteProperty(id: string) {
-    const { error } = await supabase
-      .from('properties')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
+    const db = supabase as any;
+
+    const ignoreMissingTableError = (error: any) => error?.code === '42P01';
+    const ignoreMissingColumnError = (error: any) => error?.code === '42703';
+
+    const deleteByProperty = async (table: string) => {
+      const { error } = await db.from(table).delete().eq('property_id', id);
+      if (error && !ignoreMissingTableError(error)) {
+        throw new Error(`[${table}] ${error.message}`);
+      }
+    };
+
+    // Clear profile references that can block property deletion in non-cascading schemas.
+    const { error: profileUpdateError } = await db
+      .from('profiles')
+      .update({ assigned_property_id: null })
+      .eq('assigned_property_id', id);
+
+    if (profileUpdateError && !ignoreMissingColumnError(profileUpdateError)) {
+      throw new Error(`[profiles] ${profileUpdateError.message}`);
+    }
+
+    const dependentTables = [
+      'property_manager_assignments',
+      'technician_property_assignments',
+      'proprietor_properties',
+      'caretakers',
+      'lease_applications',
+      'vacancy_notices',
+      'maintenance_requests',
+      'invoices',
+      'payments',
+      'tenants',
+      'leases',
+      'units',
+      'property_unit_types'
+    ];
+
+    for (const table of dependentTables) {
+      await deleteByProperty(table);
+    }
+
+    const { error } = await db.from('properties').delete().eq('id', id);
+    if (error) {
+      throw new Error(`[properties] ${error.message}`);
+    }
   },
 
   async updateProperty(id: string, updates: Partial<Property>) {

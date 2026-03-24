@@ -16,6 +16,21 @@ export interface LoginActivity {
   created_at: string;
 }
 
+const mapLoginActivity = (row: any): LoginActivity => ({
+  id: row.id,
+  user_id: row.user_id || "",
+  email: row.email || "",
+  role: row.role || "",
+  ip_address: row.ip_address || "",
+  user_agent: row.user_agent || "",
+  login_timestamp: row.login_timestamp || row.created_at || new Date(0).toISOString(),
+  logout_timestamp: row.logout_timestamp || null,
+  session_duration_minutes: row.session_duration_minutes ?? null,
+  login_status: row.login_status || "failed",
+  failure_reason: row.failure_reason || null,
+  created_at: row.created_at || row.login_timestamp || new Date(0).toISOString(),
+});
+
 export const loginActivityService = {
   /**
    * Record a successful login
@@ -200,11 +215,22 @@ export const loginActivityService = {
         .range(offset, offset + limit - 1);
 
       if (error) {
-        console.error("Error fetching login activities:", error);
-        return [];
+        // Fallback for environments where login_timestamp is unavailable.
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("login_activity")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (fallbackError) {
+          console.error("Error fetching login activities:", fallbackError);
+          return [];
+        }
+
+        return (fallbackData || []).map(mapLoginActivity);
       }
 
-      return data || [];
+      return (data || []).map(mapLoginActivity);
     } catch (error) {
       console.error("Error in getLoginActivities:", error);
       return [];
@@ -267,28 +293,60 @@ export const loginActivityService = {
   /**
    * Get login statistics
    */
-  getLoginStatistics: async (days: number = 7) => {
+  getLoginStatistics: async (days: number = 30) => {
     try {
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      startDate.setDate(startDate.getDate() - Math.max(days, 0));
 
-      const { data, error } = await supabase
-        .from("login_activity")
-        .select("*")
-        .gte("login_timestamp", startDate.toISOString());
+      let query = supabase.from("login_activity").select("*");
+      if (days > 0) {
+        query = query.gte("login_timestamp", startDate.toISOString());
+      }
+
+      const { data, error } = await query;
 
       if (error) {
-        console.error("Error fetching login statistics:", error);
+        let fallbackQuery = supabase.from("login_activity").select("*");
+        if (days > 0) {
+          fallbackQuery = fallbackQuery.gte("created_at", startDate.toISOString());
+        }
+
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) {
+          console.error("Error fetching login statistics:", fallbackError);
+          return {
+            totalLogins: 0,
+            successfulLogins: 0,
+            failedLogins: 0,
+            uniqueUsers: 0,
+            averageSessionDuration: 0,
+          };
+        }
+
+        const fallbackActivities = (fallbackData || []).map(mapLoginActivity);
+        const successfulLogins = fallbackActivities.filter(
+          (a) => a.login_status === "success" || a.login_status === "session_ended"
+        ).length;
+        const failedLogins = fallbackActivities.filter((a) => a.login_status === "failed").length;
+        const uniqueUsers = new Set(fallbackActivities.map((a) => a.user_id).filter(Boolean)).size;
+        const sessionDurations = fallbackActivities
+          .filter((a) => a.session_duration_minutes !== null)
+          .map((a) => a.session_duration_minutes || 0);
+        const averageSessionDuration =
+          sessionDurations.length > 0
+            ? Math.round(sessionDurations.reduce((a, b) => a + b, 0) / sessionDurations.length)
+            : 0;
+
         return {
-          totalLogins: 0,
-          successfulLogins: 0,
-          failedLogins: 0,
-          uniqueUsers: 0,
-          averageSessionDuration: 0,
+          totalLogins: fallbackActivities.length,
+          successfulLogins,
+          failedLogins,
+          uniqueUsers,
+          averageSessionDuration,
         };
       }
 
-      const activities = data || [];
+      const activities = (data || []).map(mapLoginActivity);
 
       const successfulLogins = activities.filter(
         (a) => a.login_status === "success" || a.login_status === "session_ended"

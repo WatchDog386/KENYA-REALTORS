@@ -55,6 +55,7 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
   useEffect(() => {
     if (user?.id) {
         fetchNotifications();
+        checkVacateReminders();
         
         // Subscribe to real-time notifications
         const channel = supabase
@@ -94,6 +95,61 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
       } catch (error) {
           console.error("Error fetching notifications", error);
       }
+  };
+
+  const checkVacateReminders = async () => {
+    try {
+      if (!user?.id) return;
+
+      const { data: notices, error: noticeError } = await supabase
+        .from('vacancy_notices')
+        .select('id, move_out_date, status, property_id, unit_id')
+        .eq('tenant_id', user.id)
+        .in('status', ['pending', 'inspection_scheduled'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (noticeError) throw noticeError;
+      const activeNotices = notices || [];
+      if (!activeNotices.length) return;
+
+      const reminderCandidates = activeNotices.filter((notice: any) => {
+        if (!notice.move_out_date) return false;
+        const now = new Date();
+        const moveOut = new Date(notice.move_out_date);
+        const daysLeft = Math.ceil((moveOut.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return daysLeft >= 0 && daysLeft <= 7;
+      });
+
+      if (!reminderCandidates.length) return;
+
+      const noticeIds = reminderCandidates.map((notice: any) => notice.id);
+      const { data: existingNotifications } = await supabase
+        .from('notifications')
+        .select('related_entity_id, type')
+        .eq('recipient_id', user.id)
+        .eq('type', 'vacancy_reminder_7d')
+        .in('related_entity_id', noticeIds);
+
+      const existingIds = new Set((existingNotifications || []).map((item: any) => item.related_entity_id));
+      const pendingInserts = reminderCandidates
+        .filter((notice: any) => !existingIds.has(notice.id))
+        .map((notice: any) => ({
+          recipient_id: user.id,
+          sender_id: user.id,
+          type: 'vacancy_reminder_7d',
+          title: 'Move-Out Reminder',
+          message: `Reminder: you have 1 week or less before your move-out deadline (${new Date(notice.move_out_date).toLocaleDateString()}).`,
+          related_entity_type: 'vacancy_notice',
+          related_entity_id: notice.id,
+        }));
+
+      if (pendingInserts.length) {
+        await supabase.from('notifications').insert(pendingInserts);
+      }
+    } catch (error) {
+      console.error('Error generating move-out reminders:', error);
+    }
   };
 
   const markAsRead = async (notifId: string) => {

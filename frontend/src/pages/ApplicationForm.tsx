@@ -117,9 +117,6 @@ const ApplicationForm = () => {
     "Karen",
     "CBD",
     "Roysambu",
-    "Ayden Home Towers, Wing A",
-    "Ayden Home Towers, Wing B",
-    "Ayden Home Towers, Wing C",
   ];
 
   // Handle Post Rental Form Changes

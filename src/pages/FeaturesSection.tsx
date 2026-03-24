@@ -321,7 +321,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                             <p className="text-slate-600 leading-relaxed text-sm font-normal">
                                 {item.description}
                                 <br/><br/>
-                                Living at <strong className="text-[#154279]">Ayden Home Towers</strong> offers a unique blend of community and privacy. 
+                                Living at <strong className="text-[#154279]">this property</strong> offers a unique blend of community and privacy. 
                                 Enjoy dedicated maintenance teams, secure biometric access, and a community app for all your utility payments.
                             </p>
                         </div>
@@ -664,9 +664,9 @@ export default function AydenTowersListing() {
     }, [activeProperty?.id]);
 
     const heroImage = activeProperty?.image_url || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1600";
-    const heroTitle = activeProperty?.name ? activeProperty.name.toUpperCase() : "AYDEN HOME TOWERS";
+    const heroTitle = activeProperty?.name ? activeProperty.name.toUpperCase() : "FEATURED PROPERTY";
     const heroLocation = activeProperty?.location || "Nairobi West, Kenya";
-    const heroDescName = activeProperty?.name || "Ayden Home Towers";
+    const heroDescName = activeProperty?.name || "this property";
     const heroDesc = activeProperty?.description || `Discover ${heroDescName} — a premier rental residential complex offering diverse living options.`;
     
     // Calculate pagination

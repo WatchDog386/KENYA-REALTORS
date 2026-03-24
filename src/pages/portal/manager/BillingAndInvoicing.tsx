@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency } from '@/utils/formatCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import DepositRefundSheet, { DepositRefundCase } from '@/components/portal/shared/DepositRefundSheet';
 
 interface BillingRecord {
   id: string;
@@ -52,6 +53,7 @@ const BillingAndInvoicing = () => {
   const [filterProperty, setFilterProperty] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [properties, setProperties] = useState<any[]>([]);
+  const [refundCases, setRefundCases] = useState<DepositRefundCase[]>([]);
   const [stats, setStats] = useState({
     totalExpected: 0,
     totalPaid: 0,
@@ -118,6 +120,29 @@ const BillingAndInvoicing = () => {
         .from('bills_and_utilities')
         .select('*')
         .in('property_id', propIds);
+
+      // Vacancy notices trigger deposit-refund processing
+      const { data: vacancyNotices } = await supabase
+        .from('vacancy_notices')
+        .select('id, tenant_id, unit_id, property_id, status, move_out_date, created_at, updated_at')
+        .in('property_id', propIds);
+
+      // Manager checklist damages (auto deduction source): completion reports -> maintenance request unit
+      const { data: completionReports } = await supabase
+        .from('maintenance_completion_reports')
+        .select('maintenance_request_id, cost_estimate, actual_cost, status')
+        .in('property_id', propIds);
+
+      const completionRequestIds = (completionReports || [])
+        .map((row: any) => row?.maintenance_request_id)
+        .filter(Boolean);
+
+      const { data: completionRequests } = completionRequestIds.length > 0
+        ? await supabase
+            .from('maintenance_requests')
+            .select('id, unit_id')
+            .in('id', completionRequestIds)
+        : { data: [] as any[] };
 
       // Construct billing records
       const billingRecords: BillingRecord[] = (units || []).map((unit: any) => {
@@ -222,6 +247,67 @@ const BillingAndInvoicing = () => {
 
       setBillings(billingRecords);
 
+      const requestUnitById = new Map<string, string>(
+        (completionRequests || [])
+          .filter((row: any) => row?.id && row?.unit_id)
+          .map((row: any) => [row.id, row.unit_id])
+      );
+
+      const damageByUnit = new Map<string, number>();
+      (completionReports || []).forEach((report: any) => {
+        const requestId = report?.maintenance_request_id;
+        const unitId = requestId ? requestUnitById.get(requestId) : undefined;
+        if (!unitId) return;
+        const status = String(report?.status || '').toLowerCase();
+        if (['rejected', 'cancelled', 'void'].includes(status)) return;
+        const previous = damageByUnit.get(unitId) || 0;
+        const amount = Number(report?.actual_cost ?? report?.cost_estimate ?? 0) || 0;
+        damageByUnit.set(unitId, previous + amount);
+      });
+
+      // Also include manager dashboard quick-entry damages saved per property
+      if (typeof window !== 'undefined') {
+        propIds.forEach((propertyId: string) => {
+          const raw = window.localStorage.getItem(`manager-vacancy-damages:${propertyId}`);
+          if (!raw) return;
+          try {
+            const localEntries = JSON.parse(raw) as Array<{ unitId?: string; total?: number }>;
+            (localEntries || []).forEach((entry) => {
+              if (!entry?.unitId) return;
+              const previous = damageByUnit.get(entry.unitId) || 0;
+              damageByUnit.set(entry.unitId, previous + (Number(entry.total) || 0));
+            });
+          } catch {
+            // Ignore malformed local entries
+          }
+        });
+      }
+
+      const unitById = new Map<string, any>((units || []).map((unit: any) => [unit.id, unit]));
+      const billingByUnit = new Map<string, BillingRecord>(billingRecords.map((record) => [record.unit_id, record]));
+
+      const mappedRefundCases: DepositRefundCase[] = (vacancyNotices || []).map((notice: any) => {
+        const unit = unitById.get(notice.unit_id);
+        const billing = billingByUnit.get(notice.unit_id);
+        const tenant = unit?.tenants?.find((t: any) => t?.id === notice.tenant_id || t?.user_id === notice.tenant_id) || unit?.tenants?.[0];
+
+        return {
+          id: notice.id,
+          unitNumber: String(unit?.unit_number || '-'),
+          tenantName: tenant ? `${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() : (billing?.tenant_name || 'Former Tenant'),
+          propertyName: managerProps?.find((p: any) => p.id === notice.property_id)?.name || billing?.property_name || 'N/A',
+          noticeDate: notice.updated_at || notice.created_at,
+          moveOutDate: notice.move_out_date,
+          status: notice.status,
+          securityDeposit: Number(billing?.monthly_rent || unit?.price || 0),
+          rentArrears: Number(billing?.rent_arrears || 0),
+          billNameArrears: Number((billing?.water_bill_arrears || 0) + (billing?.utilities_arrears || 0)),
+          autoChecklistDamages: Number(damageByUnit.get(notice.unit_id) || 0),
+        };
+      });
+
+      setRefundCases(mappedRefundCases);
+
       // Calculate stats
       const totalExpected = billingRecords.reduce((sum, b) => sum + (b.monthly_rent + b.water_bill + b.other_utilities), 0);
       const totalPaid = billingRecords.reduce((sum, b) => sum + b.total_paid, 0);
@@ -277,7 +363,7 @@ const BillingAndInvoicing = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-light text-[#00356B] tracking-tight">Billing & Invoicing</h1>
-          <p className="text-gray-600 text-[13px] font-medium">Rent, utilities, and payment tracking</p>
+          <p className="text-gray-600 text-[13px] font-medium">Rent, bill names, and payment tracking</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -398,9 +484,9 @@ const BillingAndInvoicing = () => {
                   <TableHead className="text-right">Water Bill</TableHead>
                   <TableHead className="text-right">Paid Water</TableHead>
                   <TableHead className="text-right">Water Arrears</TableHead>
-                  <TableHead className="text-right">Other Utilities</TableHead>
-                  <TableHead className="text-right">Paid Utilities</TableHead>
-                  <TableHead className="text-right">Utility Arrears</TableHead>
+                  <TableHead className="text-right">Other Bill Names</TableHead>
+                  <TableHead className="text-right">Paid Bill Names</TableHead>
+                  <TableHead className="text-right">Bill Name Arrears</TableHead>
                   <TableHead className="bg-red-50 text-right font-bold">Total Arrears</TableHead>
                   <TableHead className="bg-emerald-50 text-right">Overpayment</TableHead>
                   <TableHead>Last Payment</TableHead>
@@ -448,6 +534,12 @@ const BillingAndInvoicing = () => {
           </div>
         </CardContent>
       </Card>
+
+      <DepositRefundSheet
+        cases={refundCases}
+        title="Deposit Refund Sheet"
+        description="Auto-generated when a vacancy notice is received. Includes manager checklist damages and manual repair deductions: (cost per item x quantity) + labour cost."
+      />
     </div>
   );
 };

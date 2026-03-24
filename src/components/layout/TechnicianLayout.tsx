@@ -229,6 +229,12 @@ const TechnicianLayout = ({ children }: { children?: ReactNode }) => {
       description: 'Upcoming appointments'
     },
     {
+      title: 'Leave Requests',
+      href: '/portal/technician/leave-requests',
+      icon: <FileText size={20} />,
+      description: 'Request and track leave'
+    },
+    {
       title: 'Earnings',
       href: '/portal/technician/earnings',
       icon: <Wallet size={20} />,

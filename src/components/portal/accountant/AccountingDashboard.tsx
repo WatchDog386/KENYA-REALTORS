@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import VerifiedVacanciesList from '@/components/portal/shared/VerifiedVacanciesList';
 
 const AccountingDashboard = () => {
   const { user } = useAuth();
@@ -177,6 +178,12 @@ const AccountingDashboard = () => {
 
       {/* DASHBOARD CONTENT */}
       <div className="max-w-[1400px] mx-auto px-6 -mt-8 pb-20 relative z-20">
+      <div className="mb-8">
+        <VerifiedVacanciesList
+          title="Verified Vacancies"
+          description="Manager-verified move-outs surfaced for accounting close-out and refund follow-up."
+        />
+      </div>
       
       {/* 2. Key Metrics Grid - Summary Cards */}
       {dashboardData?.summaryByType && (

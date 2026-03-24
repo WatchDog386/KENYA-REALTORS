@@ -109,6 +109,8 @@ import ManagerApprovalRequests from "@/pages/portal/manager/ApprovalRequests";
 import ManagerUtilityReadings from "@/pages/portal/manager/UtilityReadings";
 import BillingAndInvoicing from "@/pages/portal/manager/BillingAndInvoicing";
 import ManagerReceipts from "@/pages/portal/manager/Receipts";
+import ManagerLeaveRequestsPage from "@/pages/portal/manager/LeaveRequests";
+import LeaveRequestsPage from "@/pages/portal/staff/LeaveRequests";
 import { managerRoutes } from "@/pages/portal/manager/routes";
 
 // Create a fallback component in case of import issues
@@ -744,6 +746,7 @@ const App = () => {
                   <Route path="properties" element={<PropertyManager />} />
                   <Route path="users" element={<UserManagementNew />} />
                   <Route path="approvals" element={<ApprovalQueue />} />
+                  <Route path="leave-requests" element={<ManagerLeaveRequestsPage />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />
                   <Route path="utilities" element={<SuperAdminUtilitiesManager />} />
                   <Route path="utilities/settings" element={<SuperAdminUtilities />} />
@@ -821,6 +824,7 @@ const App = () => {
                     path="approval-requests"
                     element={<ManagerApprovalRequests />}
                   />
+                  <Route path="leave-requests" element={<ManagerLeaveRequestsPage />} />
                   <Route
                     path="vacation-notices"
                     element={<ManagerVacancyNotices />}
@@ -889,6 +893,7 @@ const App = () => {
                   <Route path="invoices" element={<AccountantInvoices />} />
                   <Route path="receipts" element={<AccountantReceipts />} />
                   <Route path="payments" element={<AccountantPayments />} />
+                  <Route path="leave-requests" element={<LeaveRequestsPage />} />
                 </Route>
                 <Route
                   path="/portal/technician"
@@ -903,6 +908,7 @@ const App = () => {
                   <Route path="schedule" element={<TechnicianSchedule />} />
                   <Route path="earnings" element={<TechnicianEarnings />} />
                   <Route path="profile" element={<TechnicianProfile />} />
+                  <Route path="leave-requests" element={<LeaveRequestsPage />} />
                 </Route>
                 <Route
                   path="/portal/proprietor"
@@ -930,6 +936,7 @@ const App = () => {
                   <Route path="maintenance" element={<CaretakerMaintenance />} />
                   <Route path="property" element={<CaretakerProperty />} />
                   <Route path="duties" element={<CaretakerDuties />} />
+                  <Route path="leave-requests" element={<LeaveRequestsPage />} />
                 </Route>
 
                 {/* SHARED PORTAL PAGES */}

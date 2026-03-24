@@ -1,5 +1,5 @@
 import { saveAs } from "file-saver";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Zap,
@@ -45,6 +45,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import DepositRefundSheet, { DepositRefundCase } from "@/components/portal/shared/DepositRefundSheet";
 
 interface UtilityReading {
   id: string;
@@ -138,6 +139,62 @@ interface InvoiceDraft {
   notes: string;
 }
 
+type BillingEventType = 'first_payment' | 'vacating_switching';
+
+interface FirstPaymentCandidate {
+  lease_id: string;
+  tenant_id: string;
+  tenant_name: string;
+  tenant_email: string;
+  tenant_phone: string;
+  property_id: string;
+  property_name: string;
+  unit_id: string;
+  unit_number: string;
+  rent_amount: number;
+  lease_start_date?: string;
+  assigned_at?: string;
+}
+
+interface TransitionBillingCandidate {
+  vacancy_notice_id: string;
+  tenant_id: string;
+  tenant_name: string;
+  tenant_email: string;
+  tenant_phone: string;
+  property_id: string;
+  property_name: string;
+  unit_id: string;
+  unit_number: string;
+  move_out_date?: string;
+  status: string;
+  reason?: string;
+}
+
+interface SpecialInvoiceDraft {
+  eventType: BillingEventType;
+  sourceId: string;
+  tenant_id: string;
+  tenant_name: string;
+  property_id: string;
+  property_name: string;
+  unit_id: string;
+  unit_number: string;
+  baseRent: number;
+  securityDeposit: number;
+  utilityDeposit: number;
+  serviceDeposit: number;
+  moveInFee: number;
+  cleaningFee: number;
+  damageCharges: number;
+  utilityClearance: number;
+  switchingFee: number;
+  refundCredit: number;
+  customCharges: Record<string, number>;
+  dueDate: string;
+  notes: string;
+}
+
 const SuperAdminUtilitiesManager = () => {
   const [settings, setSettings] = useState<UtilitySettings>({
     water_fee: 0,
@@ -172,6 +229,13 @@ const SuperAdminUtilitiesManager = () => {
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraft | null>(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
+  const [firstPaymentCandidates, setFirstPaymentCandidates] = useState<FirstPaymentCandidate[]>([]);
+  const [transitionCandidates, setTransitionCandidates] = useState<TransitionBillingCandidate[]>([]);
+  const [specialInvoiceDraft, setSpecialInvoiceDraft] = useState<SpecialInvoiceDraft | null>(null);
+  const [savingSpecialInvoice, setSavingSpecialInvoice] = useState(false);
+  const [newSpecialChargeName, setNewSpecialChargeName] = useState('');
+  const [newSpecialChargeAmount, setNewSpecialChargeAmount] = useState('');
+  const [autoChecklistDamageByUnit, setAutoChecklistDamageByUnit] = useState<Record<string, number>>({});
 
   // Fetch utility settings and constants
   useEffect(() => {
@@ -542,8 +606,179 @@ const SuperAdminUtilitiesManager = () => {
     }
   };
 
+  const loadSpecialBillingCandidates = async () => {
+    try {
+      const { data: leaseRows, error: leaseError } = await supabase
+        .from('tenant_leases')
+        .select(`
+          id,
+          tenant_id,
+          unit_id,
+          rent_amount,
+          start_date,
+          created_at,
+          status,
+          units:unit_id(
+            id,
+            unit_number,
+            property_id,
+            properties:property_id(name)
+          )
+        `)
+        .in('status', ['active', 'pending'])
+        .order('created_at', { ascending: false });
+
+      if (leaseError) throw leaseError;
+
+      const { data: vacancyRows, error: vacancyError } = await supabase
+        .from('vacancy_notices')
+        .select('id, tenant_id, property_id, unit_id, move_out_date, status, reason, created_at')
+        .in('status', ['pending', 'inspection_scheduled', 'approved'])
+        .order('created_at', { ascending: false });
+
+      if (vacancyError && vacancyError.code !== 'PGRST116') throw vacancyError;
+
+      const tenantIds = new Set<string>();
+      (leaseRows || []).forEach((row: any) => row?.tenant_id && tenantIds.add(row.tenant_id));
+      (vacancyRows || []).forEach((row: any) => row?.tenant_id && tenantIds.add(row.tenant_id));
+
+      let profilesMap = new Map<string, any>();
+      if (tenantIds.size > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, phone')
+          .in('id', Array.from(tenantIds));
+        profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      }
+
+      const { data: existingInvoices } = await supabase
+        .from('invoices')
+        .select('id, notes')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      const firstPaymentMarkers = new Set<string>();
+      const transitionMarkers = new Set<string>();
+
+      (existingInvoices || []).forEach((inv: any) => {
+        const notes = String(inv?.notes || '');
+        const firstMatch = notes.match(/LEASE_ID:([a-f0-9-]+)/i);
+        if (firstMatch?.[1]) firstPaymentMarkers.add(firstMatch[1]);
+        const transitionMatch = notes.match(/VACANCY_NOTICE_ID:([a-f0-9-]+)/i);
+        if (transitionMatch?.[1]) transitionMarkers.add(transitionMatch[1]);
+      });
+
+      const now = Date.now();
+      const recentWindowMs = 45 * 24 * 60 * 60 * 1000;
+
+      const firstCandidates: FirstPaymentCandidate[] = (leaseRows || [])
+        .filter((lease: any) => {
+          if (!lease?.id || firstPaymentMarkers.has(lease.id)) return false;
+          const leaseCreatedAt = lease?.created_at ? new Date(lease.created_at).getTime() : 0;
+          const leaseStart = lease?.start_date ? new Date(lease.start_date).getTime() : 0;
+          const leaseRecency = Math.max(leaseCreatedAt, leaseStart);
+          return leaseRecency > 0 && now - leaseRecency <= recentWindowMs;
+        })
+        .map((lease: any) => {
+          const profile = profilesMap.get(lease.tenant_id) || {};
+          const unit = Array.isArray(lease.units) ? lease.units[0] : lease.units;
+          const propertyName = unit?.properties
+            ? (Array.isArray(unit.properties) ? unit.properties[0]?.name : unit.properties?.name)
+            : 'Unknown Property';
+
+          return {
+            lease_id: lease.id,
+            tenant_id: lease.tenant_id,
+            tenant_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Tenant',
+            tenant_email: profile.email || '',
+            tenant_phone: profile.phone || '',
+            property_id: unit?.property_id || '',
+            property_name: propertyName || 'Unknown Property',
+            unit_id: lease.unit_id,
+            unit_number: unit?.unit_number || 'N/A',
+            rent_amount: Number(lease.rent_amount || 0),
+            lease_start_date: lease.start_date,
+            assigned_at: lease.created_at,
+          };
+        })
+        .filter((c) => c.tenant_id && c.property_id && c.unit_id);
+
+      const transitionList: TransitionBillingCandidate[] = (vacancyRows || [])
+        .filter((notice: any) => notice?.id && !transitionMarkers.has(notice.id))
+        .map((notice: any) => {
+          const profile = profilesMap.get(notice.tenant_id) || {};
+          const firstLeaseForUnit = (leaseRows || []).find((lease: any) => lease.unit_id === notice.unit_id);
+          const unit = Array.isArray(firstLeaseForUnit?.units) ? firstLeaseForUnit?.units?.[0] : firstLeaseForUnit?.units;
+          const propertyName = unit?.properties
+            ? (Array.isArray(unit.properties) ? unit.properties[0]?.name : unit.properties?.name)
+            : 'Unknown Property';
+
+          return {
+            vacancy_notice_id: notice.id,
+            tenant_id: notice.tenant_id,
+            tenant_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Tenant',
+            tenant_email: profile.email || '',
+            tenant_phone: profile.phone || '',
+            property_id: notice.property_id || unit?.property_id || '',
+            property_name: propertyName || 'Unknown Property',
+            unit_id: notice.unit_id,
+            unit_number: unit?.unit_number || 'N/A',
+            move_out_date: notice.move_out_date,
+            status: notice.status || 'pending',
+            reason: notice.reason || '',
+          };
+        })
+        .filter((c) => c.tenant_id && c.property_id && c.unit_id);
+
+      const transitionUnitIds = transitionList.map((entry) => entry.unit_id).filter(Boolean);
+      let checklistDamageByUnit: Record<string, number> = {};
+      if (transitionUnitIds.length > 0) {
+        const { data: completionReports } = await supabase
+          .from('maintenance_completion_reports')
+          .select('maintenance_request_id, cost_estimate, actual_cost, status')
+          .in('property_id', transitionList.map((entry) => entry.property_id).filter(Boolean));
+
+        const requestIds = (completionReports || [])
+          .map((row: any) => row?.maintenance_request_id)
+          .filter(Boolean);
+
+        const { data: maintenanceRows } = requestIds.length > 0
+          ? await supabase
+              .from('maintenance_requests')
+              .select('id, unit_id')
+              .in('id', requestIds)
+          : { data: [] as any[] };
+
+        const requestUnitById = new Map<string, string>(
+          (maintenanceRows || [])
+            .filter((row: any) => row?.id && row?.unit_id)
+            .map((row: any) => [row.id, row.unit_id])
+        );
+
+        checklistDamageByUnit = (completionReports || []).reduce((acc: Record<string, number>, row: any) => {
+          const requestId = row?.maintenance_request_id;
+          const unitId = requestId ? requestUnitById.get(requestId) : undefined;
+          if (!unitId || !transitionUnitIds.includes(unitId)) return acc;
+          const status = String(row?.status || '').toLowerCase();
+          if (['rejected', 'cancelled', 'void'].includes(status)) return acc;
+          const amount = Number(row?.actual_cost ?? row?.cost_estimate ?? 0) || 0;
+          acc[unitId] = (acc[unitId] || 0) + amount;
+          return acc;
+        }, {});
+      }
+
+      setFirstPaymentCandidates(firstCandidates);
+      setTransitionCandidates(transitionList);
+      setAutoChecklistDamageByUnit(checklistDamageByUnit);
+    } catch (err: any) {
+      console.error('Error loading special billing candidates:', err);
+      toast.error(err.message || 'Failed to load first payment and transition billing candidates');
+    }
+  };
+
   useEffect(() => {
     loadTenantReadings();
+    loadSpecialBillingCandidates();
 
     // Setup real-time subscription for utility readings
     const readingsChannel = supabase
@@ -559,6 +794,7 @@ const SuperAdminUtilitiesManager = () => {
           console.log('Real-time utility reading change detected:', payload);
           // Refresh all readings when any change occurs
           await loadTenantReadings();
+          await loadSpecialBillingCandidates();
         }
       )
       .subscribe();
@@ -568,6 +804,238 @@ const SuperAdminUtilitiesManager = () => {
       readingsChannel.unsubscribe();
     };
   }, []);
+
+  const depositRefundCases: DepositRefundCase[] = useMemo(() => {
+    return transitionCandidates.map((candidate) => {
+      const matchingTenant = tenantsWithReadings.find((tenant) => {
+        const sameUnit = tenant.unit_id && candidate.unit_id && tenant.unit_id === candidate.unit_id;
+        const sameTenantAndUnit = tenant.tenant_id === candidate.tenant_id && tenant.unit_number === candidate.unit_number;
+        return sameUnit || sameTenantAndUnit;
+      });
+
+      return {
+        id: candidate.vacancy_notice_id,
+        unitNumber: candidate.unit_number,
+        tenantName: candidate.tenant_name,
+        propertyName: candidate.property_name,
+        noticeDate: candidate.move_out_date,
+        moveOutDate: candidate.move_out_date,
+        status: candidate.status,
+        securityDeposit: Number(matchingTenant?.rent_amount || 0),
+        rentArrears: Math.max(0, Number(matchingTenant?.total_due || 0) - Number(matchingTenant?.utility_total || 0)),
+        billNameArrears: Math.max(0, Number(matchingTenant?.utility_total || 0)),
+        autoChecklistDamages: Number(autoChecklistDamageByUnit[candidate.unit_id] || 0),
+      };
+    });
+  }, [transitionCandidates, tenantsWithReadings, autoChecklistDamageByUnit]);
+
+  const openFirstPaymentInvoice = (candidate: FirstPaymentCandidate) => {
+    setNewSpecialChargeName('');
+    setNewSpecialChargeAmount('');
+    setSpecialInvoiceDraft({
+      eventType: 'first_payment',
+      sourceId: candidate.lease_id,
+      tenant_id: candidate.tenant_id,
+      tenant_name: candidate.tenant_name,
+      property_id: candidate.property_id,
+      property_name: candidate.property_name,
+      unit_id: candidate.unit_id,
+      unit_number: candidate.unit_number,
+      baseRent: Number(candidate.rent_amount || 0),
+      securityDeposit: Number(candidate.rent_amount || 0),
+      utilityDeposit: 0,
+      serviceDeposit: 0,
+      moveInFee: 0,
+      cleaningFee: 0,
+      damageCharges: 0,
+      utilityClearance: 0,
+      switchingFee: 0,
+      refundCredit: 0,
+      customCharges: {},
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+      notes: '',
+    });
+  };
+
+  const openTransitionInvoice = (candidate: TransitionBillingCandidate) => {
+    setNewSpecialChargeName('');
+    setNewSpecialChargeAmount('');
+    setSpecialInvoiceDraft({
+      eventType: 'vacating_switching',
+      sourceId: candidate.vacancy_notice_id,
+      tenant_id: candidate.tenant_id,
+      tenant_name: candidate.tenant_name,
+      property_id: candidate.property_id,
+      property_name: candidate.property_name,
+      unit_id: candidate.unit_id,
+      unit_number: candidate.unit_number,
+      baseRent: 0,
+      securityDeposit: 0,
+      utilityDeposit: 0,
+      serviceDeposit: 0,
+      moveInFee: 0,
+      cleaningFee: 0,
+      damageCharges: 0,
+      utilityClearance: 0,
+      switchingFee: 0,
+      refundCredit: 0,
+      customCharges: {},
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
+      notes: `Transition notice: ${candidate.status}${candidate.reason ? ` | ${candidate.reason}` : ''}`,
+    });
+  };
+
+  const handleSpecialInvoiceDraftChange = (field: keyof SpecialInvoiceDraft, value: string) => {
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev) return prev;
+      if (field === 'dueDate' || field === 'notes') {
+        return { ...prev, [field]: value };
+      }
+      const parsed = Number(value);
+      return { ...prev, [field]: Number.isNaN(parsed) ? 0 : parsed } as SpecialInvoiceDraft;
+    });
+  };
+
+  const calculateSpecialInvoiceTotal = (draft: SpecialInvoiceDraft) => {
+    const extraCharges = Object.values(draft.customCharges || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+    if (draft.eventType === 'first_payment') {
+      return (
+        Number(draft.baseRent || 0) +
+        Number(draft.securityDeposit || 0) +
+        Number(draft.utilityDeposit || 0) +
+        Number(draft.serviceDeposit || 0) +
+        Number(draft.moveInFee || 0) +
+        extraCharges
+      );
+    }
+
+    return (
+      Number(draft.cleaningFee || 0) +
+      Number(draft.damageCharges || 0) +
+      Number(draft.utilityClearance || 0) +
+      Number(draft.switchingFee || 0) -
+      Number(draft.refundCredit || 0) +
+      extraCharges
+    );
+  };
+
+  const handleAddSpecialCharge = () => {
+    const name = newSpecialChargeName.trim();
+    const amount = Number(newSpecialChargeAmount || 0);
+
+    if (!specialInvoiceDraft) return;
+    if (!name) {
+      toast.error('Enter a charge name');
+      return;
+    }
+    if (Number.isNaN(amount)) {
+      toast.error('Enter a valid charge amount');
+      return;
+    }
+
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        customCharges: {
+          ...prev.customCharges,
+          [name]: amount,
+        },
+      };
+    });
+
+    setNewSpecialChargeName('');
+    setNewSpecialChargeAmount('');
+  };
+
+  const handleSpecialChargeAmountChange = (key: string, value: string) => {
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev) return prev;
+      const parsed = Number(value);
+      return {
+        ...prev,
+        customCharges: {
+          ...prev.customCharges,
+          [key]: Number.isNaN(parsed) ? 0 : parsed,
+        },
+      };
+    });
+  };
+
+  const handleRemoveSpecialCharge = (key: string) => {
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev) return prev;
+      const nextCharges = { ...prev.customCharges };
+      delete nextCharges[key];
+      return {
+        ...prev,
+        customCharges: nextCharges,
+      };
+    });
+  };
+
+  const handleGenerateSpecialInvoice = async () => {
+    if (!specialInvoiceDraft) return;
+    try {
+      setSavingSpecialInvoice(true);
+
+      const totalAmount = calculateSpecialInvoiceTotal(specialInvoiceDraft);
+      if (totalAmount < 0) {
+        toast.error('Total invoice amount cannot be negative');
+        return;
+      }
+
+      const reference = `INV-${Date.now()}`;
+      const marker = specialInvoiceDraft.eventType === 'first_payment'
+        ? `BILLING_EVENT:first_payment;LEASE_ID:${specialInvoiceDraft.sourceId}`
+        : `BILLING_EVENT:vacating_switching;VACANCY_NOTICE_ID:${specialInvoiceDraft.sourceId}`;
+
+      const firstPaymentItems = {
+        monthly_rent: Number(specialInvoiceDraft.baseRent || 0),
+        security_deposit: Number(specialInvoiceDraft.securityDeposit || 0),
+        utility_deposit: Number(specialInvoiceDraft.utilityDeposit || 0),
+        service_deposit: Number(specialInvoiceDraft.serviceDeposit || 0),
+        move_in_fee: Number(specialInvoiceDraft.moveInFee || 0),
+        additional_charges: specialInvoiceDraft.customCharges || {},
+      };
+
+      const transitionItems = {
+        cleaning_fee: Number(specialInvoiceDraft.cleaningFee || 0),
+        damage_charges: Number(specialInvoiceDraft.damageCharges || 0),
+        utility_clearance: Number(specialInvoiceDraft.utilityClearance || 0),
+        switching_fee: Number(specialInvoiceDraft.switchingFee || 0),
+        refund_credit: Number(specialInvoiceDraft.refundCredit || 0),
+        additional_charges: specialInvoiceDraft.customCharges || {},
+      };
+
+      const { error } = await supabase
+        .from('invoices')
+        .insert([
+          {
+            reference_number: reference,
+            property_id: specialInvoiceDraft.property_id,
+            tenant_id: specialInvoiceDraft.tenant_id,
+            amount: totalAmount,
+            due_date: specialInvoiceDraft.dueDate,
+            issued_date: new Date().toISOString().split('T')[0],
+            status: 'unpaid',
+            items: specialInvoiceDraft.eventType === 'first_payment' ? firstPaymentItems : transitionItems,
+            notes: `${marker}\n${specialInvoiceDraft.notes || ''}`.trim(),
+          },
+        ]);
+
+      if (error) throw error;
+
+      toast.success('Invoice generated successfully');
+      setSpecialInvoiceDraft(null);
+      await loadSpecialBillingCandidates();
+    } catch (err: any) {
+      console.error('Error generating special invoice:', err);
+      toast.error(err.message || 'Failed to generate invoice');
+    } finally {
+      setSavingSpecialInvoice(false);
+    }
+  };
 
   // Filter tenants
   useEffect(() => {
@@ -1348,7 +1816,7 @@ const SuperAdminUtilitiesManager = () => {
               Manage Billing Constants
             </CardTitle>
             <CardDescription>
-              Configure global prices/rates, then assign utilities to specific properties
+              Configure global prices/rates, then assign bill names to specific properties
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -1357,7 +1825,7 @@ const SuperAdminUtilitiesManager = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-200">
-                      <th className="text-left py-3 px-4 font-semibold text-slate-700">Utility Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-700">Bill Name</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-700">Type</th>
                       <th className="text-center py-3 px-4 font-semibold text-slate-700">Multiplier</th>
                       <th className="text-center py-3 px-4 font-semibold text-slate-700">Fixed Price (KES)</th>
@@ -1457,7 +1925,7 @@ const SuperAdminUtilitiesManager = () => {
                 </table>
               </div>
             ) : (
-              <p className="text-slate-600">No utility constants found.</p>
+              <p className="text-slate-600">No bill name constants found.</p>
             )}
 
             {/* Add Custom Bill */}
@@ -1494,7 +1962,7 @@ const SuperAdminUtilitiesManager = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="utility_name">Utility Name</Label>
+                    <Label htmlFor="utility_name">Bill Name</Label>
                     <Input
                       id="utility_name"
                       placeholder="e.g., WIFI, Parking, Maintenance Fund"
@@ -1535,13 +2003,13 @@ const SuperAdminUtilitiesManager = () => {
                         placeholder="Enter fixed fee amount"
                       />
                       <p className="text-xs text-slate-500 mt-1">
-                        {newUtilityIsMetered ? 'Price field disabled for metered utilities' : 'Flat fee charged to all tenants'}
+                        {newUtilityIsMetered ? 'Price field disabled for metered bill names' : 'Flat fee charged to all tenants'}
                       </p>
                     </div>
                   </div>
 
                   <div>
-                    <Label className="mb-2 block">Utility Type</Label>
+                    <Label className="mb-2 block">Bill Type</Label>
                     <div className="flex gap-4 mt-2 items-center">
                       <label className="flex items-center gap-2">
                         <input
@@ -1567,11 +2035,127 @@ const SuperAdminUtilitiesManager = () => {
                     className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
                   >
                     {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                    {saving ? 'Adding...' : 'Add Utility'}
+                    {saving ? 'Adding...' : 'Add Bill Name'}
                   </Button>
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* First-Time Move-In Payments */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.34 }}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Home className="w-5 h-5" />
+              First-Time Move-In Payments
+            </CardTitle>
+            <CardDescription>
+              Newly assigned tenants appear here for first invoice generation (rent + deposits + onboarding charges).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {firstPaymentCandidates.length === 0 ? (
+              <p className="text-sm text-slate-600">No newly assigned tenants pending first-payment invoicing.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Tenant</th>
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Property / Unit</th>
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Assigned</th>
+                      <th className="text-right py-2 px-3 font-semibold text-slate-700">Rent (KES)</th>
+                      <th className="text-center py-2 px-3 font-semibold text-slate-700">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {firstPaymentCandidates.map((candidate) => (
+                      <tr key={candidate.lease_id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-2 px-3">
+                          <p className="font-semibold text-slate-900">{candidate.tenant_name}</p>
+                          <p className="text-xs text-slate-500">{candidate.tenant_email}</p>
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {candidate.property_name} - {candidate.unit_number}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600">
+                          {candidate.assigned_at ? new Date(candidate.assigned_at).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold text-slate-900">
+                          {Number(candidate.rent_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <Button size="sm" onClick={() => openFirstPaymentInvoice(candidate)} className="bg-[#154279] hover:bg-[#0f325e]">
+                            Generate First Invoice
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Vacating / Switching Payments */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.36 }}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ChevronRight className="w-5 h-5" />
+              Vacating / Unit Or Property Switching
+            </CardTitle>
+            <CardDescription>
+              Transition cases (vacating or switching) appear here for final settlement invoices and adjustment credits.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {transitionCandidates.length === 0 ? (
+              <p className="text-sm text-slate-600">No pending vacating or switching notices awaiting invoicing.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Tenant</th>
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Property / Unit</th>
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Move Out</th>
+                      <th className="text-left py-2 px-3 font-semibold text-slate-700">Status</th>
+                      <th className="text-center py-2 px-3 font-semibold text-slate-700">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transitionCandidates.map((candidate) => (
+                      <tr key={candidate.vacancy_notice_id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-2 px-3">
+                          <p className="font-semibold text-slate-900">{candidate.tenant_name}</p>
+                          <p className="text-xs text-slate-500">{candidate.tenant_email}</p>
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {candidate.property_name} - {candidate.unit_number}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600">
+                          {candidate.move_out_date ? new Date(candidate.move_out_date).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="py-2 px-3">
+                          <Badge variant="outline" className="capitalize">{candidate.status}</Badge>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <Button size="sm" onClick={() => openTransitionInvoice(candidate)} className="bg-amber-600 hover:bg-amber-700">
+                            Generate Transition Invoice
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -1585,7 +2169,7 @@ const SuperAdminUtilitiesManager = () => {
               Tenant Billing Summary
             </CardTitle>
             <CardDescription>
-              View all tenants with their utility readings and billing information
+              View all tenants with their bill name readings and billing information
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -1644,7 +2228,7 @@ const SuperAdminUtilitiesManager = () => {
             {filteredTenants.length === 0 ? (
               <div className="text-center py-12">
                 <Zap size={48} className="mx-auto text-slate-300 mb-4" />
-                <p className="text-slate-600 text-lg">No utility readings found</p>
+                <p className="text-slate-600 text-lg">No bill name readings found</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1667,7 +2251,7 @@ const SuperAdminUtilitiesManager = () => {
                         Rent
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                        Utilities
+                        Bill Names
                       </th>
                       <th className="text-right py-3 px-4 font-semibold text-slate-700">
                         Invoice Total
@@ -1761,6 +2345,14 @@ const SuperAdminUtilitiesManager = () => {
             )}
           </CardContent>
         </Card>
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}>
+        <DepositRefundSheet
+          cases={depositRefundCases}
+          title="Deposit Refund Sheet"
+          description="Generated from vacancy notices. Automatically includes manager checklist damages, with manual item deductions calculated as (unit cost x quantity) + labour cost."
+        />
       </motion.div>
 
       {/* Invoice Editor Modal */}
@@ -1922,6 +2514,161 @@ const SuperAdminUtilitiesManager = () => {
               >
                 {sendingInvoice ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                 {sendingInvoice ? 'Sending...' : 'Save & Send'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Special Invoice Modal */}
+      {specialInvoiceDraft && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        >
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between border-b">
+              <div>
+                <CardTitle>
+                  {specialInvoiceDraft.eventType === 'first_payment' ? 'First-Time Move-In Invoice' : 'Vacating/Switching Settlement Invoice'}
+                </CardTitle>
+                <CardDescription>
+                  {specialInvoiceDraft.tenant_name} - {specialInvoiceDraft.property_name} ({specialInvoiceDraft.unit_number})
+                </CardDescription>
+              </div>
+              <button onClick={() => setSpecialInvoiceDraft(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Due Date</Label>
+                  <Input
+                    type="date"
+                    value={specialInvoiceDraft.dueDate}
+                    onChange={(e) => handleSpecialInvoiceDraftChange('dueDate', e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {specialInvoiceDraft.eventType === 'first_payment' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>First Month Rent</Label>
+                    <Input type="number" value={specialInvoiceDraft.baseRent} onChange={(e) => handleSpecialInvoiceDraftChange('baseRent', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Security Deposit</Label>
+                    <Input type="number" value={specialInvoiceDraft.securityDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('securityDeposit', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Utility Deposit</Label>
+                    <Input type="number" value={specialInvoiceDraft.utilityDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('utilityDeposit', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Service Deposit</Label>
+                    <Input type="number" value={specialInvoiceDraft.serviceDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('serviceDeposit', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Move-In/Admin Fee</Label>
+                    <Input type="number" value={specialInvoiceDraft.moveInFee} onChange={(e) => handleSpecialInvoiceDraftChange('moveInFee', e.target.value)} className="mt-1" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Cleaning Fee</Label>
+                    <Input type="number" value={specialInvoiceDraft.cleaningFee} onChange={(e) => handleSpecialInvoiceDraftChange('cleaningFee', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Damage Charges</Label>
+                    <Input type="number" value={specialInvoiceDraft.damageCharges} onChange={(e) => handleSpecialInvoiceDraftChange('damageCharges', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Utility Clearance</Label>
+                    <Input type="number" value={specialInvoiceDraft.utilityClearance} onChange={(e) => handleSpecialInvoiceDraftChange('utilityClearance', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Switching Fee</Label>
+                    <Input type="number" value={specialInvoiceDraft.switchingFee} onChange={(e) => handleSpecialInvoiceDraftChange('switchingFee', e.target.value)} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Refund Credit (Subtract)</Label>
+                    <Input type="number" value={specialInvoiceDraft.refundCredit} onChange={(e) => handleSpecialInvoiceDraftChange('refundCredit', e.target.value)} className="mt-1" />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <Label>Notes</Label>
+                <textarea
+                  value={specialInvoiceDraft.notes}
+                  onChange={(e) => handleSpecialInvoiceDraftChange('notes', e.target.value)}
+                  className="w-full mt-1 min-h-[80px] px-3 py-2 border border-slate-300 rounded-md"
+                  placeholder="Optional notes"
+                />
+              </div>
+
+              <div className="border border-slate-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-semibold">Additional / Missing Charges</Label>
+                  <span className="text-xs text-slate-500">Add any other line item not listed above</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
+                  <Input
+                    type="text"
+                    value={newSpecialChargeName}
+                    onChange={(e) => setNewSpecialChargeName(e.target.value)}
+                    placeholder="Charge name (e.g. Key card fee)"
+                  />
+                  <Input
+                    type="number"
+                    value={newSpecialChargeAmount}
+                    onChange={(e) => setNewSpecialChargeAmount(e.target.value)}
+                    placeholder="Amount"
+                  />
+                  <Button type="button" onClick={handleAddSpecialCharge} className="bg-[#154279] hover:bg-[#0f325e]">
+                    Add
+                  </Button>
+                </div>
+
+                {Object.keys(specialInvoiceDraft.customCharges || {}).length > 0 && (
+                  <div className="space-y-2">
+                    {Object.entries(specialInvoiceDraft.customCharges).map(([key, amount]) => (
+                      <div key={key} className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2 items-center">
+                        <Input type="text" value={key} disabled className="bg-slate-50" />
+                        <Input
+                          type="number"
+                          value={Number(amount || 0)}
+                          onChange={(e) => handleSpecialChargeAmountChange(key, e.target.value)}
+                        />
+                        <Button type="button" variant="outline" onClick={() => handleRemoveSpecialCharge(key)}>
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-slate-600">Invoice Total</p>
+                <p className="text-3xl font-bold text-blue-700">{formatKES(calculateSpecialInvoiceTotal(specialInvoiceDraft))}</p>
+              </div>
+            </CardContent>
+
+            <CardFooter className="gap-3 border-t flex-wrap justify-end">
+              <Button variant="outline" onClick={() => setSpecialInvoiceDraft(null)}>
+                Cancel
+              </Button>
+              <Button onClick={handleGenerateSpecialInvoice} disabled={savingSpecialInvoice} className="gap-2 bg-[#154279] hover:bg-[#0f325e]">
+                {savingSpecialInvoice ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                {savingSpecialInvoice ? 'Generating...' : 'Generate Invoice'}
               </Button>
             </CardFooter>
           </Card>

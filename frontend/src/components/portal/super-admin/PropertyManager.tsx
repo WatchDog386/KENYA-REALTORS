@@ -281,12 +281,11 @@ const PropertyManager: React.FC = () => {
   const handleDeleteProperty = async (id: string) => {
       if(!confirm("Are you sure? This will delete the property and all its units.")) return;
       try {
-          const { error } = await supabase.from('properties').delete().eq('id', id);
-          if(error) throw error;
+        await propertyService.deleteProperty(id);
           toast.success("Property deleted");
           fetchProperties();
-      } catch (err) {
-          toast.error("Failed to delete property");
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to delete property");
           console.error(err);
       }
   }

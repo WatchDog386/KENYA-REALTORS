@@ -38,30 +38,11 @@ const SEARCH_DATA = [
   { id: 101, title: "Modern Downtown Loft", area: "CBD", price: "85,000", type: "Loft", img: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=200" },
   { id: 102, title: "Suburban Family Home", area: "Karen", price: "150,000", type: "House", img: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=200" },
   { id: 103, title: "Cozy Studio Apartment", area: "Roysambu", price: "25,000", type: "Studio", img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=200" },
-  { id: 104, title: "Luxury Condo w/ View", area: "Westlands", price: "210,000", type: "Condo", img: "https://images.unsplash.com/photo-1515263487990-61b07816b324?q=80&w=200" },
-
-  // --- FEATURES LISTINGS (Page 1) ---
-  { id: "AHT-304", title: "Luxury 3-Bedroom Panorama Suite", area: "Ayden Home Towers, Wing A", price: 85000, type: "3 Bedroom", img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=200" },
-  { id: "AHT-202", title: "Modern 2-Bedroom Executive", area: "Ayden Home Towers, Wing B", price: 55000, type: "2 Bedroom", img: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=200" },
-  { id: "AHT-105", title: "Spacious 1-Bedroom Apartment", area: "Ayden Home Towers, Wing B", price: 35000, type: "1 Bedroom", img: "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?q=80&w=200" },
-  { id: "AHT-001", title: "Standard Single Room / Bedsitter", area: "Ayden Home Towers, Wing C", price: 18000, type: "Bedsitter", img: "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?q=80&w=200" },
-  { id: "AHT-205", title: "Premium 2-Bedroom with Balcony", area: "Ayden Home Towers, Wing A", price: 60000, type: "2 Bedroom", img: "https://images.unsplash.com/photo-1493809842364-78817add7ffb?q=80&w=200" },
-  { id: "AHT-108", title: "Economy 1-Bedroom", area: "Ayden Home Towers, Wing C", price: 28000, type: "1 Bedroom", img: "https://images.unsplash.com/photo-1554995207-c18c203602cb?q=80&w=200" },
-
-  // --- FEATURES LISTINGS (Page 2) ---
-  { id: "AHT-406", title: "Penthouse 4-Bedroom Executive Suite", area: "Ayden Home Towers, Wing A", price: 125000, type: "4 Bedroom", img: "https://images.unsplash.com/photo-1613977257363-707ba9348227?q=80&w=200" },
-  { id: "AHT-309", title: "Executive 3-Bedroom Family Unit", area: "Ayden Home Towers, Wing A", price: 92000, type: "3 Bedroom", img: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?q=80&w=200" },
-  { id: "AHT-212", title: "Modern 2-Bedroom Corner Unit", area: "Ayden Home Towers, Wing B", price: 62000, type: "2 Bedroom", img: "https://images.unsplash.com/photo-1567767292278-a4f21aa2d36e?q=80&w=200" },
-  { id: "AHT-115", title: "Premium 1-Bedroom Studio", area: "Ayden Home Towers, Wing B", price: 42000, type: "1 Bedroom", img: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=200" },
-  { id: "AHT-003", title: "Deluxe Bedsitter with Balcony", area: "Ayden Home Towers, Wing C", price: 22000, type: "Bedsitter", img: "https://images.unsplash.com/photo-1558036117-15e82a2c9a9a?q=80&w=200" },
-  { id: "AHT-110", title: "Budget-Friendly Studio Apartment", area: "Ayden Home Towers, Wing C", price: 25000, type: "Studio", img: "https://images.unsplash.com/photo-1554995207-c18c203602cb?q=80&w=200" }
+  { id: 104, title: "Luxury Condo w/ View", area: "Westlands", price: "210,000", type: "Condo", img: "https://images.unsplash.com/photo-1515263487990-61b07816b324?q=80&w=200" }
 ];
 
 // Extract unique locations with vacancy info
 const LOCATION_AREAS = [
-  { name: "Ayden Home Towers, Wing A", vacancies: 5, rentals: 12 },
-  { name: "Ayden Home Towers, Wing B", vacancies: 3, rentals: 8 },
-  { name: "Ayden Home Towers, Wing C", vacancies: 2, rentals: 6 },
   { name: "CBD", vacancies: 7, rentals: 15 },
   { name: "Karen", vacancies: 4, rentals: 10 },
   { name: "Roysambu", vacancies: 6, rentals: 14 },

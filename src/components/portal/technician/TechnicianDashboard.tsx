@@ -22,6 +22,7 @@ import {
   ChevronRight,
   User
 } from 'lucide-react';
+import VerifiedVacanciesList from '@/components/portal/shared/VerifiedVacanciesList';
 
 interface DashboardStats {
   totalJobs: number;
@@ -246,6 +247,13 @@ const TechnicianDashboard = () => {
       {/* METRICS SECTION */}
       <section className="bg-slate-50 py-8">
         <div className="max-w-[1400px] mx-auto px-6">
+          <div className="mb-6">
+            <VerifiedVacanciesList
+              title="Verified Vacancies"
+              description="Recently verified move-outs now available for technician assignment planning."
+            />
+          </div>
+
           <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-[#154279] tracking-tight mb-1">

@@ -95,6 +95,35 @@ interface Unit {
 }
 
 export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ property, onBack }) => {
+    const getFloorSortValue = (floor: string | number | null | undefined): number => {
+        const floorKey = String(floor ?? "G").trim().toUpperCase();
+        const floorOrder: Record<string, number> = {
+            B5: -5,
+            B4: -4,
+            B3: -3,
+            B2: -2,
+            B1: -1,
+            B: -1,
+            G: 0,
+            M: 0.5,
+            R: 10000,
+            ROOFTOP: 10000,
+            PH: 10001,
+            PENTHOUSE: 10001,
+        };
+
+        if (floorOrder[floorKey] !== undefined) {
+            return floorOrder[floorKey];
+        }
+
+        const parsed = Number(floorKey);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+
+        return 9999;
+    };
+
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [unitTypes, setUnitTypes] = useState<PropertyUnitType[]>([]);
@@ -107,7 +136,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
   const [generateConfig, setGenerateConfig] = useState({
     unitTypeName: "", // Replaces unitTypeId for input
     count: 1,
-    floorNumber: 1,
+        floorNumber: "1",
     startNumber: 1,
     prefix: "",
     price: "",
@@ -164,9 +193,8 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         parsed.sort((a: any, b: any) => {
           const aFloor = String(a.floor_number || 'G');
           const bFloor = String(b.floor_number || 'G');
-          const floorOrder: { [key: string]: number } = { 'B5': -5, 'B4': -4, 'B3': -3, 'B2': -2, 'B1': -1, 'B': -1, 'G': 0, 'M': 0.5 };
-          const aFloorNum = floorOrder[aFloor] ?? parseInt(aFloor) ?? 0;
-          const bFloorNum = floorOrder[bFloor] ?? parseInt(bFloor) ?? 0;
+                    const aFloorNum = getFloorSortValue(aFloor);
+                    const bFloorNum = getFloorSortValue(bFloor);
           if (aFloorNum !== bFloorNum) return aFloorNum - bFloorNum;
           return String(a.unit_number || '').localeCompare(String(b.unit_number || ''), undefined, { numeric: true, sensitivity: 'base' });
         });
@@ -219,7 +247,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
           property_id: property.id,
           unit_type_id: typeId,
           unit_number: unitNumber,
-          floor_number: generateConfig.floorNumber,
+                    floor_number: String(generateConfig.floorNumber || "1").trim(),
           price: Number(generateConfig.price),
           status: 'vacant', // Default as per request
           description: generateConfig.description || generateConfig.unitTypeName,
@@ -295,12 +323,12 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             normalizedRow[key.toString().toLowerCase().trim()] = row[key];
         });
 
-        // Expected columns: Unit Number, Floor, Type, Price (optional)
+        // Expected columns: Unit Number, Floor, Type, Rent (optional)
         // Check various likely column names
         const unitNumber = normalizedRow['unit number'] || normalizedRow['unit_number'] || normalizedRow['unit'] || normalizedRow['unit #'] || normalizedRow['unit#'];
         const floorNumber = normalizedRow['floor'] || normalizedRow['floor_number'] || normalizedRow['floor number'] || 1;
         const typeName = normalizedRow['type'] || normalizedRow['unit type'] || normalizedRow['unit_type'] || 'Standard';
-        const price = normalizedRow['price'] || normalizedRow['price (kes)'] || normalizedRow['amount'] || null;
+        const rent = normalizedRow['rent'] || normalizedRow['rent (kes)'] || normalizedRow['price'] || normalizedRow['price (kes)'] || normalizedRow['amount'] || null;
         
         // Handle "status" or "availability"
         // Also map 'vacant' -> 'available'
@@ -334,7 +362,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
               .insert({
                 property_id: property.id,
                 name: String(typeName).trim(),
-                price_per_unit: price ? Number(price) : 0
+                                price_per_unit: rent ? Number(rent) : 0
               })
               .select()
               .single();
@@ -350,9 +378,9 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         const unitData = {
             property_id: property.id,
             unit_number: unitNumberStr,
-            floor_number: Number(floorNumber),
+            floor_number: String(floorNumber).trim(),
             unit_type_id: typeId,
-            price: price ? Number(price) : null,
+            price: rent ? Number(rent) : null,
             status: status,
             description: description,
             features: features
@@ -389,7 +417,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       toast.success(`Processed units: ${importedCount} created, ${updatedCount} updated`);
       
       if (importedCount === 0 && updatedCount === 0) {
-          toast.warning("No units were processed. Please check your Excel column headers. Expected: 'Unit Number', 'Floor', 'Type', 'Price'.", { duration: 6000 });
+          toast.warning("No units were processed. Please check your Excel column headers. Expected: 'Unit Number', 'Floor', 'Type', 'Rent'.", { duration: 6000 });
           console.warn("First row keys found:", Object.keys(jsonData[0] || {}));
       }
 
@@ -631,17 +659,17 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
   return (
     <>
     <GlobalStyles />
-    <div className="min-h-screen pb-20 animate-in fade-in duration-500 bg-[#F5F8FA] font-nunito">
+        <div className="min-h-screen pb-20 animate-in fade-in duration-500 bg-[#F5F8FA] font-nunito text-slate-900">
       
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#154279] rounded-b-[2.5rem] shadow-xl mb-12 min-h-[40vh] flex items-center -mx-6 -mt-6 lg:-mx-0 lg:-mt-0">
+            <section className="relative overflow-hidden bg-gradient-to-r from-blue-50 to-blue-100 rounded-b-xl shadow-lg mb-10 min-h-[34vh] flex items-center border-b border-blue-200">
         <HeroBackground />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#154279] via-[#154279]/95 to-blue-900/80" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-blue-100" />
         
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto px-6 w-full pt-16">
           <div className="flex items-center gap-6">
              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button variant="ghost" size="icon" onClick={onBack} className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl h-12 w-12 shadow-md backdrop-blur-sm">
+                                <Button variant="ghost" size="icon" onClick={onBack} className="bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 rounded-xl h-12 w-12 shadow-sm">
                     <ArrowLeft className="w-6 h-6" />
                 </Button>
              </motion.div>
@@ -652,16 +680,16 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                     animate={{ opacity: 1, x: 0 }}
                     className="flex items-center gap-2 mb-2"
                 >
-                    <div className="h-[2px] w-8 bg-[#F96302]"></div>
-                    <span className="text-[11px] font-bold text-[#F96302] uppercase tracking-[0.2em]">{property.type || 'Property'} Management</span>
+                          <div className="h-[2px] w-8 bg-blue-600"></div>
+                          <span className="text-[11px] font-bold text-blue-600 uppercase tracking-[0.2em]">{property.type || 'Property'} Management</span>
                 </motion.div>
                 
-                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight mb-2">
-                {property.name} <span className="text-[#F96302]">Units</span>
+                     <h1 className="text-3xl md:text-5xl font-black text-blue-900 leading-tight tracking-tight mb-2">
+                     {property.name} <span className="text-blue-600">Units</span>
                 </h1>
                 
-                <p className="text-blue-100/80 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                   <Building className="w-4 h-4 text-[#F96302]" />
+                     <p className="text-blue-700 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                         <Building className="w-4 h-4 text-blue-600" />
                    {property.location}
                 </p>
              </div>
@@ -672,7 +700,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsManageTypesOpen(true)}
-                className="px-5 py-3 rounded-lg font-bold text-[11px] uppercase tracking-[0.15em] transition-all flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/40 shadow-lg backdrop-blur-sm"
+                     className="px-5 py-3 rounded-lg font-bold text-[11px] uppercase tracking-[0.15em] transition-all flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 shadow-sm"
              >
                 <Settings2 className="w-4 h-4" />
                 Manage Types
@@ -681,7 +709,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         </div>
       </section>
 
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 space-y-12">
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-6 space-y-8">
 
       {/* Summary Section - Product Card Style */}
       <motion.div 
@@ -692,53 +720,53 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       >
         <motion.div 
             whileHover={{ y: -5 }}
-            className="group relative rounded-2xl p-6 shadow-lg bg-gradient-to-br from-[#154279] to-[#205a9e] text-white overflow-hidden transition-all duration-300"
+            className="group relative rounded-2xl p-6 shadow-sm bg-white border border-slate-200 overflow-hidden transition-all duration-300"
         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
             <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3">
-                <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-2 group-hover:bg-white/30 transition-colors">
-                    <MdApartment size={32} className="text-white" />
+                <div className="p-4 bg-blue-50 rounded-2xl mb-2 group-hover:bg-blue-100 transition-colors">
+                    <MdApartment size={32} className="text-blue-700" />
                 </div>
-                <h3 className="text-xs font-bold text-blue-100 uppercase tracking-widest">Total Units</h3>
-                <div className="text-4xl font-black text-white">{units.length}</div>
-                <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest">Active Inventory</p>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total Units</h3>
+                <div className="text-4xl font-black text-blue-900">{units.length}</div>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Inventory</p>
             </div>
         </motion.div>
 
         <motion.div 
             whileHover={{ y: -5 }}
-            className="group relative rounded-2xl p-6 shadow-lg bg-gradient-to-br from-emerald-600 to-emerald-500 text-white overflow-hidden transition-all duration-300"
+            className="group relative rounded-2xl p-6 shadow-sm bg-white border border-slate-200 overflow-hidden transition-all duration-300"
         >
-             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
+             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
             <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3">
-                 <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-2 group-hover:bg-white/30 transition-colors">
-                    <CheckCircle size={32} className="text-white" />
+                 <div className="p-4 bg-emerald-50 rounded-2xl mb-2 group-hover:bg-emerald-100 transition-colors">
+                    <CheckCircle size={32} className="text-emerald-700" />
                 </div>
-                <h3 className="text-xs font-bold text-emerald-100 uppercase tracking-widest">Occupancy</h3>
-                <div className="text-4xl font-black text-white">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Occupancy</h3>
+                <div className="text-4xl font-black text-emerald-700">
                     {units.length > 0 ? Math.round((units.filter(u => u.status === 'occupied').length / units.length) * 100) : 0}%
                 </div>
-                <div className="w-full max-w-[120px] h-2 bg-black/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-white" style={{ width: `${units.length > 0 ? (units.filter(u => u.status === 'occupied').length / units.length) * 100 : 0}%` }} />
+                <div className="w-full max-w-[120px] h-2 bg-emerald-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-600" style={{ width: `${units.length > 0 ? (units.filter(u => u.status === 'occupied').length / units.length) * 100 : 0}%` }} />
                 </div>
             </div>
         </motion.div>
 
         <motion.div 
              whileHover={{ y: -5 }}
-             className="group relative rounded-2xl p-6 shadow-lg bg-gradient-to-br from-[#F96302] to-[#ff8c42] text-white overflow-hidden transition-all duration-300"
+             className="group relative rounded-2xl p-6 shadow-sm bg-white border border-slate-200 overflow-hidden transition-all duration-300"
         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
             <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3">
-                 <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-2 group-hover:bg-white/30 transition-colors">
-                    <MdStorefront size={32} className="text-white" />
+                 <div className="p-4 bg-orange-50 rounded-2xl mb-2 group-hover:bg-orange-100 transition-colors">
+                    <MdStorefront size={32} className="text-orange-700" />
                 </div>
-                <h3 className="text-xs font-bold text-orange-100 uppercase tracking-widest">Revenue Potential</h3>
-                <div className="text-3xl font-black text-white flex items-baseline">
-                    <span className="text-sm font-bold text-orange-200 mr-1">KES</span>
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Revenue Potential</h3>
+                <div className="text-3xl font-black text-orange-700 flex items-baseline">
+                    <span className="text-sm font-bold text-orange-500 mr-1">KES</span>
                     {units.reduce((sum, u) => sum + (Number(u.price) || 0), 0).toLocaleString()}
                 </div>
-                <p className="text-[10px] text-orange-100 font-bold uppercase tracking-widest flex items-center gap-1">
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1">
                     <Zap size={10} /> Monthly Projected
                 </p>
             </div>
@@ -752,45 +780,47 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-white border-none shadow-xl rounded-2xl overflow-hidden"
+                className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden"
             >
-                <div className="p-6 border-b border-slate-100 bg-white flex items-center justify-between">
+                <div className="p-6 border-b border-slate-200 bg-slate-50/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                         <h2 className="text-lg font-bold flex items-center gap-2 text-[#154279] uppercase tracking-tight">
-                            <MdKingBed className="w-5 h-5 text-[#F96302]" /> Unit Directory
+                         <h2 className="text-lg font-bold flex items-center gap-2 text-slate-900 uppercase tracking-tight">
+                            <MdKingBed className="w-5 h-5 text-blue-600" /> Unit Directory
                         </h2>
                         <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase tracking-widest">Manage individual units</p>
                     </div>
-                    
-                    <div className="relative">
+
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                      <div className="relative flex-1 md:flex-none">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input 
                             placeholder="Search..." 
-                            className="pl-9 h-9 text-xs border-slate-300 focus:border-[#F96302] focus:ring-0 rounded-lg w-40 md:w-60 bg-white"
+                            className="pl-9 h-9 text-xs border-slate-300 focus:border-blue-500 focus:ring-0 rounded-lg w-full md:w-60 bg-white"
                         />
-                    </div>
-                    <Button onClick={handleAddUnit} className="ml-4 bg-[#F96302] hover:bg-[#e05802] text-white font-bold h-9 text-xs uppercase tracking-widest shadow-sm">
+                      </div>
+                      <Button onClick={handleAddUnit} className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-9 text-xs uppercase tracking-widest shadow-sm">
                         <Plus className="w-4 h-4 mr-2" /> Add Unit
-                    </Button>
+                      </Button>
+                    </div>
                 </div>
                 
                 <div className="overflow-x-auto bg-white">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-gradient-to-r from-[#e8ecf1] to-[#f0f4f8] border-b-2 border-[#154279]">
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em]">Unit #</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em]">Type</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-center">Floor</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Rent</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-center">Status</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Actions</TableHead>
+                            <TableRow className="bg-slate-50 border-b border-slate-200">
+                                <TableHead className="py-4 text-slate-700 font-bold text-[10px] uppercase tracking-[0.2em]">Unit #</TableHead>
+                                <TableHead className="py-4 text-slate-700 font-bold text-[10px] uppercase tracking-[0.2em]">Type</TableHead>
+                                <TableHead className="py-4 text-slate-700 font-bold text-[10px] uppercase tracking-[0.2em] text-center">Floor</TableHead>
+                                <TableHead className="py-4 text-slate-700 font-bold text-[10px] uppercase tracking-[0.2em] text-right">Rent</TableHead>
+                                <TableHead className="py-4 text-slate-700 font-bold text-[10px] uppercase tracking-[0.2em] text-center">Status</TableHead>
+                                <TableHead className="py-4 text-slate-700 font-bold text-[10px] uppercase tracking-[0.2em] text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody className="divide-y divide-slate-100">
                             {loading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} className="text-center py-12">
-                                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#154279] mb-2" />
+                                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 mb-2" />
                                         <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Loading...</p>
                                     </TableCell>
                                 </TableRow>
@@ -800,7 +830,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                         <div className="opacity-20 mb-4 inline-block">
                                             <MdApartment size={64} />
                                         </div>
-                                        <h3 className="text-[#154279] font-bold text-sm uppercase tracking-wide">No units found</h3>
+                                        <h3 className="text-blue-900 font-bold text-sm uppercase tracking-wide">No units found</h3>
                                         <p className="text-slate-500 text-xs mt-1">Use the generator to create units.</p>
                                     </TableCell>
                                 </TableRow>
@@ -811,9 +841,9 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         whileHover={{ backgroundColor: "rgba(21, 66, 121, 0.02)" }}
-                                        className="hover:bg-slate-50 transition-colors group"
+                                        className="hover:bg-blue-50/40 transition-colors group"
                                     >
-                                        <TableCell className="font-bold text-[#154279] border-l-4 border-transparent group-hover:border-[#F96302] transition-all">
+                                        <TableCell className="font-bold text-blue-900 border-l-4 border-transparent group-hover:border-blue-500 transition-all">
                                             {unit.unit_number}
                                         </TableCell>
                                         <TableCell>
@@ -828,7 +858,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                         </TableCell>
                                         <TableCell className="text-center font-bold text-slate-500 text-xs">{unit.floor_number}</TableCell>
                                         <TableCell className="text-right">
-                                            <div className="font-bold text-[#154279] text-[12px]">KES {unit.price?.toLocaleString() || 0}</div>
+                                            <div className="font-bold text-blue-900 text-[12px]">KES {unit.price?.toLocaleString() || 0}</div>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className={cn(
@@ -853,7 +883,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                                 variant="ghost" 
                                                 size="sm" 
                                                 onClick={() => openEditDialog(unit)}
-                                                className="h-8 w-8 p-0 text-slate-400 hover:text-[#154279] hover:bg-transparent"
+                                                className="h-8 w-8 p-0 text-slate-400 hover:text-blue-700 hover:bg-transparent"
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </Button>
@@ -884,20 +914,20 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 viewport={{ once: true }}
                 className={cn(
                     "relative border-2 rounded-2xl transition-all duration-300 overflow-hidden bg-white",
-                    "border-[#154279] shadow-2xl shadow-[#154279]/10"
+                    "border-slate-200 shadow-sm"
                 )}
             >
                 {/* Header Section */}
-                <div className="bg-gradient-to-br from-[#154279] via-[#154279] to-[#0f325e] p-6 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none" />
+                <div className="bg-slate-50 p-6 text-slate-900 relative overflow-hidden border-b border-slate-200">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-bl-full pointer-events-none" />
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-2">
-                             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                <MdBusiness size={24} className="text-[#F96302]" />
+                             <div className="p-2 bg-blue-100 rounded-lg">
+                                <MdBusiness size={24} className="text-blue-700" />
                              </div>
                              <h2 className="text-lg font-bold uppercase tracking-wide">Bulk Generator</h2>
                         </div>
-                        <p className="text-[11px] text-blue-100 font-bold uppercase tracking-widest pl-1">Rapidly create multiple units</p>
+                        <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest pl-1">Rapidly create multiple units</p>
                     </div>
                 </div>
 
@@ -908,7 +938,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                             value={generateConfig.unitTypeName} 
                             onChange={(e) => setGenerateConfig({...generateConfig, unitTypeName: e.target.value})}
                             placeholder="e.g. 1 Bedroom"
-                            className="bg-white border-slate-200 focus:border-[#F96302] focus:ring-0 rounded-lg h-10 font-bold text-custom-primary text-sm"
+                            className="bg-white border-slate-200 focus:border-blue-500 focus:ring-0 rounded-lg h-10 font-bold text-blue-900 text-sm"
                         />
                     </div>
                     
@@ -925,11 +955,18 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                         <div className="space-y-1.5">
                             <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Floor</Label>
                             <Input 
-                                type="number" 
-                                value={generateConfig.floorNumber} 
-                                onChange={(e) => setGenerateConfig({...generateConfig, floorNumber: Number(e.target.value)})}
+                                value={generateConfig.floorNumber}
+                                onChange={(e) => setGenerateConfig({...generateConfig, floorNumber: e.target.value})}
+                                placeholder="e.g. 12, Rooftop, Penthouse"
+                                list="bulk-floor-suggestions"
                                 className="bg-white border-slate-200 focus:border-[#154279] rounded-lg"
                             />
+                            <datalist id="bulk-floor-suggestions">
+                                <option value="G" />
+                                <option value="M" />
+                                <option value="Rooftop" />
+                                <option value="Penthouse" />
+                            </datalist>
                         </div>
                     </div>
 
@@ -963,7 +1000,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 placeholder="0.00"
                                 value={generateConfig.price} 
                                 onChange={(e) => setGenerateConfig({...generateConfig, price: e.target.value})}
-                                className="pl-10 bg-white border-slate-200 focus:border-[#F96302] rounded-lg font-bold text-[#154279]"
+                                className="pl-10 bg-white border-slate-200 focus:border-blue-500 rounded-lg font-bold text-blue-900"
                             />
                         </div>
                     </div>
@@ -983,7 +1020,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                         whileTap={{ scale: 0.98 }}
                         onClick={handleGenerateUnits}
                         disabled={isGenerating}
-                        className="w-full mt-4 bg-[#F96302] hover:bg-[#e05802] text-white px-4 py-3 rounded-lg font-bold text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all"
+                        className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-bold text-[11px] uppercase tracking-[0.2em] shadow-sm flex items-center justify-center gap-2 transition-all"
                     >
                         {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MdApartment className="w-4 h-4" />}
                         Generate Units
@@ -997,26 +1034,26 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 viewport={{ once: true }}
                 className={cn(
                     "relative border-2 rounded-2xl transition-all duration-300 overflow-hidden bg-white",
-                    "border-emerald-600 shadow-2xl shadow-emerald-600/10"
+                    "border-slate-200 shadow-sm"
                 )}
             >
-                 <div className="bg-gradient-to-br from-emerald-600 via-emerald-600 to-emerald-800 p-6 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none" />
+                 <div className="bg-slate-50 p-6 text-slate-900 relative overflow-hidden border-b border-slate-200">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full pointer-events-none" />
                     <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-2">
-                             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                <Upload size={24} className="text-emerald-300" />
+                             <div className="p-2 bg-emerald-100 rounded-lg">
+                                <Upload size={24} className="text-emerald-700" />
                              </div>
                              <h2 className="text-lg font-bold uppercase tracking-wide">Import Details</h2>
                         </div>
-                        <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-widest pl-1">Upload Excel Sheet</p>
+                        <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest pl-1">Upload Excel Sheet</p>
                     </div>
                 </div>
 
                  <div className="p-6 space-y-5 bg-gradient-to-b from-white to-slate-50">
                     <div className="text-xs text-slate-500 mb-4">
                         Upload an Excel file (.xlsx, .xls) with columns: <br/>
-                        <span className="font-mono bg-slate-100 px-1 rounded">Unit Number, Floor, Type, Price, Status, Description, Features</span>
+                        <span className="font-mono bg-slate-100 px-1 rounded">Unit Number, Floor, Type, Rent, Status, Description, Features</span>
                     </div>
 
                     <div className="relative">
@@ -1193,34 +1230,29 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                      </div>
                      <div className="space-y-2">
                             <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Floor</Label>
-                            <Select 
-                                value={String(editingUnit?.floor_number ?? '')} 
-                                onValueChange={(val) => setEditingUnit(prev => ({...prev!, floor_number: val}))}
-                            >
-                                <SelectTrigger className="font-bold bg-slate-50 border-slate-200 focus:ring-[#154279] rounded-lg h-10">
-                                    <SelectValue placeholder="Select floor" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="G">Ground Floor (G)</SelectItem>
-                                    <SelectItem value="M">Mezzanine (M)</SelectItem>
-                                    <SelectItem value="1">Floor 1</SelectItem>
-                                    <SelectItem value="2">Floor 2</SelectItem>
-                                    <SelectItem value="3">Floor 3</SelectItem>
-                                    <SelectItem value="4">Floor 4</SelectItem>
-                                    <SelectItem value="5">Floor 5</SelectItem>
-                                    <SelectItem value="6">Floor 6</SelectItem>
-                                    <SelectItem value="7">Floor 7</SelectItem>
-                                    <SelectItem value="8">Floor 8</SelectItem>
-                                    <SelectItem value="9">Floor 9</SelectItem>
-                                    <SelectItem value="10">Floor 10</SelectItem>
-                                    <SelectItem value="B">Basement (Select Level Below)</SelectItem>
-                                    <SelectItem value="B1">Basement 1 (B1)</SelectItem>
-                                    <SelectItem value="B2">Basement 2 (B2)</SelectItem>
-                                    <SelectItem value="B3">Basement 3 (B3)</SelectItem>
-                                    <SelectItem value="B4">Basement 4 (B4)</SelectItem>
-                                    <SelectItem value="B5">Basement 5 (B5)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <Input
+                                value={String(editingUnit?.floor_number ?? "")}
+                                onChange={(e) => setEditingUnit(prev => ({...prev!, floor_number: e.target.value}))}
+                                placeholder="e.g. G, 14, Rooftop, Penthouse"
+                                list="unit-floor-suggestions"
+                                className="font-bold bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg h-10"
+                            />
+                            <datalist id="unit-floor-suggestions">
+                                <option value="B5" />
+                                <option value="B4" />
+                                <option value="B3" />
+                                <option value="B2" />
+                                <option value="B1" />
+                                <option value="G" />
+                                <option value="M" />
+                                <option value="1" />
+                                <option value="2" />
+                                <option value="3" />
+                                <option value="4" />
+                                <option value="5" />
+                                <option value="Rooftop" />
+                                <option value="Penthouse" />
+                            </datalist>
                      </div>
                      <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Type Name</Label>

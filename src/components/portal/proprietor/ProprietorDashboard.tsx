@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from "framer-motion";
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../integrations/supabase/client';
@@ -14,11 +14,14 @@ import {
   Home,
   Users,
   DollarSign,
-  Building2
+  Building2,
+  FileText
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
 import { cn } from "../../../lib/utils";
+import VerifiedVacanciesList from '@/components/portal/shared/VerifiedVacanciesList';
+import { leaveRequestService, LeaveRequestRecord } from '@/services/leaveRequestService';
 
 interface ProprietorProfile {
   id: string;
@@ -54,10 +57,34 @@ interface OwnedProperty {
   };
 }
 
+interface RepairProcurementReport {
+  id: string;
+  property_id: string;
+  maintenance_request_id: string;
+  lpo_number?: string;
+  invoice_number?: string;
+  supplier_name?: string;
+  cost_estimate?: number;
+  actual_cost?: number;
+  paid_amount?: number;
+  status: string;
+  submitted_at?: string;
+  paid_at?: string;
+  report_content?: string;
+  maintenance_request?: {
+    title?: string;
+  };
+  property?: {
+    name?: string;
+  };
+}
+
 export const ProprietorDashboard: React.FC = () => {
   const { user: authUser } = useAuth();
   const [proprietor, setProprietor] = useState<ProprietorProfile | null>(null);
   const [properties, setProperties] = useState<OwnedProperty[]>([]);
+  const [repairReports, setRepairReports] = useState<RepairProcurementReport[]>([]);
+  const [sharedLeaveRequests, setSharedLeaveRequests] = useState<LeaveRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState('');
 
@@ -143,6 +170,49 @@ export const ProprietorDashboard: React.FC = () => {
       mappedProp.properties_count = (propsData || []).length;
       setProprietor(mappedProp);
       setProperties(mappedProps);
+
+      const propertyIds = (propsData || []).map((p: any) => p.property_id).filter(Boolean);
+      if (propertyIds.length > 0) {
+        const { data: reportsData, error: reportsError } = await supabase
+          .from('maintenance_completion_reports')
+          .select(`
+            id,
+            property_id,
+            maintenance_request_id,
+            lpo_number,
+            invoice_number,
+            supplier_name,
+            cost_estimate,
+            actual_cost,
+            paid_amount,
+            status,
+            submitted_at,
+            paid_at,
+            report_content,
+            maintenance_request:maintenance_requests(title),
+            property:properties(name)
+          `)
+          .in('property_id', propertyIds)
+          .not('lpo_number', 'is', null)
+          .order('submitted_at', { ascending: false });
+
+        if (reportsError) {
+          console.warn('Error loading repair procurement reports:', reportsError);
+          setRepairReports([]);
+        } else {
+          setRepairReports(reportsData || []);
+        }
+      } else {
+        setRepairReports([]);
+      }
+
+      try {
+        const leaveRecords = await leaveRequestService.getSharedLeaveRequestsForProprietor();
+        setSharedLeaveRequests(leaveRecords.slice(0, 8));
+      } catch (leaveError) {
+        console.warn('Error loading shared leave requests:', leaveError);
+        setSharedLeaveRequests([]);
+      }
     } catch (error: any) {
       console.error('Error loading proprietor data:', error);
     } finally {
@@ -167,6 +237,14 @@ export const ProprietorDashboard: React.FC = () => {
     (sum, p) => sum + ((p.property?.monthly_rent || 0) * (p.ownership_percentage / 100)),
     0
   );
+
+  const getEstimatedIncome = (ownership: OwnedProperty) => {
+    return ((ownership.property?.monthly_rent || 0) * ownership.ownership_percentage) / 100;
+  };
+
+  const sortedProperties = useMemo(() => {
+    return [...properties].sort((a, b) => getEstimatedIncome(a) - getEstimatedIncome(b));
+  }, [properties]);
 
   const totalUnits = properties.reduce(
     (sum, p) => sum + (p.property?.total_units || 0),
@@ -230,6 +308,109 @@ export const ProprietorDashboard: React.FC = () => {
 
       {/* DASHBOARD CONTENT */}
       <div className="w-full px-4 md:px-8 -mt-8 pb-20 relative z-20">
+        <div className="mb-8">
+          <VerifiedVacanciesList
+            title="Verified Vacancies"
+            description="Manager-verified move-outs visible to proprietors for occupancy and turnover monitoring."
+          />
+        </div>
+
+        <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden mb-8">
+          <CardHeader className="bg-slate-50 border-b border-slate-100">
+            <CardTitle className="text-lg font-bold text-[#154279] flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#F96302]" />
+              Shared Employee Leave Records
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {sharedLeaveRequests.length === 0 ? (
+              <div className="p-6 text-sm text-slate-500">
+                No approved leave records have been shared with proprietors yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {sharedLeaveRequests.map((request) => {
+                  const requesterName = `${request.requester?.first_name || ''} ${request.requester?.last_name || ''}`.trim() || request.requester?.email || 'Employee';
+
+                  return (
+                    <div key={request.id} className="p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{requesterName}</p>
+                        <p className="text-xs text-slate-500">
+                          {request.property?.name || 'General'} | {new Date(request.start_date).toLocaleDateString('en-GB')} - {new Date(request.end_date).toLocaleDateString('en-GB')} | {request.days_requested} day(s)
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">{request.reason}</p>
+                      </div>
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 w-fit">
+                        Approved & Shared
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden mb-8">
+          <CardHeader className="bg-slate-50 border-b border-slate-100">
+            <CardTitle className="text-lg font-bold text-[#154279] flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#F96302]" />
+              Repair LPO / Invoice Reports
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {repairReports.length === 0 ? (
+              <div className="p-6 text-sm text-slate-500">
+                No repair procurement reports have been submitted for your properties yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr className="text-left text-xs uppercase tracking-wider text-slate-500">
+                      <th className="px-4 py-3">Property / Repair</th>
+                      <th className="px-4 py-3">LPO / Invoice</th>
+                      <th className="px-4 py-3">Supplier</th>
+                      <th className="px-4 py-3">Cost</th>
+                      <th className="px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {repairReports.map((report) => (
+                      <tr key={report.id} className="border-t border-slate-100">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800">{report.property?.name || '-'}</div>
+                          <div className="text-xs text-slate-500">{report.maintenance_request?.title || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-700">{report.lpo_number || '-'}</div>
+                          <div className="text-xs text-slate-500">{report.invoice_number || '-'}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{report.supplier_name || '-'}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-800">
+                          KES {Number(report.paid_amount || report.actual_cost || report.cost_estimate || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge className={cn(
+                            'uppercase text-[10px] tracking-wider',
+                            report.status === 'paid'
+                              ? 'bg-green-100 text-green-700 border-green-200'
+                              : report.status === 'accountant_approved'
+                                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                : 'bg-amber-100 text-amber-700 border-amber-200'
+                          )}>
+                            {report.status.replace('_', ' ')}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -394,11 +575,15 @@ export const ProprietorDashboard: React.FC = () => {
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
                             Use custom view to manage specific properties
                         </p>
+                    <p className="text-[11px] text-slate-500 mt-1 font-semibold flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-[#F96302]" />
+                      Sorted by estimated income: lowest to highest
+                    </p>
                     </div>
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {properties.map((ownership, index) => (
+                  {sortedProperties.map((ownership, index) => (
                         <motion.div 
                             key={ownership.id}
                             initial={{ opacity: 0, y: 20 }} 
@@ -427,11 +612,19 @@ export const ProprietorDashboard: React.FC = () => {
                                 <CardContent className="pt-4 space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                          <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ownership</p>
-                                            <p className="text-sm font-bold text-slate-700 mt-0.5">{ownership.ownership_percentage}%</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                              <TrendingUp className="w-3 h-3 text-[#F96302]" />
+                                              Ownership
+                                            </p>
+                                            <p className="text-sm font-bold text-slate-700 mt-0.5 flex items-center gap-1">
+                                              {ownership.ownership_percentage}%
+                                            </p>
                                          </div>
                                          <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider inline-flex items-center gap-1">
+                                              <Building className="w-3 h-3 text-slate-400" />
+                                              Status
+                                            </p>
                                             <Badge
                                                 className={cn(
                                                     "mt-0.5 text-[10px] uppercase font-bold tracking-wide",
@@ -447,19 +640,21 @@ export const ProprietorDashboard: React.FC = () => {
 
                                     <div className="flex items-center justify-between pt-2 border-t border-slate-50">
                                         <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Units</p>
-                                            <p className="text-sm font-bold text-slate-700">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                          <Home className="w-3 h-3 text-slate-400" />
+                                          Units
+                                        </p>
+                                        <p className="text-sm font-bold text-slate-700 flex items-center gap-1">
                                                 {ownership.property?.occupied_units}/{ownership.property?.total_units}
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Est. Income</p>
-                                            <p className="text-sm font-black text-[#154279]">
-                                                KES {(
-                                                ((ownership.property?.monthly_rent || 0) *
-                                                    ownership.ownership_percentage) /
-                                                100
-                                                ).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider inline-flex items-center gap-1">
+                                          <DollarSign className="w-3 h-3 text-[#154279]" />
+                                          Est. Income
+                                        </p>
+                                        <p className="text-sm font-black text-[#154279] flex items-center justify-end gap-1">
+                                          KES {getEstimatedIncome(ownership).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                                             </p>
                                         </div>
                                     </div>

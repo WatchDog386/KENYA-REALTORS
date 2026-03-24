@@ -237,6 +237,12 @@ const AccountantLayout = ({ children }: { children?: ReactNode }) => {
       description: 'Receipt Records'
     },
     {
+      title: 'Leave Requests',
+      href: '/portal/accountant/leave-requests',
+      icon: <FileText size={20} />,
+      description: 'Request and track leave'
+    },
+    {
       title: 'Tenants',
       href: '/portal/accountant/tenants',
       icon: <Users size={20} />,

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar, Send, FileText, CheckCircle, Clock, MessageCircle, Home, MapPin, User, Info, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import RentRefundRequestDocument from '@/components/documents/RentRefundRequestDocument';
 
 const VacancyNoticePage = () => {
   const { user } = useAuth();
@@ -28,6 +29,19 @@ const VacancyNoticePage = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [refundDocumentData, setRefundDocumentData] = useState<{
+    rentDeposit: number;
+    waterDeposit: number;
+    rentArrears: number;
+    waterArrears: number;
+    utilityArrears: number;
+  }>({
+    rentDeposit: 0,
+    waterDeposit: 0,
+    rentArrears: 0,
+    waterArrears: 0,
+    utilityArrears: 0,
+  });
 
   // Tenant Details
   const [tenantDetails, setTenantDetails] = useState<{
@@ -76,14 +90,20 @@ const VacancyNoticePage = () => {
         .maybeSingle();
 
       if (lease && lease.units && lease.units.properties) {
-        setTenantDetails({
+        const baseDetails = {
           firstName: profile?.first_name || '',
           lastName: profile?.last_name || '',
           propertyId: lease.units.properties.id,
           propertyName: lease.units.properties.name,
           unitId: lease.units.id,
           unitNumber: lease.units.unit_number,
+        };
+
+        setTenantDetails({
+          ...baseDetails,
         });
+
+        await fetchRefundDocumentData(baseDetails.propertyId, baseDetails.unitId);
       }
 
       // 3. Check if already submitted
@@ -105,6 +125,52 @@ const VacancyNoticePage = () => {
       toast.error('Failed to load details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRefundDocumentData = async (propertyId: string, unitId: string) => {
+    try {
+      const { data: unitData } = await supabase
+        .from('units')
+        .select('price')
+        .eq('id', unitId)
+        .maybeSingle();
+
+      const { data: billRows } = await supabase
+        .from('bills_and_utilities')
+        .select('bill_type, amount, paid_amount')
+        .eq('property_id', propertyId)
+        .eq('unit_id', unitId);
+
+      const rows = billRows || [];
+      const safeOutstanding = (row: any) => Math.max(0, Number(row.amount || 0) - Number(row.paid_amount || 0));
+
+      const rentArrears = rows
+        .filter((row: any) => String(row.bill_type || '').toLowerCase() === 'rent')
+        .reduce((sum: number, row: any) => sum + safeOutstanding(row), 0);
+
+      const waterArrears = rows
+        .filter((row: any) => String(row.bill_type || '').toLowerCase().includes('water'))
+        .reduce((sum: number, row: any) => sum + safeOutstanding(row), 0);
+
+      const utilityArrears = rows
+        .filter((row: any) => {
+          const billType = String(row.bill_type || '').toLowerCase();
+          return billType !== 'rent' && !billType.includes('water');
+        })
+        .reduce((sum: number, row: any) => sum + safeOutstanding(row), 0);
+
+      const rentDeposit = Math.max(0, Number(unitData?.price || 0));
+
+      setRefundDocumentData({
+        rentDeposit,
+        waterDeposit: 0,
+        rentArrears,
+        waterArrears,
+        utilityArrears,
+      });
+    } catch (error) {
+      console.error('Error fetching refund document data:', error);
     }
   };
 
@@ -477,6 +543,31 @@ const VacancyNoticePage = () => {
                 </div>
 
             </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Rent Refund Request Document</CardTitle>
+                <CardDescription>
+                  This is the billing and invoicing format used during move-out refund processing.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RentRefundRequestDocument
+                  propertyName={tenantDetails.propertyName || 'AYDEN HOMES TOWERS'}
+                  unitNumber={tenantDetails.unitNumber || 'N/A'}
+                  requestDate={existingNotice.move_out_date || existingNotice.created_at || new Date().toISOString()}
+                  addItems={[
+                    { label: 'Rent Deposit', amount: refundDocumentData.rentDeposit },
+                    { label: 'Water Deposit', amount: refundDocumentData.waterDeposit },
+                  ]}
+                  deductItems={[
+                    { label: 'Rent Arrears', amount: refundDocumentData.rentArrears },
+                    { label: 'Water Bill Arrears', amount: refundDocumentData.waterArrears },
+                    { label: 'Other Utility Arrears', amount: refundDocumentData.utilityArrears },
+                  ]}
+                />
+              </CardContent>
+            </Card>
         </div>
      )
   }
@@ -606,6 +697,31 @@ const VacancyNoticePage = () => {
                 <p className="text-xs text-gray-500 uppercase tracking-widest">Tenant Signature (Digital)</p>
              </div>
            </div>
+
+           <Card>
+             <CardHeader>
+               <CardTitle>Rent Refund Request Document</CardTitle>
+               <CardDescription>
+                 Preview of the billing and invoicing document that will be used for your move-out refund.
+               </CardDescription>
+             </CardHeader>
+             <CardContent>
+               <RentRefundRequestDocument
+                 propertyName={tenantDetails.propertyName || 'AYDEN HOMES TOWERS'}
+                 unitNumber={tenantDetails.unitNumber || 'N/A'}
+                 requestDate={moveOutDate || new Date().toISOString()}
+                 addItems={[
+                   { label: 'Rent Deposit', amount: refundDocumentData.rentDeposit },
+                   { label: 'Water Deposit', amount: refundDocumentData.waterDeposit },
+                 ]}
+                 deductItems={[
+                   { label: 'Rent Arrears', amount: refundDocumentData.rentArrears },
+                   { label: 'Water Bill Arrears', amount: refundDocumentData.waterArrears },
+                   { label: 'Other Utility Arrears', amount: refundDocumentData.utilityArrears },
+                 ]}
+               />
+             </CardContent>
+           </Card>
         </div>
       </div>
     </div>

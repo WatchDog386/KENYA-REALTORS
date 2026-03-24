@@ -345,6 +345,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Check if we are already on the correct path to avoid loops
     const currentPath = location.pathname;
+
+    // Keep users on their current work page inside the portal on session refresh/tab return.
+    if (currentPath.startsWith("/portal/")) {
+      return;
+    }
     
     // Helper to check if we should redirect
     const shouldRedirect = (targetPath: string) => {
@@ -529,7 +534,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           console.log("📝 [AuthContext] About to call recordLogin with:", {
             userId: data.user.id,
             email: trimmedEmail,
-            role: profile.role
+            role: profile.role,
           });
           const result = await loginActivityService.recordLogin(
             data.user.id,

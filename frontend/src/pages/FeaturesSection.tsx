@@ -276,7 +276,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                             <p className="text-slate-600 leading-relaxed text-sm font-normal">
                                 {item.description}
                                 <br/><br/>
-                                Living at <strong className="text-[#154279]">Ayden Home Towers</strong> offers a unique blend of community and privacy. 
+                                Living at <strong className="text-[#154279]">this property</strong> offers a unique blend of community and privacy. 
                                 Enjoy dedicated maintenance teams, secure biometric access, and a community app for all your utility payments.
                             </p>
                         </div>
@@ -546,7 +546,7 @@ export default function AydenTowersListing() {
                         className="mb-10 pb-6 border-b border-slate-200/60"
                     >
                         <h1 className="text-xl sm:text-2xl md:text-4xl font-semibold text-[#154279] leading-tight tracking-tight">
-                            Ayden Home Towers
+                            Featured Property
                         </h1>
                         <p className="text-slate-500 mt-2 text-sm font-normal">
                             Discover your perfect home from our selection of 100+ premium rental units
@@ -564,7 +564,7 @@ export default function AydenTowersListing() {
                         >
                             <img
                                 src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1600"
-                                alt="Ayden Home Towers Exterior"
+                                alt="Featured property exterior"
                                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                             />
                         </motion.div>
@@ -581,7 +581,7 @@ export default function AydenTowersListing() {
                             </h2>
                             
                             <p className="text-slate-600 text-sm leading-relaxed mb-6 font-normal">
-                                Discover <strong className="text-[#154279]">Ayden Home Towers</strong> — a premier rental residential complex offering diverse living options. With over 100 meticulously designed units ranging from studios to 4-bedroom apartments.
+                                Discover our featured residential property with diverse living options and thoughtfully designed units from studios to 4-bedroom apartments.
                             </p>
                             
                             <div className="flex flex-col sm:flex-row gap-3">

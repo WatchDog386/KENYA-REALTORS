@@ -66,6 +66,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
 import LoginActivityTracker from "@/components/portal/super-admin/LoginActivityTracker";
+import VerifiedVacanciesList from "@/components/portal/shared/VerifiedVacanciesList";
 
 interface DashboardStats {
   totalProperties: number;
@@ -846,6 +847,16 @@ const SuperAdminDashboard = () => {
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="bg-offwhite pt-6">
+        <div className="max-w-[1400px] mx-auto px-6">
+          <VerifiedVacanciesList
+            title="Verified Vacancies"
+            description="Manager-verified move-outs visible system-wide for technician, proprietor, accountant, and admin operations."
+            limit={12}
+          />
         </div>
       </section>
 

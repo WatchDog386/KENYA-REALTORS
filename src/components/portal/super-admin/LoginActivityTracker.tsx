@@ -48,8 +48,8 @@ const LoginActivityTracker: React.FC<LoginActivityTrackerProps> = ({
     setLoading(true);
     try {
       const [activities, stats] = await Promise.all([
-        loginActivityService.getLoginActivities(30),
-        loginActivityService.getLoginStatistics(7),
+        loginActivityService.getLoginActivities(200),
+        loginActivityService.getLoginStatistics(0),
       ]);
       setActivities(activities);
       setStats(stats);

@@ -370,6 +370,12 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       description: 'Pending Manager Actions'
     },
     {
+      title: 'Leave Requests',
+      href: '/portal/manager/leave-requests',
+      icon: <Calendar size={20} />,
+      description: 'Review employee leave'
+    },
+    {
       title: 'Caretaker Duties',
       href: '/portal/manager/caretaker-duties',
       icon: <Briefcase size={20} />,

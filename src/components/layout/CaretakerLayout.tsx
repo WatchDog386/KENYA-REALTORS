@@ -238,6 +238,12 @@ const CaretakerLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/caretaker/duties',
       icon: <Briefcase size={20} />,
       description: 'View assigned duties'
+    },
+    {
+      title: 'Leave Requests',
+      href: '/portal/caretaker/leave-requests',
+      icon: <ClipboardList size={20} />,
+      description: 'Request and track leave'
     }
   ];
 

@@ -50,6 +50,86 @@ const ManagerVacancyNotices = () => {
   const [inspectionDate, setInspectionDate] = useState('');
   const [actionSubmitting, setActionSubmitting] = useState(false);
 
+  const getDefaultInspectionDate = () => {
+    return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+  };
+
+  const notifyInspectionStakeholders = async (notice: any, scheduledAt: string) => {
+    try {
+      const recipientIds = new Set<string>();
+
+      const { data: managerRows } = await supabase
+        .from('property_manager_assignments')
+        .select('property_manager_id')
+        .eq('property_id', notice.property_id)
+        .eq('status', 'active');
+
+      (managerRows || []).forEach((row: any) => {
+        if (row.property_manager_id) recipientIds.add(row.property_manager_id);
+      });
+
+      const { data: proprietorRows } = await supabase
+        .from('proprietor_properties')
+        .select('proprietor_id')
+        .eq('property_id', notice.property_id)
+        .eq('is_active', true);
+
+      (proprietorRows || []).forEach((row: any) => {
+        if (row.proprietor_id) recipientIds.add(row.proprietor_id);
+      });
+
+      const { data: technicianAssignmentRows } = await supabase
+        .from('technician_property_assignments')
+        .select('technician_id')
+        .eq('property_id', notice.property_id)
+        .eq('is_active', true);
+
+      const technicianIds = (technicianAssignmentRows || [])
+        .map((row: any) => row.technician_id)
+        .filter(Boolean);
+
+      if (technicianIds.length > 0) {
+        const { data: technicians } = await supabase
+          .from('technicians')
+          .select('id, user_id')
+          .in('id', technicianIds);
+
+        (technicians || []).forEach((tech: any) => {
+          if (tech.user_id) recipientIds.add(tech.user_id);
+        });
+      }
+
+      const { data: superAdmins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'super_admin');
+
+      (superAdmins || []).forEach((row: any) => {
+        if (row.id) recipientIds.add(row.id);
+      });
+
+      recipientIds.delete(user!.id);
+      recipientIds.delete(notice.tenant_id);
+
+      if (recipientIds.size === 0) return;
+
+      const notifications = Array.from(recipientIds).map((recipientId) => ({
+        recipient_id: recipientId,
+        sender_id: user!.id,
+        type: 'vacancy_update',
+        title: 'Vacant Unit Inspection Scheduled',
+        message: `Unit inspection must be done within 24 hours. Scheduled for ${new Date(scheduledAt).toLocaleString()}. Technician should report damages and required tools/materials to manager.`,
+        related_entity_type: 'vacancy_notice',
+        related_entity_id: notice.id,
+        read: false
+      }));
+
+      await supabase.from('notifications').insert(notifications);
+    } catch (error) {
+      console.error('Failed to notify inspection stakeholders:', error);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) fetchNotices();
   }, [user?.id]);
@@ -192,6 +272,19 @@ const ManagerVacancyNotices = () => {
         return;
     }
 
+    if (status === 'inspection_scheduled') {
+      const scheduledAt = new Date(inspectionDate).getTime();
+      const latestAllowed = Date.now() + 24 * 60 * 60 * 1000;
+      if (Number.isNaN(scheduledAt)) {
+        toast.error('Please provide a valid inspection date and time');
+        return;
+      }
+      if (scheduledAt > latestAllowed) {
+        toast.error('Inspection must be scheduled within 24 hours');
+        return;
+      }
+    }
+
     setActionSubmitting(true);
     try {
       // 1. If there is a response text, add it as a message
@@ -277,6 +370,10 @@ const ManagerVacancyNotices = () => {
              related_entity_id: selectedNotice.id,
              read: false
          });
+
+         if (status === 'inspection_scheduled') {
+           await notifyInspectionStakeholders(selectedNotice, inspectionDate);
+         }
       }
 
       if (status !== selectedNotice.status) {
@@ -386,7 +483,7 @@ const ManagerVacancyNotices = () => {
                             onClick={() => {
                               setSelectedNotice(notice);
                               setResponse(''); // Start fresh for new messages
-                              setInspectionDate(notice.inspection_date ? new Date(notice.inspection_date).toISOString().slice(0, 16) : '');
+                              setInspectionDate(notice.inspection_date ? new Date(notice.inspection_date).toISOString().slice(0, 16) : getDefaultInspectionDate());
                               setIsDialogOpen(true);
                             }}
                           >
