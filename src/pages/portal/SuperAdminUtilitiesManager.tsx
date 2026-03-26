@@ -217,11 +217,12 @@ const SuperAdminUtilitiesManager = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPropertyId, setSelectedPropertyId] = useState('all');
   const [filterProperty, setFilterProperty] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedTenant, setSelectedTenant] = useState<TenantWithReadings | null>(null);
-  const [properties, setProperties] = useState<string[]>([]);
   const [propertyOptions, setPropertyOptions] = useState<PropertyOption[]>([]);
+  const [propertyUtilityMap, setPropertyUtilityMap] = useState<Record<string, string[]>>({});
   const [showAddUtility, setShowAddUtility] = useState(false);
   const [newUtilityName, setNewUtilityName] = useState('');
   const [newUtilityConstant, setNewUtilityConstant] = useState(1);
@@ -296,6 +297,24 @@ const SuperAdminUtilitiesManager = () => {
         if (!newUtilityPropertyId && mappedProperties.length > 0) {
           setNewUtilityPropertyId(mappedProperties[0].id);
         }
+
+        const { data: propertyUtilitiesData, error: propertyUtilitiesError } = await supabase
+          .from('property_utilities')
+          .select('property_id, utility_constant_id');
+
+        if (propertyUtilitiesError && propertyUtilitiesError.code !== 'PGRST116') {
+          throw propertyUtilitiesError;
+        }
+
+        const utilityMap: Record<string, string[]> = {};
+        (propertyUtilitiesData || []).forEach((row: any) => {
+          if (!row?.property_id || !row?.utility_constant_id) return;
+          if (!utilityMap[row.property_id]) {
+            utilityMap[row.property_id] = [];
+          }
+          utilityMap[row.property_id].push(row.utility_constant_id);
+        });
+        setPropertyUtilityMap(utilityMap);
 
         const { data: propertyTemplatesData, error: propertyTemplatesError } = await supabase
           .from('properties')
@@ -503,11 +522,6 @@ const SuperAdminUtilitiesManager = () => {
         }
       }
 
-      // 2. Fetch all properties for the filter list
-      const { data: allProperties } = await supabase.from('properties').select('name').order('name');
-      const propertyNamesList = allProperties ? allProperties.map(p => p.name) : [];
-      setProperties(propertyNamesList);
-
       const { data: readings, error: readingsError } = await supabase
         .from('utility_readings')
         .select('*')
@@ -627,7 +641,6 @@ const SuperAdminUtilitiesManager = () => {
       }
 
       const tenantList = Array.from(tenantMap.values());
-      const propertyNames = propertyNamesList;
       setTenantsWithReadings(tenantList);
       // setProperties is already called;
     } catch (err: any) {
@@ -1167,7 +1180,7 @@ const SuperAdminUtilitiesManager = () => {
     }
 
     if (filterProperty !== 'all') {
-      filtered = filtered.filter(t => t.property_name === filterProperty);
+      filtered = filtered.filter(t => t.property_id === filterProperty);
     }
 
     if (filterStatus !== 'all') {
@@ -1313,6 +1326,11 @@ const SuperAdminUtilitiesManager = () => {
           throw assignmentError;
         }
 
+        setPropertyUtilityMap((prev) => ({
+          ...prev,
+          [newUtilityPropertyId]: [...(prev[newUtilityPropertyId] || []), newUtility.id],
+        }));
+
         // Refresh all constants from database to ensure persistence
         const { data: refreshedConstants, error: refreshError } = await supabase
           .from('utility_constants')
@@ -1454,14 +1472,36 @@ const SuperAdminUtilitiesManager = () => {
       return;
     }
 
+    const scopedToProperty = selectedPropertyId !== 'all';
+    const selectedPropertyName = propertyOptions.find((p) => p.id === selectedPropertyId)?.name || 'selected property';
     const confirmed = window.confirm(
-      `Delete "${utility.utility_name}" from billing constants? This removes it from property assignments.`
+      scopedToProperty
+        ? `Remove "${utility.utility_name}" from ${selectedPropertyName}?`
+        : `Delete "${utility.utility_name}" from billing constants? This removes it from all property assignments.`
     );
 
     if (!confirmed) return;
 
     try {
       setDeletingUtilityId(utility.id);
+
+      if (scopedToProperty) {
+        const { error: unassignError } = await supabase
+          .from('property_utilities')
+          .delete()
+          .eq('property_id', selectedPropertyId)
+          .eq('utility_constant_id', utility.id);
+
+        if (unassignError) throw unassignError;
+
+        setPropertyUtilityMap((prev) => ({
+          ...prev,
+          [selectedPropertyId]: (prev[selectedPropertyId] || []).filter((id) => id !== utility.id),
+        }));
+
+        toast.success('Billing utility removed from selected property');
+        return;
+      }
 
       const { error: assignmentError } = await supabase
         .from('property_utilities')
@@ -1481,6 +1521,14 @@ const SuperAdminUtilitiesManager = () => {
       setUtilityDrafts((prev) => {
         const next = { ...prev };
         delete next[utility.id];
+        return next;
+      });
+
+      setPropertyUtilityMap((prev) => {
+        const next: Record<string, string[]> = {};
+        Object.entries(prev).forEach(([propertyId, ids]) => {
+          next[propertyId] = ids.filter((id) => id !== utility.id);
+        });
         return next;
       });
 
@@ -1888,6 +1936,90 @@ const SuperAdminUtilitiesManager = () => {
     }
   };
 
+  const selectedPropertyName = selectedPropertyId === 'all'
+    ? 'All Properties'
+    : (propertyOptions.find((property) => property.id === selectedPropertyId)?.name || 'Selected Property');
+
+  const scopedUtilityConstants = selectedPropertyId === 'all'
+    ? utilityConstants
+    : utilityConstants.filter((utility) => (propertyUtilityMap[selectedPropertyId] || []).includes(utility.id));
+
+  const scopedFirstPaymentCandidates = selectedPropertyId === 'all'
+    ? firstPaymentCandidates
+    : firstPaymentCandidates.filter((candidate) => candidate.property_id === selectedPropertyId);
+
+  const scopedTransitionCandidates = selectedPropertyId === 'all'
+    ? transitionCandidates
+    : transitionCandidates.filter((candidate) => candidate.property_id === selectedPropertyId);
+
+  const scopedDepositRefundCases = selectedPropertyId === 'all'
+    ? depositRefundCases
+    : depositRefundCases.filter((item) => {
+      const candidate = transitionCandidates.find((entry) => entry.vacancy_notice_id === item.id);
+      return candidate?.property_id === selectedPropertyId;
+    });
+
+  const allPropertiesBreakdown = useMemo(() => {
+    return propertyOptions.map((property) => {
+      const propertyTenants = tenantsWithReadings.filter((tenant) => tenant.property_id === property.id);
+      const tenantCount = propertyTenants.length;
+      const paidTenants = propertyTenants.filter((tenant) => tenant.status === 'paid').length;
+      const pendingTenants = propertyTenants.filter((tenant) => tenant.status !== 'paid').length;
+
+      const rentTotal = propertyTenants.reduce((sum, tenant) => sum + Number(tenant.rent_amount || 0), 0);
+      const utilityTotal = propertyTenants.reduce((sum, tenant) => sum + Number(tenant.utility_total || 0), 0);
+      const invoiceTotal = propertyTenants.reduce((sum, tenant) => sum + Number(tenant.total_due || 0), 0);
+
+      const firstPaymentPending = firstPaymentCandidates.filter((item) => item.property_id === property.id).length;
+      const transitionPending = transitionCandidates.filter((item) => item.property_id === property.id).length;
+      const utilityTypesCount = (propertyUtilityMap[property.id] || []).length;
+      const initialChargesCount = (propertyInitialChargesMap[property.id] || []).length;
+
+      return {
+        propertyId: property.id,
+        propertyName: property.name,
+        tenantCount,
+        paidTenants,
+        pendingTenants,
+        rentTotal,
+        utilityTotal,
+        invoiceTotal,
+        firstPaymentPending,
+        transitionPending,
+        utilityTypesCount,
+        initialChargesCount,
+      };
+    });
+  }, [propertyOptions, tenantsWithReadings, firstPaymentCandidates, transitionCandidates, propertyUtilityMap, propertyInitialChargesMap]);
+
+  const allPropertiesSummary = useMemo(() => {
+    return allPropertiesBreakdown.reduce(
+      (acc, item) => {
+        acc.properties += 1;
+        acc.tenants += item.tenantCount;
+        acc.paid += item.paidTenants;
+        acc.pending += item.pendingTenants;
+        acc.rent += item.rentTotal;
+        acc.utilities += item.utilityTotal;
+        acc.total += item.invoiceTotal;
+        acc.firstPayments += item.firstPaymentPending;
+        acc.transitions += item.transitionPending;
+        return acc;
+      },
+      {
+        properties: 0,
+        tenants: 0,
+        paid: 0,
+        pending: 0,
+        rent: 0,
+        utilities: 0,
+        total: 0,
+        firstPayments: 0,
+        transitions: 0,
+      }
+    );
+  }, [allPropertiesBreakdown]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -1913,6 +2045,143 @@ const SuperAdminUtilitiesManager = () => {
         </p>
       </div>
 
+      {/* Property Switcher */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Home className="w-5 h-5 text-[#154279]" />
+              Property Billing Workspace
+            </CardTitle>
+            <CardDescription>
+              Select a property to manage billing and utilities independently. Current scope: {selectedPropertyName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPropertyId('all');
+                  setFilterProperty('all');
+                }}
+                className={`text-left rounded-xl border px-4 py-3 transition ${
+                  selectedPropertyId === 'all'
+                    ? 'border-[#154279] bg-[#154279] text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-800 hover:border-[#154279]/50 hover:bg-slate-50'
+                }`}
+              >
+                <p className="text-xs uppercase tracking-wider opacity-80">Workspace</p>
+                <p className="font-bold">All Properties</p>
+              </button>
+
+              {propertyOptions.map((property) => (
+                <button
+                  key={property.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPropertyId(property.id);
+                    setFilterProperty(property.id);
+                    setNewUtilityPropertyId(property.id);
+                  }}
+                  className={`text-left rounded-xl border px-4 py-3 transition ${
+                    selectedPropertyId === property.id
+                      ? 'border-[#154279] bg-[#154279] text-white shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-800 hover:border-[#154279]/50 hover:bg-slate-50'
+                  }`}
+                >
+                  <p className="text-xs uppercase tracking-wider opacity-80">Property</p>
+                  <p className="font-bold truncate">{property.name}</p>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {selectedPropertyId === 'all' && (
+        <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <DollarSign className="w-5 h-5 text-[#154279]" />
+                All Properties Billing Breakdown
+              </CardTitle>
+              <CardDescription>
+                Detailed combined billing view across every property. Select any property card above for independent editing and management.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Properties</p>
+                  <p className="text-2xl font-black text-slate-900">{allPropertiesSummary.properties}</p>
+                  <p className="text-xs text-slate-500 mt-1">Active property workspaces</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Tenants</p>
+                  <p className="text-2xl font-black text-slate-900">{allPropertiesSummary.tenants}</p>
+                  <p className="text-xs text-slate-500 mt-1">Paid: {allPropertiesSummary.paid} | Pending: {allPropertiesSummary.pending}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Total Rent</p>
+                  <p className="text-2xl font-black text-slate-900">{formatKES(allPropertiesSummary.rent)}</p>
+                  <p className="text-xs text-slate-500 mt-1">Base rent across all units</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">Total Bill Names</p>
+                  <p className="text-2xl font-black text-slate-900">{formatKES(allPropertiesSummary.utilities)}</p>
+                  <p className="text-xs text-slate-500 mt-1">Utilities + service charges</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
+                <table className="w-full text-sm min-w-[1050px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left py-3 px-3 font-semibold text-slate-700">Property</th>
+                      <th className="text-center py-3 px-3 font-semibold text-slate-700">Tenants</th>
+                      <th className="text-center py-3 px-3 font-semibold text-slate-700">Paid/Pending</th>
+                      <th className="text-right py-3 px-3 font-semibold text-slate-700">Rent Total</th>
+                      <th className="text-right py-3 px-3 font-semibold text-slate-700">Utilities Total</th>
+                      <th className="text-right py-3 px-3 font-semibold text-slate-700">Invoice Total</th>
+                      <th className="text-center py-3 px-3 font-semibold text-slate-700">1st Payment Queue</th>
+                      <th className="text-center py-3 px-3 font-semibold text-slate-700">Transition Queue</th>
+                      <th className="text-center py-3 px-3 font-semibold text-slate-700">Billing Types</th>
+                      <th className="text-center py-3 px-3 font-semibold text-slate-700">Initial Charges</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allPropertiesBreakdown.map((item) => (
+                      <tr key={item.propertyId} className="border-b border-slate-100 hover:bg-slate-50/70">
+                        <td className="py-3 px-3 font-semibold text-slate-900">{item.propertyName}</td>
+                        <td className="py-3 px-3 text-center text-slate-700">{item.tenantCount}</td>
+                        <td className="py-3 px-3 text-center text-slate-700">{item.paidTenants} / {item.pendingTenants}</td>
+                        <td className="py-3 px-3 text-right font-semibold text-slate-900">{formatKES(item.rentTotal)}</td>
+                        <td className="py-3 px-3 text-right font-semibold text-slate-900">{formatKES(item.utilityTotal)}</td>
+                        <td className="py-3 px-3 text-right font-bold text-[#154279]">{formatKES(item.invoiceTotal)}</td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant={item.firstPaymentPending > 0 ? 'outline' : 'secondary'}>{item.firstPaymentPending}</Badge>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <Badge variant={item.transitionPending > 0 ? 'outline' : 'secondary'}>{item.transitionPending}</Badge>
+                        </td>
+                        <td className="py-3 px-3 text-center text-slate-700">{item.utilityTypesCount}</td>
+                        <td className="py-3 px-3 text-center text-slate-700">{item.initialChargesCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 font-medium">
+                Grand Invoice Total Across All Properties: {formatKES(allPropertiesSummary.total)}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Alerts */}
       {error && (
         <Alert variant="destructive">
@@ -1933,11 +2202,13 @@ const SuperAdminUtilitiesManager = () => {
               Manage Billing Constants
             </CardTitle>
             <CardDescription>
-              Configure global prices/rates, then assign bill names to specific properties
+              {selectedPropertyId === 'all'
+                ? 'Configure global prices/rates, then assign bill names to specific properties'
+                : `Configure bill names and rates for ${selectedPropertyName}`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {utilityConstants.length > 0 ? (
+            {scopedUtilityConstants.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1951,7 +2222,7 @@ const SuperAdminUtilitiesManager = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {utilityConstants.map(constant => (
+                    {scopedUtilityConstants.map(constant => (
                       (() => {
                         const rentUtility = isRentUtility(constant.utility_name);
                         const draft = utilityDrafts[constant.id] || {
@@ -2042,7 +2313,7 @@ const SuperAdminUtilitiesManager = () => {
                 </table>
               </div>
             ) : (
-              <p className="text-slate-600">No bill name constants found.</p>
+              <p className="text-slate-600">No bill name constants found for this property scope.</p>
             )}
 
             {/* Add Custom Bill */}
@@ -2067,6 +2338,7 @@ const SuperAdminUtilitiesManager = () => {
                       id="utility_property"
                       value={newUtilityPropertyId}
                       onChange={(e) => setNewUtilityPropertyId(e.target.value)}
+                      disabled={selectedPropertyId !== 'all'}
                       className="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg bg-white"
                     >
                       <option value="">Select property</option>
@@ -2076,6 +2348,9 @@ const SuperAdminUtilitiesManager = () => {
                         </option>
                       ))}
                     </select>
+                    {selectedPropertyId !== 'all' && (
+                      <p className="text-xs text-slate-500 mt-2">Property is locked to the selected workspace card.</p>
+                    )}
                   </div>
 
                   <div>
@@ -2174,7 +2449,7 @@ const SuperAdminUtilitiesManager = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {firstPaymentCandidates.length === 0 ? (
+            {scopedFirstPaymentCandidates.length === 0 ? (
               <p className="text-sm text-slate-600">No newly assigned tenants pending first-payment invoicing.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -2189,7 +2464,7 @@ const SuperAdminUtilitiesManager = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {firstPaymentCandidates.map((candidate) => (
+                    {scopedFirstPaymentCandidates.map((candidate) => (
                       <tr key={candidate.lease_id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-2 px-3">
                           <p className="font-semibold text-slate-900">{candidate.tenant_name}</p>
@@ -2232,7 +2507,7 @@ const SuperAdminUtilitiesManager = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {transitionCandidates.length === 0 ? (
+            {scopedTransitionCandidates.length === 0 ? (
               <p className="text-sm text-slate-600">No pending vacating or switching notices awaiting invoicing.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -2247,7 +2522,7 @@ const SuperAdminUtilitiesManager = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {transitionCandidates.map((candidate) => (
+                    {scopedTransitionCandidates.map((candidate) => (
                       <tr key={candidate.vacancy_notice_id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="py-2 px-3">
                           <p className="font-semibold text-slate-900">{candidate.tenant_name}</p>
@@ -2313,16 +2588,27 @@ const SuperAdminUtilitiesManager = () => {
                 </Label>
                 <select
                   value={filterProperty}
-                  onChange={e => setFilterProperty(e.target.value)}
+                  onChange={e => {
+                    const nextPropertyId = e.target.value;
+                    setFilterProperty(nextPropertyId);
+                    setSelectedPropertyId(nextPropertyId);
+                    if (nextPropertyId !== 'all') {
+                      setNewUtilityPropertyId(nextPropertyId);
+                    }
+                  }}
+                  disabled={selectedPropertyId !== 'all'}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
                 >
                   <option value="all">All Properties</option>
-                  {properties.map(prop => (
-                    <option key={prop} value={prop}>
-                      {prop}
+                  {propertyOptions.map((property) => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}
                     </option>
                   ))}
                 </select>
+                {selectedPropertyId !== 'all' && (
+                  <p className="text-xs text-slate-500 mt-2">Property is controlled by the workspace card selector above.</p>
+                )}
               </div>
 
               <div className="flex-1 min-w-[200px]">
@@ -2466,7 +2752,7 @@ const SuperAdminUtilitiesManager = () => {
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}>
         <DepositRefundSheet
-          cases={depositRefundCases}
+          cases={scopedDepositRefundCases}
           title="Deposit Refund Sheet"
           description="Generated from vacancy notices. Automatically includes manager checklist damages, with manual item deductions calculated as (unit cost x quantity) + labour cost."
         />
