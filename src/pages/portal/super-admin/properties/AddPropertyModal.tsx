@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Home, Calculator, Loader2, Building, ImageIcon, MapPin, Grid } from 'lucide-react';
-import { CreatePropertyDTO } from '@/services/propertyService';
+import { CreatePropertyDTO, PropertyInitialChargeTemplate } from '@/services/propertyService';
 import { Separator } from "@/components/ui/separator"
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,8 +20,53 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, on
     name: '',
     location: '',
     image_url: '',
-    units: [{ name: '', units_count: 0, price_per_unit: 0 }]
+    units: [{ name: '', units_count: 0, price_per_unit: 0 }],
+    initial_charge_templates: []
   });
+
+  const handleAddInitialChargeTemplate = () => {
+    const nextItem: PropertyInitialChargeTemplate = {
+      id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: '',
+      charge_type: 'deposit',
+      amount: 0,
+    };
+
+    setFormData({
+      ...formData,
+      initial_charge_templates: [...(formData.initial_charge_templates || []), nextItem],
+    });
+  };
+
+  const handleRemoveInitialChargeTemplate = (id: string) => {
+    setFormData({
+      ...formData,
+      initial_charge_templates: (formData.initial_charge_templates || []).filter((item) => item.id !== id),
+    });
+  };
+
+  const handleInitialChargeTemplateChange = (
+    id: string,
+    field: keyof PropertyInitialChargeTemplate,
+    value: string | number
+  ) => {
+    setFormData({
+      ...formData,
+      initial_charge_templates: (formData.initial_charge_templates || []).map((item) => {
+        if (item.id !== id) return item;
+        if (field === 'amount') {
+          return { ...item, amount: Number(value) || 0 };
+        }
+        if (field === 'charge_type') {
+          return { ...item, charge_type: value === 'fee' ? 'fee' : 'deposit' };
+        }
+        if (field === 'name') {
+          return { ...item, name: String(value) };
+        }
+        return item;
+      }),
+    });
+  };
 
   const handleAddUnit = () => {
     setFormData({
@@ -52,7 +97,8 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, on
         name: '',
         location: '',
         image_url: '',
-        units: [{ name: '', units_count: 0, price_per_unit: 0 }]
+        units: [{ name: '', units_count: 0, price_per_unit: 0 }],
+        initial_charge_templates: []
       });
     } catch (error) {
       console.error(error);
@@ -146,7 +192,79 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, on
 
           <Separator className="bg-slate-100" />
 
-          {/* Section 2: Unit Configuration */}
+          {/* Section 2: Move-In Charge Template */}
+          <div className="space-y-5">
+            <div className="flex justify-between items-end">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                Property Move-In Charge Template
+              </h3>
+              <Button size="sm" variant="outline" type="button" onClick={handleAddInitialChargeTemplate} className="h-8 border-dashed border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg gap-1.5 text-xs font-bold transition-all">
+                <Plus className="w-3.5 h-3.5" /> Add Deposit / Fee
+              </Button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              First Month Rent and Security Deposit are automatic. Add any extra named deposits or one-time fees for this property (for example, Water Deposit, Service Deposit, Key Fee).
+            </p>
+
+            {(formData.initial_charge_templates || []).length === 0 ? (
+              <div className="border border-dashed border-slate-200 rounded-lg p-4 text-xs text-slate-500 bg-slate-50">
+                No custom move-in charges yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(formData.initial_charge_templates || []).map((item) => (
+                  <div key={item.id} className="grid grid-cols-12 gap-3 items-end bg-slate-50/60 p-3 rounded-lg border border-slate-200">
+                    <div className="col-span-12 md:col-span-5 space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-500">Charge Name</Label>
+                      <Input
+                        value={item.name}
+                        onChange={(e) => handleInitialChargeTemplateChange(item.id, 'name', e.target.value)}
+                        placeholder="e.g. Water Deposit"
+                        className="h-9 border-slate-200 bg-white text-sm"
+                      />
+                    </div>
+                    <div className="col-span-6 md:col-span-3 space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-500">Type</Label>
+                      <select
+                        value={item.charge_type}
+                        onChange={(e) => handleInitialChargeTemplateChange(item.id, 'charge_type', e.target.value)}
+                        className="h-9 w-full border border-slate-200 rounded-md px-2 bg-white text-sm"
+                      >
+                        <option value="deposit">Deposit</option>
+                        <option value="fee">Fee</option>
+                      </select>
+                    </div>
+                    <div className="col-span-5 md:col-span-3 space-y-1.5">
+                      <Label className="text-xs font-semibold text-slate-500">Amount (KES)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={item.amount}
+                        onChange={(e) => handleInitialChargeTemplateChange(item.id, 'amount', e.target.value)}
+                        className="h-9 border-slate-200 bg-white text-sm text-right"
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end pb-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        onClick={() => handleRemoveInitialChargeTemplate(item.id)}
+                        className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Separator className="bg-slate-100" />
+
+          {/* Section 3: Unit Configuration */}
           <div className="space-y-5">
              <div className="flex justify-between items-end">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">

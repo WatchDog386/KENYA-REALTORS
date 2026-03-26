@@ -191,6 +191,68 @@ const MakePaymentPage: React.FC = () => {
     }
   };
 
+  const ensureTenantForPayment = async () => {
+    if (!user?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: existingTenant, error: existingTenantError } = await supabase
+      .from('tenants')
+      .select('id, unit_id, property_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingTenantError) throw existingTenantError;
+    if (existingTenant) return existingTenant;
+
+    const { data: latestApplication, error: latestApplicationError } = await supabase
+      .from('lease_applications')
+      .select('property_id, unit_id')
+      .eq('applicant_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestApplicationError) throw latestApplicationError;
+    if (!latestApplication?.property_id || !latestApplication?.unit_id) {
+      throw new Error('No linked application found for automatic tenant creation.');
+    }
+
+    const { data: createdTenant, error: createTenantError } = await supabase
+      .from('tenants')
+      .insert([
+        {
+          user_id: user.id,
+          property_id: latestApplication.property_id,
+          unit_id: latestApplication.unit_id,
+          status: 'active',
+          move_in_date: new Date().toISOString(),
+        },
+      ])
+      .select('id, unit_id, property_id')
+      .single();
+
+    if (createTenantError) {
+      const { data: retryTenant, error: retryError } = await supabase
+        .from('tenants')
+        .select('id, unit_id, property_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (retryError) throw retryError;
+      if (!retryTenant) throw createTenantError;
+      return retryTenant;
+    }
+
+    await supabase
+      .from('units')
+      .update({ status: 'occupied' })
+      .eq('id', latestApplication.unit_id)
+      .in('status', ['available', 'vacant']);
+
+    return createdTenant;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Form submitted - handleSubmit called");
@@ -226,13 +288,7 @@ const MakePaymentPage: React.FC = () => {
       const payAmount = parseFloat(amount);
       
       // Get tenant info for receipt
-      const { data: tenant } = await supabase
-        .from("tenants")
-        .select("id, unit_id, property_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!tenant) throw new Error("Tenant not found");
+      const tenant = await ensureTenantForPayment();
 
       // Build receipt items based on payment type
       let receiptItems: ReceiptData['items'] = [];

@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { propertyService } from "@/services/propertyService";
 
 // --- 1. THEME & STYLES (Matching DIY Rental Guide) ---
 const THEME = {
@@ -464,43 +463,56 @@ export default function AydenTowersListing() {
             try {
                 setLoading(true);
                 console.log('Starting to fetch listings...');
-                
-                // Use propertyService.fetchProperties() - same as Hero.tsx
-                const allProperties = await propertyService.fetchProperties();
-                console.log('Properties data received:', allProperties);
-                
-                // Extract properties and unit types from the response
-                setProperties(allProperties || []);
-                
-                // Extract unique unit types from properties
-                const unitTypesMap = new Map();
-                (allProperties || []).forEach((prop: any) => {
-                    (prop.property_unit_types || []).forEach((unitType: any) => {
-                        if (!unitTypesMap.has(unitType.id)) {
-                            unitTypesMap.set(unitType.id, unitType);
-                        }
-                    });
-                });
-                setUnitTypes(Array.from(unitTypesMap.values()));
-                
-                // Fetch vacant units with all related info
-                const { data: unitsData, error: unitsError } = await supabase
-                    .from('units')
-                    .select(`
-                        id,
-                        unit_number,
-                        status,
-                        property_id,
-                        unit_type_id,
-                        image_url,
-                        property_unit_types(
+
+                const fetchUnits = async (includeSampleImage: boolean) => {
+                    const unitTypeColumns = includeSampleImage
+                        ? `
                             id,
+                            name,
+                            unit_type_name,
+                            price_per_unit,
+                            sample_image_url
+                          `
+                        : `
+                            id,
+                            name,
                             unit_type_name,
                             price_per_unit
-                        )
-                    `)
-                    .in('status', ['available', 'vacant'])
-                    .order('created_at', { ascending: false });
+                          `;
+
+                    return supabase
+                        .from('units')
+                        .select(`
+                            id,
+                            unit_number,
+                            status,
+                            property_id,
+                            unit_type_id,
+                            price,
+                            image_url,
+                            properties(
+                                id,
+                                name,
+                                location,
+                                amenities,
+                                description,
+                                image_url
+                            ),
+                            property_unit_types(
+                                ${unitTypeColumns}
+                            )
+                        `)
+                        .in('status', ['available', 'vacant'])
+                        .order('created_at', { ascending: false });
+                };
+
+                // Fetch vacant units with all related info (with compatibility fallback)
+                let { data: unitsData, error: unitsError } = await fetchUnits(true);
+                if (unitsError && String(unitsError.message || '').toLowerCase().includes('sample_image_url')) {
+                    const fallback = await fetchUnits(false);
+                    unitsData = fallback.data;
+                    unitsError = fallback.error;
+                }
                 
                 if (unitsError) {
                     console.error('Units fetch error:', unitsError);
@@ -508,16 +520,29 @@ export default function AydenTowersListing() {
                 }
                 
                 console.log('Units data received:', unitsData);
-                
-                // Create a map of properties for quick lookup
-                const propertiesMap = new Map();
-                (allProperties || []).forEach((prop: any) => {
-                    propertiesMap.set(prop.id, prop);
+
+                const propertiesMap = new Map<string, any>();
+                const unitTypesMap = new Map<string, any>();
+
+                (unitsData || []).forEach((unit: any) => {
+                    const unitProperty = Array.isArray(unit.properties) ? unit.properties[0] : unit.properties;
+                    if (unitProperty?.id && !propertiesMap.has(unitProperty.id)) {
+                        propertiesMap.set(unitProperty.id, unitProperty);
+                    }
+
+                    const unitType = Array.isArray(unit.property_unit_types) ? unit.property_unit_types[0] : unit.property_unit_types;
+                    if (unitType?.id && !unitTypesMap.has(unitType.id)) {
+                        unitTypesMap.set(unitType.id, unitType);
+                    }
                 });
+
+                setProperties(Array.from(propertiesMap.values()));
+                setUnitTypes(Array.from(unitTypesMap.values()));
                 
                 // Transform database data into listing format
                 const listings = (unitsData || []).map((unit: any) => {
-                    const prop = propertiesMap.get(unit.property_id) || {};
+                    const unitProperty = Array.isArray(unit.properties) ? unit.properties[0] : unit.properties;
+                    const prop = unitProperty || {};
                     
                     // Parse amenities if it's a string
                     let amenities: string[] = [];
@@ -540,13 +565,36 @@ export default function AydenTowersListing() {
 
                     const typeName = ut.unit_type_name || ut.name || "Unit";
 
+                    const parseImageList = (value: any): string[] => {
+                        if (!value) return [];
+                        if (Array.isArray(value)) return value.filter(Boolean);
+                        if (typeof value === 'string') {
+                            try {
+                                const parsed = JSON.parse(value);
+                                if (Array.isArray(parsed)) return parsed.filter(Boolean);
+                            } catch {
+                                return [value].filter(Boolean);
+                            }
+                        }
+                        return [];
+                    };
+
+                    const unitImages = parseImageList(unit.image_url);
+                    const unitTypeSampleImages = parseImageList(ut.sample_image_url);
+                    const propertyImages = parseImageList(prop.image_url);
+                    const galleryImages = unitImages.length > 0
+                        ? unitImages
+                        : unitTypeSampleImages.length > 0
+                            ? unitTypeSampleImages
+                            : propertyImages;
+
                     return {
                         id: unit.id,
                         unitNumber: unit.unit_number,
                         title: prop.name || "Property",
                         type: typeName,
                         typeId: ut.id || unit.unit_type_id,
-                        price: ut.price_per_unit || 0,
+                        price: Number(unit.price ?? ut.price_per_unit ?? 0),
                         floor: "Available",
                         rating: 4.5,
                         location: prop.location || "Not specified",
@@ -558,22 +606,7 @@ export default function AydenTowersListing() {
                         featured: false,
                         amenities: amenities.slice(0, 5),
                         description: prop.description || 'Premium rental unit with modern amenities and excellent facilities.',
-                        gallery: (() => {
-                            let imgs = [];
-                            try {
-                                if (unit.image_url) imgs = Array.isArray(JSON.parse(unit.image_url)) ? JSON.parse(unit.image_url) : [unit.image_url];
-                            } catch {
-                                if (unit.image_url) imgs = [unit.image_url];
-                            }
-                            if (imgs.length === 0) {
-                                try {
-                                    if (prop.image_url) imgs = Array.isArray(JSON.parse(prop.image_url)) ? JSON.parse(prop.image_url) : [prop.image_url];
-                                } catch {
-                                    if (prop.image_url) imgs = [prop.image_url];
-                                }
-                            }
-                            return imgs.filter(Boolean);
-                        })()
+                        gallery: galleryImages
                     };
                 });
                 

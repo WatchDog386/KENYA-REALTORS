@@ -156,6 +156,13 @@ interface FirstPaymentCandidate {
   assigned_at?: string;
 }
 
+interface InitialChargeLineItem {
+  id: string;
+  name: string;
+  charge_type: 'deposit' | 'fee';
+  amount: number;
+}
+
 interface TransitionBillingCandidate {
   vacancy_notice_id: string;
   tenant_id: string;
@@ -182,9 +189,7 @@ interface SpecialInvoiceDraft {
   unit_number: string;
   baseRent: number;
   securityDeposit: number;
-  utilityDeposit: number;
-  serviceDeposit: number;
-  moveInFee: number;
+  initialCharges: InitialChargeLineItem[];
   cleaningFee: number;
   damageCharges: number;
   utilityClearance: number;
@@ -233,6 +238,10 @@ const SuperAdminUtilitiesManager = () => {
   const [transitionCandidates, setTransitionCandidates] = useState<TransitionBillingCandidate[]>([]);
   const [specialInvoiceDraft, setSpecialInvoiceDraft] = useState<SpecialInvoiceDraft | null>(null);
   const [savingSpecialInvoice, setSavingSpecialInvoice] = useState(false);
+  const [propertyInitialChargesMap, setPropertyInitialChargesMap] = useState<Record<string, InitialChargeLineItem[]>>({});
+  const [newInitialChargeName, setNewInitialChargeName] = useState('');
+  const [newInitialChargeAmount, setNewInitialChargeAmount] = useState('');
+  const [newInitialChargeType, setNewInitialChargeType] = useState<'deposit' | 'fee'>('deposit');
   const [newSpecialChargeName, setNewSpecialChargeName] = useState('');
   const [newSpecialChargeAmount, setNewSpecialChargeAmount] = useState('');
   const [autoChecklistDamageByUnit, setAutoChecklistDamageByUnit] = useState<Record<string, number>>({});
@@ -286,6 +295,30 @@ const SuperAdminUtilitiesManager = () => {
         setPropertyOptions(mappedProperties);
         if (!newUtilityPropertyId && mappedProperties.length > 0) {
           setNewUtilityPropertyId(mappedProperties[0].id);
+        }
+
+        const { data: propertyTemplatesData, error: propertyTemplatesError } = await supabase
+          .from('properties')
+          .select('id, initial_charge_templates');
+
+        if (propertyTemplatesError) {
+          const missingColumn = String(propertyTemplatesError.message || '').toLowerCase().includes('initial_charge_templates');
+          if (!missingColumn) throw propertyTemplatesError;
+          setPropertyInitialChargesMap({});
+        } else {
+          const templateMap: Record<string, InitialChargeLineItem[]> = {};
+          (propertyTemplatesData || []).forEach((row: any) => {
+            const templates = Array.isArray(row?.initial_charge_templates) ? row.initial_charge_templates : [];
+            templateMap[row.id] = templates
+              .map((item: any, index: number) => ({
+                id: String(item?.id || `tpl-${row.id}-${index}`),
+                name: String(item?.name || '').trim(),
+                charge_type: item?.charge_type === 'fee' ? 'fee' : 'deposit',
+                amount: Number(item?.amount || 0),
+              }))
+              .filter((item: InitialChargeLineItem) => item.name && item.amount >= 0);
+          });
+          setPropertyInitialChargesMap(templateMap);
         }
       } catch (err: any) {
         console.error("Error fetching utility settings:", err);
@@ -830,6 +863,16 @@ const SuperAdminUtilitiesManager = () => {
   }, [transitionCandidates, tenantsWithReadings, autoChecklistDamageByUnit]);
 
   const openFirstPaymentInvoice = (candidate: FirstPaymentCandidate) => {
+    const propertyTemplates = (propertyInitialChargesMap[candidate.property_id] || []).map((item, index) => ({
+      id: item.id || `tpl-${candidate.property_id}-${index}`,
+      name: item.name,
+      charge_type: item.charge_type,
+      amount: Number(item.amount || 0),
+    }));
+
+    setNewInitialChargeName('');
+    setNewInitialChargeAmount('');
+    setNewInitialChargeType('deposit');
     setNewSpecialChargeName('');
     setNewSpecialChargeAmount('');
     setSpecialInvoiceDraft({
@@ -843,9 +886,7 @@ const SuperAdminUtilitiesManager = () => {
       unit_number: candidate.unit_number,
       baseRent: Number(candidate.rent_amount || 0),
       securityDeposit: Number(candidate.rent_amount || 0),
-      utilityDeposit: 0,
-      serviceDeposit: 0,
-      moveInFee: 0,
+      initialCharges: propertyTemplates,
       cleaningFee: 0,
       damageCharges: 0,
       utilityClearance: 0,
@@ -871,9 +912,7 @@ const SuperAdminUtilitiesManager = () => {
       unit_number: candidate.unit_number,
       baseRent: 0,
       securityDeposit: 0,
-      utilityDeposit: 0,
-      serviceDeposit: 0,
-      moveInFee: 0,
+      initialCharges: [],
       cleaningFee: 0,
       damageCharges: 0,
       utilityClearance: 0,
@@ -891,21 +930,22 @@ const SuperAdminUtilitiesManager = () => {
       if (field === 'dueDate' || field === 'notes') {
         return { ...prev, [field]: value };
       }
+      if (field === 'initialCharges') {
+        return prev;
+      }
       const parsed = Number(value);
       return { ...prev, [field]: Number.isNaN(parsed) ? 0 : parsed } as SpecialInvoiceDraft;
     });
   };
 
   const calculateSpecialInvoiceTotal = (draft: SpecialInvoiceDraft) => {
+    const initialChargesTotal = (draft.initialCharges || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const extraCharges = Object.values(draft.customCharges || {}).reduce((sum, value) => sum + Number(value || 0), 0);
     if (draft.eventType === 'first_payment') {
       return (
         Number(draft.baseRent || 0) +
         Number(draft.securityDeposit || 0) +
-        Number(draft.utilityDeposit || 0) +
-        Number(draft.serviceDeposit || 0) +
-        Number(draft.moveInFee || 0) +
-        extraCharges
+        initialChargesTotal
       );
     }
 
@@ -917,6 +957,71 @@ const SuperAdminUtilitiesManager = () => {
       Number(draft.refundCredit || 0) +
       extraCharges
     );
+  };
+
+  const handleAddInitialCharge = () => {
+    const name = newInitialChargeName.trim();
+    const amount = Number(newInitialChargeAmount || 0);
+
+    if (!specialInvoiceDraft || specialInvoiceDraft.eventType !== 'first_payment') return;
+    if (!name) {
+      toast.error('Enter a charge name');
+      return;
+    }
+    if (Number.isNaN(amount) || amount < 0) {
+      toast.error('Enter a valid charge amount');
+      return;
+    }
+
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev || prev.eventType !== 'first_payment') return prev;
+      return {
+        ...prev,
+        initialCharges: [
+          ...(prev.initialCharges || []),
+          {
+            id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            name,
+            charge_type: newInitialChargeType,
+            amount,
+          },
+        ],
+      };
+    });
+
+    setNewInitialChargeName('');
+    setNewInitialChargeAmount('');
+    setNewInitialChargeType('deposit');
+  };
+
+  const handleInitialChargeChange = (
+    id: string,
+    field: 'name' | 'charge_type' | 'amount',
+    value: string
+  ) => {
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev || prev.eventType !== 'first_payment') return prev;
+      return {
+        ...prev,
+        initialCharges: (prev.initialCharges || []).map((item) => {
+          if (item.id !== id) return item;
+          if (field === 'name') return { ...item, name: value };
+          if (field === 'charge_type') return { ...item, charge_type: value === 'fee' ? 'fee' : 'deposit' };
+          const parsed = Number(value);
+          return { ...item, amount: Number.isNaN(parsed) ? 0 : parsed };
+        }),
+      };
+    });
+  };
+
+  const handleRemoveInitialCharge = (id: string) => {
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev || prev.eventType !== 'first_payment') return prev;
+      return {
+        ...prev,
+        initialCharges: (prev.initialCharges || []).filter((item) => item.id !== id),
+      };
+    });
   };
 
   const handleAddSpecialCharge = () => {
@@ -990,13 +1095,25 @@ const SuperAdminUtilitiesManager = () => {
         ? `BILLING_EVENT:first_payment;LEASE_ID:${specialInvoiceDraft.sourceId}`
         : `BILLING_EVENT:vacating_switching;VACANCY_NOTICE_ID:${specialInvoiceDraft.sourceId}`;
 
+      const initialCharges = (specialInvoiceDraft.initialCharges || [])
+        .map((item) => ({
+          id: item.id,
+          name: String(item.name || '').trim(),
+          charge_type: item.charge_type === 'fee' ? 'fee' : 'deposit',
+          amount: Number(item.amount || 0),
+        }))
+        .filter((item) => item.name && item.amount >= 0);
+
+      const additionalChargesMapFromInitial = initialCharges.reduce((acc: Record<string, number>, item) => {
+        acc[item.name] = Number(item.amount || 0);
+        return acc;
+      }, {});
+
       const firstPaymentItems = {
         monthly_rent: Number(specialInvoiceDraft.baseRent || 0),
         security_deposit: Number(specialInvoiceDraft.securityDeposit || 0),
-        utility_deposit: Number(specialInvoiceDraft.utilityDeposit || 0),
-        service_deposit: Number(specialInvoiceDraft.serviceDeposit || 0),
-        move_in_fee: Number(specialInvoiceDraft.moveInFee || 0),
-        additional_charges: specialInvoiceDraft.customCharges || {},
+        initial_charges: initialCharges,
+        additional_charges: additionalChargesMapFromInitial,
       };
 
       const transitionItems = {
@@ -2556,26 +2673,81 @@ const SuperAdminUtilitiesManager = () => {
               </div>
 
               {specialInvoiceDraft.eventType === 'first_payment' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>First Month Rent</Label>
-                    <Input type="number" value={specialInvoiceDraft.baseRent} onChange={(e) => handleSpecialInvoiceDraftChange('baseRent', e.target.value)} className="mt-1" />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>First Month Rent</Label>
+                      <Input type="number" value={specialInvoiceDraft.baseRent} onChange={(e) => handleSpecialInvoiceDraftChange('baseRent', e.target.value)} className="mt-1" />
+                    </div>
+                    <div>
+                      <Label>Security Deposit</Label>
+                      <Input type="number" value={specialInvoiceDraft.securityDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('securityDeposit', e.target.value)} className="mt-1" />
+                    </div>
                   </div>
-                  <div>
-                    <Label>Security Deposit</Label>
-                    <Input type="number" value={specialInvoiceDraft.securityDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('securityDeposit', e.target.value)} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Utility Deposit</Label>
-                    <Input type="number" value={specialInvoiceDraft.utilityDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('utilityDeposit', e.target.value)} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Service Deposit</Label>
-                    <Input type="number" value={specialInvoiceDraft.serviceDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('serviceDeposit', e.target.value)} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>Move-In/Admin Fee</Label>
-                    <Input type="number" value={specialInvoiceDraft.moveInFee} onChange={(e) => handleSpecialInvoiceDraftChange('moveInFee', e.target.value)} className="mt-1" />
+
+                  <div className="border border-slate-200 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">Property Initial Charges (Deposits / Fees)</Label>
+                      <span className="text-xs text-slate-500">These are linked to this property profile</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_140px_180px_auto] gap-2">
+                      <Input
+                        type="text"
+                        value={newInitialChargeName}
+                        onChange={(e) => setNewInitialChargeName(e.target.value)}
+                        placeholder="Charge name (e.g. Water Deposit)"
+                      />
+                      <select
+                        value={newInitialChargeType}
+                        onChange={(e) => setNewInitialChargeType(e.target.value === 'fee' ? 'fee' : 'deposit')}
+                        className="h-10 border border-slate-300 rounded-md px-2 bg-white"
+                      >
+                        <option value="deposit">Deposit</option>
+                        <option value="fee">Fee</option>
+                      </select>
+                      <Input
+                        type="number"
+                        value={newInitialChargeAmount}
+                        onChange={(e) => setNewInitialChargeAmount(e.target.value)}
+                        placeholder="Amount"
+                      />
+                      <Button type="button" onClick={handleAddInitialCharge} className="bg-[#154279] hover:bg-[#0f325e]">
+                        Add
+                      </Button>
+                    </div>
+
+                    {(specialInvoiceDraft.initialCharges || []).length > 0 ? (
+                      <div className="space-y-2">
+                        {(specialInvoiceDraft.initialCharges || []).map((item) => (
+                          <div key={item.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_180px_auto] gap-2 items-center">
+                            <Input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) => handleInitialChargeChange(item.id, 'name', e.target.value)}
+                            />
+                            <select
+                              value={item.charge_type}
+                              onChange={(e) => handleInitialChargeChange(item.id, 'charge_type', e.target.value)}
+                              className="h-10 border border-slate-300 rounded-md px-2 bg-white"
+                            >
+                              <option value="deposit">Deposit</option>
+                              <option value="fee">Fee</option>
+                            </select>
+                            <Input
+                              type="number"
+                              value={Number(item.amount || 0)}
+                              onChange={(e) => handleInitialChargeChange(item.id, 'amount', e.target.value)}
+                            />
+                            <Button type="button" variant="outline" onClick={() => handleRemoveInitialCharge(item.id)}>
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">No extra initial charges. Add deposits/fees if needed.</p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -2613,48 +2785,50 @@ const SuperAdminUtilitiesManager = () => {
                 />
               </div>
 
-              <div className="border border-slate-200 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Additional / Missing Charges</Label>
-                  <span className="text-xs text-slate-500">Add any other line item not listed above</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
-                  <Input
-                    type="text"
-                    value={newSpecialChargeName}
-                    onChange={(e) => setNewSpecialChargeName(e.target.value)}
-                    placeholder="Charge name (e.g. Key card fee)"
-                  />
-                  <Input
-                    type="number"
-                    value={newSpecialChargeAmount}
-                    onChange={(e) => setNewSpecialChargeAmount(e.target.value)}
-                    placeholder="Amount"
-                  />
-                  <Button type="button" onClick={handleAddSpecialCharge} className="bg-[#154279] hover:bg-[#0f325e]">
-                    Add
-                  </Button>
-                </div>
-
-                {Object.keys(specialInvoiceDraft.customCharges || {}).length > 0 && (
-                  <div className="space-y-2">
-                    {Object.entries(specialInvoiceDraft.customCharges).map(([key, amount]) => (
-                      <div key={key} className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2 items-center">
-                        <Input type="text" value={key} disabled className="bg-slate-50" />
-                        <Input
-                          type="number"
-                          value={Number(amount || 0)}
-                          onChange={(e) => handleSpecialChargeAmountChange(key, e.target.value)}
-                        />
-                        <Button type="button" variant="outline" onClick={() => handleRemoveSpecialCharge(key)}>
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
+              {specialInvoiceDraft.eventType !== 'first_payment' && (
+                <div className="border border-slate-200 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Additional / Missing Charges</Label>
+                    <span className="text-xs text-slate-500">Add any other line item not listed above</span>
                   </div>
-                )}
-              </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
+                    <Input
+                      type="text"
+                      value={newSpecialChargeName}
+                      onChange={(e) => setNewSpecialChargeName(e.target.value)}
+                      placeholder="Charge name (e.g. Key card fee)"
+                    />
+                    <Input
+                      type="number"
+                      value={newSpecialChargeAmount}
+                      onChange={(e) => setNewSpecialChargeAmount(e.target.value)}
+                      placeholder="Amount"
+                    />
+                    <Button type="button" onClick={handleAddSpecialCharge} className="bg-[#154279] hover:bg-[#0f325e]">
+                      Add
+                    </Button>
+                  </div>
+
+                  {Object.keys(specialInvoiceDraft.customCharges || {}).length > 0 && (
+                    <div className="space-y-2">
+                      {Object.entries(specialInvoiceDraft.customCharges).map(([key, amount]) => (
+                        <div key={key} className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2 items-center">
+                          <Input type="text" value={key} disabled className="bg-slate-50" />
+                          <Input
+                            type="number"
+                            value={Number(amount || 0)}
+                            onChange={(e) => handleSpecialChargeAmountChange(key, e.target.value)}
+                          />
+                          <Button type="button" variant="outline" onClick={() => handleRemoveSpecialCharge(key)}>
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-slate-600">Invoice Total</p>

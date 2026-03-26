@@ -194,35 +194,25 @@ const SuperAdminDashboard = () => {
 
   const loadStats = async () => {
     try {
-      // Fetch properties and unit types separately to avoid PostgREST schema cache issues
+      // Fetch properties
       const { data: properties, error: propertiesError } = await supabase
         .from("properties")
         .select("id, status");
-      
-      const { data: unitTypes } = await supabase
-        .from("property_unit_types")
-        .select("property_id, units_count, price_per_unit");
 
-      // Fetch actual units with their status
+      if (propertiesError) throw propertiesError;
+
+      // Live unit data is the source of truth for occupancy and expected rent.
       const { data: units = [] } = await supabase
         .from("units")
-        .select("id, status");
+        .select("id, status, price");
 
       const propertiesData = properties || [];
-      const unitsData = unitTypes || [];
-      
+
       // Calculate occupied units from actual unit records
       const occupiedUnits = units.filter((u: any) => u.status?.toLowerCase() === 'occupied').length; 
       
       // Calculate total units from actual units table
       const totalUnits = units.length;
-      
-      // Calculate estimated monthly rent potential from the units
-       const estimatedMonthlyRent = propertiesData.reduce((sum, prop: any) => {
-          return sum + (prop.property_unit_types || []).reduce((subSum: number, u: any) => subSum + (u.units_count * u.price_per_unit), 0);
-       }, 0);
-       // We'll map this to 'totalRevenue' or wherever it was used. 
-       // Wait, the original code used 'monthly_rent' column. 
        
       const vacantUnits = totalUnits - occupiedUnits;
       const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
@@ -242,10 +232,12 @@ const SuperAdminDashboard = () => {
         .select("*", { count: "exact", head: true })
         .in("status", ["pending", "assigned"]);
 
+      const todayIso = new Date().toISOString().split('T')[0];
       const { count: overduePaymentsCount } = await supabase
-        .from("payments")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "failed");
+        .from("rent_payments")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "partial"])
+        .lt("due_date", todayIso);
 
       const { count: totalLeasesCount } = await supabase
         .from("leases")
@@ -257,18 +249,20 @@ const SuperAdminDashboard = () => {
       startOfMonth.setHours(0, 0, 0, 0);
 
       const { data: payments } = await supabase
-        .from("payments")
-        .select("amount")
-        .eq("status", "completed")
+        .from("rent_payments")
+        .select("amount, amount_paid, status, paid_date, created_at")
+        .in("status", ["paid", "partial", "completed"])
         .gte("created_at", startOfMonth.toISOString());
 
-      const totalRevenue = payments?.reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+      const totalRevenue = payments?.reduce((sum, payment: any) => {
+        const paidAmount = Number(payment.amount_paid || 0);
+        const fallbackAmount = Number(payment.amount || 0);
+        return sum + (paidAmount || fallbackAmount);
+      }, 0) || 0;
 
-      const totalExpectedRevenue = propertiesData.reduce((sum, p: any) => {
-        // Use potential income calculated from unit types
-        const potential = (p.property_unit_types || []).reduce((acc: number, u: any) => acc + (u.units_count * u.price_per_unit), 0);
-        return sum + potential;
-      }, 0);
+      const totalExpectedRevenue = units
+        .filter((u: any) => String(u.status || '').toLowerCase() === 'occupied')
+        .reduce((sum: number, u: any) => sum + Number(u.price || 0), 0);
 
       const collectionRate = totalExpectedRevenue > 0 ? (totalRevenue / totalExpectedRevenue) * 100 : 0;
 

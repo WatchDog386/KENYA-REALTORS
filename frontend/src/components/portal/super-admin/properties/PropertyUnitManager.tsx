@@ -102,6 +102,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
   // Edit State
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditLoading, setIsEditLoading] = useState(false);
   
   // Bulk Generation State
   const [generateConfig, setGenerateConfig] = useState({
@@ -623,9 +624,45 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       setIsTypeDialogOpen(true);
   };
 
-  const openEditDialog = (unit: Unit) => {
-    setEditingUnit({...unit});
+  const openEditDialog = async (unit: Unit) => {
+    setIsEditLoading(true);
     setIsEditOpen(true);
+    try {
+      // Fetch the full unit details from the database including images
+      const { data, error } = await supabase
+        .from('units')
+        .select(`
+          *,
+          property_unit_types (
+            id,
+            name,
+            price_per_unit,
+            description,
+            features
+          ),
+          unit_images (
+            id,
+            image_url
+          )
+        `)
+        .eq('id', unit.id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching unit details:", error);
+        toast.error("Failed to load unit details");
+        // Fallback to existing unit data
+        setEditingUnit({...unit});
+      } else if (data) {
+        setEditingUnit(data as Unit);
+      }
+    } catch (err) {
+      console.error("Error in openEditDialog:", err);
+      toast.error("Failed to load unit details");
+      setEditingUnit({...unit});
+    } finally {
+      setIsEditLoading(false);
+    }
   };
 
   return (
@@ -1165,7 +1202,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       
       {/* Unit Edit Dialog with Images and Features */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-0 border-none shadow-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-0 border-none shadow-2xl bg-white">
             <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] text-white p-6 sticky top-0 z-20">
                 <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-white/10 rounded-lg">
@@ -1180,6 +1217,12 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 </div>
             </div>
             
+            {isEditLoading ? (
+                <div className="flex flex-col items-center justify-center p-16 bg-white">
+                    <Loader2 className="w-12 h-12 animate-spin text-[#154279] mb-4" />
+                    <p className="text-slate-500 font-bold text-sm uppercase tracking-widest">Loading unit details...</p>
+                </div>
+            ) : (
             <div className="p-8 space-y-6 bg-white">
                 {/* Top Grid: Number, Floor, Type */}
                 <div className="grid grid-cols-3 gap-6">
@@ -1314,6 +1357,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 </div>
 
             </div>
+            )}
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 sticky bottom-0 z-20">
                 <Button variant="ghost" onClick={() => setIsEditOpen(false)} className="font-bold text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl h-11 px-6">Cancel</Button>
                 <Button onClick={handleSaveUnit} className="bg-[#154279] hover:bg-[#0f325e] text-white font-bold shadow-lg shadow-blue-900/20 rounded-xl h-11 px-8 uppercase tracking-widest text-xs">
@@ -1322,9 +1366,6 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             </div>
         </DialogContent>
       </Dialog>
-    </div>
-    </>
-  );
 };
 
 

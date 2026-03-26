@@ -258,26 +258,50 @@ const ManagerDashboard: React.FC = () => {
             });
         }
   
-        // 7. Recent Activity (Mocked + Real Mix equivalent)
-        // In production, fetch this from a 'activity_logs' or union of tables
-        setRecentActivities([
-          {
-            id: '1', type: 'payment', title: 'Rent Payment Received', description: 'Unit 4B - John Doe',
-            date: new Date().toISOString(), amount: 45000, status: 'completed'
-          },
-          {
-            id: '2', type: 'maintenance', title: 'Leaking Faucet Reported', description: 'Unit 2A - Kitchen Sink',
-            date: new Date(Date.now() - 86400000).toISOString(), status: 'pending'
-          },
-          {
-            id: '3', type: 'lease', title: 'Lease Expiring Soon', description: 'Unit 1C - Sarah Smith',
-            date: new Date(Date.now() - 172800000).toISOString(), status: 'warning'
-          },
-          {
-            id: '4', type: 'tenant', title: 'New Tenant Onboarded', description: 'Unit 5F - Mike Ross',
-            date: new Date(Date.now() - 259200000).toISOString(), status: 'success'
-          }
-        ]);
+        const activities: RecentActivity[] = [];
+
+        if (propertyId) {
+          const { data: recentPayments } = await supabase
+            .from('rent_payments')
+            .select('id, amount, amount_paid, status, created_at, units(unit_number)')
+            .eq('property_id', propertyId)
+            .order('created_at', { ascending: false })
+            .limit(6);
+
+          (recentPayments || []).forEach((payment: any) => {
+            const paidAmount = Number(payment.amount_paid || payment.amount || 0);
+            activities.push({
+              id: `payment-${payment.id}`,
+              type: 'payment',
+              title: 'Rent Payment Update',
+              description: `Unit ${payment.units?.unit_number || '-'} payment recorded`,
+              date: payment.created_at,
+              amount: paidAmount,
+              status: payment.status,
+            });
+          });
+
+          const { data: recentMaintenance } = await supabase
+            .from('maintenance_requests')
+            .select('id, title, status, created_at, units(unit_number)')
+            .eq('property_id', propertyId)
+            .order('created_at', { ascending: false })
+            .limit(6);
+
+          (recentMaintenance || []).forEach((item: any) => {
+            activities.push({
+              id: `maintenance-${item.id}`,
+              type: 'maintenance',
+              title: item.title || 'Maintenance Request',
+              description: `Unit ${item.units?.unit_number || '-'} maintenance activity`,
+              date: item.created_at,
+              status: item.status || 'pending',
+            });
+          });
+        }
+
+        activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setRecentActivities(activities.slice(0, 6));
 
         if (refreshing) {
             toast.success("Dashboard refreshed successfully");
@@ -316,7 +340,7 @@ const ManagerDashboard: React.FC = () => {
 
       const item = damageItem.trim();
       if (!item) {
-        toast.error('Enter a damage item');
+        toast.error('Enter a damaged item');
         return;
       }
 
@@ -744,7 +768,7 @@ const ManagerDashboard: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <Label className="text-xs font-semibold">Damage Item</Label>
+                      <Label className="text-xs font-semibold">Damaged Item</Label>
                       <Input list="dashboard-damage-memory" value={damageItem} onChange={(e) => handleDamageItemChange(e.target.value)} className="mt-1" />
                     </div>
                     <div>

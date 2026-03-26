@@ -32,6 +32,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import PaystackPaymentDialog from "@/components/dialogs/PaystackPaymentDialog";
 import { downloadReceiptPDF, formatReceiptData } from "@/utils/receiptGenerator";
+import jsPDF from "jspdf";
 
 interface Invoice {
   id: string;
@@ -236,8 +237,24 @@ const TenantPaymentsPage: React.FC = () => {
   };
 
   // Download receipt
-  const handleDownloadReceipt = (receipt: Receipt) => {
+  const handleDownloadReceipt = async (receipt: Receipt) => {
     try {
+      if (receipt.pdf_url) {
+        const response = await fetch(receipt.pdf_url);
+        if (!response.ok) throw new Error("Receipt file not reachable");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${receipt.receipt_number || "receipt"}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success("Receipt downloaded");
+        return;
+      }
+
       const receiptData = formatReceiptData(receipt, {
         name: "Property Management System",
         address: "Nairobi, Kenya",
@@ -249,6 +266,31 @@ const TenantPaymentsPage: React.FC = () => {
     } catch (error) {
       console.error("Error downloading receipt:", error);
       toast.error("Failed to download receipt");
+    }
+  };
+
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text("INVOICE", 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Invoice ID: ${invoice.id}`, 14, 32);
+      doc.text(`Unit: ${invoice.unit_number || "N/A"}`, 14, 38);
+      doc.text(`Status: ${invoice.status}`, 14, 44);
+      doc.text(`Issued: ${new Date(invoice.created_at).toLocaleDateString("en-KE")}`, 14, 50);
+      doc.text(`Due Date: ${new Date(invoice.due_date).toLocaleDateString("en-KE")}`, 14, 56);
+      doc.text(`Amount: KES ${Number(invoice.amount || 0).toLocaleString("en-KE", { maximumFractionDigits: 2 })}`, 14, 62);
+      if (invoice.description) {
+        const wrapped = doc.splitTextToSize(String(invoice.description), 180);
+        doc.text("Description:", 14, 74);
+        doc.text(wrapped, 14, 80);
+      }
+      doc.save(`invoice-${invoice.id.slice(0, 8)}.pdf`);
+      toast.success("Invoice downloaded");
+    } catch (error) {
+      console.error("Error downloading invoice:", error);
+      toast.error("Failed to download invoice");
     }
   };
 
@@ -433,6 +475,14 @@ const TenantPaymentsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadInvoice(invoice)}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Invoice
+                          </Button>
                           {invoice.status === "unpaid" && (
                             <Button
                               size="sm"
@@ -482,7 +532,9 @@ const TenantPaymentsPage: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         KES {receipt.amount.toLocaleString("en-KE", {
-                          maximumFractionDigits: 2,
+                        {receipt.transaction_reference
+                          ? `${receipt.transaction_reference.substring(0, 16)}...`
+                          : "N/A"}
                         })}
                       </TableCell>
                       <TableCell>

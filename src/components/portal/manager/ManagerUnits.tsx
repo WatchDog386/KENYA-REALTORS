@@ -538,163 +538,211 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     }
   };
 
-  const handleAssignTenant = async () => {
-      if(!selectedUnit || !selectedTenant) return;
-      
-      try {
-          setSavingUnit(true);
-          const now = new Date().toISOString();
-          const targetPropertyId = selectedUnit.property_id;
+  const createInitialMoveInInvoice = async (tenantRecordId: string, leaseId: string) => {
+    if (!selectedUnit) return;
 
-          const { data: selectedTenantProfile, error: selectedTenantProfileError } = await supabase
-            .from('profiles')
-            .select('id, status, role')
-            .eq('id', selectedTenant)
-            .maybeSingle();
+    const rentAmount = Number(selectedUnit.property_unit_types?.price_per_unit || selectedUnit.price || 0);
+    const securityDeposit = rentAmount;
 
-          if (selectedTenantProfileError) throw selectedTenantProfileError;
+    const { data: propertyData } = await supabase
+      .from('properties')
+      .select('initial_charge_templates')
+      .eq('id', selectedUnit.property_id)
+      .maybeSingle();
 
-          if (!selectedTenantProfile) {
-            toast.error('Selected tenant profile not found');
-            return;
-          }
+    const initialCharges = (Array.isArray((propertyData as any)?.initial_charge_templates)
+      ? (propertyData as any).initial_charge_templates
+      : [])
+      .map((item: any) => ({
+        id: String(item?.id || `tpl-${Date.now()}`),
+        name: String(item?.name || '').trim(),
+        charge_type: item?.charge_type === 'fee' ? 'fee' : 'deposit',
+        amount: Number(item?.amount || 0),
+      }))
+      .filter((item: any) => item.name && item.amount >= 0);
 
-          const tenantStatus = String(selectedTenantProfile.status || '').toLowerCase();
-          if (tenantStatus !== 'active') {
-            toast.error('This tenant is pending superadmin approval and cannot be assigned yet.');
-            return;
-          }
+    const additionalChargesMap = initialCharges.reduce((acc: Record<string, number>, item: any) => {
+      acc[item.name] = Number(item.amount || 0);
+      return acc;
+    }, {});
 
-          const activeStatuses = ['active', 'approved', 'manager_approved', 'ongoing', 'current'];
-          let conflictQuery = supabase
-            .from('tenant_leases')
-            .select('id, unit_id, status, units(unit_number)')
-            .eq('tenant_id', selectedTenant)
-            .in('status', activeStatuses);
+    const extraChargesTotal = initialCharges.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+    const totalAmount = rentAmount + securityDeposit + extraChargesTotal;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 1);
 
-          if (selectedUnit.active_lease?.id) {
-            conflictQuery = conflictQuery.neq('id', selectedUnit.active_lease.id);
-          }
+    const { error } = await supabase
+      .from('invoices')
+      .insert({
+        reference_number: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+        property_id: selectedUnit.property_id,
+        tenant_id: tenantRecordId,
+        amount: totalAmount,
+        due_date: dueDate.toISOString().split('T')[0],
+        issued_date: new Date().toISOString().split('T')[0],
+        status: 'unpaid',
+        items: {
+          monthly_rent: rentAmount,
+          security_deposit: securityDeposit,
+          initial_charges: initialCharges,
+          additional_charges: additionalChargesMap,
+        },
+        notes: `BILLING_EVENT:first_payment;LEASE_ID:${leaseId}\nAuto-generated on tenant onboarding`,
+      });
 
-          const { data: conflictingLeases, error: conflictError } = await conflictQuery.limit(1);
-          if (conflictError) throw conflictError;
+    if (error) throw error;
+  };
 
-          if (conflictingLeases && conflictingLeases.length > 0) {
-            const conflict: any = conflictingLeases[0];
-            const conflictUnit = conflict?.units?.unit_number || 'another unit';
-            toast.error(`This tenant is already assigned to unit ${conflictUnit}. Unassign first.`);
-            return;
-          }
-          
-          console.log("🔹 Starting tenant assignment...", { selectedTenant, propertyId: targetPropertyId, unitId: selectedUnit.id });
-          
-          if (selectedUnit.active_lease) {
-               // Update existing assignment
-               console.log("📝 Updating existing lease...");
-               const { error } = await supabase
-                  .from('tenant_leases')
-                  .update({ 
-                      tenant_id: selectedTenant 
-                  })
-                  .eq('id', selectedUnit.active_lease.id);
-               
-               if(error) throw error;
+  const assignTenantToUnit = async (
+    tenantUserId: string,
+    options: { allowPendingTenant?: boolean; createInitialInvoice?: boolean } = {}
+  ) => {
+    if (!selectedUnit || !tenantUserId) return;
 
-               // Also update the tenants table to keep them in sync
-               const { error: tenantsError } = await supabase
-                  .from('tenants')
-                  .update({
-                    property_id: targetPropertyId,
-                      unit_id: selectedUnit.id,
-                      move_in_date: now,
-                      status: 'active'
-                  })
-                  .eq('user_id', selectedTenant);
+    try {
+      setSavingUnit(true);
+      const now = new Date().toISOString();
 
-               if(tenantsError) throw new Error(`Failed to update tenant record: ${tenantsError.message}`);
-               console.log("✅ Tenant record updated");
-               
-               toast.success("Assignment updated successfully");
-          } else {
-              // First, create the tenants table record so tenant can see assignment immediately
-              console.log("🔍 Checking for existing tenant record...");
-              const { data: existingTenant, error: checkError } = await supabase
-                  .from('tenants')
-                  .select('id')
-                  .eq('user_id', selectedTenant)
-                  .limit(1)
-                  .maybeSingle();
+      const { data: selectedTenantProfile, error: selectedTenantProfileError } = await supabase
+        .from('profiles')
+        .select('id, status, role')
+        .eq('id', tenantUserId)
+        .maybeSingle();
 
-              if (checkError && checkError.code !== 'PGRST116') {
-                  throw new Error(`Database check failed: ${checkError.message}`);
-              }
-
-              if (existingTenant) {
-                  console.log("📝 Updating existing tenant record...");
-                  // Update existing tenant record
-                  const { error: updateError } = await supabase
-                      .from('tenants')
-                      .update({
-                        property_id: targetPropertyId,
-                          unit_id: selectedUnit.id,
-                          move_in_date: now,
-                          status: 'active'
-                      })
-                      .eq('user_id', selectedTenant);
-
-                  if (updateError) throw updateError;
-                  console.log("✅ Tenant record updated successfully");
-              } else {
-                  console.log("➕ Creating new tenant record...");
-                  // Create new tenant record
-                  const { error: insertError } = await supabase
-                      .from('tenants')
-                      .insert({
-                          user_id: selectedTenant,
-                        property_id: targetPropertyId,
-                          unit_id: selectedUnit.id,
-                          move_in_date: now,
-                          status: 'active'
-                      });
-
-                  if (insertError) throw insertError;
-                  console.log("✅ Tenant record created successfully");
-              }
-
-              // Create lease
-              console.log("➕ Creating lease record...");
-              const { error: leaseError } = await supabase.from('tenant_leases').insert({
-                  unit_id: selectedUnit.id,
-                  tenant_id: selectedTenant,
-                  start_date: now,
-                  rent_amount: selectedUnit.property_unit_types?.price_per_unit || 0,
-                  status: 'active'
-              });
-
-              if(leaseError) throw leaseError;
-              console.log("✅ Lease record created");
-              
-              // Update unit status to 'occupied' as requested
-              console.log("🔄 Updating unit status to occupied...");
-              const { error: unitError } = await supabase.from('units').update({ status: 'occupied' }).eq('id', selectedUnit.id);
-              if(unitError) throw unitError;
-              console.log("✅ Unit status updated");
-              
-              toast.success("Tenant assigned successfully");
-          }
-
-          setIsAssignOpen(false);
-          loadUnits();
-      } catch(e: any) {
-          console.error("❌ Assignment error:", e);
-          if (e.message?.includes("409") || e.code === "409" || (typeof e === 'object' && JSON.stringify(e).includes("409"))) {
-            toast.error("User is already a tenant elsewhere. You do not have permission to move them. Ask an admin to enable full tenant access.");
-          } else {
-            toast.error("Failed to save assignment: " + (e.message || JSON.stringify(e)));
-          }
-      } finally {
-          setSavingUnit(false);
+      if (selectedTenantProfileError) throw selectedTenantProfileError;
+      if (!selectedTenantProfile) {
+        toast.error('Selected tenant profile not found');
+        return;
       }
+
+      const tenantStatus = String(selectedTenantProfile.status || '').toLowerCase();
+      if (!options.allowPendingTenant && tenantStatus !== 'active') {
+        toast.error('This tenant is pending approval and cannot be assigned yet.');
+        return;
+      }
+
+      const activeStatuses = ['active', 'approved', 'manager_approved', 'ongoing', 'current'];
+      let conflictQuery = supabase
+        .from('tenant_leases')
+        .select('id, unit_id, status, units(unit_number)')
+        .eq('tenant_id', tenantUserId)
+        .in('status', activeStatuses);
+
+      if (selectedUnit.active_lease?.id) {
+        conflictQuery = conflictQuery.neq('id', selectedUnit.active_lease.id);
+      }
+
+      const { data: conflictingLeases, error: conflictError } = await conflictQuery.limit(1);
+      if (conflictError) throw conflictError;
+
+      if (conflictingLeases && conflictingLeases.length > 0) {
+        const conflict: any = conflictingLeases[0];
+        const conflictUnit = conflict?.units?.unit_number || 'another unit';
+        toast.error(`This tenant is already assigned to unit ${conflictUnit}. Unassign first.`);
+        return;
+      }
+
+      const { data: existingTenant, error: checkError } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('user_id', tenantUserId)
+        .limit(1)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw new Error(`Database check failed: ${checkError.message}`);
+      }
+
+      let tenantRecordId = existingTenant?.id as string | undefined;
+      if (existingTenant) {
+        const { error: updateError } = await supabase
+          .from('tenants')
+          .update({
+            property_id: selectedUnit.property_id,
+            unit_id: selectedUnit.id,
+            move_in_date: now,
+            status: 'active'
+          })
+          .eq('id', existingTenant.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { data: insertedTenant, error: insertError } = await supabase
+          .from('tenants')
+          .insert({
+            user_id: tenantUserId,
+            auth_user_id: tenantUserId,
+            property_id: selectedUnit.property_id,
+            unit_id: selectedUnit.id,
+            move_in_date: now,
+            status: 'active'
+          })
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        tenantRecordId = insertedTenant?.id;
+      }
+
+      if (selectedUnit.active_lease) {
+        const { error } = await supabase
+          .from('tenant_leases')
+          .update({ tenant_id: tenantUserId })
+          .eq('id', selectedUnit.active_lease.id);
+
+        if (error) throw error;
+        toast.success('Assignment updated successfully');
+      } else {
+        const { data: insertedLease, error: leaseError } = await supabase
+          .from('tenant_leases')
+          .insert({
+            unit_id: selectedUnit.id,
+            tenant_id: tenantUserId,
+            start_date: now,
+            rent_amount: selectedUnit.property_unit_types?.price_per_unit || 0,
+            status: 'active'
+          })
+          .select('id')
+          .single();
+
+        if (leaseError) throw leaseError;
+
+        const { error: unitError } = await supabase
+          .from('units')
+          .update({ status: 'occupied' })
+          .eq('id', selectedUnit.id);
+        if (unitError) throw unitError;
+
+        if (options.createInitialInvoice && tenantRecordId && insertedLease?.id) {
+          try {
+            await createInitialMoveInInvoice(tenantRecordId, insertedLease.id);
+            toast.success('Initial payment invoice created for the new tenant');
+          } catch (invoiceError: any) {
+            console.error('Failed to create initial invoice:', invoiceError);
+            toast.warning('Tenant assigned, but initial payment invoice creation failed.');
+          }
+        }
+
+        toast.success('Tenant assigned successfully');
+      }
+
+      setIsAssignOpen(false);
+      loadUnits();
+    } catch (e: any) {
+      console.error('❌ Assignment error:', e);
+      if (e.message?.includes('409') || e.code === '409' || (typeof e === 'object' && JSON.stringify(e).includes('409'))) {
+        toast.error('User is already a tenant elsewhere. Ask admin to resolve previous assignment first.');
+      } else {
+        toast.error('Failed to save assignment: ' + (e.message || JSON.stringify(e)));
+      }
+    } finally {
+      setSavingUnit(false);
+    }
+  };
+
+  const handleAssignTenant = async () => {
+    if (!selectedTenant) return;
+    await assignTenantToUnit(selectedTenant, { allowPendingTenant: false, createInitialInvoice: false });
   };
 
   const loadApplicantCandidates = async () => {
@@ -750,41 +798,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     }
   };
 
-  const createTenantApprovalRequest = async (tenantUserId: string, source: 'create_user' | 'from_applicants') => {
-    const targetPropertyId = selectedUnit?.property_id || propertyId;
-    if (!selectedUnit || !targetPropertyId) {
-      throw new Error('Please choose a target unit before creating tenant request');
-    }
-
-    const metadata: Record<string, any> = {
-      user_id: tenantUserId,
-      property_id: targetPropertyId,
-      unit_id: selectedUnit.id,
-      move_in_date: new Date().toISOString(),
-      source,
-      requested_role: 'tenant',
-    };
-
-    if (source === 'from_applicants' && selectedApplicantId) {
-      const selectedApplicant = applicantCandidates.find((a) => a.applicant_id === selectedApplicantId);
-      metadata.application_id = selectedApplicant?.application_id;
-    }
-
-    const { error: approvalError } = await supabase
-      .from('approvals')
-      .insert({
-        approval_type: 'tenant_addition',
-        user_id: user?.id,
-        status: 'in_progress',
-        metadata,
-        notes: `Tenant addition request from manager for unit ${selectedUnit.unit_number}`,
-      });
-
-    if (approvalError) {
-      throw new Error(`Failed to create approval request: ${approvalError.message}`);
-    }
-  };
-
   const handleAddTenantFromApplicants = async () => {
     if (!selectedApplicantId) {
       toast.error('Please select an applicant');
@@ -804,8 +817,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         .update({
           role: 'tenant',
           user_type: 'tenant',
-          status: 'pending',
-          is_active: false,
+          status: 'active',
+          is_active: true,
           property_id: selectedUnit?.property_id || propertyId,
           unit_id: selectedUnit?.id || null,
           updated_at: new Date().toISOString(),
@@ -816,12 +829,10 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to update applicant profile: ${profileUpdateError.message}`);
       }
 
-      await createTenantApprovalRequest(candidate.applicant_id, 'from_applicants');
-
       setSelectedTenant(candidate.applicant_id);
       setIsAddTenantOpen(false);
-      setIsAssignOpen(true);
-      toast.success('Applicant submitted for superadmin approval and ready for assignment');
+      await assignTenantToUnit(candidate.applicant_id, { allowPendingTenant: true, createInitialInvoice: true });
+      toast.success('Applicant activated, assigned, and billed successfully');
     } catch (error: any) {
       console.error('Error adding tenant from applicants:', error);
       toast.error(error.message || 'Failed to add tenant from applicants');
@@ -864,7 +875,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             last_name: lastName,
             phone: newTenantForm.phone?.trim() || null,
             role: 'tenant',
-            status: 'pending',
+            status: 'active',
           },
         },
       });
@@ -885,8 +896,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           phone: newTenantForm.phone?.trim() || null,
           role: 'tenant',
           user_type: 'tenant',
-          status: 'pending',
-          is_active: false,
+          status: 'active',
+          is_active: true,
           property_id: selectedUnit?.property_id || propertyId,
           unit_id: selectedUnit?.id || null,
           updated_at: new Date().toISOString(),
@@ -896,13 +907,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to save tenant profile: ${profileUpsertError.message}`);
       }
 
-      await createTenantApprovalRequest(tenantUserId, 'create_user');
-
       setSelectedTenant(tenantUserId);
       setNewTenantForm({ first_name: '', last_name: '', email: '', phone: '', password: '' });
       setIsAddTenantOpen(false);
-      setIsAssignOpen(true);
-      toast.success('Tenant created and sent to superadmin for approval. Continue assignment when approved.');
+      await assignTenantToUnit(tenantUserId, { allowPendingTenant: true, createInitialInvoice: true });
+      toast.success('Tenant created, assigned, and initial payment prompt generated');
     } catch (error: any) {
       console.error('Error creating tenant user:', error);
       toast.error(error.message || 'Failed to create tenant user');
@@ -1310,7 +1319,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                <DialogHeader>
                    <DialogTitle className="text-slate-800">Add Tenant</DialogTitle>
                    <DialogDescription className="text-slate-500">
-                       Choose how you want to add tenant access before assignment.
+                     Add a tenant and assign this unit in one step.
                    </DialogDescription>
                </DialogHeader>
 
@@ -1395,7 +1404,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   )}
 
                   <div className="rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs p-3">
-                    New tenants are created with pending approval so they appear in superadmin user management before activation.
+                    New tenants are activated and assigned immediately to this unit. The system also creates an initial payment invoice.
                   </div>
                </div>
 
@@ -1406,7 +1415,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                      disabled={isCreatingTenantUser}
                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold"
                    >
-                     {isCreatingTenantUser ? 'Processing...' : 'Submit For Approval'}
+                     {isCreatingTenantUser ? 'Processing...' : 'Create & Assign Tenant'}
                    </Button>
                </DialogFooter>
            </DialogContent>

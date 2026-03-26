@@ -8,6 +8,14 @@ export interface PropertyUnitType {
   unit_category?: string;
   units_count: number;
   price_per_unit: number;
+  sample_image_url?: string | null;
+}
+
+export interface PropertyInitialChargeTemplate {
+  id: string;
+  name: string;
+  charge_type: 'deposit' | 'fee';
+  amount: number;
 }
 
 export interface Property {
@@ -20,6 +28,7 @@ export interface Property {
   amenities?: string;
   number_of_floors?: number;
   property_unit_types?: PropertyUnitType[];
+  initial_charge_templates?: PropertyInitialChargeTemplate[];
   // Computed on frontend
   total_units?: number;
   expected_income?: number;
@@ -38,7 +47,9 @@ export interface CreatePropertyDTO {
     name: string;
     units_count: number;
     price_per_unit: number;
+    sample_image_url?: string;
   }[];
+  initial_charge_templates?: PropertyInitialChargeTemplate[];
 }
 
 export const propertyService = {
@@ -113,22 +124,51 @@ export const propertyService = {
   },
 
   async createProperty(property: CreatePropertyDTO) {
-    // 1. Create Property
-    const { data: propData, error: propError } = await supabase
+    const sanitizedTemplates = (property.initial_charge_templates || [])
+      .map((item, index) => ({
+        id: item.id || `tpl-${Date.now()}-${index}`,
+        name: String(item.name || '').trim(),
+        charge_type: item.charge_type === 'fee' ? 'fee' : 'deposit',
+        amount: Number(item.amount || 0),
+      }))
+      .filter((item) => item.name && item.amount >= 0);
+
+    const basePropertyPayload = {
+      name: property.name,
+      location: property.location,
+      image_url: property.image_url,
+      type: property.type,
+      description: property.description,
+      amenities: property.amenities,
+      number_of_floors: property.number_of_floors || 1,
+    };
+
+    // 1. Create Property (with backward-compatible fallback if migration is pending)
+    let propData: any = null;
+    const insertWithTemplates = await supabase
       .from('properties')
       .insert({
-        name: property.name,
-        location: property.location,
-        image_url: property.image_url,
-        type: property.type,
-        description: property.description,
-        amenities: property.amenities,
-        number_of_floors: property.number_of_floors || 1
+        ...basePropertyPayload,
+        initial_charge_templates: sanitizedTemplates,
       })
       .select()
       .single();
 
-    if (propError) throw propError;
+    if (insertWithTemplates.error) {
+      const missingColumn = String(insertWithTemplates.error.message || '').toLowerCase().includes('initial_charge_templates');
+      if (!missingColumn) throw insertWithTemplates.error;
+
+      const retryWithoutTemplates = await supabase
+        .from('properties')
+        .insert(basePropertyPayload)
+        .select()
+        .single();
+
+      if (retryWithoutTemplates.error) throw retryWithoutTemplates.error;
+      propData = retryWithoutTemplates.data;
+    } else {
+      propData = insertWithTemplates.data;
+    }
 
     if (!propData) throw new Error('Failed to create property');
 
@@ -138,7 +178,8 @@ export const propertyService = {
         property_id: propData.id,
         name: unit.name,
         units_count: unit.units_count,
-        price_per_unit: unit.price_per_unit
+        price_per_unit: unit.price_per_unit,
+        sample_image_url: unit.sample_image_url?.trim() || null
       }));
 
       const { error: unitsError } = await supabase

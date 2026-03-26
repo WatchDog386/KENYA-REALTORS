@@ -153,7 +153,7 @@ const ManagerRentCollection = () => {
       const { data: units, error: unitsError } = await supabase
         .from('units')
         .select(`
-          id, unit_number, floor_number, status, property_id,
+          id, unit_number, floor_number, status, property_id, price,
           property_unit_types (name, price_per_unit),
           leases:tenant_leases (tenant_id, rent_amount, status)
         `)
@@ -201,8 +201,10 @@ const ManagerRentCollection = () => {
         const activeLease = leasesList.find((l: any) => l.status === 'active');
         
         const unitType = unit.property_unit_types?.name || 'Standard';
-        // Base rent from lease OR unit type price
-        const monthlyRent = activeLease?.rent_amount || unit.property_unit_types?.price_per_unit || 0;
+        // Source of truth: unit.price from Unit Management. Fallback to active lease, then type default.
+        const monthlyRent = Number(unit.price || 0)
+          || Number(activeLease?.rent_amount || 0)
+          || Number(unit.property_unit_types?.price_per_unit || 0);
 
         // ... rest calculation...
         // Find records
@@ -215,7 +217,7 @@ const ManagerRentCollection = () => {
         const waterArrears = waterBillAmount - paidWaterBill;
 
         // Rent Calcs
-        const expectedRent = rentRecord?.amount || monthlyRent; // Use record amount if generated, else mock expected
+        const expectedRent = monthlyRent;
         const paidRent = rentRecord?.amount_paid || 0;
         
         // If lease exists, expect rent. 

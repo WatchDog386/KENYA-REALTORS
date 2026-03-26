@@ -68,6 +68,7 @@ type PropertyFormData = Omit<CreatePropertyDTO, 'units'> & {
     name: string;
     units_count: number;
     price_per_unit: number;
+    sample_image_url?: string;
   }>;
 };
 
@@ -106,7 +107,7 @@ const PropertyManager: React.FC = () => {
     description: '',
     amenities: '',
     number_of_floors: 1,
-    units: [{ name: '', units_count: 0, price_per_unit: 0 }]
+    units: [{ name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
   });
 
   useEffect(() => {
@@ -243,7 +244,7 @@ const PropertyManager: React.FC = () => {
   const handleAddUnit = () => {
     setFormData({
       ...formData,
-      units: [...formData.units, { name: '', units_count: 0, price_per_unit: 0 }]
+      units: [...formData.units, { name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
     });
   };
 
@@ -259,12 +260,107 @@ const PropertyManager: React.FC = () => {
     setFormData({ ...formData, units: newUnits });
   };
 
+  const handleUnitSampleImageUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const validationError = propertyImageService.getImageValidationError(file);
+    if (validationError) {
+      toast.error(validationError);
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      const ownerId = selectedProperty?.id || `new-property-${Date.now()}`;
+      const publicUrl = await propertyImageService.uploadPropertyImage(file, `${ownerId}/unit-samples`);
+      handleUnitChange(index, 'sample_image_url', publicUrl);
+      toast.success('Sample unit image uploaded');
+    } catch (error: any) {
+      console.error('Error uploading unit sample image:', error);
+      toast.error(error?.message || 'Failed to upload sample image');
+    } finally {
+      setUploadingImage(false);
+      event.target.value = '';
+    }
+  };
+
   const [unassignConfig, setUnassignConfig] = useState<{ propertyId: string, roleType: 'manager' | 'technician' | 'proprietor' | 'caretaker', recordId: string } | null>(null);
 
   const parseFloorCount = (value: string | number) => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed < 1) return 1;
     return Math.floor(parsed);
+  };
+
+  const getLivePropertySnapshot = async (property: Property): Promise<Property> => {
+    const { data: liveUnits, error } = await supabase
+      .from('units')
+      .select('id, unit_number, floor_number, price, unit_type_id, property_unit_types(name, price_per_unit)')
+      .eq('property_id', property.id);
+
+    if (error) {
+      console.error('Error fetching live units for property snapshot:', error);
+      return property;
+    }
+
+    const units = liveUnits || [];
+    if (units.length === 0) {
+      return {
+        ...property,
+        total_units: 0,
+        expected_income: 0,
+        property_unit_types: [],
+        number_of_floors: property.number_of_floors || 1,
+      };
+    }
+
+    const floorSet = new Set<string>();
+    const typeMap = new Map<string, { id: string; name: string; units_count: number; total_price: number; priced_count: number; default_price: number }>();
+    let expectedIncome = 0;
+
+    units.forEach((unit: any) => {
+      floorSet.add(String(unit.floor_number ?? 'G'));
+
+      const unitPrice = Number(unit.price || 0);
+      const typePrice = Number(unit.property_unit_types?.price_per_unit || 0);
+      const resolvedPrice = unitPrice || typePrice;
+      expectedIncome += resolvedPrice;
+
+      const typeName = unit.property_unit_types?.name || 'Standard';
+      const mapKey = `${unit.unit_type_id || typeName}`;
+      const current = typeMap.get(mapKey) || {
+        id: String(unit.unit_type_id || typeName),
+        name: typeName,
+        units_count: 0,
+        total_price: 0,
+        priced_count: 0,
+        default_price: typePrice,
+      };
+
+      current.units_count += 1;
+      if (resolvedPrice > 0) {
+        current.total_price += resolvedPrice;
+        current.priced_count += 1;
+      }
+      typeMap.set(mapKey, current);
+    });
+
+    const unitTypes = Array.from(typeMap.values()).map((item) => ({
+      id: item.id,
+      name: item.name,
+      units_count: item.units_count,
+      price_per_unit: item.priced_count > 0 ? Math.round(item.total_price / item.priced_count) : item.default_price,
+    }));
+
+    return {
+      ...property,
+      total_units: units.length,
+      expected_income: expectedIncome,
+      number_of_floors: floorSet.size || property.number_of_floors || 1,
+      property_unit_types: unitTypes,
+    };
   };
 
   const handleSaveProperty = async () => {
@@ -288,7 +384,7 @@ const PropertyManager: React.FC = () => {
         description: '',
         amenities: '',
         number_of_floors: 1,
-        units: [{ name: '', units_count: 0, price_per_unit: 0 }]
+        units: [{ name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
       });
       setImagePreview(null);
 
@@ -391,29 +487,32 @@ const PropertyManager: React.FC = () => {
     }
   };
 
-  const handleViewProperty = (property: Property) => {
-    setSelectedProperty(property);
+  const handleViewProperty = async (property: Property) => {
+    const liveProperty = await getLivePropertySnapshot(property);
+    setSelectedProperty(liveProperty);
     setShowViewProperty(true);
   }
 
-  const handleEditProperty = (property: Property) => {
-    setSelectedProperty(property);
+  const handleEditProperty = async (property: Property) => {
+    const liveProperty = await getLivePropertySnapshot(property);
+    setSelectedProperty(liveProperty);
     setFormData({
-      name: property.name,
-      location: property.location,
-      image_url: property.image_url || '',
-      type: property.type || 'Apartment',
-      description: property.description || '',
-      amenities: property.amenities || '',
-      number_of_floors: property.number_of_floors || 1,
-      units: property.property_unit_types?.map((u: any) => ({
+      name: liveProperty.name,
+      location: liveProperty.location,
+      image_url: liveProperty.image_url || '',
+      type: liveProperty.type || 'Apartment',
+      description: liveProperty.description || '',
+      amenities: liveProperty.amenities || '',
+      number_of_floors: liveProperty.number_of_floors || 1,
+      units: liveProperty.property_unit_types?.map((u: any) => ({
         id: u.id,
         name: u.name,
         units_count: u.units_count,
-        price_per_unit: u.price_per_unit
-      })) || [{ name: '', units_count: 0, price_per_unit: 0 }]
+        price_per_unit: u.price_per_unit,
+        sample_image_url: u.sample_image_url || ''
+      })) || [{ name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
     });
-    setImagePreview(property.image_url || null);
+    setImagePreview(liveProperty.image_url || null);
     setShowEditProperty(true);
   }
 
@@ -449,7 +548,34 @@ const PropertyManager: React.FC = () => {
           name: unit.name.trim(),
           units_count: Number(unit.units_count) || 0,
           price_per_unit: Number(unit.price_per_unit) || 0,
+          sample_image_url: unit.sample_image_url?.trim() || null,
         }));
+
+      const { data: existingUnits, error: existingUnitsError } = await supabase
+        .from('property_unit_types')
+        .select('id')
+        .eq('property_id', selectedProperty.id);
+
+      if (existingUnitsError) throw existingUnitsError;
+
+      const retainedIds = new Set(
+        validUnits
+          .filter((unit) => Boolean(unit.id))
+          .map((unit) => unit.id as string)
+      );
+
+      const unitsToDelete = (existingUnits || [])
+        .map((unit: any) => unit.id as string)
+        .filter((unitId: string) => !retainedIds.has(unitId));
+
+      if (unitsToDelete.length > 0) {
+        const { error: unitDeleteError } = await supabase
+          .from('property_unit_types')
+          .delete()
+          .in('id', unitsToDelete);
+
+        if (unitDeleteError) throw unitDeleteError;
+      }
 
       for (const unit of validUnits) {
         if (unit.id) {
@@ -459,6 +585,7 @@ const PropertyManager: React.FC = () => {
               name: unit.name,
               units_count: unit.units_count,
               price_per_unit: unit.price_per_unit,
+              sample_image_url: unit.sample_image_url,
             })
             .eq('id', unit.id);
 
@@ -471,6 +598,7 @@ const PropertyManager: React.FC = () => {
               name: unit.name,
               units_count: unit.units_count,
               price_per_unit: unit.price_per_unit,
+              sample_image_url: unit.sample_image_url,
             });
 
           if (unitInsertError) throw unitInsertError;
@@ -753,6 +881,30 @@ const PropertyManager: React.FC = () => {
                                         <datalist id={`unit-types-${index}`}>
                                             {unitTypeOptions.map(opt => <option key={opt} value={opt} />)}
                                         </datalist>
+                                    </div>
+                                    <div className="mt-2 space-y-1.5">
+                                        <Label className="text-[11px] font-semibold text-blue-600">Sample Unit Photo (optional)</Label>
+                                        <div className="flex gap-2">
+                                          <Input
+                                            value={unit.sample_image_url || ''}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'sample_image_url', e.target.value)}
+                                            placeholder="https://example.com/shop-sample.jpg"
+                                            className="h-8 border-blue-300 bg-white text-xs font-medium"
+                                          />
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            id={`unit-sample-upload-${index}`}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitSampleImageUpload(index, e)}
+                                          />
+                                          <label
+                                            htmlFor={`unit-sample-upload-${index}`}
+                                            className="h-8 px-3 inline-flex items-center justify-center rounded-md border border-blue-300 bg-white text-blue-700 text-[11px] font-semibold cursor-pointer hover:bg-blue-100"
+                                          >
+                                            Upload
+                                          </label>
+                                        </div>
                                     </div>
                                     </div>
                                     
@@ -1317,6 +1469,30 @@ const PropertyManager: React.FC = () => {
                           <datalist id={`edit-unit-types-${index}`}>
                             {unitTypeOptions.map(opt => <option key={opt} value={opt} />)}
                           </datalist>
+                          <div className="mt-2 space-y-1.5">
+                            <Label className="text-[11px] font-semibold text-slate-600">Sample Unit Photo (optional)</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={unit.sample_image_url || ''}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'sample_image_url', e.target.value)}
+                                placeholder="https://example.com/unit-sample.jpg"
+                                className="h-8 border-slate-300 bg-white text-xs font-medium"
+                              />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                id={`edit-unit-sample-upload-${index}`}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitSampleImageUpload(index, e)}
+                              />
+                              <label
+                                htmlFor={`edit-unit-sample-upload-${index}`}
+                                className="h-8 px-3 inline-flex items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 text-[11px] font-semibold cursor-pointer hover:bg-slate-100"
+                              >
+                                Upload
+                              </label>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="col-span-4 md:col-span-2 space-y-1.5">

@@ -84,6 +84,7 @@ const PaymentsManagement = () => {
           property_id,
           unit:units (
             unit_number,
+            price,
             property_unit_types (
               name,
               price_per_unit
@@ -113,19 +114,25 @@ const PaymentsManagement = () => {
         }
       }
 
-      // Fetch rent amounts from leases table
+      // Fetch active lease rents as secondary fallback after live unit rent.
       let leases: any[] = [];
       const { data: leasesData } = await supabase
-        .from("leases")
-        .select("tenant_id, monthly_rent");
+        .from("tenant_leases")
+        .select("tenant_id, unit_id, rent_amount, status")
+        .eq("status", "active");
       leases = leasesData || [];
 
       const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
-      const leaseMap = new Map(leases.map((l: any) => [l.tenant_id, l]));
+      const leaseByUnitMap = new Map(leases.map((l: any) => [l.unit_id, l]));
 
       const formattedTenants: TenantData[] = activeTenants?.map((tenant: any) => {
         const profile = profileMap.get(tenant.user_id);
-        const lease = leaseMap.get(tenant.user_id);
+        const lease = leaseByUnitMap.get(tenant.unit_id);
+        const unitPrice = Number(tenant.unit?.price || 0);
+        const leaseRent = Number(lease?.rent_amount || 0);
+        const typeDefaultRent = Number(tenant.unit?.property_unit_types?.price_per_unit || 0);
+        const resolvedRent = unitPrice || leaseRent || typeDefaultRent;
+
         return {
           id: tenant.id,
           user_id: tenant.user_id,
@@ -136,7 +143,7 @@ const PaymentsManagement = () => {
           unit_number: tenant.unit?.unit_number || "N/A",
           unit_type: tenant.unit?.property_unit_types?.name || "N/A",
           lease_fee: 0,
-          rent: lease?.monthly_rent || 0,
+          rent: resolvedRent,
         };
       }) || [];
 

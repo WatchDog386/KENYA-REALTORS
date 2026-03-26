@@ -1112,7 +1112,10 @@ const HomePage = () => {
                       // Collect all vacant units from filtered properties
                       filteredListings.forEach((property) => {
                         const propertyUnits = (unitDetails || []).filter(u => u.property_id === property.propertyId);
-                        const vacantUnits = propertyUnits.filter(u => u.status === 'available');
+                        const vacantUnits = propertyUnits.filter((u: any) => {
+                          const status = String(u.status || '').toLowerCase();
+                          return status === 'available' || status === 'vacant';
+                        });
                         
                         vacantUnits.forEach((unit) => {
                           vacantUnitsList.push({

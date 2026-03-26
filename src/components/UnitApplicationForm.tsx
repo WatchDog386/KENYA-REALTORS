@@ -37,6 +37,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
     age_bracket: "",
     occupants_count: "",
     next_of_kin: "",
+    next_of_kin_email: "",
     nationality: "",
     house_staff: false,
     home_address: "",
@@ -79,6 +80,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         age_bracket: form.age_bracket,
         occupants_count: form.occupants_count ? parseInt(form.occupants_count) : 1,
         next_of_kin: form.next_of_kin,
+        next_of_kin_email: form.next_of_kin_email,
         nationality: form.nationality,
         house_staff: form.house_staff,
         home_address: form.home_address,
@@ -86,9 +88,17 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         sub_location: form.sub_location,
       };
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from("lease_applications")
         .insert([applicationData]);
+
+      // Backward compatibility for deployments that haven't applied next_of_kin_email migration yet.
+      if (error && String(error.message || '').toLowerCase().includes('next_of_kin_email')) {
+        const { next_of_kin_email, ...fallbackData } = applicationData as any;
+        ({ error } = await supabase
+          .from("lease_applications")
+          .insert([fallbackData]));
+      }
 
       if (error) {
         console.error("Supabase Error:", error);
@@ -122,6 +132,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         age_bracket: "",
         occupants_count: "",
         next_of_kin: "",
+        next_of_kin_email: "",
         nationality: "",
         house_staff: false,
         home_address: "",
@@ -241,6 +252,10 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
              <Label className={labelClass}>Name & Contact of Next of Kin</Label>
              <Input name="next_of_kin" value={form.next_of_kin} onChange={handleChange} placeholder="Jane Doe - +254 756 789 012 (Sister)" className={inputClass} />
           </div>
+           <div>
+             <Label className={labelClass}>Next of Kin Email</Label>
+             <Input type="email" name="next_of_kin_email" value={form.next_of_kin_email} onChange={handleChange} placeholder="kin@example.com" className={inputClass} />
+           </div>
         </div>
       </div>
 

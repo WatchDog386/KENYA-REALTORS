@@ -186,8 +186,24 @@ const ManagerUtilityReadings = () => {
     return values;
   }
 
-  const getUtilityConstant = (name: string) =>
-    utilityConstants.find(u => u.utility_name === name);
+  const getUtilityConstant = (name: string, propertyId?: string) => {
+    const candidates = utilityConstants.filter((u) => u.utility_name === name);
+    if (candidates.length === 0) return undefined;
+
+    const hasAnyAssignments = Object.keys(propertyUtilityMap).length > 0;
+    if (!hasAnyAssignments) return candidates[0];
+
+    const resolvedPropertyId =
+      propertyId ||
+      formData.property_id ||
+      units.find((u) => u.id === formData.unit_id)?.property_id;
+
+    if (!resolvedPropertyId) return candidates[0];
+
+    const assignedIds = new Set(propertyUtilityMap[resolvedPropertyId] || []);
+    const assignedMatch = candidates.find((u) => assignedIds.has(u.id));
+    return assignedMatch || candidates[0];
+  };
 
   const CORE_UTILITY_NAMES = ['Electricity', 'Water', 'Garbage', 'Security', 'Service'];
 
@@ -287,11 +303,11 @@ const ManagerUtilityReadings = () => {
     const serviceEnabled = isUtilityActiveForProperty('Service', propertyId);
 
     // Get constants from utility_constants table with utility_settings fallback
-    const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
-    const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
-    const garbagePrice = garbageEnabled ? Math.abs(getUtilityConstant('Garbage')?.price ?? utilitySettings.garbage_fee ?? reading.garbage_fee ?? 0) : 0;
-    const securityPrice = securityEnabled ? Math.abs(getUtilityConstant('Security')?.price ?? utilitySettings.security_fee ?? reading.security_fee ?? 0) : 0;
-    const servicePrice = serviceEnabled ? Math.abs(getUtilityConstant('Service')?.price ?? utilitySettings.service_fee ?? (reading.service_fee ?? 0)) : 0;
+    const waterConstant = getUtilityConstant('Water', propertyId)?.constant || utilitySettings.water_constant || 1;
+    const electricityConstant = getUtilityConstant('Electricity', propertyId)?.constant || utilitySettings.electricity_constant || 1;
+    const garbagePrice = garbageEnabled ? Math.abs(getUtilityConstant('Garbage', propertyId)?.price ?? utilitySettings.garbage_fee ?? reading.garbage_fee ?? 0) : 0;
+    const securityPrice = securityEnabled ? Math.abs(getUtilityConstant('Security', propertyId)?.price ?? utilitySettings.security_fee ?? reading.security_fee ?? 0) : 0;
+    const servicePrice = serviceEnabled ? Math.abs(getUtilityConstant('Service', propertyId)?.price ?? utilitySettings.service_fee ?? (reading.service_fee ?? 0)) : 0;
     
     // Calculate usage as the range/magnitude between readings (absolute difference)
     const electricityUsage = electricityEnabled ? Math.abs(reading.current_reading - reading.previous_reading) : 0;
@@ -497,12 +513,13 @@ const ManagerUtilityReadings = () => {
 
   // Keep all prices and constants locked to server values so users cannot alter them
   useEffect(() => {
-    const garbagePrice = getUtilityConstant('Garbage')?.price || 0;
-    const securityPrice = getUtilityConstant('Security')?.price || 0;
-    const servicePrice = getUtilityConstant('Service')?.price || 0;
-    const electricityConstant = getUtilityConstant('Electricity')?.constant || utilitySettings.electricity_constant || 1;
-    const waterConstant = getUtilityConstant('Water')?.constant || utilitySettings.water_constant || 1;
-    const customUtilityValues = buildCustomUtilityValues(formData.property_id);
+    const resolvedPropertyId = formData.property_id || units.find((u) => u.id === formData.unit_id)?.property_id;
+    const garbagePrice = getUtilityConstant('Garbage', resolvedPropertyId)?.price || 0;
+    const securityPrice = getUtilityConstant('Security', resolvedPropertyId)?.price || 0;
+    const servicePrice = getUtilityConstant('Service', resolvedPropertyId)?.price || 0;
+    const electricityConstant = getUtilityConstant('Electricity', resolvedPropertyId)?.constant || utilitySettings.electricity_constant || 1;
+    const waterConstant = getUtilityConstant('Water', resolvedPropertyId)?.constant || utilitySettings.water_constant || 1;
+    const customUtilityValues = buildCustomUtilityValues(resolvedPropertyId);
 
     setFormData(prev => ({
       ...prev,
@@ -513,7 +530,7 @@ const ManagerUtilityReadings = () => {
       electricity_rate: electricityConstant,
       water_rate: waterConstant,
     }));
-  }, [utilityConstants, propertyUtilityMap, utilitySettings.electricity_constant, utilitySettings.water_constant]);
+  }, [utilityConstants, propertyUtilityMap, formData.property_id, formData.unit_id, units, utilitySettings.electricity_constant, utilitySettings.water_constant]);
 
   // Fetch managed properties and their units
   useEffect(() => {
