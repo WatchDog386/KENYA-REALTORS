@@ -710,6 +710,7 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
 // CAROUSEL & CARD (UPDATED WITH HowItWorks STYLING)
 // ==========================================
 const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardClick: (slide: any) => void; onSlideChange: (slideId: number) => void; slides?: any[] }) => {
+  const navigate = useNavigate();
   const [[page, direction], setPage] = useState([0, 0]);
   const safeSlides = slides || [];
   const slideLength = safeSlides.length > 0 ? safeSlides.length : 1;
@@ -741,11 +742,19 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
     center: { zIndex: 1, x: 0, opacity: 1 },
     exit: (dir: number) => ({ zIndex: 0, x: dir < 0 ? "100%" : "-100%", opacity: 1 })
   };
+
+  const headlineParts = String(currentSlide?.headline || "").split("\n");
+  const primaryHeadline = headlineParts[0] || "Find Your Next Home";
+  const secondaryHeadline = headlineParts[1] || "Across Nairobi";
+  const parsedPrice = Number.parseInt(String(currentSlide?.price || "0").replace(/,/g, ""), 10);
+  const formattedPrice = Number.isNaN(parsedPrice)
+    ? String(currentSlide?.price || "0")
+    : parsedPrice.toLocaleString();
   
   // Show loading state if no slides are available
   if (!currentSlide || safeSlides.length === 0) {
     return (
-      <div className="relative w-full h-[400px] md:h-[600px] lg:h-[750px] font-nunito overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] flex items-center justify-center">
+      <div className="relative w-full h-[540px] md:h-[580px] font-nunito overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] flex items-center justify-center pt-12 md:pt-16">
         <div className="flex flex-col items-center gap-4">
           <Loader size={40} className="text-white animate-spin" />
           <p className="text-white font-bold text-sm">Loading properties...</p>
@@ -755,56 +764,136 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
   }
   
   return (
-    <div className="relative w-full h-[400px] md:h-[600px] lg:h-[750px] font-nunito overflow-hidden">
-      <AnimatePresence initial={false} custom={direction} mode="popLayout">
-        <motion.div
-          key={page}
-          custom={direction}
-          variants={variants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }}
-          className="absolute inset-0 h-full w-full"
-        >
-          {/* Full-width Image */}
-          <div className="w-full h-full relative overflow-hidden">
-            <img src={currentSlide.img} alt="Property" className="w-full h-full object-cover" />
-            
-            {/* Gradient overlay for text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-black/50 to-transparent"></div>
-            
-            {/* Text overlay - positioned at bottom left */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-10 lg:p-16">
-              <div className="max-w-[700px]">
-                <h1 className="text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-white leading-none mb-2 md:mb-3 uppercase tracking-tight">
-                  {currentSlide.headline.split("\n")[0]}{" "}
-                  <span className="text-[#F96302]">{currentSlide.headline.split("\n")[1]}</span>
+    <section className="w-full bg-[#f4f4f4] border-b border-slate-200 font-nunito pt-12 md:pt-16">
+      <div className="w-full max-w-[1660px] mx-auto px-2 md:px-3 lg:px-4 py-4 md:py-6">
+        <div className="relative overflow-hidden border border-[#d8d8d8] bg-white shadow-[0_12px_32px_rgba(15,35,65,0.14)]">
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <motion.div
+              key={page}
+              custom={direction}
+              variants={variants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ x: { type: "spring", stiffness: 280, damping: 28 }, opacity: { duration: 0.2 } }}
+              className="grid grid-cols-1 lg:grid-cols-12 min-h-[540px] md:min-h-[580px]"
+            >
+              <div className="lg:col-span-5 p-4 md:p-6 lg:p-7 flex flex-col bg-white relative">
+                <div className="mb-2">
+                  <span className="inline-flex items-center gap-2 bg-[#0f335f] text-white text-[10px] md:text-xs font-black uppercase tracking-[0.16em] px-3 py-1">
+                    <ShoppingCart size={12} />
+                    {currentSlide.tag || "Featured"}
+                  </span>
+                </div>
+
+                <h1 className="text-2xl md:text-4xl font-black text-[#0f335f] leading-[0.95] uppercase tracking-tight">
+                  {primaryHeadline}
+                  <span className="block text-[#F96302]">{secondaryHeadline}</span>
                 </h1>
-                
-                <p className="text-[10px] md:text-sm font-bold text-white/90 mb-2 md:mb-4 uppercase tracking-[0.15em]">
-                  {currentSlide.subhead}
+
+                <p className="mt-2 text-xs md:text-sm text-slate-600 leading-relaxed font-semibold max-w-[34ch]">
+                  {String(currentSlide.description || "").slice(0, 110)}...
                 </p>
-                
-                <div className="w-8 md:w-12 h-1 bg-[#F96302] mb-3 md:mb-4"></div>
-                
-                <p className="text-xs md:text-sm text-white/80 font-medium mb-4 md:mb-6 leading-relaxed max-w-[550px] ">
-                  {currentSlide.description}
-                </p>
-                
-                <button 
-                  className="bg-[#F96302] text-white font-bold py-2 px-5 md:py-3 md:px-8 hover:bg-[#d85502] transition-all shadow-lg flex items-center justify-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.2em]" 
-                  onClick={() => navigate('/features')}
-                >
-                  View This Listing <ChevronRight size={14} className="md:w-4 md:h-4" />
-                </button>
+
+                <div className="mt-3 space-y-2">
+                  <div className="inline-flex items-center gap-2 bg-[#fff4ec] text-[#a74412] text-[11px] font-bold px-2.5 py-1 border border-[#ffd7bd]">
+                    <MapPin size={14} />
+                    {currentSlide.location}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    onClick={() => navigate('/features')}
+                    className="col-span-2 border-2 border-[#0f335f] text-[#0f335f] font-black py-3 px-3 uppercase tracking-[0.12em] text-[10px] md:text-[11px] hover:bg-[#0f335f] hover:text-white transition-colors"
+                  >
+                    Browse Homes
+                  </button>
+                </div>
+
+                <div className="mt-4 border border-[#e3e3e3] bg-[#f8f8f8] p-3 md:p-4">
+                  <p className="text-[9px] font-black text-[#0f335f] uppercase tracking-[0.2em]">Quick Search</p>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-5 gap-2">
+                    <div className="sm:col-span-3 relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        readOnly
+                        value={currentSlide.location || "Nairobi"}
+                        className="w-full h-11 border border-slate-300 bg-white pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-700 focus:outline-none"
+                      />
+                    </div>
+                    <button
+                      onClick={() => navigate('/features')}
+                      className="sm:col-span-2 h-11 bg-[#0f335f] text-white text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] hover:bg-[#0c284a] transition-colors"
+                    >
+                      Find Homes
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-    </div>
+
+              <div className="lg:col-span-7 relative h-[540px] md:h-[640px] lg:h-auto lg:min-h-full">
+                <img src={currentSlide.img} alt={currentSlide.subhead || "Featured property"} className="absolute inset-0 w-full h-full object-cover object-top" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-l from-black/45 via-transparent to-transparent"></div>
+
+                <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 lg:p-5">
+                  <div className="max-w-xl bg-black/45 backdrop-blur-[2px] border border-white/15 p-3 md:p-4">
+                    <p className="text-[10px] md:text-xs font-black text-[#ffd6bd] uppercase tracking-[0.2em]">{currentSlide.subhead}</p>
+                    <p className="mt-1.5 text-white text-sm md:text-xl font-black uppercase leading-tight">
+                      {currentSlide.specs || "Ready-to-move units"}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => onCardClick(currentSlide)}
+                        className="bg-[#F96302] text-white text-[10px] md:text-xs font-black uppercase tracking-[0.12em] px-3 py-1.5 hover:bg-[#d75502] transition-colors"
+                      >
+                        Book Tour
+                      </button>
+                      <button
+                        onClick={() => navigate('/pricing')}
+                        className="bg-white text-[#0f335f] text-[10px] md:text-xs font-black uppercase tracking-[0.12em] px-3 py-1.5 hover:bg-slate-100 transition-colors"
+                      >
+                        Financing
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 flex items-center gap-2">
+                  <button
+                    onClick={() => paginate(-1)}
+                    className="w-10 h-10 bg-white/90 hover:bg-white text-[#0f335f] border border-white/60 transition-colors flex items-center justify-center"
+                    aria-label="Previous slide"
+                  >
+                    <ChevronRight size={18} className="rotate-180" />
+                  </button>
+                  <button
+                    onClick={() => paginate(1)}
+                    className="w-10 h-10 bg-white/90 hover:bg-white text-[#0f335f] border border-white/60 transition-colors flex items-center justify-center"
+                    aria-label="Next slide"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+
+                <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 flex gap-1.5">
+                  {safeSlides.map((slide, index) => (
+                    <button
+                      key={slide.id || index}
+                      onClick={() => goToSlide(index)}
+                      className={`h-1.5 transition-all ${slideIndex === index ? 'w-8 bg-[#F96302]' : 'w-4 bg-white/60 hover:bg-white'}`}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+    </section>
   );
 };
 

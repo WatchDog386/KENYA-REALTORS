@@ -9,7 +9,9 @@ import { formatCurrency } from "@/utils/formatCurrency";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import PaystackPaymentDialog from "@/components/dialogs/PaystackPaymentDialog";
-import { processPaymentWithReceipt, ReceiptData } from "../../../utils/receiptGenerator";
+import { downloadReceiptPDF, formatReceiptData, processPaymentWithReceipt, ReceiptData } from "../../../utils/receiptGenerator";
+import { getTenantPortalAccessState, reconcileInitialAllocationInvoicesForTenant } from "@/services/tenantOnboardingService";
+import { extractInvoiceLineItems } from "@/utils/invoiceLineItems";
 
 interface OutstandingItem {
   id: string;
@@ -26,22 +28,22 @@ const MakePaymentPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  console.log("⚙️ LOADED: src/pages/portal/tenant/MakePayment.tsx");
   
   const paymentTypeParamRaw = searchParams.get('type');
   const paymentTypeParam = paymentTypeParamRaw === 'all' ? 'custom' : paymentTypeParamRaw;
   const referenceId = searchParams.get('id');
+  const onboardingInvoiceId = searchParams.get('onboardingInvoiceId');
   const dueAmount = searchParams.get('amount') ? parseFloat(searchParams.get('amount')!) : 0;
 
   const [paymentType, setPaymentType] = useState<string | null>(paymentTypeParam);
   const [amount, setAmount] = useState(dueAmount > 0 ? dueAmount.toString() : "");
-  const remarks = "";
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState<any>(null);
   const [userEmail, setUserEmail] = useState<string>("");
   const [showPaystackDialog, setShowPaystackDialog] = useState(false);
   const [outstandingItems, setOutstandingItems] = useState<OutstandingItem[]>([]);
   const [suggestedOutstandingTotal, setSuggestedOutstandingTotal] = useState(0);
+  const [onboardingInvoiceDetails, setOnboardingInvoiceDetails] = useState<any>(null);
 
   const isUuid = (value: string | null): boolean => {
     if (!value) return false;
@@ -49,11 +51,7 @@ const MakePaymentPage: React.FC = () => {
   };
 
   const hasValidReferenceId = isUuid(referenceId);
-
-  // Debug: Log when dialog state changes
-  useEffect(() => {
-    console.log("showPaystackDialog changed:", showPaystackDialog);
-  }, [showPaystackDialog]);
+  const hasValidOnboardingInvoiceId = isUuid(onboardingInvoiceId);
 
   useEffect(() => {
     if (paymentTypeParam) {
@@ -78,6 +76,52 @@ const MakePaymentPage: React.FC = () => {
 
     setOutstandingItems([]);
   }, [hasValidReferenceId, paymentType, user?.id]);
+
+  useEffect(() => {
+    const fetchOnboardingInvoiceDetails = async () => {
+      try {
+        if (!user?.id || !hasValidOnboardingInvoiceId) {
+          setOnboardingInvoiceDetails(null);
+          return;
+        }
+
+        const { data: tenantRow } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        const tenantIdentifiers = [user.id, tenantRow?.id].filter(Boolean) as string[];
+
+        const { data, error } = await supabase
+          .from('invoices')
+          .select('id, reference_number, amount, due_date, status, items, notes')
+          .eq('id', onboardingInvoiceId)
+          .in('tenant_id', tenantIdentifiers)
+          .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+
+        setOnboardingInvoiceDetails(data || null);
+
+        if (!amount && data?.amount) {
+          setAmount(String(data.amount));
+        }
+      } catch (error) {
+        console.error('Error fetching onboarding invoice details:', error);
+        setOnboardingInvoiceDetails(null);
+      }
+    };
+
+    fetchOnboardingInvoiceDetails();
+  }, [onboardingInvoiceId, hasValidOnboardingInvoiceId, user?.id]);
+
+  const buildOnboardingInvoiceBreakdown = (invoice: any) => {
+    return extractInvoiceLineItems(invoice?.items);
+  };
 
   const fetchDetails = async () => {
       try {
@@ -191,7 +235,7 @@ const MakePaymentPage: React.FC = () => {
     }
   };
 
-  const ensureTenantForPayment = async () => {
+  const resolveTenantPaymentContext = async () => {
     if (!user?.id) {
       throw new Error('User not authenticated');
     }
@@ -200,6 +244,7 @@ const MakePaymentPage: React.FC = () => {
       .from('tenants')
       .select('id, unit_id, property_id')
       .eq('user_id', user.id)
+      .eq('status', 'active')
       .maybeSingle();
 
     if (existingTenantError) throw existingTenantError;
@@ -215,50 +260,18 @@ const MakePaymentPage: React.FC = () => {
 
     if (latestApplicationError) throw latestApplicationError;
     if (!latestApplication?.property_id || !latestApplication?.unit_id) {
-      throw new Error('No linked application found for automatic tenant creation.');
+      return null;
     }
 
-    const { data: createdTenant, error: createTenantError } = await supabase
-      .from('tenants')
-      .insert([
-        {
-          user_id: user.id,
-          property_id: latestApplication.property_id,
-          unit_id: latestApplication.unit_id,
-          status: 'active',
-          move_in_date: new Date().toISOString(),
-        },
-      ])
-      .select('id, unit_id, property_id')
-      .single();
-
-    if (createTenantError) {
-      const { data: retryTenant, error: retryError } = await supabase
-        .from('tenants')
-        .select('id, unit_id, property_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (retryError) throw retryError;
-      if (!retryTenant) throw createTenantError;
-      return retryTenant;
-    }
-
-    await supabase
-      .from('units')
-      .update({ status: 'occupied' })
-      .eq('id', latestApplication.unit_id)
-      .in('status', ['available', 'vacant']);
-
-    return createdTenant;
+    return {
+      id: user.id,
+      property_id: latestApplication.property_id,
+      unit_id: latestApplication.unit_id,
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted - handleSubmit called");
-    console.log("user?.id:", user?.id);
-    console.log("amount:", amount);
-    console.log("userEmail:", userEmail);
     
     if (!user?.id || !amount) {
       toast.error("Please enter an amount");
@@ -277,26 +290,52 @@ const MakePaymentPage: React.FC = () => {
     }
 
     // Open Paystack payment dialog
-    console.log("Setting showPaystackDialog to true");
     setShowPaystackDialog(true);
-    console.log("showPaystackDialog state set");
   };
 
   const handlePaystackPaymentSuccess = async (transactionRef: string, paymentData: any) => {
     setLoading(true);
     try {
       const payAmount = parseFloat(amount);
-      
-      // Get tenant info for receipt
-      const tenant = await ensureTenantForPayment();
+      let remainingAmount = payAmount;
+
+      const onboardingInvoiceResult = await reconcileInitialAllocationInvoicesForTenant(
+        user!.id,
+        payAmount,
+        transactionRef
+      );
+      const onboardingFlowUnlocked = onboardingInvoiceResult.finalized.length > 0;
+
+      remainingAmount = Math.max(0, payAmount - onboardingInvoiceResult.appliedAmount);
+
+      const firstFinalizedAssignment = onboardingInvoiceResult.finalized[0];
+      const firstPaidOnboardingInvoice = onboardingInvoiceResult.paidInvoices[0];
+      let receiptPropertyId =
+        firstFinalizedAssignment?.propertyId ||
+        firstPaidOnboardingInvoice?.propertyId ||
+        null;
+      let receiptUnitId =
+        firstFinalizedAssignment?.unitId ||
+        firstPaidOnboardingInvoice?.unitId ||
+        null;
+      let tenant: { id: string; property_id: string; unit_id: string } | null = null;
+
+      if (remainingAmount > 0 || !receiptPropertyId || !receiptUnitId) {
+        tenant = await resolveTenantPaymentContext();
+        receiptPropertyId = receiptPropertyId || tenant?.property_id || null;
+        receiptUnitId = receiptUnitId || tenant?.unit_id || null;
+      }
 
       // Build receipt items based on payment type
-      let receiptItems: ReceiptData['items'] = [];
+      let receiptItems: ReceiptData['items'] = onboardingInvoiceResult.paidInvoices.map((invoice) => ({
+        description: `Initial Move-In Invoice (${invoice.id.slice(0, 8)})`,
+        amount: invoice.amount,
+        type: 'other',
+      }));
       let rentPaymentId: string | undefined;
       let billPaymentId: string | undefined;
 
-      if (!hasValidReferenceId && (paymentType === 'custom' || paymentType === 'rent' || paymentType === 'utility')) {
-          let remainingAmount = payAmount;
+      if (remainingAmount > 0 && !hasValidReferenceId && (paymentType === 'custom' || paymentType === 'rent' || paymentType === 'utility')) {
           const prioritizedItems = [...outstandingItems].sort((firstItem, secondItem) => {
             if (firstItem.source === 'rent' && secondItem.source !== 'rent') return -1;
             if (firstItem.source !== 'rent' && secondItem.source === 'rent') return 1;
@@ -351,11 +390,11 @@ const MakePaymentPage: React.FC = () => {
 
             remainingAmount -= allocation;
           }
-      } else if (paymentType && hasValidReferenceId && details) {
+        } else if (remainingAmount > 0 && paymentType && hasValidReferenceId && details) {
           // Update existing record
           const currentPaid = details.amount_paid || details.paid_amount || 0;
           const totalDue = details.amount || 0;
-          const newPaidTotal = currentPaid + payAmount;
+          const newPaidTotal = currentPaid + remainingAmount;
           const status = newPaidTotal >= totalDue ? 'paid' : 'partial';
 
           if (paymentType === 'rent') {
@@ -373,7 +412,7 @@ const MakePaymentPage: React.FC = () => {
               rentPaymentId = referenceId;
               receiptItems = [{
                 description: 'Rent Payment',
-                amount: payAmount,
+                amount: remainingAmount,
                 type: 'rent'
               }];
           } else {
@@ -390,20 +429,23 @@ const MakePaymentPage: React.FC = () => {
                billPaymentId = referenceId;
                receiptItems = [{
                 description: `${paymentType?.charAt(0).toUpperCase()}${paymentType?.slice(1)} Bill`,
-                amount: payAmount,
+                amount: remainingAmount,
                 type: (paymentType as any) || 'other'
               }];
           }
-      } else {
+            } else if (remainingAmount > 0) {
            // New Manual Payment
            // If it's rent, insert into rent_payments
+           if (!tenant?.property_id || !tenant?.unit_id) {
+             throw new Error('No active tenant assignment context found for this payment.');
+           }
            if (paymentType === 'rent') {
                const { data: rentData, error } = await supabase.from("rent_payments").insert([
                 {
-                      tenant_id: tenant.id,
-                  unit_id: tenant.unit_id,
-                  property_id: tenant.property_id,
-                  amount: payAmount,
+                    tenant_id: user!.id,
+                  unit_id: tenant!.unit_id,
+                  property_id: tenant!.property_id,
+                  amount: remainingAmount,
                   due_date: new Date().toISOString(),
                   paid_date: new Date().toISOString(),
                   payment_method: 'paystack',
@@ -417,17 +459,17 @@ const MakePaymentPage: React.FC = () => {
               rentPaymentId = rentData?.id;
               receiptItems = [{
                 description: 'Rent Payment',
-                amount: payAmount,
+                amount: remainingAmount,
                 type: 'rent'
               }];
            } else {
                const { data: billData, error } = await supabase.from("bills_and_utilities").insert([
                    {
-                       unit_id: tenant.unit_id,
-                           property_id: tenant.property_id,
+                     unit_id: tenant!.unit_id,
+                       property_id: tenant!.property_id,
                        bill_type: (paymentType && paymentType !== 'custom' && paymentType !== 'all') ? paymentType : 'utility',
-                       amount: payAmount,
-                           paid_amount: payAmount,
+                     amount: remainingAmount,
+                       paid_amount: remainingAmount,
                        due_date: new Date().toISOString(),
                        status: 'paid',
                            remarks: paymentType ? `${paymentType} payment` : undefined,
@@ -440,13 +482,29 @@ const MakePaymentPage: React.FC = () => {
                billPaymentId = billData?.id;
                receiptItems = [{
                 description: `${paymentType?.charAt(0).toUpperCase()}${paymentType?.slice(1)} Bill`,
-                amount: payAmount,
+                amount: remainingAmount,
                 type: (paymentType as any) || 'other'
               }];
            }
       }
+
+      if (receiptItems.length === 0) {
+        receiptItems = [{
+          description: 'Invoice Payment',
+          amount: payAmount,
+          type: 'other',
+        }];
+      }
+
+      if (!receiptPropertyId || !receiptUnitId) {
+        toast.warning('Payment was processed. Receipt generation will complete after assignment metadata sync.');
+        navigate(onboardingFlowUnlocked ? "/portal/tenant" : "/portal/tenant/payments?tab=receipts");
+        return;
+      }
+
       // Generate receipt with retry logic
       let receiptCreated = false;
+      let createdReceipt: any = null;
       let retries = 0;
       const maxRetries = 3;
       
@@ -454,16 +512,16 @@ const MakePaymentPage: React.FC = () => {
         try {
           console.log('🎟️ Starting receipt creation (attempt ' + (retries + 1) + ')...', {
             tenantId: user.id,
-            propertyId: tenant.property_id,
-            unitId: tenant.unit_id,
+            propertyId: receiptPropertyId,
+            unitId: receiptUnitId,
             amount: payAmount,
             method: 'paystack',
             reference: transactionRef
           });
           const receipt = await processPaymentWithReceipt(
             user.id,  // Use actual auth.uid(), not tenant.id from tenants table
-            tenant.property_id,
-            tenant.unit_id,
+            receiptPropertyId,
+            receiptUnitId,
             payAmount,
             'paystack',
             transactionRef,
@@ -472,6 +530,7 @@ const MakePaymentPage: React.FC = () => {
             billPaymentId
           );
           console.log('✅ Receipt created successfully:', receipt);
+          createdReceipt = receipt;
           receiptCreated = true;
         } catch (receiptErr) {
           retries++;
@@ -505,8 +564,39 @@ const MakePaymentPage: React.FC = () => {
       } else {
         toast.success("Payment successful! Receipt generation is in progress and will be available shortly.");
       }
-      // Redirect to receipts tab to show the new receipt
-      navigate("/portal/tenant/payments?tab=receipts");
+
+      if (createdReceipt) {
+        try {
+          const receiptData = formatReceiptData(createdReceipt);
+          downloadReceiptPDF(receiptData, `receipt-${receiptData.receiptNumber}.pdf`);
+        } catch (downloadError) {
+          console.warn('Receipt was created but auto-download failed:', downloadError);
+        }
+      }
+
+      if (onboardingInvoiceResult.finalized.length > 0) {
+        toast.success('Initial payment confirmed. Your unit assignment is now active and lease signing is unlocked.');
+      }
+
+      let shouldOpenDashboard = onboardingFlowUnlocked;
+      if (onboardingInvoiceResult.paidInvoices.length > 0) {
+        try {
+          const latestAccessState = await getTenantPortalAccessState(user.id);
+          shouldOpenDashboard = shouldOpenDashboard || !latestAccessState.isLocked;
+        } catch (accessError) {
+          console.warn('Could not refresh tenant access state after payment:', accessError);
+        }
+      }
+
+      // After first-payment onboarding, send tenant directly to dashboard.
+      if (shouldOpenDashboard) {
+        navigate("/portal/tenant");
+      } else {
+        if (onboardingInvoiceResult.paidInvoices.length > 0) {
+          toast.warning('Payment is confirmed, but assignment sync is still in progress. Please refresh shortly.');
+        }
+        navigate("/portal/tenant/payments?tab=receipts");
+      }
     } catch (err) {
       console.error("Error processing payment:", err);
       toast.error("Failed to process payment");
@@ -602,6 +692,52 @@ const MakePaymentPage: React.FC = () => {
       </div>
 
       <div className="grid gap-6">
+        {onboardingInvoiceDetails && (
+          <Card className="bg-amber-50/60 border-amber-200 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-amber-900 flex items-center gap-2">
+                <CreditCard size={18} />
+                Initial Move-In Invoice
+              </CardTitle>
+              <CardDescription className="text-amber-800">
+                Review this invoice breakdown before proceeding to payment.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-amber-800">Invoice Ref:</span>
+                <span className="font-semibold text-amber-900">
+                  {onboardingInvoiceDetails.reference_number || onboardingInvoiceDetails.id?.slice(0, 8)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-amber-800">Due Date:</span>
+                <span className="font-semibold text-amber-900">
+                  {onboardingInvoiceDetails.due_date
+                    ? new Date(onboardingInvoiceDetails.due_date).toLocaleDateString()
+                    : 'Immediately'}
+                </span>
+              </div>
+              <div className="border-t border-amber-200 pt-2 mt-2 space-y-1.5">
+                {buildOnboardingInvoiceBreakdown(onboardingInvoiceDetails).length === 0 ? (
+                  <p className="text-xs text-amber-800">Line items will appear exactly as issued in Billing and Invoicing.</p>
+                ) : (
+                  buildOnboardingInvoiceBreakdown(onboardingInvoiceDetails).map((line, index) => (
+                    <div key={`onboarding-line-${index}`} className="flex justify-between">
+                      <span className="text-amber-800">{line.label}</span>
+                      <span className="font-medium text-amber-900">{formatCurrency(line.amount)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="border-t border-amber-300 pt-2 mt-2 flex justify-between">
+                <span className="font-bold text-amber-900">Total Invoice:</span>
+                <span className="font-bold text-amber-900">{formatCurrency(Number(onboardingInvoiceDetails.amount || 0))}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {details && (
             <Card className="bg-blue-50/50 border-blue-100 shadow-sm">
                 <CardHeader className="pb-3">
@@ -714,19 +850,6 @@ const MakePaymentPage: React.FC = () => {
             </form>
             </CardContent>
         </Card>
-      </div>
-
-      {/* DEBUG: Show dialog state */}
-      {showPaystackDialog && (
-        <div className="fixed top-4 right-4 bg-green-500 text-white p-4 rounded-lg z-50 max-w-xs">
-          <p className="font-bold">✓ Dialog state is TRUE</p>
-          <p className="text-sm">The dialog SHOULD be opening now</p>
-        </div>
-      )}
-
-      {/* DEBUG: Always show something so we know React is rendering */}
-      <div className="fixed bottom-4 right-4 bg-blue-600 text-white p-2 rounded text-xs z-40">
-        Dialog: {showPaystackDialog ? '✓ TRUE' : '✗ FALSE'}
       </div>
 
       {/* Paystack Payment Dialog */}

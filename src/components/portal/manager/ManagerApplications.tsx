@@ -3,6 +3,8 @@ import { ClipboardCheck, Search, Loader2, CheckCircle, Clock, XCircle, Home, Pho
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { createOrEnsureMoveInInvoiceForApplication } from '@/services/tenantOnboardingService';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +18,7 @@ import {
 
 interface LeaseApplication {
   id: string;
-  applicant_id: string;
+  applicant_id: string | null;
   property_id: string;
   unit_id: string;
   status: string;
@@ -39,6 +41,11 @@ interface LeaseApplication {
     unit_number: string;
     price: number;
     status: string;
+    unit_type_id?: string | null;
+    property_unit_types?: {
+      name?: string | null;
+      unit_type_name?: string | null;
+    } | null;
   };
 }
 
@@ -64,27 +71,16 @@ const ManagerApplications = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      
-      // Get manager's assigned property
-      const { data: assignment, error: assignError } = await supabase
-        .from('property_manager_assignments')
-        .select('property_id')
-        .eq('property_manager_id', user.id)
-        .single();
 
-      if (assignError) {
-          // If no assignment found (PGRST116), just show empty
-          if (assignError.code === 'PGRST116') {
-             setApplications([]);
-             setLoading(false);
-             return;
-          }
-          throw assignError;
+      const propertyIds = await getManagerAssignedPropertyIds(user.id);
+
+      if (propertyIds.length === 0) {
+        setApplications([]);
+        setLoading(false);
+        return;
       }
 
-      const propertyId = assignment.property_id;
-
-      // Fetch lease applications for this property
+      // Fetch lease applications for manager properties
       const { data, error } = await supabase
         .from('lease_applications')
         .select(`
@@ -94,15 +90,15 @@ const ManagerApplications = () => {
              location
           )
         `)
-        .eq('property_id', propertyId)
+        .in('property_id', propertyIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       const { data: unitsData } = await supabase
         .from('units')
-        .select('id, unit_number, price, status')
-        .eq('property_id', propertyId);
+        .select('id, unit_number, price, status, unit_type_id, property_unit_types:unit_type_id(name, unit_type_name)')
+        .in('property_id', propertyIds);
 
       const applicationsWithUnits = (data || []).map(app => {
         const unit = unitsData?.find(u => u.id === app.unit_id);
@@ -124,28 +120,65 @@ const ManagerApplications = () => {
   const handleStatusChange = async (applicationId: string, newStatus: string) => {
     setUpdatingId(applicationId);
     try {
+      const currentApplication = applications.find((application) => application.id === applicationId);
+      if (!currentApplication) {
+        toast.error('Application not found');
+        return;
+      }
+
+      let finalStatus = newStatus;
+      const shouldGenerateInvoice = newStatus === 'under_review' || newStatus === 'approved';
+
+      let linkedToBillingInvoice = false;
+
+      if (shouldGenerateInvoice) {
+        if (!currentApplication.applicant_id) {
+          toast.error('Applicant account is missing. Ask tenant to submit with registration email and password.');
+          return;
+        }
+
+        const invoiceResult = await createOrEnsureMoveInInvoiceForApplication({
+          id: currentApplication.id,
+          applicant_id: currentApplication.applicant_id,
+          property_id: currentApplication.property_id,
+          unit_id: currentApplication.unit_id,
+          applicant_name: currentApplication.applicant_name,
+          applicant_email: currentApplication.applicant_email,
+          telephone_numbers: currentApplication.telephone_numbers,
+          unit_number: currentApplication.units?.unit_number,
+          unit_type_id: currentApplication.units?.unit_type_id,
+          unit_type_name:
+            currentApplication.units?.property_unit_types?.name ||
+            currentApplication.units?.property_unit_types?.unit_type_name ||
+            null,
+          property_name: currentApplication.properties?.name,
+        });
+        linkedToBillingInvoice = Boolean(invoiceResult?.linkedInvoiceId);
+
+        finalStatus = newStatus;
+      }
+
       const { error } = await supabase
         .from('lease_applications')
-        .update({ status: newStatus })
+        .update({ status: finalStatus })
         .eq('id', applicationId);
 
       if (error) throw error;
       
-      if (newStatus === 'manager_approved') {
-        const app = applications.find(a => a.id === applicationId);
-        if (app && app.applicant_id && app.unit_id && app.property_id) {        
-            toast.success('Application approved by manager. Pending Superadmin approval.');
+      if (shouldGenerateInvoice) {
+        if (linkedToBillingInvoice) {
+          toast.success('Invoice prepared successfully. Tenant can now complete first-payment onboarding.');
         } else {
-            toast.error('Application data missing. Cannot process.');
+          toast.success('Application updated. Awaiting Super Admin Billing invoice before tenant checkout.');
         }
       } else {
-        toast.success(`Application marked as ${newStatus}`);
+        toast.success(`Application marked as ${finalStatus}`);
       }
 
       setApplications((prev) =>
         sortByNewest(
           prev.map((app) =>
-            app.id === applicationId ? { ...app, status: newStatus } : app
+            app.id === applicationId ? { ...app, status: finalStatus } : app
           )
         )
       );
@@ -153,8 +186,10 @@ const ManagerApplications = () => {
       console.error('Error updating status:', err);
       if (err.message?.includes("409") || err.code === "409" || (typeof err === 'object' && JSON.stringify(err).includes("409"))) {
         toast.error("User is already a tenant elsewhere. Cannot assign.");
+      } else if (err?.code === '42501' || String(err?.message || '').toLowerCase().includes('permission') || String(err?.message || '').includes('403')) {
+        toast.error('Permission denied while creating invoice. Apply the latest invoice RLS migration and retry.');
       } else {
-        toast.error('Failed to update status');
+        toast.error(`Failed to update status: ${err?.message || 'Unknown error'}`);
       }
     } finally {
       setUpdatingId(null);
@@ -165,6 +200,7 @@ const ManagerApplications = () => {
     switch (status) {
       case 'approved': return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'under_review': return <Clock className="w-4 h-4 text-blue-500" />;
       case 'rejected': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return <Clock className="w-4 h-4 text-slate-500" />;
     }
@@ -175,7 +211,7 @@ const ManagerApplications = () => {
       case 'approved': return 'bg-green-100 text-green-800 border-green-200';
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      case 'manager_approved': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'under_review': return 'bg-blue-100 text-blue-800 border-blue-200';
       default: return 'bg-slate-100 text-slate-800 border-slate-200';
     }
   };
@@ -201,8 +237,8 @@ const ManagerApplications = () => {
   const stats = {
     total: applications.length,
     pending: applications.filter(a => a.status === 'pending').length,
+    under_review: applications.filter(a => a.status === 'under_review').length,
     approved: applications.filter(a => a.status === 'approved').length,
-    manager_approved: applications.filter(a => a.status === 'manager_approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
   };
 
@@ -239,11 +275,11 @@ const ManagerApplications = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {[
           { label: 'Total', value: stats.total, tone: 'text-slate-800 bg-slate-50 border-slate-200' },
           { label: 'Pending', value: stats.pending, tone: 'text-amber-800 bg-amber-50 border-amber-200' },
-          { label: 'Manager Approved', value: stats.manager_approved, tone: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+          { label: 'Under Review', value: stats.under_review, tone: 'text-blue-800 bg-blue-50 border-blue-200' },
           { label: 'Approved', value: stats.approved, tone: 'text-green-800 bg-green-50 border-green-200' },
           { label: 'Rejected', value: stats.rejected, tone: 'text-red-800 bg-red-50 border-red-200' },
         ].map((stat, idx) => (
@@ -279,8 +315,8 @@ const ManagerApplications = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Applications</SelectItem>
-              <SelectItem value="manager_approved">Manager Approved</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="under_review">Under Review</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
@@ -382,7 +418,8 @@ const ManagerApplications = () => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="pending">Mark Pending</SelectItem>
-                                <SelectItem value="manager_approved">Approve Application</SelectItem>
+                              <SelectItem value="under_review">Send Invoice / Under Review</SelectItem>
+                              <SelectItem value="approved">Mark Approved</SelectItem>
                                 <SelectItem value="rejected">Reject Application</SelectItem>
                             </SelectContent>
                         </Select>

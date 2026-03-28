@@ -72,6 +72,57 @@ type PropertyFormData = Omit<CreatePropertyDTO, 'units'> & {
   }>;
 };
 
+const parseSampleImageUrls = (rawValue?: string | null): string[] => {
+  const normalized = String(rawValue || '').trim();
+  if (!normalized) return [];
+
+  try {
+    const parsed = JSON.parse(normalized);
+    if (Array.isArray(parsed)) {
+      return Array.from(
+        new Set(
+          parsed
+            .map((item) => String(item || '').trim())
+            .filter(Boolean)
+        )
+      );
+    }
+
+    if (typeof parsed === 'string' && parsed.trim()) {
+      return [parsed.trim()];
+    }
+  } catch {
+    // Keep backward compatibility with plain URL string storage.
+  }
+
+  if (normalized.includes(',')) {
+    const splitUrls = normalized
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (splitUrls.length > 1) {
+      return Array.from(new Set(splitUrls));
+    }
+  }
+
+  return [normalized];
+};
+
+const serializeSampleImageUrls = (imageUrls: string[]): string => {
+  const deduped = Array.from(
+    new Set(
+      (imageUrls || [])
+        .map((url) => String(url || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (deduped.length === 0) return '';
+  if (deduped.length === 1) return deduped[0];
+  return JSON.stringify(deduped);
+};
+
 const PropertyManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -97,6 +148,7 @@ const PropertyManager: React.FC = () => {
   const [showAssignManagerDialog, setShowAssignManagerDialog] = useState(false);
   const [availableManagers, setAvailableManagers] = useState<any[]>([]);
   const [selectedManagerId, setSelectedManagerId] = useState<string>("");
+  const [unitSampleUrlDrafts, setUnitSampleUrlDrafts] = useState<Record<string, string>>({});
 
   // Form State
   const [formData, setFormData] = useState<PropertyFormData>({
@@ -260,23 +312,70 @@ const PropertyManager: React.FC = () => {
     setFormData({ ...formData, units: newUnits });
   };
 
-  const handleUnitSampleImageUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const getUnitSampleImages = (index: number) => {
+    const rawValue = formData.units[index]?.sample_image_url;
+    return parseSampleImageUrls(rawValue);
+  };
 
-    const validationError = propertyImageService.getImageValidationError(file);
-    if (validationError) {
-      toast.error(validationError);
-      event.target.value = '';
+  const setUnitSampleImages = (index: number, imageUrls: string[]) => {
+    const serialized = serializeSampleImageUrls(imageUrls);
+    handleUnitChange(index, 'sample_image_url', serialized);
+  };
+
+  const addUnitSampleImageFromUrl = (index: number, draftKey: string) => {
+    const draftUrl = String(unitSampleUrlDrafts[draftKey] || '').trim();
+    if (!draftUrl) return;
+
+    if (!/^https?:\/\//i.test(draftUrl)) {
+      toast.error('Use a valid image URL that starts with http:// or https://');
       return;
+    }
+
+    const currentImages = getUnitSampleImages(index);
+    if (currentImages.includes(draftUrl)) {
+      toast.info('That image is already added for this unit type');
+      return;
+    }
+
+    setUnitSampleImages(index, [...currentImages, draftUrl]);
+    setUnitSampleUrlDrafts((prev) => ({ ...prev, [draftKey]: '' }));
+  };
+
+  const removeUnitSampleImage = (index: number, imageUrl: string) => {
+    const remaining = getUnitSampleImages(index).filter((url) => url !== imageUrl);
+    setUnitSampleImages(index, remaining);
+  };
+
+  const clearUnitSampleImages = (index: number) => {
+    setUnitSampleImages(index, []);
+  };
+
+  const handleUnitSampleImageUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      const validationError = propertyImageService.getImageValidationError(file);
+      if (validationError) {
+        toast.error(validationError);
+        event.target.value = '';
+        return;
+      }
     }
 
     try {
       setUploadingImage(true);
       const ownerId = selectedProperty?.id || `new-property-${Date.now()}`;
-      const publicUrl = await propertyImageService.uploadPropertyImage(file, `${ownerId}/unit-samples`);
-      handleUnitChange(index, 'sample_image_url', publicUrl);
-      toast.success('Sample unit image uploaded');
+      const existingImages = getUnitSampleImages(index);
+      const uploadedImages: string[] = [];
+
+      for (const file of files) {
+        const publicUrl = await propertyImageService.uploadPropertyImage(file, `${ownerId}/unit-samples`);
+        uploadedImages.push(publicUrl);
+      }
+
+      setUnitSampleImages(index, [...existingImages, ...uploadedImages]);
+      toast.success(`${uploadedImages.length} sample image${uploadedImages.length > 1 ? 's' : ''} uploaded`);
     } catch (error: any) {
       console.error('Error uploading unit sample image:', error);
       toast.error(error?.message || 'Failed to upload sample image');
@@ -295,48 +394,97 @@ const PropertyManager: React.FC = () => {
   };
 
   const getLivePropertySnapshot = async (property: Property): Promise<Property> => {
-    const { data: liveUnits, error } = await supabase
-      .from('units')
-      .select('id, unit_number, floor_number, price, unit_type_id, property_unit_types(name, price_per_unit)')
-      .eq('property_id', property.id);
+    const [unitsResponse, unitTypesResponse] = await Promise.all([
+      supabase
+        .from('units')
+        .select('id, unit_number, floor_number, price, unit_type_id, property_unit_types(id, name, unit_type_name, price_per_unit)')
+        .eq('property_id', property.id),
+      supabase
+        .from('property_unit_types')
+        .select('id, name, unit_type_name, units_count, price_per_unit, sample_image_url')
+        .eq('property_id', property.id),
+    ]);
+
+    const { data: liveUnits, error } = unitsResponse;
+    const { data: configuredUnitTypes, error: configuredTypesError } = unitTypesResponse;
 
     if (error) {
       console.error('Error fetching live units for property snapshot:', error);
       return property;
     }
+    if (configuredTypesError) {
+      console.warn('Unable to fetch configured unit types for snapshot:', configuredTypesError.message);
+    }
 
     const units = liveUnits || [];
+    const configuredTypes = configuredUnitTypes || [];
+
+    const normalizeTypeName = (typeRow: any) => String(typeRow?.name || typeRow?.unit_type_name || 'Standard').trim();
+    const configuredById = new Map<string, any>(
+      configuredTypes
+        .filter((typeRow: any) => Boolean(typeRow?.id))
+        .map((typeRow: any) => [String(typeRow.id), typeRow])
+    );
+    const configuredByName = new Map<string, any>(
+      configuredTypes
+        .map((typeRow: any) => [normalizeTypeName(typeRow).toLowerCase(), typeRow])
+    );
+
     if (units.length === 0) {
+      const mappedTypes = configuredTypes.map((typeRow: any) => ({
+        id: String(typeRow.id || normalizeTypeName(typeRow)),
+        name: normalizeTypeName(typeRow),
+        units_count: Number(typeRow.units_count || 0),
+        price_per_unit: Number(typeRow.price_per_unit || 0),
+        sample_image_url: typeRow.sample_image_url || '',
+      }));
+
       return {
         ...property,
         total_units: 0,
         expected_income: 0,
-        property_unit_types: [],
+        property_unit_types: mappedTypes,
         number_of_floors: property.number_of_floors || 1,
       };
     }
 
     const floorSet = new Set<string>();
-    const typeMap = new Map<string, { id: string; name: string; units_count: number; total_price: number; priced_count: number; default_price: number }>();
+    const typeMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        units_count: number;
+        total_price: number;
+        priced_count: number;
+        default_price: number;
+        sample_image_url: string;
+      }
+    >();
     let expectedIncome = 0;
 
     units.forEach((unit: any) => {
       floorSet.add(String(unit.floor_number ?? 'G'));
 
       const unitPrice = Number(unit.price || 0);
-      const typePrice = Number(unit.property_unit_types?.price_per_unit || 0);
+      const unitTypeRow = Array.isArray(unit.property_unit_types)
+        ? unit.property_unit_types[0]
+        : unit.property_unit_types;
+      const typePrice = Number(unitTypeRow?.price_per_unit || 0);
       const resolvedPrice = unitPrice || typePrice;
       expectedIncome += resolvedPrice;
 
-      const typeName = unit.property_unit_types?.name || 'Standard';
-      const mapKey = `${unit.unit_type_id || typeName}`;
+      const typeName = normalizeTypeName(unitTypeRow);
+      const mapKey = String(unit.unit_type_id || unitTypeRow?.id || typeName);
+      const matchedType = configuredById.get(mapKey) || configuredByName.get(typeName.toLowerCase());
       const current = typeMap.get(mapKey) || {
-        id: String(unit.unit_type_id || typeName),
+        id: mapKey,
         name: typeName,
         units_count: 0,
         total_price: 0,
         priced_count: 0,
         default_price: typePrice,
+        sample_image_url: String(matchedType?.sample_image_url || ''),
       };
 
       current.units_count += 1;
@@ -347,19 +495,31 @@ const PropertyManager: React.FC = () => {
       typeMap.set(mapKey, current);
     });
 
-    const unitTypes = Array.from(typeMap.values()).map((item) => ({
+    const aggregatedUnitTypes = Array.from(typeMap.values()).map((item) => ({
       id: item.id,
       name: item.name,
       units_count: item.units_count,
       price_per_unit: item.priced_count > 0 ? Math.round(item.total_price / item.priced_count) : item.default_price,
+      sample_image_url: item.sample_image_url,
     }));
+
+    const aggregatedKeys = new Set(aggregatedUnitTypes.map((item) => String(item.id)));
+    const missingConfiguredTypes = configuredTypes
+      .filter((typeRow: any) => !aggregatedKeys.has(String(typeRow.id)))
+      .map((typeRow: any) => ({
+        id: String(typeRow.id || normalizeTypeName(typeRow)),
+        name: normalizeTypeName(typeRow),
+        units_count: Number(typeRow.units_count || 0),
+        price_per_unit: Number(typeRow.price_per_unit || 0),
+        sample_image_url: String(typeRow.sample_image_url || ''),
+      }));
 
     return {
       ...property,
       total_units: units.length,
       expected_income: expectedIncome,
       number_of_floors: floorSet.size || property.number_of_floors || 1,
-      property_unit_types: unitTypes,
+      property_unit_types: [...aggregatedUnitTypes, ...missingConfiguredTypes],
     };
   };
 
@@ -386,6 +546,7 @@ const PropertyManager: React.FC = () => {
         number_of_floors: 1,
         units: [{ name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
       });
+      setUnitSampleUrlDrafts({});
       setImagePreview(null);
 
       fetchProperties();
@@ -496,6 +657,7 @@ const PropertyManager: React.FC = () => {
   const handleEditProperty = async (property: Property) => {
     const liveProperty = await getLivePropertySnapshot(property);
     setSelectedProperty(liveProperty);
+    setUnitSampleUrlDrafts({});
     setFormData({
       name: liveProperty.name,
       location: liveProperty.location,
@@ -548,7 +710,7 @@ const PropertyManager: React.FC = () => {
           name: unit.name.trim(),
           units_count: Number(unit.units_count) || 0,
           price_per_unit: Number(unit.price_per_unit) || 0,
-          sample_image_url: unit.sample_image_url?.trim() || null,
+          sample_image_url: serializeSampleImageUrls(parseSampleImageUrls(unit.sample_image_url)) || null,
         }));
 
       const { data: existingUnits, error: existingUnitsError } = await supabase
@@ -608,6 +770,7 @@ const PropertyManager: React.FC = () => {
       toast.success("Property updated successfully");
       setShowEditProperty(false);
       setSelectedProperty(null);
+      setUnitSampleUrlDrafts({});
       fetchProperties();
     } catch (error) {
       console.error("Error updating property:", error);
@@ -859,7 +1022,10 @@ const PropertyManager: React.FC = () => {
 
                             <div className="space-y-3">
                             <AnimatePresence initial={false}>
-                                {formData.units.map((unit: any, index: number) => (
+                              {formData.units.map((unit: any, index: number) => {
+                              const sampleImages = getUnitSampleImages(index);
+                              const sampleDraftKey = `create-${index}`;
+                              return (
                                 <motion.div 
                                     key={index}
                                     initial={{ opacity: 0, y: 10 }}
@@ -883,17 +1049,51 @@ const PropertyManager: React.FC = () => {
                                         </datalist>
                                     </div>
                                     <div className="mt-2 space-y-1.5">
-                                        <Label className="text-[11px] font-semibold text-blue-600">Sample Unit Photo (optional)</Label>
+                                        <Label className="text-[11px] font-semibold text-blue-600">Sample Unit Photos (optional)</Label>
+                                        {sampleImages.length > 0 && (
+                                          <div className="flex flex-wrap gap-2">
+                                            {sampleImages.map((imageUrl, imageIndex) => (
+                                              <div key={`${imageUrl}-${imageIndex}`} className="relative h-14 w-14 rounded-md overflow-hidden border border-blue-200 bg-blue-100">
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={`Sample ${imageIndex + 1}`}
+                                                  className="w-full h-full object-cover"
+                                                  onError={(event) => {
+                                                    (event.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23dbeafe"/%3E%3C/svg%3E';
+                                                  }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeUnitSampleImage(index, imageUrl)}
+                                                  className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/60 text-white flex items-center justify-center"
+                                                  title="Remove image"
+                                                >
+                                                  <X className="w-3 h-3" />
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
                                         <div className="flex gap-2">
                                           <Input
-                                            value={unit.sample_image_url || ''}
-                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'sample_image_url', e.target.value)}
-                                            placeholder="https://example.com/shop-sample.jpg"
+                                            value={unitSampleUrlDrafts[sampleDraftKey] || ''}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUnitSampleUrlDrafts((prev) => ({ ...prev, [sampleDraftKey]: e.target.value }))}
+                                            placeholder="Paste image URL and click Add"
                                             className="h-8 border-blue-300 bg-white text-xs font-medium"
                                           />
+                                          <Button
+                                            type="button"
+                                            onClick={() => addUnitSampleImageFromUrl(index, sampleDraftKey)}
+                                            className="h-8 px-3 text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                                          >
+                                            Add
+                                          </Button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
                                           <input
                                             type="file"
                                             accept="image/*"
+                                            multiple
                                             className="hidden"
                                             id={`unit-sample-upload-${index}`}
                                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitSampleImageUpload(index, e)}
@@ -902,9 +1102,19 @@ const PropertyManager: React.FC = () => {
                                             htmlFor={`unit-sample-upload-${index}`}
                                             className="h-8 px-3 inline-flex items-center justify-center rounded-md border border-blue-300 bg-white text-blue-700 text-[11px] font-semibold cursor-pointer hover:bg-blue-100"
                                           >
-                                            Upload
+                                            {uploadingImage ? 'Uploading...' : 'Upload Many'}
                                           </label>
+                                          {sampleImages.length > 0 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => clearUnitSampleImages(index)}
+                                              className="h-8 px-2 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 text-[11px] font-semibold hover:bg-red-100"
+                                            >
+                                              Clear
+                                            </button>
+                                          )}
                                         </div>
+                                        <p className="text-[10px] text-blue-600">{sampleImages.length} image(s) attached</p>
                                     </div>
                                     </div>
                                     
@@ -946,7 +1156,8 @@ const PropertyManager: React.FC = () => {
                                     </Button>
                                     </div>
                                 </motion.div>
-                                ))}
+                                  );
+                                  })}
                             </AnimatePresence>
                             
                             {formData.units.length === 0 && (
@@ -1452,7 +1663,10 @@ const PropertyManager: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {formData.units.map((unit: any, index: number) => (
+                    {formData.units.map((unit: any, index: number) => {
+                      const sampleImages = getUnitSampleImages(index);
+                      const sampleDraftKey = `edit-${index}`;
+                      return (
                       <div
                         key={unit.id || `edit-unit-${index}`}
                         className="grid grid-cols-12 gap-3 items-end bg-slate-50 p-4 rounded-lg border border-slate-200"
@@ -1470,17 +1684,51 @@ const PropertyManager: React.FC = () => {
                             {unitTypeOptions.map(opt => <option key={opt} value={opt} />)}
                           </datalist>
                           <div className="mt-2 space-y-1.5">
-                            <Label className="text-[11px] font-semibold text-slate-600">Sample Unit Photo (optional)</Label>
+                            <Label className="text-[11px] font-semibold text-slate-600">Sample Unit Photos (optional)</Label>
+                            {sampleImages.length > 0 && (
+                              <div className="flex flex-wrap gap-2">
+                                {sampleImages.map((imageUrl, imageIndex) => (
+                                  <div key={`${imageUrl}-${imageIndex}`} className="relative h-14 w-14 rounded-md overflow-hidden border border-slate-300 bg-slate-100">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Sample ${imageIndex + 1}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(event) => {
+                                        (event.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect width="64" height="64" fill="%23e2e8f0"/%3E%3C/svg%3E';
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeUnitSampleImage(index, imageUrl)}
+                                      className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-black/60 text-white flex items-center justify-center"
+                                      title="Remove image"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             <div className="flex gap-2">
                               <Input
-                                value={unit.sample_image_url || ''}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitChange(index, 'sample_image_url', e.target.value)}
-                                placeholder="https://example.com/unit-sample.jpg"
+                                value={unitSampleUrlDrafts[sampleDraftKey] || ''}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUnitSampleUrlDrafts((prev) => ({ ...prev, [sampleDraftKey]: e.target.value }))}
+                                placeholder="Paste image URL and click Add"
                                 className="h-8 border-slate-300 bg-white text-xs font-medium"
                               />
+                              <Button
+                                type="button"
+                                onClick={() => addUnitSampleImageFromUrl(index, sampleDraftKey)}
+                                className="h-8 px-3 text-[11px] font-semibold bg-slate-700 hover:bg-slate-800 text-white"
+                              >
+                                Add
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <input
                                 type="file"
                                 accept="image/*"
+                                multiple
                                 className="hidden"
                                 id={`edit-unit-sample-upload-${index}`}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUnitSampleImageUpload(index, e)}
@@ -1489,9 +1737,19 @@ const PropertyManager: React.FC = () => {
                                 htmlFor={`edit-unit-sample-upload-${index}`}
                                 className="h-8 px-3 inline-flex items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 text-[11px] font-semibold cursor-pointer hover:bg-slate-100"
                               >
-                                Upload
+                                {uploadingImage ? 'Uploading...' : 'Upload Many'}
                               </label>
+                              {sampleImages.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => clearUnitSampleImages(index)}
+                                  className="h-8 px-2 inline-flex items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 text-[11px] font-semibold hover:bg-red-100"
+                                >
+                                  Clear
+                                </button>
+                              )}
                             </div>
+                            <p className="text-[10px] text-slate-500">{sampleImages.length} image(s) attached</p>
                           </div>
                         </div>
 
@@ -1528,7 +1786,8 @@ const PropertyManager: React.FC = () => {
                           </Button>
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </CardContent>
                 </Card>
 

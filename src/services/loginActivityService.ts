@@ -158,7 +158,7 @@ export const loginActivityService = {
       const latestLogin = latestLoginArray && latestLoginArray.length > 0 ? latestLoginArray[0] : null;
 
       if (!latestLogin) {
-        console.warn("⚠️ [recordLogout] No active login session found for user:", userId);
+        console.info("ℹ️ [recordLogout] No active login session found for user:", userId);
         return null;
       }
 

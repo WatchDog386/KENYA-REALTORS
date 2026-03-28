@@ -250,8 +250,8 @@ const SuperAdminApplications = () => {
     const stats = {
     total: applications.length,
     pending: applications.filter(a => a.status === 'pending').length,
+      under_review: applications.filter(a => a.status === 'under_review').length,
     approved: applications.filter(a => a.status === 'approved').length,
-    manager_approved: applications.filter(a => a.status === 'manager_approved').length,
     rejected: applications.filter(a => a.status === 'rejected').length,
   };
 
@@ -277,7 +277,7 @@ const SuperAdminApplications = () => {
         {[
           { label: 'Total Applications', value: stats.total, color: 'from-blue-500 to-blue-600' },
           { label: 'Pending Review', value: stats.pending, color: 'from-orange-400 to-orange-500' },
-          { label: 'Manager Approved', value: stats.manager_approved, color: 'from-blue-400 to-blue-500' },
+          { label: 'Under Review', value: stats.under_review, color: 'from-blue-400 to-blue-500' },
           { label: 'Approved', value: stats.approved, color: 'from-green-500 to-green-600' },
           { label: 'Rejected', value: stats.rejected, color: 'from-red-500 to-red-600' },
         ].map((stat, idx) => (
@@ -314,7 +314,7 @@ const SuperAdminApplications = () => {
           <SelectContent>
             <SelectItem value="all">All Applications</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="manager_approved">Manager Approved</SelectItem>
+            <SelectItem value="under_review">Under Review</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>

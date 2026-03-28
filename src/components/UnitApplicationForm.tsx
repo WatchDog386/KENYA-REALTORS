@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Info, User, Briefcase, Users, MapPin, Building } from "lucide-react";
 
+interface SelectedUnitDetails {
+  id: string;
+  propertyId: string | null;
+  propertyName: string;
+  propertyLocation: string;
+  unitNumber: string;
+  unitTypeId: string;
+  unitTypeName: string;
+  status: string;
+  floorNumber: string;
+  rentAmount: number;
+  description: string;
+  features: string[];
+}
+
 export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -21,8 +36,14 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
   const propertyName = searchParams.get("propertyName") || "";
   const unitNumber = searchParams.get("unitNumber") || "";
   const locationParam = searchParams.get("location") || "";
+  const unitTypeIdParam = searchParams.get("unitTypeId") || "";
+  const unitTypeNameParam = searchParams.get("unitTypeName") || "";
+  const rentParam = searchParams.get("rent") || "";
+  const statusParam = searchParams.get("status") || "";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [unitDetailsLoading, setUnitDetailsLoading] = useState(false);
+  const [unitDetails, setUnitDetails] = useState<SelectedUnitDetails | null>(null);
 
   const [form, setForm] = useState({
     property_to_let: propertyName && unitNumber ? `${propertyName} - Unit ${unitNumber}` : "",
@@ -43,7 +64,134 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
     home_address: "",
     location: locationParam,
     sub_location: "",
+    password: "",
   });
+
+  useEffect(() => {
+    const loadUnitDetails = async () => {
+      if (!unitId) return;
+
+      try {
+        setUnitDetailsLoading(true);
+
+        const { data, error } = await supabase
+          .from("units")
+          .select(
+            `
+            *,
+            properties:property_id(name, location),
+            property_unit_types:unit_type_id(*)
+          `
+          )
+          .eq("id", unitId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        const propertyRow = Array.isArray((data as any)?.properties)
+          ? (data as any).properties[0]
+          : (data as any)?.properties;
+        const unitTypeRow = Array.isArray((data as any)?.property_unit_types)
+          ? (data as any).property_unit_types[0]
+          : (data as any)?.property_unit_types;
+
+        const parsePositiveNumber = (...values: any[]) => {
+          for (const value of values) {
+            if (value === null || value === undefined || value === "") continue;
+            const parsed = Number(value);
+            if (Number.isFinite(parsed) && parsed > 0) {
+              return parsed;
+            }
+          }
+          return 0;
+        };
+
+        const parseFeatures = (value: any): string[] => {
+          if (!value) return [];
+          if (Array.isArray(value)) {
+            return value.filter(Boolean).map((feature: any) => String(feature));
+          }
+          if (typeof value === "string") {
+            try {
+              const parsed = JSON.parse(value);
+              if (Array.isArray(parsed)) {
+                return parsed.filter(Boolean).map((feature: any) => String(feature));
+              }
+            } catch {
+              return value
+                .split(",")
+                .map((feature) => feature.trim())
+                .filter(Boolean);
+            }
+          }
+          return [];
+        };
+
+        const resolvedPropertyName = propertyRow?.name || propertyName || "Unknown Property";
+        const resolvedUnitNumber = (data as any)?.unit_number || unitNumber || "N/A";
+        const resolvedUnitTypeName =
+          unitTypeRow?.name || unitTypeRow?.unit_type_name || unitTypeNameParam || "Not specified";
+        const resolvedRent = parsePositiveNumber((data as any)?.price, unitTypeRow?.price_per_unit, rentParam);
+        const rawFloorNumber = (data as any)?.floor_number;
+        const resolvedFloorNumber =
+          rawFloorNumber === null || rawFloorNumber === undefined || String(rawFloorNumber).trim() === ""
+            ? "N/A"
+            : String(rawFloorNumber);
+
+        setUnitDetails({
+          id: String((data as any)?.id || unitId),
+          propertyId: (data as any)?.property_id || propertyId || null,
+          propertyName: resolvedPropertyName,
+          propertyLocation: propertyRow?.location || locationParam || "",
+          unitNumber: resolvedUnitNumber,
+          unitTypeId: String((data as any)?.unit_type_id || unitTypeRow?.id || unitTypeIdParam || ""),
+          unitTypeName: resolvedUnitTypeName,
+          status: String((data as any)?.status || statusParam || "unknown"),
+          floorNumber: resolvedFloorNumber,
+          rentAmount: resolvedRent,
+          description: String((data as any)?.description || ""),
+          features: parseFeatures((data as any)?.features),
+        });
+
+        setForm((prev) => ({
+          ...prev,
+          property_to_let: `${resolvedPropertyName} - Unit ${resolvedUnitNumber}`,
+        }));
+      } catch (error) {
+        console.error("Failed to load full unit details:", error);
+
+        const fallbackRent = Number(rentParam || 0);
+        setUnitDetails({
+          id: unitId || "N/A",
+          propertyId: propertyId || null,
+          propertyName: propertyName || "Unknown Property",
+          propertyLocation: locationParam || "",
+          unitNumber: unitNumber || "N/A",
+          unitTypeId: unitTypeIdParam || "N/A",
+          unitTypeName: unitTypeNameParam || "Not specified",
+          status: statusParam || "unknown",
+          floorNumber: "N/A",
+          rentAmount: Number.isFinite(fallbackRent) ? fallbackRent : 0,
+          description: "",
+          features: [],
+        });
+      } finally {
+        setUnitDetailsLoading(false);
+      }
+    };
+
+    loadUnitDetails();
+  }, [
+    locationParam,
+    propertyId,
+    propertyName,
+    rentParam,
+    statusParam,
+    unitId,
+    unitNumber,
+    unitTypeIdParam,
+    unitTypeNameParam,
+  ]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -57,6 +205,16 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
       return;
     }
 
+    if (!user?.id && !form.password) {
+      toast.error("Please provide a password to complete registration.");
+      return;
+    }
+
+    if (!user?.id && form.password.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+
     if (!propertyId || !unitId) {
       toast.error("Unable to find property or unit information. Please go back and select a unit again.");
       return;
@@ -64,8 +222,38 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
 
     setIsSubmitting(true);
     try {
+      let applicantId = user?.id || null;
+
+      if (!applicantId) {
+        const [firstName, ...lastNameParts] = form.applicant_name.trim().split(/\s+/);
+        const lastName = lastNameParts.join(" ").trim();
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: form.applicant_email.trim().toLowerCase(),
+          password: form.password,
+          options: {
+            data: {
+              first_name: firstName || form.applicant_name,
+              last_name: lastName || "Tenant",
+              phone: form.telephone_numbers,
+              role: "tenant",
+              status: "active",
+            },
+          },
+        });
+
+        if (authError) {
+          throw new Error(authError.message || "Could not register applicant account.");
+        }
+
+        applicantId = authData.user?.id || null;
+        if (!applicantId) {
+          throw new Error("Registration did not return an applicant account. Please try again.");
+        }
+      }
+
       const applicationData = {
-        applicant_id: user?.id || null,
+        applicant_id: applicantId,
         property_id: propertyId,
         unit_id: unitId,
         status: "pending",
@@ -118,7 +306,9 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         return;
       }
       
-      toast.success("Application submitted successfully! We'll review it shortly.");
+      toast.success(user?.id
+        ? "Application submitted successfully! We'll review it shortly."
+        : "Application submitted and account created successfully. You'll use this email/password to sign in.");
       setForm({
         property_to_let: "",
         applicant_name: "",
@@ -138,6 +328,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         home_address: "",
         location: locationParam,
         sub_location: "",
+        password: "",
       });
       onSuccess();
 
@@ -178,6 +369,79 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
             className="bg-slate-50 border-gray-300 text-slate-500 font-medium cursor-not-allowed h-12 shadow-inner" 
           />
         </div>
+
+        {unitDetailsLoading ? (
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading full unit details...
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Unit ID</p>
+              <p className="text-sm font-semibold text-slate-800 break-all">{unitDetails?.id || unitId || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Property ID</p>
+              <p className="text-sm font-semibold text-slate-800 break-all">{unitDetails?.propertyId || propertyId || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Property Name</p>
+              <p className="text-sm font-semibold text-slate-800">{unitDetails?.propertyName || propertyName || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Unit Number</p>
+              <p className="text-sm font-semibold text-slate-800">{unitDetails?.unitNumber || unitNumber || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Unit Type ID</p>
+              <p className="text-sm font-semibold text-slate-800 break-all">{unitDetails?.unitTypeId || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Unit Type Name</p>
+              <p className="text-sm font-semibold text-slate-800">{unitDetails?.unitTypeName || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Rent</p>
+              <p className="text-sm font-semibold text-slate-800">
+                {unitDetails?.rentAmount ? `KES ${unitDetails.rentAmount.toLocaleString()}` : "N/A"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Status</p>
+              <p className="text-sm font-semibold text-slate-800 capitalize">{unitDetails?.status || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 mb-1">Floor</p>
+              <p className="text-sm font-semibold text-slate-800">{unitDetails?.floorNumber || "N/A"}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2 xl:col-span-3">
+              <p className="text-xs text-slate-500 mb-1">Location</p>
+              <p className="text-sm font-semibold text-slate-800">{unitDetails?.propertyLocation || locationParam || "N/A"}</p>
+            </div>
+            {unitDetails?.description && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2 xl:col-span-3">
+                <p className="text-xs text-slate-500 mb-1">Unit Description</p>
+                <p className="text-sm text-slate-700">{unitDetails.description}</p>
+              </div>
+            )}
+            {unitDetails?.features && unitDetails.features.length > 0 && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-2 xl:col-span-3">
+                <p className="text-xs text-slate-500 mb-2">Features</p>
+                <div className="flex flex-wrap gap-2">
+                  {unitDetails.features.map((feature) => (
+                    <span
+                      key={feature}
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
       <div className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm transition-all hover:shadow-md">
@@ -194,6 +458,20 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
              <Label className={labelClass}>Email Address <span className="text-red-500">*</span></Label>
              <Input type="email" name="applicant_email" value={form.applicant_email} onChange={handleChange} required placeholder="john.doe@example.com" className={inputClass} />
           </div>
+          {!user?.id && (
+            <div>
+              <Label className={labelClass}>Password for Registration <span className="text-red-500">*</span></Label>
+              <Input
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                placeholder="At least 6 characters"
+                className={inputClass}
+              />
+            </div>
+          )}
           <div>
             <Label className={labelClass}>Telephone Number(s) <span className="text-red-500">*</span></Label>
             <Input name="telephone_numbers" value={form.telephone_numbers} onChange={handleChange} required placeholder="e.g. +254 712 345 678" className={inputClass} />

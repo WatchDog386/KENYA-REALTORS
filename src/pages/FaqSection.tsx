@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  ChevronRight, 
+    Search,
+    HelpCircle,
   CreditCard, 
   FileText, 
   Users, 
   Terminal, 
+    ArrowRight,
   Copy, 
   Check, 
-  Layout, 
+    LayoutGrid, 
   Server, 
   MessageSquare,
   ChevronDown
@@ -20,7 +22,14 @@ import { cn } from "@/lib/utils";
 // ==========================================
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+    
+        :root {
+            --faq-navy: #0f335f;
+            --faq-orange: #F96302;
+            --faq-ink: #17253a;
+            --faq-muted: #5b6473;
+        }
     
     * {
       -webkit-font-smoothing: antialiased;
@@ -28,26 +37,27 @@ const GlobalStyles = () => (
     }
 
     body { 
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background-color: #f8fafc;
-      color: #334155;
+            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: radial-gradient(circle at 85% -10%, #ffe4d2 0, rgba(255, 228, 210, 0) 38%), #f5f7fa;
+            color: var(--faq-ink);
     }
+
+        .h-support-title {
+            font-family: 'Space Grotesk', 'Manrope', sans-serif;
+        }
 
     .scroll-panel::-webkit-scrollbar { width: 6px; }
     .scroll-panel::-webkit-scrollbar-track { background: transparent; }
     .scroll-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     .scroll-panel::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    .nav-item-hover { position: relative; overflow: hidden; }
-    .nav-item-hover::before {
-        content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 3px;
-        background-color: #D85C2C; transform: scaleY(0); transition: transform 0.2s ease;
-    }
-    .nav-item-hover:hover::before { transform: scaleY(1); }
+        .faq-card-glow {
+            transition: box-shadow 0.25s ease, transform 0.25s ease;
+        }
 
-    .table-row-hover { transition: all 0.15s ease-in-out; border-left: 3px solid transparent; }
-    .table-row-hover:hover {
-        background-color: #f1f5f9; border-left-color: #D85C2C; transform: translateX(2px);
+        .faq-card-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 35px -26px rgba(15, 51, 95, 0.55);
     }
   `}</style>
 );
@@ -56,14 +66,16 @@ const GlobalStyles = () => (
 // DATA
 // ==========================================
 
-const CATEGORIES = [
-    { id: "All", label: "All Topics", icon: Layout },
-    { id: "Billing", label: "Billing & Finance", icon: CreditCard },
-    { id: "Leases", label: "Lease Management", icon: FileText },
-    { id: "Tenants", label: "Tenant Portal", icon: Users },
-    { id: "API", label: "API Integration", icon: Terminal },
-    { id: "System", label: "System Config", icon: Server },
-];
+const CATEGORY_META: Record<string, { icon: any; summary: string }> = {
+    All: { icon: LayoutGrid, summary: "Browse every help topic" },
+    General: { icon: HelpCircle, summary: "General platform guidance" },
+    Support: { icon: MessageSquare, summary: "Contact and support timelines" },
+    Tenants: { icon: Users, summary: "Tenant portal and maintenance" },
+    Billing: { icon: CreditCard, summary: "Payments and finance" },
+    Leases: { icon: FileText, summary: "Lease lifecycle questions" },
+    API: { icon: Terminal, summary: "Integration and webhooks" },
+    System: { icon: Server, summary: "System and admin settings" },
+};
 
 const RAW_FAQS = [
     {
@@ -125,130 +137,119 @@ const RAW_FAQS = [
 // ==========================================
 // ACCORDION COMPONENT
 // ==========================================
-const FAQItem = ({ item, isOpen, onToggle }: { item: any, isOpen: boolean, onToggle: () => void }) => {
+type FaqItemType = {
+    id: string;
+    category: string;
+    views: string;
+    updated: string;
+    question: string;
+    preview: string;
+    content: {
+        answer: string;
+        code: string;
+    };
+};
+
+const FAQItem = ({ item, isOpen, onToggle }: { item: FaqItemType; isOpen: boolean; onToggle: () => void }) => {
     const [copied, setCopied] = useState(false);
+    const Icon = CATEGORY_META[item.category]?.icon || HelpCircle;
 
     const handleCopyCode = () => {
+        if (!item.content.code) return;
         navigator.clipboard.writeText(item.content.code);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
 
     return (
-        <div key={item.id} className="group border-b border-slate-100 last:border-0 relative">
-            <div 
+        <article
+            className={cn(
+                "faq-card-glow group rounded-2xl border overflow-hidden transition-all duration-300",
+                isOpen
+                    ? "border-[#F96302]/60 bg-white shadow-[0_18px_40px_-28px_rgba(15,51,95,0.7)]"
+                    : "border-slate-200/80 bg-white"
+            )}
+        >
+            <button
+                type="button"
                 onClick={onToggle}
-                className={cn(
-                    "relative w-full cursor-pointer transition-all duration-200",
-                    isOpen ? 'bg-blue-50/40' : 'bg-white hover:bg-slate-50'
-                )}
+                className="w-full text-left px-4 py-4 md:px-6 md:py-5"
             >
-                {/* Desktop Grid Layout */}
-                <div className="hidden md:grid grid-cols-12 gap-6 px-8 py-5 items-center">
-                    <div className="col-span-2">
-                        <span className="text-[10px] font-semibold font-mono text-slate-400 group-hover:text-navy bg-slate-100 px-2 py-1 rounded">
-                            {item.id}
-                        </span>
-                    </div>
-                    <div className="col-span-5">
-                        <div className={cn(
-                            "text-sm font-semibold transition-colors mb-1",
-                            isOpen ? 'text-navy' : 'text-slate-700 group-hover:text-navy'
-                        )}>
-                            {item.question}
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-1">{item.preview}</p>
-                    </div>
-                    <div className="col-span-2">
-                        <span className="text-xs font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded">
-                            {item.category}
-                        </span>
-                    </div>
-                    <div className="col-span-1 text-center">
-                        <span className="text-xs font-medium text-slate-600">{item.views}</span>
-                    </div>
-                    <div className="col-span-2 flex justify-end">
-                        <ChevronDown 
-                            size={16} 
-                            className={cn(
-                                "text-slate-400 transition-transform duration-300",
-                                isOpen && "rotate-180"
-                            )}
-                        />
-                    </div>
-                </div>
-
-                {/* Mobile Stacked Layout */}
-                <div className="md:hidden flex flex-col px-3 py-3 gap-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-semibold font-mono text-slate-500 bg-slate-100/80 px-1.5 py-0.5 rounded">
-                            {item.id}
-                        </span>
-                        <div className="flex items-center gap-2">
-                             <span className="text-[9px] font-medium text-slate-600 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-full">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-[0.15em]">
+                                {item.id}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-[#ffcfb1] bg-[#fff5ee] text-[#ad4a17] text-[10px] font-black uppercase tracking-[0.12em]">
+                                <Icon size={12} />
                                 {item.category}
                             </span>
-                            <ChevronDown 
-                                size={14} 
-                                className={cn(
-                                    "text-slate-400 transition-transform duration-300",
-                                    isOpen && "rotate-180"
-                                )}
-                            />
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100/80 text-slate-500 text-[10px] font-bold uppercase tracking-[0.08em]">
+                                {item.views} views
+                            </span>
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100/80 text-slate-500 text-[10px] font-bold uppercase tracking-[0.08em]">
+                                Updated {item.updated}
+                            </span>
                         </div>
-                    </div>
-                    
-                    <div>
-                        <div className={cn(
-                            "text-xs font-semibold transition-colors mb-1 pr-2",
-                            isOpen ? 'text-navy' : 'text-slate-700'
+
+                        <h3 className={cn(
+                            "h-support-title text-lg md:text-xl font-bold leading-tight",
+                            isOpen ? "text-[#0f335f]" : "text-slate-800"
                         )}>
                             {item.question}
-                        </div>
+                        </h3>
+
                         {!isOpen && (
-                            <p className="text-[10px] text-slate-500 line-clamp-2">{item.preview}</p>
+                            <p className="mt-2 text-sm text-slate-500 leading-relaxed max-w-[72ch]">
+                                {item.preview}
+                            </p>
                         )}
                     </div>
+
+                    <span
+                        className={cn(
+                            "shrink-0 mt-1 rounded-full border p-2 transition-all duration-300",
+                            isOpen
+                                ? "border-[#F96302]/50 bg-[#fff3ea] text-[#F96302] rotate-180"
+                                : "border-slate-200 bg-white text-slate-500 group-hover:border-slate-300 group-hover:text-slate-700"
+                        )}
+                    >
+                        <ChevronDown size={16} />
+                    </span>
                 </div>
+            </button>
 
-                {/* Accent Border on Left when active */}
-                {isOpen && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#F96302]"></div>
-                )}
-            </div>
-
-            {/* Expanded Content - Shared */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden bg-slate-50/50 border-t border-slate-100"
+                        transition={{ duration: 0.28, ease: "easeOut" }}
+                        className="overflow-hidden border-t border-slate-100 bg-gradient-to-br from-[#fffdfa] to-white"
                     >
-                        <div className="px-3 py-4 md:px-8 md:py-6 space-y-2 md:space-y-4">
-                            <div>
-                                <p className="text-[11px] md:text-sm text-slate-700 leading-relaxed font-medium">
-                                    {item.content.answer}
-                                </p>
-                            </div>
+                        <div className="px-4 py-4 md:px-6 md:py-5 space-y-4">
+                            <p className="text-sm md:text-[15px] text-slate-700 leading-relaxed font-medium max-w-[78ch]">
+                                {item.content.answer}
+                            </p>
 
                             {item.content.code && (
-                                <div className="relative">
-                                    <div className="bg-slate-800 text-slate-100 p-3 md:p-4 rounded border border-slate-700 overflow-x-auto">
-                                        <pre className="text-[10px] md:text-xs font-mono whitespace-pre-wrap break-words">
+                                <div className="relative rounded-xl border border-[#0f335f]/20 overflow-hidden">
+                                    <div className="bg-[#0f335f] text-slate-100 p-3 md:p-4 overflow-x-auto">
+                                        <pre className="text-[11px] md:text-xs font-mono whitespace-pre-wrap break-words">
                                             {item.content.code}
                                         </pre>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={handleCopyCode}
-                                        className="absolute top-3 right-3 p-2 bg-slate-700 hover:bg-slate-600 rounded transition-colors"
+                                        className="absolute top-3 right-3 p-2 bg-[#0a2646] hover:bg-[#133d6e] rounded-md transition-colors"
                                     >
                                         {copied ? (
-                                            <Check size={14} className="text-green-400" />
+                                            <Check size={14} className="text-emerald-300" />
                                         ) : (
-                                            <Copy size={14} className="text-slate-300" />
+                                            <Copy size={14} className="text-slate-200" />
                                         )}
                                     </button>
                                 </div>
@@ -257,7 +258,7 @@ const FAQItem = ({ item, isOpen, onToggle }: { item: any, isOpen: boolean, onTog
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </article>
     );
 };
 
@@ -268,148 +269,190 @@ const FAQItem = ({ item, isOpen, onToggle }: { item: any, isOpen: boolean, onTog
 export default function FAQSection() {
     const [activeCat, setActiveCat] = useState("All");
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const categories = useMemo(
+        () => ["All", ...Array.from(new Set(RAW_FAQS.map((item) => item.category)))],
+        []
+    );
+
+    const categoryCounts = useMemo(() => {
+        return categories.reduce<Record<string, number>>((acc, cat) => {
+            acc[cat] = cat === "All"
+                ? RAW_FAQS.length
+                : RAW_FAQS.filter((item) => item.category === cat).length;
+            return acc;
+        }, {});
+    }, [categories]);
 
     // Filter Logic
     const filteredData = useMemo(() => {
-        if (activeCat === "All") return RAW_FAQS;
-        return RAW_FAQS.filter(item => item.category === activeCat);
-    }, [activeCat]);
+        return RAW_FAQS.filter((item) => {
+            const categoryMatch = activeCat === "All" || item.category === activeCat;
+            const query = searchQuery.trim().toLowerCase();
+            const textMatch = !query || [
+                item.question,
+                item.preview,
+                item.content.answer,
+                item.category,
+            ].join(" ").toLowerCase().includes(query);
+
+            return categoryMatch && textMatch;
+        });
+    }, [activeCat, searchQuery]);
 
     const handleCatClick = (id: string) => {
         setActiveCat(id);
         setExpandedId(null); 
     };
 
+    const ActiveCategoryIcon = CATEGORY_META[activeCat]?.icon || LayoutGrid;
+
     return (
         <>
         <GlobalStyles />
-        <div className="flex flex-col md:flex-row min-h-screen md:h-screen bg-slate-50 md:overflow-hidden font-brand pt-[60px] md:pt-[5rem]">
-            
-            {/* --- SIDEBAR (Desktop Fixed / Mobile Horizontal) --- */}
-            <aside className="w-full md:w-72 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col z-20 shadow-sm md:h-full sticky top-[60px] md:static shrink-0">
-                {/* Branding - Hidden on Mobile */}
-                <div className="hidden md:flex h-24 items-center px-8 border-b border-slate-100">
-                    <div className="flex flex-col">
-                        <h1 className="font-black text-navy text-lg tracking-tight uppercase leading-none">REALTORS<span className="text-cta">.</span></h1>
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Support</span>
-                    </div>
-                </div>
+        <section className="relative overflow-hidden pt-[76px] md:pt-[96px] pb-14 md:pb-16 bg-transparent">
+            <div className="absolute -top-40 -left-32 w-72 h-72 rounded-full bg-[#ffddc8]/40 blur-3xl pointer-events-none"></div>
+            <div className="absolute top-[35%] -right-36 w-80 h-80 rounded-full bg-[#d9e8fb]/45 blur-3xl pointer-events-none"></div>
 
-                {/* Navigation */}
-                <div className="p-2 md:p-6 overflow-x-auto md:overflow-y-auto scroll-panel w-full">
-                    {/* Mobile Label */}
-                    <div className="md:hidden px-2 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Select Topic
-                    </div>
+            <div className="relative max-w-[1200px] mx-auto px-4 md:px-6">
+                <header className="rounded-[28px] bg-[#0f335f] text-white p-5 md:p-8 lg:p-10 border border-[#1f4b7f] shadow-[0_24px_56px_-30px_rgba(15,51,95,0.85)] overflow-hidden">
+                    <div className="absolute -top-20 right-8 w-56 h-56 rounded-full bg-[#F96302]/25 blur-2xl"></div>
+                    <div className="absolute bottom-0 right-0 w-52 h-52 bg-gradient-to-tr from-[#F96302]/25 to-transparent"></div>
 
-                    <div className="flex flex-row md:flex-col gap-2 md:gap-0 md:space-y-1 mb-0 md:mb-8 min-w-max md:min-w-0">
-                        <p className="hidden md:block mb-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Modules</p>
-                        {CATEGORIES.map((cat) => {
-                            const isActive = activeCat === cat.id;
-                            const count = cat.id === "All" ? RAW_FAQS.length : RAW_FAQS.filter(i => i.category === cat.id).length;
-                            
-                            return (
-                                <button 
-                                    key={cat.id} 
-                                    onClick={() => handleCatClick(cat.id)}
-                                    className={cn(
-                                        "flex-shrink-0 md:flex-shrink md:w-full nav-item-hover flex items-center justify-between px-3 py-2 md:py-3 rounded-full md:rounded text-[10px] font-semibold uppercase tracking-wide transition-all duration-200 group border whitespace-nowrap",
-                                        isActive 
-                                            ? 'bg-navy text-white border-navy shadow-md md:shadow-none' 
-                                            : 'bg-white md:bg-transparent text-slate-600 border-slate-200 md:border-transparent hover:bg-slate-50 hover:text-navy hover:border-slate-300 md:hover:border-transparent'
-                                    )}
-                                >
-                                    <div className="flex items-center gap-2 md:gap-3">
-                                        <cat.icon className={cn(
-                                            "w-3 h-3 md:w-4 md:h-4 transition-colors",
-                                            isActive ? 'text-cta' : 'text-slate-400 group-hover:text-navy'
-                                        )} />
-                                        {cat.label}
-                                    </div>
-                                    <span className={cn(
-                                        "hidden md:block text-[9px] px-2 py-0.5 rounded font-bold",
-                                        isActive ? 'bg-cta text-white' : 'bg-slate-100 text-slate-500'
-                                    )}>
-                                        {count}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Footer Button - Desktop Only */}
-                <div className="hidden md:block p-6 border-t border-slate-100 bg-white mt-auto">
-                    <button className="w-full flex items-center justify-center gap-2 py-3 bg-navy text-white text-[10px] font-semibold uppercase tracking-wider hover:bg-cta transition-colors rounded shadow-sm">
-                        <MessageSquare size={14} /> Contact Agent
-                    </button>
-                </div>
-            </aside>
-
-            {/* --- MAIN CONTENT --- */}
-            <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative h-[calc(100vh-130px)] md:h-auto">
-
-                {/* Content Body */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-panel pb-24 md:pb-8">
-                    
-                    {/* FAQ Table */}
-                    <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-                        {/* Table Header - Desktop Only */}
-                        <div className="hidden md:grid grid-cols-12 gap-6 px-8 py-4 bg-navy border-b border-navy text-[10px] font-semibold text-white uppercase tracking-wider sticky top-0 z-10">
-                            <div className="col-span-2">Reference ID</div>
-                            <div className="col-span-5">Question</div>
-                            <div className="col-span-2">Category</div>
-                            <div className="col-span-1 text-center">Popularity</div>
-                            <div className="col-span-2 text-right">More</div>
-                        </div>
-
-                        {/* Table Body */}
-                        <div className="divide-y divide-slate-100 bg-white">
-                            {filteredData.length > 0 ? (
-                                filteredData.map((faq) => {
-                                    const isOpen = expandedId === faq.id;
-                                    return (
-                                        <FAQItem
-                                            key={faq.id}
-                                            item={faq}
-                                            isOpen={isOpen}
-                                            onToggle={() => setExpandedId(isOpen ? null : faq.id)}
-                                        />
-                                    );
-                                })
-                            ) : (
-                                <div className="col-span-full px-8 py-12 text-center">
-                                    <p className="text-slate-500 text-sm font-medium">No FAQs found for this category.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <p className="text-xs text-slate-600 font-medium">
-                            Showing {filteredData.length} of {RAW_FAQS.length} results
+                    <div className="relative z-10">
+                        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-[#ffd8c2]">Support Center</p>
+                        <h2 className="h-support-title mt-3 text-2xl md:text-4xl font-bold leading-tight max-w-[22ch]">
+                            Need help with rentals, billing, or onboarding?
+                        </h2>
+                        <p className="mt-3 text-sm md:text-base text-slate-100/90 max-w-[62ch] leading-relaxed">
+                            Search answers instantly, browse by topic, or contact our support team when you need one-on-one guidance.
                         </p>
-                        <div className="flex gap-2">
-                            <button className="p-2 rounded border border-slate-200 bg-white hover:border-navy hover:bg-slate-50 transition-all text-slate-600 hover:text-navy">
-                                <ChevronRight size={16} className="rotate-180" />
-                            </button>
-                            <button className="p-2 rounded border border-slate-200 bg-white hover:border-navy hover:bg-slate-50 transition-all text-slate-600 hover:text-navy">
-                                <ChevronRight size={16} />
+
+                        <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
+                            <label className="relative flex items-center h-12 bg-white text-slate-700 border border-white/20 px-3">
+                                <Search size={16} className="text-slate-500 mr-2" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search questions: payments, maintenance, API..."
+                                    className="w-full h-full bg-transparent outline-none text-sm font-semibold placeholder:text-slate-400"
+                                />
+                            </label>
+                            <button className="h-12 px-5 bg-[#F96302] text-white font-black text-[11px] uppercase tracking-[0.14em] hover:bg-[#d75502] transition-colors flex items-center justify-center gap-2">
+                                <MessageSquare size={16} />
+                                Contact Support
                             </button>
                         </div>
+
+                        <div className="mt-5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[#ffd8c2]">
+                            <ActiveCategoryIcon size={14} />
+                            Browsing: {activeCat}
+                            <span className="text-white/60">|</span>
+                            {filteredData.length} article{filteredData.length === 1 ? "" : "s"}
+                        </div>
                     </div>
+                </header>
+
+                <div className="mt-6 flex flex-wrap gap-2">
+                    {categories.map((cat) => {
+                        const Icon = CATEGORY_META[cat]?.icon || HelpCircle;
+                        const isActive = activeCat === cat;
+
+                        return (
+                            <button
+                                key={cat}
+                                onClick={() => handleCatClick(cat)}
+                                className={cn(
+                                    "h-10 px-3 md:px-4 border text-[11px] md:text-xs font-black uppercase tracking-[0.12em] flex items-center gap-2 transition-all",
+                                    isActive
+                                        ? "bg-[#0f335f] text-white border-[#0f335f] shadow-md"
+                                        : "bg-white text-slate-600 border-slate-200 hover:border-[#0f335f]/40 hover:text-[#0f335f]"
+                                )}
+                            >
+                                <Icon size={14} className={isActive ? "text-[#ffb07d]" : "text-slate-500"} />
+                                <span>{cat}</span>
+                                <span className={cn(
+                                    "inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 text-[10px] rounded-sm",
+                                    isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                                )}>
+                                    {categoryCounts[cat]}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
 
-                {/* Mobile Floating Contact Button */}
-                <div className="md:hidden fixed bottom-6 right-6 z-50">
-                    <button className="flex items-center justify-center w-14 h-14 bg-[#F96302] text-white rounded-full shadow-lg hover:scale-105 transition-transform">
-                        <MessageSquare size={24} />
-                    </button>
-                </div>
+                <div className="mt-6 grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                    <div className="xl:col-span-2 space-y-3">
+                        {filteredData.length > 0 ? (
+                            filteredData.map((faq) => {
+                                const isOpen = expandedId === faq.id;
 
-            </main>
-        </div>
+                                return (
+                                    <FAQItem
+                                        key={faq.id}
+                                        item={faq}
+                                        isOpen={isOpen}
+                                        onToggle={() => setExpandedId(isOpen ? null : faq.id)}
+                                    />
+                                );
+                            })
+                        ) : (
+                            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center">
+                                <p className="h-support-title text-xl font-bold text-[#0f335f]">No matching FAQs</p>
+                                <p className="mt-2 text-sm text-slate-500">
+                                    Try a broader keyword or switch category to discover more help articles.
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setSearchQuery("");
+                                        setActiveCat("All");
+                                    }}
+                                    className="mt-5 h-11 px-5 bg-[#F96302] text-white text-xs font-black uppercase tracking-[0.12em] hover:bg-[#d75502] transition-colors"
+                                >
+                                    Reset Filters
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <aside className="xl:col-span-1 xl:sticky xl:top-28">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-[0_20px_40px_-30px_rgba(15,51,95,0.5)]">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ad4a17]">Quick Help</p>
+                            <h3 className="h-support-title mt-2 text-2xl font-bold text-[#0f335f] leading-tight">
+                                Can't find what you need?
+                            </h3>
+                            <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+                                Share your issue and our team will route you to the right specialist.
+                            </p>
+
+                            <div className="mt-5 grid grid-cols-2 gap-3">
+                                <div className="border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Avg Response</p>
+                                    <p className="mt-1 text-lg font-black text-[#0f335f]">2 hrs</p>
+                                </div>
+                                <div className="border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">Emergency</p>
+                                    <p className="mt-1 text-lg font-black text-[#0f335f]">24/7</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-5 space-y-2.5">
+                                <button className="w-full h-11 bg-[#0f335f] text-white text-[11px] font-black uppercase tracking-[0.12em] hover:bg-[#0c284a] transition-colors flex items-center justify-center gap-2">
+                                    Start Live Chat
+                                    <ArrowRight size={15} />
+                                </button>
+                                <button className="w-full h-11 border-2 border-[#0f335f] text-[#0f335f] text-[11px] font-black uppercase tracking-[0.12em] hover:bg-[#0f335f] hover:text-white transition-colors">
+                                    Open Contact Form
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </section>
         </>
     );
 }

@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useEffect } from 'react';
+import React, { ReactNode, useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { getTenantPortalAccessState, TenantPortalAccessState } from '@/services/tenantOnboardingService';
 
 interface NavItem {
   title: string;
@@ -42,12 +43,20 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [accessState, setAccessState] = useState<TenantPortalAccessState | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   
   // Real notifications state
   const [notifications, setNotifications] = useState<any[]>([]);
+
+  const tenantOnboardingLocked = Boolean(accessState?.isLocked);
+  const isAllowedDuringOnboarding =
+    location.pathname === '/portal/tenant' ||
+    location.pathname === '/portal/tenant/payments' ||
+    location.pathname.startsWith('/portal/tenant/payments/');
   
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -80,6 +89,37 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
         };
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    const loadAccessState = async () => {
+      if (!user?.id) {
+        setAccessState(null);
+        setAccessLoading(false);
+        return;
+      }
+
+      try {
+        setAccessLoading(true);
+        const state = await getTenantPortalAccessState(user.id);
+        setAccessState(state);
+      } catch (error) {
+        console.error('Error loading tenant access state:', error);
+      } finally {
+        setAccessLoading(false);
+      }
+    };
+
+    loadAccessState();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (!tenantOnboardingLocked) return;
+    if (isAllowedDuringOnboarding) return;
+
+    navigate('/portal/tenant', { replace: true });
+    toast.info('Complete your initial invoice payment to unlock all tenant portal pages.');
+  }, [accessLoading, tenantOnboardingLocked, isAllowedDuringOnboarding, navigate]);
   
   const fetchNotifications = async () => {
       try {
@@ -164,6 +204,11 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
   const handleNotificationClick = (notif: any) => {
       markAsRead(notif.id);
       setNotificationsOpen(false);
+
+      if (tenantOnboardingLocked && notif.type !== 'payment') {
+        navigate('/portal/tenant');
+        return;
+      }
       
       // Navigate based on type/entity
       if (notif.related_entity_type === 'vacancy_notice' || notif.title?.includes('Vacancy') || notif.title?.includes('Inspection')) {
@@ -239,7 +284,7 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
     );
   };
 
-  const navItems: NavItem[] = [
+  const fullNavItems: NavItem[] = [
     {
       title: 'Dashboard',
       href: '/portal/tenant',
@@ -292,7 +337,7 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
     },
   ];
 
-  const secondaryItems: NavItem[] = [
+  const fullSecondaryItems: NavItem[] = [
     {
       title: 'Safety',
       href: '/portal/tenant/safety',
@@ -328,13 +373,27 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
     badge: 'Track'
   };
 
+  const navItems: NavItem[] = useMemo(() => {
+    if (!tenantOnboardingLocked) return fullNavItems;
+    return fullNavItems.filter((item) =>
+      item.href === '/portal/tenant' || item.href === '/portal/tenant/payments'
+    );
+  }, [tenantOnboardingLocked]);
+
+  const secondaryItems: NavItem[] = useMemo(() => {
+    if (!tenantOnboardingLocked) return fullSecondaryItems;
+    return [];
+  }, [tenantOnboardingLocked]);
+
   const isActive = (href: string) => {
     if (href === '/portal/tenant' && location.pathname !== '/portal/tenant') return false;
     return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 
   // Find current page title
-  const allItems = [...navItems, refundItem, ...secondaryItems];
+  const allItems = tenantOnboardingLocked
+    ? [...navItems]
+    : [...navItems, refundItem, ...secondaryItems];
   const currentPage = allItems.find(item => isActive(item.href)) || navItems[0];
 
   const renderNavItem = (item: NavItem) => {
@@ -545,7 +604,7 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
               <div className="flex-1 h-px bg-gradient-to-r from-slate-300 to-transparent"></div>
             </div>
             <div className="space-y-0.5">
-              {renderNavItem(refundItem)}
+              {!tenantOnboardingLocked && renderNavItem(refundItem)}
               {secondaryItems.map(item => renderNavItem(item))}
             </div>
           </div>
@@ -707,6 +766,15 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
         {/* Page Content */}
         <div className="flex-1 overflow-x-hidden custom-scroll bg-slate-50">
           <div className="p-4 md:p-6 lg:p-8">
+            {!accessLoading && tenantOnboardingLocked && (
+              <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+                <p className="text-sm font-semibold">Initial payment pending</p>
+                <p className="text-xs mt-1">
+                  Your tenant onboarding is in progress. Please complete payment from Payments to unlock maintenance,
+                  documents, messaging, and other tenant tools.
+                </p>
+              </div>
+            )}
             {children}
           </div>
         </div>

@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getPrimaryManagerAssignedPropertyId } from "@/services/managerPropertyAssignmentService";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -143,15 +144,7 @@ const ManagerDashboard: React.FC = () => {
   
         // 1. Get Assigned Property
         if (!propertyId) {
-          const { data: assignment } = await supabase
-            .from('property_manager_assignments')
-            .select('property_id')
-            .eq('property_manager_id', user.id)
-            .maybeSingle();
-  
-          if (assignment) {
-            propertyId = assignment.property_id;
-          }
+          propertyId = (await getPrimaryManagerAssignedPropertyId(user.id)) || undefined;
         }
   
         // 2. Fetch Property Details
@@ -205,16 +198,26 @@ const ManagerDashboard: React.FC = () => {
 
             const { data: vacancyRows } = await supabase
               .from('vacancy_notices')
-              .select('id, unit_id, tenant_id, move_out_date, status, units(unit_number), profiles:tenant_id(first_name, last_name)')
+              .select('id, unit_id, tenant_id, move_out_date, status, units(unit_number)')
               .eq('property_id', propertyId)
               .in('status', ['pending', 'inspection_scheduled', 'approved'])
               .order('created_at', { ascending: false });
+
+            const vacancyTenantIds = [...new Set((vacancyRows || []).map((row: any) => row.tenant_id).filter(Boolean))];
+            let vacancyProfiles: any[] = [];
+            if (vacancyTenantIds.length > 0) {
+              const { data: profileRows } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name')
+                .in('id', vacancyTenantIds);
+              vacancyProfiles = profileRows || [];
+            }
 
             const mappedVacancies: VacancyNoticeSummary[] = (vacancyRows || []).map((row: any) => ({
               id: row.id,
               unit_id: row.unit_id,
               unit_number: row.units?.unit_number || '-',
-              tenant_name: `${row.profiles?.first_name || ''} ${row.profiles?.last_name || ''}`.trim() || 'Tenant',
+              tenant_name: `${(vacancyProfiles.find((profile: any) => profile.id === row.tenant_id)?.first_name) || ''} ${(vacancyProfiles.find((profile: any) => profile.id === row.tenant_id)?.last_name) || ''}`.trim() || 'Tenant',
               move_out_date: row.move_out_date,
               status: row.status,
             }));

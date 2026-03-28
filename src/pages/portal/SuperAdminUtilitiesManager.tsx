@@ -151,6 +151,8 @@ interface FirstPaymentCandidate {
   property_name: string;
   unit_id: string;
   unit_number: string;
+  unit_type_id?: string;
+  unit_type_name?: string;
   rent_amount: number;
   lease_start_date?: string;
   assigned_at?: string;
@@ -183,10 +185,13 @@ interface SpecialInvoiceDraft {
   sourceId: string;
   tenant_id: string;
   tenant_name: string;
+  tenant_email?: string;
   property_id: string;
   property_name: string;
   unit_id: string;
   unit_number: string;
+  unit_type_id?: string;
+  unit_type_name?: string;
   baseRent: number;
   securityDeposit: number;
   initialCharges: InitialChargeLineItem[];
@@ -668,6 +673,8 @@ const SuperAdminUtilitiesManager = () => {
             id,
             unit_number,
             property_id,
+            unit_type_id,
+            property_unit_types:unit_type_id(name, unit_type_name),
             properties:property_id(name)
           )
         `)
@@ -731,6 +738,9 @@ const SuperAdminUtilitiesManager = () => {
           const propertyName = unit?.properties
             ? (Array.isArray(unit.properties) ? unit.properties[0]?.name : unit.properties?.name)
             : 'Unknown Property';
+          const unitType = unit?.property_unit_types
+            ? (Array.isArray(unit.property_unit_types) ? unit.property_unit_types[0] : unit.property_unit_types)
+            : null;
 
           return {
             lease_id: lease.id,
@@ -742,6 +752,8 @@ const SuperAdminUtilitiesManager = () => {
             property_name: propertyName || 'Unknown Property',
             unit_id: lease.unit_id,
             unit_number: unit?.unit_number || 'N/A',
+            unit_type_id: unit?.unit_type_id || '',
+            unit_type_name: unitType?.name || unitType?.unit_type_name || '',
             rent_amount: Number(lease.rent_amount || 0),
             lease_start_date: lease.start_date,
             assigned_at: lease.created_at,
@@ -893,10 +905,13 @@ const SuperAdminUtilitiesManager = () => {
       sourceId: candidate.lease_id,
       tenant_id: candidate.tenant_id,
       tenant_name: candidate.tenant_name,
+      tenant_email: candidate.tenant_email,
       property_id: candidate.property_id,
       property_name: candidate.property_name,
       unit_id: candidate.unit_id,
       unit_number: candidate.unit_number,
+      unit_type_id: candidate.unit_type_id,
+      unit_type_name: candidate.unit_type_name,
       baseRent: Number(candidate.rent_amount || 0),
       securityDeposit: Number(candidate.rent_amount || 0),
       initialCharges: propertyTemplates,
@@ -1104,8 +1119,9 @@ const SuperAdminUtilitiesManager = () => {
       }
 
       const reference = `INV-${Date.now()}`;
+      const cleanMetadata = (value?: string | null) => String(value || '').replace(/[;\r\n]/g, ' ').trim();
       const marker = specialInvoiceDraft.eventType === 'first_payment'
-        ? `BILLING_EVENT:first_payment;LEASE_ID:${specialInvoiceDraft.sourceId}`
+        ? `BILLING_EVENT:first_payment;LEASE_ID:${specialInvoiceDraft.sourceId};UNIT_ID:${specialInvoiceDraft.unit_id};PROPERTY_ID:${specialInvoiceDraft.property_id};APPLICANT_ID:${specialInvoiceDraft.tenant_id};UNIT_NUMBER:${cleanMetadata(specialInvoiceDraft.unit_number)};UNIT_TYPE_ID:${cleanMetadata(specialInvoiceDraft.unit_type_id)};UNIT_TYPE_NAME:${cleanMetadata(specialInvoiceDraft.unit_type_name)};PROPERTY_NAME:${cleanMetadata(specialInvoiceDraft.property_name)};APPLICANT_NAME:${cleanMetadata(specialInvoiceDraft.tenant_name)};APPLICANT_EMAIL:${cleanMetadata(specialInvoiceDraft.tenant_email)}`
         : `BILLING_EVENT:vacating_switching;VACANCY_NOTICE_ID:${specialInvoiceDraft.sourceId}`;
 
       const initialCharges = (specialInvoiceDraft.initialCharges || [])

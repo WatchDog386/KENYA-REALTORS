@@ -45,9 +45,7 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
     const script = document.createElement("script");
     script.src = "https://js.paystack.co/v1/inline.js";
     script.async = true;
-    script.onload = () => {
-      console.log("Paystack SDK loaded successfully");
-    };
+    script.onload = () => {};
     script.onerror = () => {
       console.error("Failed to load Paystack SDK");
     };
@@ -122,19 +120,16 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
             ]
         },
         callback: (transaction: any) => {
-          console.log("Payment successful:", transaction);
           // transaction.reference should match our ref
           verifyTransaction(transaction.reference);
         },
         onClose: () => {
-          console.log("Paystack dialog closed by user");
           setLoading(false);
           setTransactionStatus("idle"); // User closed popup
           setErrorMessage("Payment canceled");
         }
       });
-      
-      console.log("Opening Paystack payment dialog...");
+
       handler.openIframe();
       
     } catch (error: any) {
@@ -159,16 +154,22 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   const verifyTransaction = async (reference: string) => {
     setTransactionStatus("verifying");
     try {
-      // Attempt verification
-      try {
-        const verifyResponse = await verifyPaystackTransaction(reference);
-        if (!verifyResponse.status) {
-           throw new Error(verifyResponse.message || "Payment verification failed");
-        }
+      const verifyResponse = await verifyPaystackTransaction(reference);
+      if (!verifyResponse.status) {
+        throw new Error(verifyResponse.message || "Payment verification failed");
+      }
+
+      if (verifyResponse.verification_unavailable) {
+        console.info("Server verification unavailable; using callback fallback.");
+        onPaymentSuccess(reference, {
+          status: "success",
+          reference,
+          amount,
+          verification_unavailable: true,
+          fallback_reason: verifyResponse.fallback_reason,
+        });
+      } else {
         onPaymentSuccess(reference, verifyResponse.data);
-      } catch (verifyError) {
-        console.warn("Server verification failed (likely CORS), falling back to client success:", verifyError);
-        onPaymentSuccess(reference, { status: "success", reference, amount });
       }
 
       setTransactionStatus("success");

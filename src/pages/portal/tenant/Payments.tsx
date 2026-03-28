@@ -49,6 +49,8 @@ import {
 } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import TenantReceipts from "@/components/TenantReceipts";
+import { getTenantPortalAccessState, PendingInitialInvoice } from "@/services/tenantOnboardingService";
+import { extractInvoiceLineItems } from "@/utils/invoiceLineItems";
 
 interface Payment {
   id: string;
@@ -56,7 +58,7 @@ interface Payment {
   amount_paid: number; // For bills & rent: Amount paid so far
   payment_date?: string;
   due_date: string;
-  status: "pending" | "paid" | "overdue" | "partial" | "completed" | "open";
+  status: "pending" | "paid" | "overdue" | "partial" | "completed" | "open" | "unpaid";
   payment_method?: string;
   created_at: string;
   bill_type?: string; // For distinguish
@@ -86,11 +88,13 @@ interface UtilityReading {
 }
 
 const PaymentsPage: React.FC = () => {
+  const ONBOARDING_INVOICE_NOTES_FILTER = "notes.ilike.%BILLING_EVENT:unit_allocation%,notes.ilike.%BILLING_EVENT:first_payment%";
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [rentPayments, setRentPayments] = useState<Payment[]>([]);
   const [utilityBills, setUtilityBills] = useState<Payment[]>([]);
+  const [paidInitialInvoices, setPaidInitialInvoices] = useState<Payment[]>([]);
   const [utilityReadings, setUtilityReadings] = useState<UtilityReading[]>([]);
   const [utilitySettings, setUtilitySettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -100,6 +104,9 @@ const PaymentsPage: React.FC = () => {
   const [selectedPaymentItems, setSelectedPaymentItems] = useState<Set<string>>(new Set());
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [tenantUnitMonthlyRent, setTenantUnitMonthlyRent] = useState<number>(0);
+  const [onboardingLocked, setOnboardingLocked] = useState(false);
+  const [pendingInitialInvoices, setPendingInitialInvoices] = useState<PendingInitialInvoice[]>([]);
+  const [initialInvoiceTotal, setInitialInvoiceTotal] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -184,6 +191,13 @@ const PaymentsPage: React.FC = () => {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && ['summary', 'all', 'receipts'].includes(requestedTab)) {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
+
   // Refetch data when user returns from payment page
   useEffect(() => {
     const hasTabParam = searchParams.has('tab');
@@ -237,6 +251,20 @@ const PaymentsPage: React.FC = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
+
+      const accessState = await getTenantPortalAccessState(user.id);
+      setOnboardingLocked(accessState.isLocked);
+      setPendingInitialInvoices(accessState.pendingInitialInvoices);
+      setInitialInvoiceTotal(accessState.initialInvoiceTotal);
+
+      if (accessState.isLocked) {
+        setRentPayments([]);
+        setUtilityBills([]);
+        setPaidInitialInvoices([]);
+        setUtilityReadings([]);
+        return;
+      }
+
       let derivedUtilityBills: Payment[] = [];
 
       // 1. Get Tenant Unit Info
@@ -245,7 +273,7 @@ const PaymentsPage: React.FC = () => {
         .select('id, unit_id, property_id')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
       
       const unitId = tenantData?.unit_id;
       const propertyId = tenantData?.property_id;
@@ -283,12 +311,68 @@ const PaymentsPage: React.FC = () => {
 
       setTenantUnitMonthlyRent(leaseMonthlyRent);
 
+      const mapPaidInvoicesToPayments = (rows: any[]): Payment[] => {
+        return (rows || []).map((invoice: any) => ({
+          id: `invoice-${invoice.id}`,
+          amount: Math.abs(Number(invoice.amount || 0)),
+          amount_paid: Math.abs(Number(invoice.amount || 0)),
+          due_date: invoice.due_date || invoice.updated_at || invoice.created_at || new Date().toISOString(),
+          status: 'paid',
+          payment_method: 'paystack',
+          payment_date: invoice.updated_at || invoice.created_at || new Date().toISOString(),
+          created_at: invoice.created_at || invoice.updated_at || new Date().toISOString(),
+          bill_type: 'onboarding',
+          remarks: invoice.reference_number
+            ? `Initial Move-In Invoice (${invoice.reference_number})`
+            : 'Initial Move-In Invoice',
+        }));
+      };
+
+      const { data: paidOnboardingInvoicesByProfile, error: paidOnboardingInvoicesError } = await supabase
+        .from('invoices')
+        .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes')
+        .eq('tenant_id', user.id)
+        .eq('status', 'paid')
+        .or(ONBOARDING_INVOICE_NOTES_FILTER)
+        .order('updated_at', { ascending: false });
+
+      if (paidOnboardingInvoicesError) {
+        console.warn('Unable to fetch paid onboarding invoices by profile id:', paidOnboardingInvoicesError);
+      }
+
+      let paidOnboardingInvoices = paidOnboardingInvoicesByProfile || [];
+
+      if ((paidOnboardingInvoices.length === 0) && tenantId && tenantId !== user.id) {
+        const { data: paidOnboardingInvoicesByTenantId, error: paidOnboardingInvoicesByTenantIdError } = await supabase
+          .from('invoices')
+          .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'paid')
+          .or(ONBOARDING_INVOICE_NOTES_FILTER)
+          .order('updated_at', { ascending: false });
+
+        if (paidOnboardingInvoicesByTenantIdError) {
+          console.warn('Unable to fetch paid onboarding invoices by tenant row id:', paidOnboardingInvoicesByTenantIdError);
+        } else {
+          paidOnboardingInvoices = paidOnboardingInvoicesByTenantId || [];
+        }
+      }
+
+      setPaidInitialInvoices(mapPaidInvoicesToPayments(paidOnboardingInvoices));
+
       // 2. Fetch Rent Payments
-      const { data: rentData, error: rentError } = await supabase
+      let rentQuery = supabase
         .from("rent_payments")
         .select("*")
-        .eq("tenant_id", tenantId)
         .order("due_date", { ascending: false });
+
+      if (tenantId) {
+        rentQuery = rentQuery.or(`tenant_id.eq.${user.id},tenant_id.eq.${tenantId}`);
+      } else {
+        rentQuery = rentQuery.eq("tenant_id", user.id);
+      }
+
+      const { data: rentData, error: rentError } = await rentQuery;
 
       if (rentError) throw rentError;
       
@@ -491,6 +575,10 @@ const PaymentsPage: React.FC = () => {
     }
   };
 
+  const buildInitialInvoiceBreakdown = (invoice: PendingInitialInvoice) => {
+    return extractInvoiceLineItems(invoice.items);
+  };
+
   const handlePaymentTypeClick = (type: string) => {
     if (type === 'all' || type === 'custom') {
       // Lump sum should include rent + utilities, but tenant enters any amount they can pay.
@@ -664,6 +752,98 @@ const PaymentsPage: React.FC = () => {
     );
   }
 
+  if (onboardingLocked) {
+    return (
+      <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50 pb-20">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+          <div>
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#154279] to-[#F96302]">
+              Initial Payment Required
+            </h1>
+            <p className="text-sm text-gray-500">Pay your onboarding invoice to unlock the full tenant portal</p>
+          </div>
+        </motion.div>
+
+        <Alert className="bg-amber-50 border-amber-300">
+          <Bell className="h-4 w-4 text-amber-700" />
+          <AlertDescription className="text-amber-900">
+            Your application has been approved and your unit is reserved. Complete the initial move-in payment first.
+          </AlertDescription>
+        </Alert>
+
+        <Card className="border-none shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-[#154279]">Outstanding Initial Invoices</CardTitle>
+            <CardDescription>
+              Total due: <span className="font-semibold text-[#154279]">{formatCurrency(initialInvoiceTotal)}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingInitialInvoices.length === 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-700">Payment is confirmed. We are finalizing your unit assignment and lease activation.</p>
+                <Button
+                  onClick={fetchData}
+                  className="bg-[#154279] hover:bg-[#0f305a]"
+                >
+                  Refresh Assignment Status
+                </Button>
+              </div>
+            ) : (
+              pendingInitialInvoices.map((invoice) => (
+                <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Invoice {invoice.reference_number || invoice.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Due {invoice.due_date ? formatDate(invoice.due_date) : 'Immediately'} • {invoice.status}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="font-bold text-[#154279]">{formatCurrency(invoice.amount)}</p>
+                      <Button
+                        onClick={() => navigate(`/portal/tenant/payments/make?type=custom&amount=${invoice.amount}&onboardingInvoiceId=${invoice.id}`)}
+                        className="bg-[#154279] hover:bg-[#0f305a]"
+                      >
+                        Proceed To Payment
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <p className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wide">Invoice Breakdown</p>
+                    <div className="space-y-1.5">
+                      {buildInitialInvoiceBreakdown(invoice).length === 0 ? (
+                        <p className="text-xs text-slate-500">Line items will appear exactly as issued in Billing and Invoicing.</p>
+                      ) : (
+                        buildInitialInvoiceBreakdown(invoice).map((line, index) => (
+                          <div key={`${invoice.id}-line-${index}`} className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600">{line.label}</span>
+                            <span className="font-medium text-slate-900">{formatCurrency(line.amount)}</span>
+                          </div>
+                        ))
+                      )}
+                      <div className="border-t border-slate-200 pt-2 mt-2 flex items-center justify-between text-sm">
+                        <span className="font-semibold text-slate-700">Total Invoice</span>
+                        <span className="font-bold text-[#154279]">{formatCurrency(invoice.amount)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Calculate Totals
   const rentDue = rentPayments.reduce((sum, p) => {
       if (p.status === 'paid') return sum;
@@ -750,6 +930,18 @@ const PaymentsPage: React.FC = () => {
 
   const totalDueBalance = Math.max(0, billedTotal - totalPaidAmount);
   const overpaymentBalance = Math.max(0, totalPaidAmount - billedTotal);
+
+  const allTransactionRows: Payment[] = [
+    ...paidInitialInvoices,
+    ...rentPayments,
+    ...utilityBills,
+  ]
+    .filter((row) => Math.abs(Number(row.amount || 0)) > 0 || Math.abs(Number(row.amount_paid || 0)) > 0)
+    .sort((left, right) => {
+      const leftDate = new Date(left.payment_date || left.due_date || left.created_at || 0).getTime();
+      const rightDate = new Date(right.payment_date || right.due_date || right.created_at || 0).getTime();
+      return rightDate - leftDate;
+    });
 
   if (!selectedPaymentType && selectedPaymentType !== null) {
     // Just show normal view if user deselects
@@ -1021,7 +1213,7 @@ const PaymentsPage: React.FC = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
+      <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
         <div className="flex items-center justify-between mb-4">
            <TabsList>
              <TabsTrigger value="summary">Summary</TabsTrigger>
@@ -1084,18 +1276,7 @@ const PaymentsPage: React.FC = () => {
              </div>
            )}
            <PaymentsTable 
-              data={[
-                {
-                  id: 'combined-monthly-bill',
-                  amount: billedTotal,
-                  amount_paid: Math.min(totalPaidAmount, billedTotal),
-                  due_date: rentPayments[0]?.due_date || new Date().toISOString(),
-                  status: totalDueBalance > 0 ? 'pending' : 'paid',
-                  created_at: new Date().toISOString(),
-                  bill_type: 'combined',
-                  remarks: 'Monthly bill including rent and utilities'
-                }
-              ]}
+              data={allTransactionRows}
               formatCurrency={formatCurrency}
               formatDate={formatDate}
               getStatusColor={getStatusColor}
@@ -1133,10 +1314,13 @@ const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navig
         <TableBody>
           {data.map((item: any) => {
              const isCombinedBill = item.bill_type === 'combined';
-             const isUtilityItem = (item.bill_type && item.bill_type !== 'rent' && !isCombinedBill) || (item.remarks && item.remarks.toLowerCase().includes('utility'));
+             const isOnboardingInvoice = item.bill_type === 'onboarding';
+             const isUtilityItem = !isOnboardingInvoice && ((item.bill_type && item.bill_type !== 'rent' && !isCombinedBill) || (item.remarks && item.remarks.toLowerCase().includes('utility')));
              
              const typeLabel = isCombinedBill
                 ? 'Monthly Bill'
+               : isOnboardingInvoice
+               ? (item.remarks || 'Initial Move-In Invoice')
                 : isUtilityItem 
                 ? (item.bill_type ? item.bill_type.charAt(0).toUpperCase() + item.bill_type.slice(1) + ' Bill' : 'Utility Bill')
                 : 'Rent Payment';
@@ -1159,6 +1343,8 @@ const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navig
                     <div className="flex items-center gap-2">
                         {isCombinedBill ? (
                             <div className="p-1.5 rounded-full bg-purple-100 text-purple-600"><DollarSign size={14}/></div>
+                    ) : isOnboardingInvoice ? (
+                      <div className="p-1.5 rounded-full bg-amber-100 text-amber-700"><CreditCard size={14}/></div>
                         ) : isUtilityItem ? (
                             <div className="p-1.5 rounded-full bg-cyan-100 text-cyan-600"><Droplets size={14}/></div>
                         ) : (
@@ -1179,7 +1365,7 @@ const PaymentsTable = ({ data, formatCurrency, formatDate, getStatusColor, navig
                     </Badge>
                  </TableCell>
                  <TableCell className="text-right">
-                    {!isPaid && (
+                  {!isPaid && !isOnboardingInvoice && (
                         <Button 
                             size="sm" 
                             onClick={handlePayClick}

@@ -95,8 +95,8 @@ const TenantPaymentsPage: React.FC = () => {
         // Get tenant ID from tenants table
         const { data: tenantData, error: tenantError } = await supabase
           .from("tenants")
-          .select("id, email")
-          .eq("auth_user_id", user.id)
+          .select("id")
+          .eq("user_id", user.id)
           .single();
 
         if (tenantError || !tenantData) {
@@ -106,7 +106,7 @@ const TenantPaymentsPage: React.FC = () => {
         }
 
         setTenantId(tenantData.id);
-        setTenantEmail(tenantData.email || user.email || "");
+        setTenantEmail(user.email || "");
 
         // Subscribe to real-time changes
         const subscription = supabase

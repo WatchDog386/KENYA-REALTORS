@@ -25,6 +25,8 @@ const THEME = {
     textMid: "#666666"
 };
 
+const DEFAULT_UNIT_IMAGE = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1400&auto=format&fit=crop";
+
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -587,6 +589,7 @@ export default function AydenTowersListing() {
                         : unitTypeSampleImages.length > 0
                             ? unitTypeSampleImages
                             : propertyImages;
+                    const thumbnail = galleryImages[0] || propertyImages[0] || DEFAULT_UNIT_IMAGE;
 
                     return {
                         id: unit.id,
@@ -594,6 +597,7 @@ export default function AydenTowersListing() {
                         title: prop.name || "Property",
                         type: typeName,
                         typeId: ut.id || unit.unit_type_id,
+                        rawStatus: unit.status,
                         price: Number(unit.price ?? ut.price_per_unit ?? 0),
                         floor: "Available",
                         rating: 4.5,
@@ -606,7 +610,8 @@ export default function AydenTowersListing() {
                         featured: false,
                         amenities: amenities.slice(0, 5),
                         description: prop.description || 'Premium rental unit with modern amenities and excellent facilities.',
-                        gallery: galleryImages
+                        gallery: galleryImages.length > 0 ? galleryImages : [thumbnail],
+                        thumbnail,
                     };
                 });
                 
@@ -919,19 +924,32 @@ export default function AydenTowersListing() {
                                     viewport={{ once: true }}
                                       className={cn("rounded-none overflow-hidden shadow-2xl hover:shadow-xl group flex flex-col transition-all duration-300", getCardTheme(item.type).cardBg, getCardTheme(item.type).border)}
                                   >
-                                          {/* Minimal Unit Card Top (No Image) */}
-                                          <div className={cn("p-4 cursor-pointer", getCardTheme(item.type).header)} onClick={() => setSelectedItem(item)}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className={cn("text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] inline-block", getCardTheme(item.type).tag)}>
-                                                    AVAILABLE
-                                                </div>
-                                                {item.featured && (
-                                                    <div className="bg-[#F96302] text-white text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] inline-block">
-                                                        Featured
-                                                    </div>
-                                                )}
+                                    <div className={cn("relative h-44 overflow-hidden cursor-pointer", getCardTheme(item.type).header)} onClick={() => setSelectedItem(item)}>
+                                        <img
+                                            src={item.thumbnail || DEFAULT_UNIT_IMAGE}
+                                            alt={item.title || item.propertyName || 'Available Unit'}
+                                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                            onError={(event) => {
+                                                (event.target as HTMLImageElement).src = DEFAULT_UNIT_IMAGE;
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-900/20 to-transparent" />
+                                        <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+                                            <div className={cn("text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] inline-block", getCardTheme(item.type).tag)}>
+                                                AVAILABLE
                                             </div>
+                                            {item.featured && (
+                                                <div className="bg-[#F96302] text-white text-[9px] font-bold px-3 py-1.5 uppercase tracking-[0.15em] inline-block">
+                                                    Featured
+                                                </div>
+                                            )}
                                         </div>
+                                        <div className="absolute bottom-3 left-3">
+                                            <span className="bg-white/90 text-[#154279] text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide">
+                                                {item.type}
+                                            </span>
+                                        </div>
+                                    </div>
                                     
                                     <div className="p-5 flex-1 flex flex-col">
                                         <h4
@@ -981,7 +999,11 @@ export default function AydenTowersListing() {
                                                                 unitId: item.id || '',
                                                                 propertyName: item.propertyName || '',
                                                                 unitNumber: item.unitNumber || '',
-                                                                location: item.location || ''
+                                                                location: item.location || '',
+                                                                unitTypeId: item.typeId ? String(item.typeId) : '',
+                                                                unitTypeName: item.type || '',
+                                                                rent: item.price ? String(item.price) : '',
+                                                                status: item.rawStatus || 'available'
                                                             });
                                                             window.location.href = `/applications?${params.toString()}`;
                                                         }}

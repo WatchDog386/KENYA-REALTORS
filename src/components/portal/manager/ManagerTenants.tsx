@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 import {
   Card,
   CardContent,
@@ -96,30 +97,26 @@ const ManagerTenants: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get property assigned to manager
-      const { data: assignment, error: assignmentError } = await supabase
-        .from('property_manager_assignments')
-        .select(`
-            property_id,
-            properties (
-               name
-            )
-        `)
-        .eq('property_manager_id', user.id)
-        .single();
+      const propertyIds = await getManagerAssignedPropertyIds(user.id);
 
-      if (assignmentError && assignmentError.code !== 'PGRST116') {
-        throw assignmentError;
-      }
-
-      if (!assignment) {
+      if (propertyIds.length === 0) {
         setTenants([]);
         return;
       }
 
-      if (assignment.properties) {
-          // @ts-ignore
-          setPropertyName(assignment.properties.name);
+      const { data: managerProperties, error: managerPropertiesError } = await supabase
+        .from('properties')
+        .select('id, name')
+        .in('id', propertyIds);
+
+      if (managerPropertiesError) {
+        throw managerPropertiesError;
+      }
+
+      if ((managerProperties || []).length === 1) {
+        setPropertyName(String((managerProperties as any[])[0]?.name || ''));
+      } else {
+        setPropertyName(`${propertyIds.length} properties`);
       }
 
       // Get tenants via leases (Source of Truth for Occupancy)
@@ -137,8 +134,8 @@ const ManagerTenants: React.FC = () => {
             property_id
           )
         `)
-        .or('status.eq.active,status.eq.pending_renewal')
-        .eq('units.property_id', assignment.property_id);
+        .in('status', ['active', 'pending', 'approved', 'manager_approved', 'pending_renewal'])
+        .in('units.property_id', propertyIds);
 
       if (leasesError) throw leasesError;
 

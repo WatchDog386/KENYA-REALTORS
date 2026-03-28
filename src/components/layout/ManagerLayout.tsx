@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 
 interface NavItem {
   title: string;
@@ -104,16 +105,9 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       if (!user?.id) return;
 
       try {
-        // Get property IDs from assignment table
-        const { data: assignments, error: assignmentError } = await supabase
-          .from("property_manager_assignments")
-          .select("property_id")
-          .eq("property_manager_id", user.id);
+        const propertyIds = await getManagerAssignedPropertyIds(user.id);
 
-        if (assignmentError) throw assignmentError;
-
-        if (assignments && assignments.length > 0) {
-          const propertyIds = assignments.map(a => a.property_id);
+        if (propertyIds.length > 0) {
 
           // Fetch property details
           const { data: properties, error: propsError } = await supabase

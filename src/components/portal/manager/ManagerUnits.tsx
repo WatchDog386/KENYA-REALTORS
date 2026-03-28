@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -267,6 +268,20 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     email: '',
     phone: '',
     password: '',
+    physical_address: '',
+    po_box: '',
+    employer_details: '',
+    marital_status: '',
+    children_count: '',
+    age_bracket: '',
+    occupants_count: '1',
+    next_of_kin: '',
+    next_of_kin_email: '',
+    nationality: '',
+    house_staff: false,
+    home_address: '',
+    location: '',
+    sub_location: '',
   });
   const [newUnit, setNewUnit] = useState({
     unit_number: '',
@@ -398,18 +413,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       if (id) {
         targetPropertyIds = [id];
       } else {
-        const { data: assignments, error: assignError } = await supabase
-          .from('property_manager_assignments')
-          .select('property_id')
-          .eq('property_manager_id', user.id);
-
-        if (assignError && assignError.code !== 'PGRST116') {
-          console.error("Assignment error:", assignError);
-        }
-        
-        if (assignments && assignments.length > 0) {
-          targetPropertyIds = assignments.map(a => a.property_id);
-        }
+        targetPropertyIds = await getManagerAssignedPropertyIds(user.id);
       }
 
       if (targetPropertyIds.length === 0) {
@@ -538,59 +542,55 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     }
   };
 
-  const createInitialMoveInInvoice = async (tenantRecordId: string, leaseId: string) => {
-    if (!selectedUnit) return;
+  const createMoveInAllocationInvoice = async (tenantProfileId: string, leaseApplicationId?: string) => {
+    if (!selectedUnit) return null;
 
-    const rentAmount = Number(selectedUnit.property_unit_types?.price_per_unit || selectedUnit.price || 0);
-    const securityDeposit = rentAmount;
+    const applicationTag = leaseApplicationId ? `LEASE_APPLICATION_ID:${leaseApplicationId}` : null;
+    const onboardingFilter = 'notes.ilike.%BILLING_EVENT:first_payment%,notes.ilike.%BILLING_EVENT:unit_allocation%';
+    const notesFilter = applicationTag ? `${onboardingFilter},notes.ilike.%${applicationTag}%` : onboardingFilter;
 
-    const { data: propertyData } = await supabase
-      .from('properties')
-      .select('initial_charge_templates')
-      .eq('id', selectedUnit.property_id)
+    const { data: existingInvoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('id, notes')
+      .eq('tenant_id', tenantProfileId)
+      .eq('property_id', selectedUnit.property_id)
+      .in('status', ['unpaid', 'overdue'])
+      .or(notesFilter)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    const initialCharges = (Array.isArray((propertyData as any)?.initial_charge_templates)
-      ? (propertyData as any).initial_charge_templates
-      : [])
-      .map((item: any) => ({
-        id: String(item?.id || `tpl-${Date.now()}`),
-        name: String(item?.name || '').trim(),
-        charge_type: item?.charge_type === 'fee' ? 'fee' : 'deposit',
-        amount: Number(item?.amount || 0),
-      }))
-      .filter((item: any) => item.name && item.amount >= 0);
+    if (invoiceError && invoiceError.code !== 'PGRST116') {
+      throw invoiceError;
+    }
 
-    const additionalChargesMap = initialCharges.reduce((acc: Record<string, number>, item: any) => {
-      acc[item.name] = Number(item.amount || 0);
-      return acc;
-    }, {});
+    if (!existingInvoice?.id) {
+      return null;
+    }
 
-    const extraChargesTotal = initialCharges.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
-    const totalAmount = rentAmount + securityDeposit + extraChargesTotal;
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 1);
+    const existingNotes = String(existingInvoice.notes || '');
+    const metadataLines = [
+      `LEASE_APPLICATION_ID:${leaseApplicationId || ''}`,
+      `APPLICANT_ID:${tenantProfileId}`,
+      `UNIT_ID:${selectedUnit.id}`,
+      `PROPERTY_ID:${selectedUnit.property_id}`,
+      `UNIT_NUMBER:${selectedUnit.unit_number || ''}`,
+      `UNIT_TYPE_ID:${selectedUnit.unit_type_id || ''}`,
+      `UNIT_TYPE_NAME:${selectedUnit.property_unit_types?.name || ''}`,
+    ].filter((line) => !line.endsWith(':'));
 
-    const { error } = await supabase
-      .from('invoices')
-      .insert({
-        reference_number: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-        property_id: selectedUnit.property_id,
-        tenant_id: tenantRecordId,
-        amount: totalAmount,
-        due_date: dueDate.toISOString().split('T')[0],
-        issued_date: new Date().toISOString().split('T')[0],
-        status: 'unpaid',
-        items: {
-          monthly_rent: rentAmount,
-          security_deposit: securityDeposit,
-          initial_charges: initialCharges,
-          additional_charges: additionalChargesMap,
-        },
-        notes: `BILLING_EVENT:first_payment;LEASE_ID:${leaseId}\nAuto-generated on tenant onboarding`,
-      });
+    const missingLines = metadataLines.filter((line) => !existingNotes.includes(line));
+    if (missingLines.length > 0) {
+      const mergedNotes = existingNotes ? `${existingNotes}\n${missingLines.join('\n')}` : missingLines.join('\n');
+      const { error: updateNotesError } = await supabase
+        .from('invoices')
+        .update({ notes: mergedNotes })
+        .eq('id', existingInvoice.id);
 
-    if (error) throw error;
+      if (updateNotesError) throw updateNotesError;
+    }
+
+    return existingInvoice.id;
   };
 
   const assignTenantToUnit = async (
@@ -671,7 +671,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           .from('tenants')
           .insert({
             user_id: tenantUserId,
-            auth_user_id: tenantUserId,
             property_id: selectedUnit.property_id,
             unit_id: selectedUnit.id,
             move_in_date: now,
@@ -713,13 +712,17 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           .eq('id', selectedUnit.id);
         if (unitError) throw unitError;
 
-        if (options.createInitialInvoice && tenantRecordId && insertedLease?.id) {
+        if (options.createInitialInvoice && insertedLease?.id) {
           try {
-            await createInitialMoveInInvoice(tenantRecordId, insertedLease.id);
-            toast.success('Initial payment invoice created for the new tenant');
+            const linkedInvoiceId = await createMoveInAllocationInvoice(tenantUserId, insertedLease.id);
+            if (linkedInvoiceId) {
+              toast.success('Tenant linked to existing Super Admin billing invoice.');
+            } else {
+              toast.info('Tenant assigned. Super Admin should issue the onboarding invoice from Billing and Invoicing.');
+            }
           } catch (invoiceError: any) {
             console.error('Failed to create initial invoice:', invoiceError);
-            toast.warning('Tenant assigned, but initial payment invoice creation failed.');
+            toast.warning('Tenant assigned, but linking to Billing invoice failed.');
           }
         }
 
@@ -753,17 +756,24 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         return;
       }
 
-      const { data, error } = await supabase
+      let applicationsQuery = supabase
         .from('lease_applications')
         .select(`
           id,
           applicant_id,
-          status,
-          profiles:applicant_id (first_name, last_name, email)
+          applicant_name,
+          applicant_email,
+          status
         `)
         .eq('property_id', targetPropertyId)
-        .in('status', ['pending', 'manager_approved', 'approved'])
+        .in('status', ['pending', 'under_review', 'approved'])
         .order('created_at', { ascending: false });
+
+      if (selectedUnit?.id) {
+        applicationsQuery = applicationsQuery.eq('unit_id', selectedUnit.id);
+      }
+
+      const { data, error } = await applicationsQuery;
 
       if (error) throw error;
 
@@ -778,13 +788,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         if (!row?.applicant_id) return;
         if (assignedTenantIds.has(row.applicant_id)) return;
 
-        const profile = row.profiles || {};
         if (!uniqueByApplicant.has(row.applicant_id)) {
           uniqueByApplicant.set(row.applicant_id, {
             application_id: row.id,
             applicant_id: row.applicant_id,
-            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Applicant',
-            email: profile.email || 'No email',
+            name: row.applicant_name || 'Unknown Applicant',
+            email: row.applicant_email || 'No email',
             status: row.status || 'pending',
           });
         }
@@ -817,10 +826,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         .update({
           role: 'tenant',
           user_type: 'tenant',
-          status: 'active',
-          is_active: true,
-          property_id: selectedUnit?.property_id || propertyId,
-          unit_id: selectedUnit?.id || null,
+          status: 'pending',
+          is_active: false,
+          assigned_property_id: selectedUnit?.property_id || propertyId || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', candidate.applicant_id);
@@ -829,10 +837,22 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to update applicant profile: ${profileUpdateError.message}`);
       }
 
+      const linkedInvoiceId = await createMoveInAllocationInvoice(candidate.applicant_id, candidate.application_id);
+
+      const { error: appStatusError } = await supabase
+        .from('lease_applications')
+        .update({ status: 'under_review' })
+        .eq('id', candidate.application_id);
+
+      if (appStatusError) throw appStatusError;
+
       setSelectedTenant(candidate.applicant_id);
       setIsAddTenantOpen(false);
-      await assignTenantToUnit(candidate.applicant_id, { allowPendingTenant: true, createInitialInvoice: true });
-      toast.success('Applicant activated, assigned, and billed successfully');
+      if (linkedInvoiceId) {
+        toast.success('Tenant linked to Super Admin invoice. Unit allocation will happen automatically after successful payment.');
+      } else {
+        toast.success('Applicant moved to under review. Awaiting Super Admin Billing invoice before checkout.');
+      }
     } catch (error: any) {
       console.error('Error adding tenant from applicants:', error);
       toast.error(error.message || 'Failed to add tenant from applicants');
@@ -845,10 +865,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     const email = newTenantForm.email.trim().toLowerCase();
     const firstName = newTenantForm.first_name.trim();
     const lastName = newTenantForm.last_name.trim();
+    const phone = newTenantForm.phone.trim();
     const password = newTenantForm.password;
 
-    if (!email || !firstName || !lastName || !password) {
-      toast.error('Please complete first name, last name, email and password');
+    if (!email || !firstName || !lastName || !phone || !password) {
+      toast.error('Please complete first name, last name, email, phone and password');
       return;
     }
 
@@ -866,6 +887,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     try {
       setIsCreatingTenantUser(true);
 
+      const occupantsCountRaw = parseInt(newTenantForm.occupants_count, 10);
+      const occupantsCount = Number.isFinite(occupantsCountRaw) && occupantsCountRaw > 0 ? occupantsCountRaw : 1;
+      const childrenCountRaw = parseInt(newTenantForm.children_count, 10);
+      const childrenCount = Number.isFinite(childrenCountRaw) && childrenCountRaw >= 0 ? childrenCountRaw : 0;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -873,9 +899,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           data: {
             first_name: firstName,
             last_name: lastName,
-            phone: newTenantForm.phone?.trim() || null,
+            phone,
             role: 'tenant',
-            status: 'active',
+            status: 'pending',
           },
         },
       });
@@ -893,13 +919,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           email,
           first_name: firstName,
           last_name: lastName,
-          phone: newTenantForm.phone?.trim() || null,
+          phone,
           role: 'tenant',
           user_type: 'tenant',
-          status: 'active',
-          is_active: true,
-          property_id: selectedUnit?.property_id || propertyId,
-          unit_id: selectedUnit?.id || null,
+          status: 'pending',
+          is_active: false,
+          assigned_property_id: selectedUnit?.property_id || propertyId || null,
           updated_at: new Date().toISOString(),
         });
 
@@ -907,11 +932,79 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to save tenant profile: ${profileUpsertError.message}`);
       }
 
+      const applicationInsertPayload = {
+        applicant_id: tenantUserId,
+        property_id: selectedUnit?.property_id || propertyId,
+        unit_id: selectedUnit?.id,
+        status: 'under_review',
+        applicant_name: `${firstName} ${lastName}`,
+        applicant_email: email,
+        telephone_numbers: phone,
+        physical_address: newTenantForm.physical_address.trim() || null,
+        po_box: newTenantForm.po_box.trim() || null,
+        employer_details: newTenantForm.employer_details.trim() || null,
+        marital_status: newTenantForm.marital_status || null,
+        children_count: childrenCount,
+        age_bracket: newTenantForm.age_bracket || null,
+        occupants_count: occupantsCount,
+        next_of_kin: newTenantForm.next_of_kin.trim() || null,
+        next_of_kin_email: newTenantForm.next_of_kin_email.trim() || null,
+        nationality: newTenantForm.nationality.trim() || null,
+        house_staff: Boolean(newTenantForm.house_staff),
+        home_address: newTenantForm.home_address.trim() || null,
+        location: newTenantForm.location.trim() || null,
+        sub_location: newTenantForm.sub_location.trim() || null,
+      };
+
+      let { data: newApplication, error: newApplicationError } = await supabase
+        .from('lease_applications')
+        .insert(applicationInsertPayload)
+        .select('id')
+        .single();
+
+      if (newApplicationError && String(newApplicationError.message || '').toLowerCase().includes('next_of_kin_email')) {
+        const { next_of_kin_email, ...fallbackPayload } = applicationInsertPayload as any;
+        ({ data: newApplication, error: newApplicationError } = await supabase
+          .from('lease_applications')
+          .insert(fallbackPayload)
+          .select('id')
+          .single());
+      }
+
+      if (newApplicationError) {
+        throw new Error(`Failed to create lease application: ${newApplicationError.message}`);
+      }
+
+      const linkedInvoiceId = await createMoveInAllocationInvoice(tenantUserId, newApplication?.id);
+
       setSelectedTenant(tenantUserId);
-      setNewTenantForm({ first_name: '', last_name: '', email: '', phone: '', password: '' });
+      setNewTenantForm({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        password: '',
+        physical_address: '',
+        po_box: '',
+        employer_details: '',
+        marital_status: '',
+        children_count: '',
+        age_bracket: '',
+        occupants_count: '1',
+        next_of_kin: '',
+        next_of_kin_email: '',
+        nationality: '',
+        house_staff: false,
+        home_address: '',
+        location: '',
+        sub_location: '',
+      });
       setIsAddTenantOpen(false);
-      await assignTenantToUnit(tenantUserId, { allowPendingTenant: true, createInitialInvoice: true });
-      toast.success('Tenant created, assigned, and initial payment prompt generated');
+      if (linkedInvoiceId) {
+        toast.success('Tenant created and linked to Super Admin invoice. Unit allocation will happen after payment is confirmed.');
+      } else {
+        toast.success('Tenant created and moved to under review. Awaiting Super Admin Billing invoice before checkout.');
+      }
     } catch (error: any) {
       console.error('Error creating tenant user:', error);
       toast.error(error.message || 'Failed to create tenant user');
@@ -1043,7 +1136,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               <div className="p-2 bg-blue-100 rounded-lg">
                   <Building className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-4xl font-bold text-slate-800">Properties & Units</h1>
+              <h1 className="text-4xl font-bold text-slate-800">Units</h1>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center bg-white border border-slate-200 rounded-lg p-1">
@@ -1314,12 +1407,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         </Dialog>
 
         {/* Assign Tenant Dialog */}
-        <Dialog open={isAddTenantOpen} onOpenChange={setIsAddTenantOpen}>
-           <DialogContent className="bg-white border-slate-100 shadow-xl">
+          <Dialog open={isAddTenantOpen} onOpenChange={setIsAddTenantOpen}>
+            <DialogContent className="bg-white border-slate-100 shadow-xl max-w-3xl max-h-[90vh] overflow-y-auto">
                <DialogHeader>
                    <DialogTitle className="text-slate-800">Add Tenant</DialogTitle>
                    <DialogDescription className="text-slate-500">
-                     Add a tenant and assign this unit in one step.
+                     Create a tenant or pick an applicant, then send the initial invoice. Assignment completes automatically after payment.
                    </DialogDescription>
                </DialogHeader>
 
@@ -1381,6 +1474,151 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                           placeholder="At least 6 characters"
                         />
                       </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Physical Address</Label>
+                        <Input
+                          value={newTenantForm.physical_address}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, physical_address: e.target.value }))}
+                          placeholder="Apartment/House, Street"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">P.O. Box</Label>
+                        <Input
+                          value={newTenantForm.po_box}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, po_box: e.target.value }))}
+                          placeholder="P.O. Box"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Marital Status</Label>
+                        <Select
+                          value={newTenantForm.marital_status || 'none'}
+                          onValueChange={(val) => setNewTenantForm((prev) => ({ ...prev, marital_status: val === 'none' ? '' : val }))}
+                        >
+                          <SelectTrigger className="bg-white border-slate-200">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not set</SelectItem>
+                            <SelectItem value="Single">Single</SelectItem>
+                            <SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Divorced">Divorced</SelectItem>
+                            <SelectItem value="Widowed">Widowed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Age Bracket</Label>
+                        <Select
+                          value={newTenantForm.age_bracket || 'none'}
+                          onValueChange={(val) => setNewTenantForm((prev) => ({ ...prev, age_bracket: val === 'none' ? '' : val }))}
+                        >
+                          <SelectTrigger className="bg-white border-slate-200">
+                            <SelectValue placeholder="Select bracket" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not set</SelectItem>
+                            <SelectItem value="18-25">18-25</SelectItem>
+                            <SelectItem value="26-35">26-35</SelectItem>
+                            <SelectItem value="36-45">36-45</SelectItem>
+                            <SelectItem value="46-55">46-55</SelectItem>
+                            <SelectItem value="55+">55+</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Occupants Count</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={newTenantForm.occupants_count}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, occupants_count: e.target.value }))}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Children Count</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={newTenantForm.children_count}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, children_count: e.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Nationality</Label>
+                        <Input
+                          value={newTenantForm.nationality}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, nationality: e.target.value }))}
+                          placeholder="e.g. Kenyan"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Live-in House Staff</Label>
+                        <Select
+                          value={newTenantForm.house_staff ? 'yes' : 'no'}
+                          onValueChange={(val) => setNewTenantForm((prev) => ({ ...prev, house_staff: val === 'yes' }))}
+                        >
+                          <SelectTrigger className="bg-white border-slate-200">
+                            <SelectValue placeholder="Select option" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">No</SelectItem>
+                            <SelectItem value="yes">Yes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Next of Kin</Label>
+                        <Input
+                          value={newTenantForm.next_of_kin}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, next_of_kin: e.target.value }))}
+                          placeholder="Name and contact"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Next of Kin Email</Label>
+                        <Input
+                          type="email"
+                          value={newTenantForm.next_of_kin_email}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, next_of_kin_email: e.target.value }))}
+                          placeholder="kin@example.com"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Employer Details</Label>
+                        <Textarea
+                          value={newTenantForm.employer_details}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, employer_details: e.target.value }))}
+                          placeholder="Employer name and address"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Home Address</Label>
+                        <Input
+                          value={newTenantForm.home_address}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, home_address: e.target.value }))}
+                          placeholder="Village / Estate"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Location</Label>
+                        <Input
+                          value={newTenantForm.location}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, location: e.target.value }))}
+                          placeholder="County / City"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Sub-Location</Label>
+                        <Input
+                          value={newTenantForm.sub_location}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, sub_location: e.target.value }))}
+                          placeholder="Ward / Area"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -1404,7 +1642,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   )}
 
                   <div className="rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs p-3">
-                    New tenants are activated and assigned immediately to this unit. The system also creates an initial payment invoice.
+                    The tenant receives an initial invoice first. Unit allocation is completed automatically after successful payment.
                   </div>
                </div>
 
@@ -1415,7 +1653,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                      disabled={isCreatingTenantUser}
                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold"
                    >
-                     {isCreatingTenantUser ? 'Processing...' : 'Create & Assign Tenant'}
+                     {isCreatingTenantUser ? 'Processing...' : 'Create / Send Invoice'}
                    </Button>
                </DialogFooter>
            </DialogContent>
@@ -1710,12 +1948,13 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             <p className="text-slate-500 text-sm mb-4 font-medium">Unit is currently vacant.</p>
                                             <Button 
                                                 onClick={() => {
-                                                    setSelectedTenant('');
-                                                    setIsAssignOpen(true);
+                                                setAddTenantMode('from_applicants');
+                                                setSelectedApplicantId('');
+                                                setIsAddTenantOpen(true);
                                                 }}
                                                 className="w-full bg-orange-500 hover:bg-orange-600 text-white shadow-sm font-bold border-orange-600 border-b-2 active:translate-y-[1px] active:border-b-0 transition-all"
                                             >
-                                                <Plus className="w-4 h-4 mr-2" /> Assign Tenant
+                                              <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
                                             </Button>
                                         </div>
                                     </div>
@@ -1906,10 +2145,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                         className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
                                         onClick={() => { 
                                             setSelectedUnit(unit);
-                                            setIsAssignOpen(true);
+                                        setAddTenantMode('from_applicants');
+                                        setSelectedApplicantId('');
+                                        setIsAddTenantOpen(true);
                                         }}
                                     >
-                                        Assign
+                                      Add Tenant
                                     </Button>
                                 </>
                              )}

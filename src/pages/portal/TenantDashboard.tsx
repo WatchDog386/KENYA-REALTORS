@@ -56,6 +56,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { getTenantPortalAccessState, PendingInitialInvoice } from "@/services/tenantOnboardingService";
+import { extractInvoiceLineItems } from "@/utils/invoiceLineItems";
 
 // Interfaces matching your database schema
 interface Payment {
@@ -149,6 +151,9 @@ const TenantDashboard: React.FC = () => {
   const [utilitySettings, setUtilitySettings] = useState<any>(null);
   const [utilityBills, setUtilityBills] = useState<any[]>([]);
   const [currentMonthUtility, setCurrentMonthUtility] = useState<any>(null);
+  const [tenantPortalLocked, setTenantPortalLocked] = useState(false);
+  const [pendingInitialInvoices, setPendingInitialInvoices] = useState<PendingInitialInvoice[]>([]);
+  const [initialInvoiceTotal, setInitialInvoiceTotal] = useState(0);
 
   const [stats, setStats] = useState({
     currentBalance: 0,
@@ -214,7 +219,7 @@ const TenantDashboard: React.FC = () => {
 
       console.log("🔍 Fetching tenant info for user:", user.id);
       
-      const { data, error } = await supabase
+      const { data: tenantRows, error } = await supabase
         .from("tenants")
         .select(`
           id,
@@ -225,24 +230,32 @@ const TenantDashboard: React.FC = () => {
           move_in_date
         `)
         .eq("user_id", user.id)
-        .eq("status", "active")
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.warn("❌ Error fetching tenant record:", error.message);
         // Don't return false yet, try fallback
       }
       
-      let tenantData: any = data;
+      const tenantIdentifiers = [
+        user.id,
+        ...((tenantRows || []).map((row: any) => row.id).filter(Boolean)),
+      ];
+
+      let tenantData: any =
+        (tenantRows || []).find((row: any) => row.status === "active" && row.property_id && row.unit_id) ||
+        (tenantRows || []).find((row: any) => row.property_id && row.unit_id) ||
+        (tenantRows || []).find((row: any) => row.status === "active") ||
+        (tenantRows || [])[0] ||
+        null;
 
       // Fallback: Check tenant_leases if no direct tenant record
-      if (!tenantData) {
+      if (!tenantData || !tenantData.property_id || !tenantData.unit_id) {
         console.warn("⚠️ No active tenant record found. Checking active leases...");
         const { data: leaseData, error: leaseError } = await supabase
           .from("tenant_leases")
-          .select("id, unit_id, start_date")
-          .eq("tenant_id", user.id)
+          .select("id, unit_id, start_date, tenant_id")
+          .in("tenant_id", tenantIdentifiers)
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(1)
@@ -258,12 +271,15 @@ const TenantDashboard: React.FC = () => {
              .eq("id", leaseData.unit_id)
              .maybeSingle();
 
+           const leaseTenantId = leaseData.tenant_id;
+           const leaseTenantRow = (tenantRows || []).find((row: any) => row.id === leaseTenantId);
+
            tenantData = {
-               id: "lease-derived-" + leaseData.id,
+               id: leaseTenantRow?.id || `lease-derived-${leaseData.id}`,
                user_id: user.id,
                property_id: unitData?.property_id,
                unit_id: leaseData.unit_id,
-               status: "active",
+               status: leaseTenantRow?.status || "active",
                move_in_date: leaseData.start_date
            };
         }
@@ -341,12 +357,22 @@ const TenantDashboard: React.FC = () => {
   const fetchLeaseData = async () => {
     try {
       if (!user?.id) return;
+
+      const { data: tenantRows } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("user_id", user.id);
+
+      const tenantIdentifiers = [
+        user.id,
+        ...((tenantRows || []).map((row: any) => row.id).filter(Boolean)),
+      ];
       
       // Fetch active lease for current tenant
       const { data: lease, error: leaseError } = await supabase
         .from("tenant_leases")
         .select("*, units!inner(property_id)")
-        .eq("tenant_id", user.id)
+        .in("tenant_id", tenantIdentifiers)
         .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(1)
@@ -390,6 +416,21 @@ const TenantDashboard: React.FC = () => {
 
       // Fetch user profile for full name and avatar
       await fetchUserProfile();
+
+      const accessState = await getTenantPortalAccessState(user.id);
+      setTenantPortalLocked(accessState.isLocked);
+      setPendingInitialInvoices(accessState.pendingInitialInvoices);
+      setInitialInvoiceTotal(accessState.initialInvoiceTotal);
+
+      if (accessState.isLocked) {
+        setTenantInfo(null);
+        setPropertyData(null);
+        setLeaseData(null);
+        setRecentPayments([]);
+        setMaintenanceRequests([]);
+        setUpcomingDueDates([]);
+        return;
+      }
 
       // CRITICAL: Fetch tenant info first - all other queries depend on this
       const hasTenantInfo = await fetchTenantInfo();
@@ -444,11 +485,21 @@ const TenantDashboard: React.FC = () => {
     try {
       if (!user?.id) return;
 
+      const { data: tenantRows } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("user_id", user.id);
+
+      const tenantIdentifiers = [
+        user.id,
+        ...((tenantRows || []).map((row: any) => row.id).filter(Boolean)),
+      ];
+
       // Query rent_payments table - FILTERED BY CURRENT TENANT
       const { data: payments, error: paymentsError } = await supabase
         .from("rent_payments")
         .select("*")
-        .eq("tenant_id", user.id)
+        .in("tenant_id", tenantIdentifiers)
         .order("created_at", { ascending: false })
         .limit(10);
 
@@ -483,14 +534,12 @@ const TenantDashboard: React.FC = () => {
 
   const fetchMaintenanceRequests = async () => {
     try {
-      // First get tenant info to scope to property
-      if (!tenantInfo) return;
+      if (!user?.id) return;
       
       const { data: requests, error: requestsError } = await supabase
         .from("maintenance_requests")
         .select("*")
-        .eq("property_id", tenantInfo.property_id)
-        .eq("user_id", user.id)
+        .or(`tenant_id.eq.${user.id},reported_by.eq.${user.id}`)
         .order("created_at", { ascending: false })
         .limit(4);
 
@@ -524,12 +573,22 @@ const TenantDashboard: React.FC = () => {
   const fetchUpcomingDueDates = async () => {
     try {
       if (!user?.id) return;
+
+      const { data: tenantRows } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("user_id", user.id);
+
+      const tenantIdentifiers = [
+        user.id,
+        ...((tenantRows || []).map((row: any) => row.id).filter(Boolean)),
+      ];
       
       // Fetch upcoming/overdue payments ONLY FOR CURRENT TENANT
       const { data: upcoming, error: upcomingError } = await supabase
         .from("rent_payments")
         .select("*")
-        .eq("tenant_id", user.id)
+        .in("tenant_id", tenantIdentifiers)
         .in("status", ["pending", "overdue"])
         .order("due_date", { ascending: true });
 
@@ -735,12 +794,100 @@ const TenantDashboard: React.FC = () => {
     }
   };
 
+  const buildInitialInvoiceBreakdown = (invoice: PendingInitialInvoice) => {
+    return extractInvoiceLineItems(invoice.items);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] bg-slate-50 font-nunito">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#154279]" />
           <p className="text-slate-600 text-[13px] font-medium">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (tenantPortalLocked) {
+    return (
+      <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+        <div className="max-w-[1100px] mx-auto px-6 py-10">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6 mb-6">
+            <h1 className="text-2xl font-bold text-amber-900">Initial Move-In Payment Required</h1>
+            <p className="text-amber-800 mt-2 text-sm">
+              Your application has been approved and your unit is reserved. Complete the initial invoice payment to
+              unlock maintenance, property details, messaging, and all tenant dashboard features.
+            </p>
+          </div>
+
+          <Card className="border-none shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-xl text-[#154279]">Outstanding Initial Invoices</CardTitle>
+              <CardDescription>
+                Total due: <span className="font-semibold text-[#154279]">{formatCurrency(initialInvoiceTotal)}</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pendingInitialInvoices.length === 0 ? (
+                <div className="space-y-3">
+                  <div className="text-sm text-slate-700">
+                    Payment is confirmed. We are finalizing your unit assignment and lease activation.
+                  </div>
+                  <Button onClick={handleRefresh} className="bg-[#154279] hover:bg-[#0f305a]" size="sm">
+                    <RefreshCw className={cn("w-4 h-4 mr-2", refreshing ? "animate-spin" : "")} />
+                    {refreshing ? "Refreshing..." : "Refresh Assignment Status"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingInitialInvoices.map((invoice) => (
+                    <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            Invoice {invoice.reference_number || invoice.id.slice(0, 8)}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Due {invoice.due_date ? formatDate(invoice.due_date) : "Immediately"} • Status {invoice.status}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <p className="font-bold text-[#154279]">{formatCurrency(invoice.amount)}</p>
+                          <Button
+                            onClick={() => navigate(`/portal/tenant/payments/make?type=custom&amount=${invoice.amount}&onboardingInvoiceId=${invoice.id}`)}
+                            className="bg-[#154279] hover:bg-[#0f305a]"
+                          >
+                            Proceed To Payment
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                        <p className="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wide">Invoice Breakdown</p>
+                        <div className="space-y-1.5">
+                          {buildInitialInvoiceBreakdown(invoice).length === 0 ? (
+                            <p className="text-xs text-slate-500">Line items will appear exactly as issued in Billing and Invoicing.</p>
+                          ) : (
+                            buildInitialInvoiceBreakdown(invoice).map((line, index) => (
+                              <div key={`${invoice.id}-line-${index}`} className="flex items-center justify-between text-sm">
+                                <span className="text-slate-600">{line.label}</span>
+                                <span className="font-medium text-slate-900">{formatCurrency(line.amount)}</span>
+                              </div>
+                            ))
+                          )}
+                          <div className="border-t border-slate-200 pt-2 mt-2 flex items-center justify-between text-sm">
+                            <span className="font-semibold text-slate-700">Total Invoice</span>
+                            <span className="font-bold text-[#154279]">{formatCurrency(invoice.amount)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
