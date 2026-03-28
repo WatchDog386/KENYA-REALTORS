@@ -68,7 +68,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
     const uniqueUnitTypes = unitTypes || [];
 
     return (
-        <div className="bg-gradient-to-br from-[#f0f4f8] via-white to-[#e8ecf1] p-4 md:p-6 rounded-lg md:rounded-none shadow-lg md:shadow-2xl border-2 border-slate-300 font-inter overflow-hidden mb-4 md:mb-0">
+        <div className="bg-gradient-to-br from-[#f0f4f8] via-white to-[#e8ecf1] p-4 md:p-6 rounded-none md:rounded-none  md: border-2 border-transparent  font-inter overflow-hidden mb-4 md:mb-0 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
             <div 
                 className="flex items-center justify-between mb-0 md:mb-6 pb-2 md:pb-4 border-b-0 md:border-b-2 border-[#154279] cursor-pointer md:cursor-default"
                 onClick={() => setIsMobileOpen(!isMobileOpen)}
@@ -80,7 +80,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
                     </h3>
                 </div>
                 {/* Mobile Toggle Icon */}
-                <div className="md:hidden bg-slate-200 p-1.5 rounded-full text-[#154279]">
+                <div className="md:hidden bg-[#efeeee] p-1.5 rounded-full text-[#154279] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                    <ChevronRight size={14} className={cn("transition-transform duration-300", isMobileOpen ? "rotate-90" : "")} />
                 </div>
             </div>
@@ -88,7 +88,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
             <div className={cn("mt-4 md:mt-0 space-y-4 md:space-y-5", isMobileOpen ? "block" : "hidden md:block")}>
                 {loading ? (
                     <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin h-6 w-6 border-3 border-[#F96302] border-t-transparent rounded-full"></div>
+                        <div className="animate-spin h-6 w-6 border-3 border-[#F96302] border-t-transparent rounded-full shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"></div>
                     </div>
                 ) : (
                     <>
@@ -98,7 +98,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
                                 name="property"
                                 value={filters.property || ""}
                                 onChange={handleChange}
-                                className="w-full bg-white border-2 border-slate-300 p-2.5 md:p-3 rounded-none text-xs md:text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
+                                className="w-full bg-[#efeeee] border-2 border-transparent  p-2.5 md:p-3 rounded-none text-xs md:text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                             >
                                 <option value="">All Properties ({uniqueProperties.length})</option>
                                 {uniqueProperties.map((prop: any) => (
@@ -115,7 +115,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
                                 name="type" 
                                 value={filters.type}
                                 onChange={handleChange}
-                                className="w-full bg-white border-2 border-slate-300 p-2.5 md:p-3 rounded-none text-xs md:text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer"
+                                className="w-full bg-[#efeeee] border-2 border-transparent  p-2.5 md:p-3 rounded-none text-xs md:text-sm text-slate-700 focus:ring-2 focus:ring-[#F96302]/20 focus:border-[#F96302] outline-none cursor-pointer shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                             >
                                 <option value="">All Unit Types ({uniqueUnitTypes.length})</option>
                                 {uniqueUnitTypes.map((unitType: any, idx: number) => (
@@ -136,7 +136,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
                                 step="5000"
                                 value={filters.maxPrice || 500000}
                                 onChange={handleChange}
-                                className="w-full h-2 bg-slate-300 rounded-none appearance-none cursor-pointer accent-[#F96302]"
+                                className="w-full h-2 bg-slate-300 rounded-none appearance-none cursor-pointer accent-[#F96302] shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                             />
                             <div className="flex justify-between text-[10px] text-[#154279] mt-2 font-bold">
                                 <span>10k</span>
@@ -146,7 +146,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
 
                         <div className="pt-2">
                             <label className="text-[10px] font-bold text-[#154279] uppercase tracking-[0.15em] mb-3 block">📊 Vacant Units Available</label>
-                            <div className="bg-white p-3 rounded-lg border border-slate-200">
+                            <div className="bg-[#efeeee] p-3 rounded-none border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                 <p className="text-sm font-bold text-[#F96302]">{allListings.length} Units Available</p>
                                 <p className="text-xs text-slate-600 mt-1">Properties: {properties.length}</p>
                                 <p className="text-xs text-slate-600">Types: {unitTypes.length}</p>
@@ -155,7 +155,7 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
 
                         <button 
                             onClick={() => setFilters({ property: "", type: "", maxPrice: 500000 })}
-                            className="w-full bg-[#154279] hover:bg-[#F96302] text-white font-bold py-3 rounded-none text-[10px] uppercase tracking-[0.15em] transition-all shadow-lg">
+                            className="w-full bg-[#154279] hover:bg-[#F96302] text-white font-bold py-3 rounded-none text-[10px] uppercase tracking-[0.15em] transition-all ">
                             Reset Filters
                         </button>
                     </>
@@ -220,30 +220,30 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
             className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm overflow-y-auto custom-scroll font-inter"
         >
             {/* Header / Nav inside Modal */}
-            <div className="sticky top-0 bg-white shadow-sm z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-slate-200/60">
+            <div className="sticky top-0 bg-[#efeeee]  z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-transparent ">
                 <div className="font-semibold text-xl text-[#154279] tracking-tight">AYDEN<span className="text-[#F96302]">HOMES</span></div>
                 <button 
                     onClick={onClose}
-                    className="w-10 h-10 rounded-lg bg-slate-100 hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all"
+                    className="w-10 h-10 rounded-none bg-[#efeeee] hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"
                 >
                     <X size={20} />
                 </button>
             </div>
 
-            <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20 shadow-lg rounded-b-xl">
+            <div className="max-w-7xl mx-auto bg-[#efeeee] min-h-screen pb-20  ">
                 {/* 1. Title Header Section */}
-                <div className="p-6 md:p-10 pb-6 flex flex-col md:flex-row justify-between items-start border-b border-slate-200/60 bg-slate-50/50 rounded-t-xl">
+                <div className="p-6 md:p-10 pb-6 flex flex-col md:flex-row justify-between items-start border-b border-transparent  bg-[#efeeee]/50 ">
                     <div>
                         <div className="flex gap-2 mb-4">
-                            <span className="bg-[#F96302] text-white text-xs font-medium px-3 py-1.5 rounded-full">For Rent</span>
-                            {item.featured && <span className="bg-[#154279] text-white text-xs font-medium px-3 py-1.5 rounded-full">Featured</span>} 
+                            <span className="bg-[#F96302] text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">For Rent</span>
+                            {item.featured && <span className="bg-[#154279] text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">Featured</span>} 
                         </div>
                         <h1 className="text-2xl md:text-4xl font-semibold text-[#154279] mb-3 tracking-tight leading-tight">{item.title}</h1>
                         <p className="text-slate-500 flex items-center gap-2 text-sm font-normal">
                             <MapPin size={16} className="text-[#F96302]"/> {item.location} <span className="text-slate-300">|</span> {item.floor}
                         </p>
                     </div>
-                    <div className="mt-6 md:mt-0 text-left md:text-right bg-[#154279] p-6 rounded-xl shadow-sm">
+                    <div className="mt-6 md:mt-0 text-left md:text-right bg-[#154279] p-6 rounded-none shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                         <div className="text-xs font-medium text-white/70 mb-1">Monthly Rent</div>
                         <div className="text-2xl md:text-3xl font-bold text-white leading-none">KES {item.price.toLocaleString()}</div>
                         <p className="text-[#F96302] font-medium text-sm mt-1">All Inclusive</p>
@@ -254,7 +254,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                 <div className="p-6 md:p-10 pt-4">
                     {item.gallery && item.gallery.length > 0 ? (
                         <div className="flex flex-col gap-3">
-                            <div className="w-full h-[300px] md:h-[400px] rounded-xl overflow-hidden shadow-sm relative group">
+                            <div className="w-full h-[300px] md:h-[400px] rounded-none overflow-hidden  relative group shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                 <img 
                                     src={item.gallery[activeImageIndex]} 
                                     alt={item.title}
@@ -262,7 +262,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent pointer-events-none"></div>
                                 <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
-                                    <span className="bg-white/90 text-[#154279] text-xs px-3 py-1.5 rounded-full font-bold backdrop-blur-sm">
+                                    <span className="bg-[#efeeee]/90 text-[#154279] text-xs px-3 py-1.5 rounded-full font-bold backdrop-blur-sm shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                         {item.propertyName}
                                     </span>
                                 </div>
@@ -276,7 +276,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                                             key={idx}
                                             onClick={() => setActiveImageIndex(idx)}
                                             className={cn(
-                                                "w-24 h-20 rounded-lg overflow-hidden shrink-0 border-2 transition-all",
+                                                "w-24 h-20 rounded-none overflow-hidden shrink-0 border-2 transition-all",
                                                 activeImageIndex === idx ? "border-[#F96302] opacity-100 ring-2 ring-[#F96302]/30" : "border-transparent opacity-60 hover:opacity-100"
                                             )}
                                         >
@@ -287,7 +287,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                             )}
                         </div>
                     ) : (
-                        <div className="w-full bg-[#154279]/5 rounded-xl border border-[#154279]/10 p-6 flex items-center justify-center h-24">
+                        <div className="w-full bg-[#154279]/5 rounded-none border-transparent border-[#154279]/10 p-6 flex items-center justify-center h-24 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                              <span className="text-[#154279] font-medium text-sm flex items-center gap-2">
                                 <FileText size={18} className="text-[#F96302]" /> Detailed Unit Information Below
                              </span>
@@ -301,9 +301,9 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                     {/* LEFT COLUMN: Details */}
                     <div className="lg:col-span-2">
                         {/* Quick Overview Badges */}
-                        <div className="bg-slate-50 p-6 rounded-xl flex flex-wrap gap-8 md:gap-12 mb-10 border border-slate-200/60">
+                        <div className="bg-[#efeeee] p-6 rounded-none flex flex-wrap gap-8 md:gap-12 mb-10 border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                             <div className="flex items-center gap-4">
-                                <div className="bg-[#154279]/5 p-3 rounded-lg">
+                                <div className="bg-[#154279]/5 p-3 rounded-none shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <Bath size={24} className="text-[#F96302]"/>
                                 </div>
                                 <div>
@@ -334,28 +334,28 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                                 <h3 className="text-lg font-semibold text-[#154279]">Property & Unit Details</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-4 border border-slate-100">
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-[#efeeee] rounded-none p-4 border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <Home size={20} className="text-[#F96302]"/>
                                     <div>
                                         <span className="block text-[10px] uppercase text-slate-500 font-bold mb-0.5">Property Name</span>
                                         <span className="text-[#154279]">{item.propertyName}</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-4 border border-slate-100">
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-[#efeeee] rounded-none p-4 border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <BedDouble size={20} className="text-[#F96302]"/>
                                     <div>
                                         <span className="block text-[10px] uppercase text-slate-500 font-bold mb-0.5">Unit Type</span>
                                         <span className="text-[#154279]">{item.type}</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-4 border border-slate-100">
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-[#efeeee] rounded-none p-4 border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <FileText size={20} className="text-[#F96302]"/>
                                     <div>
                                         <span className="block text-[10px] uppercase text-slate-500 font-bold mb-0.5">Unit Number</span>
                                         <span className="text-[#154279]">{item.unitNumber || "Not Specified"}</span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-slate-50 rounded-lg p-4 border border-slate-100">
+                                <div className="flex items-center gap-3 text-slate-700 text-sm font-medium bg-[#efeeee] rounded-none p-4 border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <Clock size={20} className="text-[#F96302]"/>
                                     <div>
                                         <span className="block text-[10px] uppercase text-slate-500 font-bold mb-0.5">Status</span>
@@ -366,31 +366,31 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                         </div>
 
                         {/* Property Details Table */}
-                        <div className="bg-white p-6 rounded-xl border border-slate-200/60">
+                        <div className="bg-[#efeeee] p-6 rounded-none border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                             <div className="flex items-center gap-3 mb-5">
                                 <div className="h-px w-8 bg-[#F96302]"></div>
                                 <h3 className="text-lg font-semibold text-[#154279]">Technical Specs</h3>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                <div className="flex justify-between bg-[#efeeee] rounded-none p-3 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <span className="font-medium text-slate-500 text-sm">Unit ID</span>
                                     <span className="font-semibold text-[#154279]">{item.id}</span>
                                 </div>
-                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                <div className="flex justify-between bg-[#efeeee] rounded-none p-3 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <span className="font-medium text-slate-500 text-sm">Monthly Fee</span>
                                     <span className="font-semibold text-[#F96302]">KES {item.price.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                <div className="flex justify-between bg-[#efeeee] rounded-none p-3 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <span className="font-medium text-slate-500 text-sm">Unit Type</span>
                                     <span className="font-semibold text-[#154279]">{item.type}</span>
                                 </div>
-                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                <div className="flex justify-between bg-[#efeeee] rounded-none p-3 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <span className="font-medium text-slate-500 text-sm">Year Built</span>
                                     <span className="font-semibold text-[#154279]">2024</span>
                                 </div>
-                                <div className="flex justify-between bg-slate-50 rounded-lg p-3">
+                                <div className="flex justify-between bg-[#efeeee] rounded-none p-3 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <span className="font-medium text-slate-500 text-sm">Status</span>
-                                    <span className="bg-green-100 text-green-700 px-3 py-1 text-xs font-medium rounded-full">Available</span>
+                                    <span className="bg-green-100 text-green-700 px-3 py-1 text-xs font-medium rounded-full shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">Available</span>
                                 </div>
                             </div>
                         </div>
@@ -398,13 +398,13 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
 
                     {/* RIGHT COLUMN: Contact Form */}
                     <div className="lg:col-span-1">
-                        <div className="bg-[#154279] rounded-xl p-6 shadow-sm sticky top-24">
+                        <div className="bg-[#154279] rounded-none p-6  sticky top-24 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                             <div className="flex items-center gap-2 mb-5">
                                 <Clock size={18} className="text-[#F96302]" />
                                 <h4 className="text-lg font-semibold text-white">Schedule Visit</h4>
                             </div>
-                            <div className="flex items-center gap-4 mb-6 bg-white/10 p-4 rounded-lg">
-                                <div className="w-12 h-12 bg-white/10 rounded-lg overflow-hidden shrink-0">
+                            <div className="flex items-center gap-4 mb-6 bg-[#efeeee]/10 p-4 rounded-none shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
+                                <div className="w-12 h-12 bg-[#efeeee]/10 rounded-none overflow-hidden shrink-0 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     <img src={managerAvatar} alt="Agent" className="w-full h-full object-cover" />
                                 </div>
                                 <div className="overflow-hidden">
@@ -416,21 +416,21 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                             <form className="space-y-4">
                                 <div>
                                     <label className="text-xs font-medium text-white/70 mb-1.5 block">Full Name</label>
-                                    <input type="text" placeholder="John Doe" className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all"/>
+                                    <input type="text" placeholder="John Doe" className="w-full bg-[#efeeee]/10 border-transparent border-white/20 rounded-none px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"/>
                                 </div>
                                 <div>
                                     <label className="text-xs font-medium text-white/70 mb-1.5 block">Email Address</label>
-                                    <input type="email" placeholder="john@example.com" className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all"/>
+                                    <input type="email" placeholder="john@example.com" className="w-full bg-[#efeeee]/10 border-transparent border-white/20 rounded-none px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"/>
                                 </div>
                                 <div>
                                     <label className="text-xs font-medium text-white/70 mb-1.5 block">Message</label>
-                                    <textarea rows={3} placeholder="I want to see this unit..." className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all resize-none"></textarea>
+                                    <textarea rows={3} placeholder="I want to see this unit..." className="w-full bg-[#efeeee]/10 border-transparent border-white/20 rounded-none px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-[#F96302] outline-none transition-all resize-none shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"></textarea>
                                 </div>
                                 
-                                <button className="w-full bg-[#F96302] hover:bg-[#e55a00] text-white font-medium py-3 rounded-lg transition-all text-sm">
+                                <button className="w-full bg-[#F96302] hover:bg-[#e55a00] text-white font-medium py-3 rounded-none transition-all text-sm shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                                     Reserve My Tour
                                 </button>
-                                <button className="w-full bg-transparent border border-white/30 text-white font-medium py-3 rounded-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2 text-sm">
+                                <button className="w-full bg-transparent border-transparent border-white/30 text-white font-medium py-3 rounded-none hover:bg-[#efeeee]/10 transition-all flex items-center justify-center gap-2 text-sm shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]">
                                     <Phone size={16} className="text-[#F96302]"/> Direct Line
                                 </button>
                             </form>
@@ -652,60 +652,6 @@ export default function AydenTowersListing() {
         
         return sorted;
     }, [filters, allListings, sortBy]);
-    // Current Property Data based on filter
-    const activeProperty = useMemo(() => {
-        if (!filters.property) return null;
-        return properties.find(p => p.id === filters.property) || null;
-    }, [filters.property, properties]);
-
-    const [propertyManager, setPropertyManager] = useState<any>(null);
-
-    useEffect(() => {
-        const fetchManager = async () => {
-            if (!activeProperty?.id) {
-                setPropertyManager(null);
-                return;
-            }
-            const propId = activeProperty.id;
-
-            const { data: assignments } = await supabase
-                .from('property_manager_assignments')
-                .select('property_manager_id')
-                .eq('property_id', propId)
-                .eq('status', 'active')
-                .limit(1);
-
-            let mId = assignments?.[0]?.property_manager_id;
-
-            if (!mId) {
-                const { data: caretakers } = await supabase
-                    .from('caretakers')
-                    .select('user_id')
-                    .eq('property_id', propId)
-                    .eq('status', 'active')
-                    .limit(1);
-                mId = caretakers?.[0]?.user_id;
-            }
-
-            if (mId) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('full_name, phone, role, avatar_url')
-                    .eq('id', mId)
-                    .single();
-                setPropertyManager(profile);
-            } else {
-                setPropertyManager(null);
-            }
-        };
-        fetchManager();
-    }, [activeProperty?.id]);
-
-    const heroImage = activeProperty?.image_url || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?q=80&w=1600";
-    const heroTitle = activeProperty?.name ? activeProperty.name.toUpperCase() : "FEATURED PROPERTY";
-    const heroLocation = activeProperty?.location || "Nairobi West, Kenya";
-    const heroDescName = activeProperty?.name || "this property";
-    const heroDesc = activeProperty?.description || `Discover ${heroDescName} — a premier rental residential complex offering diverse living options.`;
     
     // Calculate pagination
     const totalPages = Math.ceil(filteredListings.length / listingsPerPage);
@@ -769,14 +715,14 @@ export default function AydenTowersListing() {
         }
         // Default (White/Dark Blue/Orange accents)
         return {
-            cardBg: "bg-white",
+            cardBg: "bg-[#efeeee]",
             border: "border-transparent",
             header: "border-transparent",
             tag: "bg-[#154279] text-white",
             title: "text-[#154279] hover:text-[#F96302]",
             price: "text-[#F96302]",
             icon: "text-[#F96302]",
-            innerBox: "bg-slate-50 border-transparent",
+            innerBox: "bg-[#efeeee] border-transparent",
             priceBg: "bg-gradient-to-r from-[#f0f4f8] via-white to-[#e8ecf1] border-transparent"
         };
     };
@@ -784,76 +730,7 @@ export default function AydenTowersListing() {
     return (
         <>
         <GlobalStyles />
-        <div className="min-h-screen bg-slate-50 text-slate-800 font-inter" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-            
-            {/* --- HERO SECTION (DIY Rental Guide Style) --- */}
-            <section className="bg-slate-50 pt-24 pb-12 lg:pt-28 lg:pb-16">
-                <div className="max-w-[1400px] mx-auto px-4">
-                    
-                    {/* Page Header */}
-                    <motion.div 
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mb-10 pb-6 border-b border-slate-200/60"
-                    >
-                        <h1 className="text-xl sm:text-2xl md:text-4xl font-semibold text-[#154279] leading-tight tracking-tight">
-                            Available Properties & Units
-                        </h1>
-                        <p className="text-slate-500 mt-2 text-sm font-normal">
-                            Browse {allListings.length} vacant units across our portfolio of premium properties
-                        </p>
-                    </motion.div>
-
-                    {/* Featured Hero - Image Card + Text Side by Side */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                        {/* Image Card */}
-                        <motion.div 
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            className="lg:col-span-7 h-[280px] lg:h-[380px] relative rounded-none overflow-hidden"
-                        >
-                            <img
-                                src={heroImage}
-                                alt={heroDescName}
-                                className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105"
-                            />
-                        </motion.div>
-
-                        {/* Text Content - No Card */}
-                        <div className="lg:col-span-5 flex flex-col justify-center">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="h-px w-8 bg-[#F96302]"></div>
-                                <span className="text-xs font-medium text-[#F96302]">Signature Living</span>
-                            </div>
-                            <h2 className="text-xl lg:text-3xl font-semibold text-[#154279] leading-tight tracking-tight mb-4">
-                                Modern Living<br/>
-                                <span className="text-[#F96302]">Perfected.</span>
-                            </h2>
-
-                            <p className="text-slate-600 text-sm leading-relaxed mb-6 font-normal">
-                                {heroDesc}
-                            </p>
-
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <button className="bg-[#F96302] text-white py-3 px-6 rounded-lg font-medium text-sm hover:bg-[#e55a00] transition-all flex items-center justify-center gap-2">
-                                    Explore Units <ArrowRight size={16} />
-                                </button>
-                                {propertyManager?.phone ? (
-                                    <a href={`tel:${propertyManager.phone}`} className="border border-slate-200 text-[#154279] py-3 px-6 rounded-lg font-medium text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                                        <Phone size={16} className="text-[#F96302]" /> Contact Manager
-                                    </a>
-                                ) : (
-                                    <button className="border border-slate-200 text-[#154279] py-3 px-6 rounded-lg font-medium text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                                        <Phone size={16} className="text-[#F96302]" /> Contact Manager
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-            {/* --- END HERO SECTION --- */}
+        <div className="min-h-screen bg-[#efeeee] text-slate-800 font-inter" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
             {/* MAIN CONTENT AREA */}
             <div className="max-w-[1400px] mx-auto px-4 pb-16 flex flex-col md:flex-row gap-6">
@@ -863,13 +740,13 @@ export default function AydenTowersListing() {
                     <FilterSidebar filters={filters} setFilters={setFilters} allListings={allListings} loading={loading} properties={properties} unitTypes={unitTypes} />
                     
                     {/* Promo Banner */}
-                    <div className="mt-6 bg-[#F96302] rounded-xl p-5 text-white shadow-sm hidden md:block">
+                    <div className="mt-6 bg-[#F96302] rounded-none p-5 text-white  hidden md:block shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                         <div className="flex items-center gap-2 mb-3">
                             <Zap size={18} />
                             <h4 className="font-semibold text-base">Move In Special!</h4>
                         </div>
                         <p className="text-sm opacity-90 mb-4 font-normal">Get 50% OFF your first month's rent when you sign a lease for Wing A units.</p>
-                        <button className="bg-white text-[#F96302] px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors w-full">
+                        <button className="bg-[#efeeee] text-[#F96302] px-4 py-2.5 rounded-none font-medium text-sm hover:bg-[#efeeee] transition-colors w-full shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]">
                             View Details
                         </button>
                     </div>
@@ -894,7 +771,7 @@ export default function AydenTowersListing() {
                             <select 
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value)}
-                                className="border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F96302] bg-white font-medium text-slate-700"
+                                className="border border-transparent  rounded-none px-4 py-2.5 text-sm focus:outline-none focus:border-[#F96302] bg-[#efeeee] font-medium text-slate-700 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"
                             >
                                 <option value="Newest">Sort by: Newest</option>
                                 <option value="Price (Low to High)">Sort by: Price (Low to High)</option>
@@ -905,7 +782,7 @@ export default function AydenTowersListing() {
                     </div>
 
                     {currentListings.length === 0 ? (
-                        <div className="bg-white p-10 text-center rounded-xl shadow-sm border border-slate-200/60">
+                        <div className="bg-[#efeeee] p-10 text-center rounded-none  border-transparent border-transparent shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                             <h3 className="text-lg font-semibold text-slate-400 mb-2">No units match your criteria.</h3>
                             <button 
                                 onClick={()=>setFilters({property:"", type:"", maxPrice:500000})} 
@@ -922,7 +799,7 @@ export default function AydenTowersListing() {
                                     initial={{ opacity: 0, y: 20 }}
                                     whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }}
-                                      className={cn("rounded-none overflow-hidden shadow-2xl hover:shadow-xl group flex flex-col transition-all duration-300", getCardTheme(item.type).cardBg, getCardTheme(item.type).border)}
+                                      className={cn("rounded-none overflow-hidden  hover: group flex flex-col transition-all duration-300", getCardTheme(item.type).cardBg, getCardTheme(item.type).border)}
                                   >
                                     <div className={cn("relative h-44 overflow-hidden cursor-pointer", getCardTheme(item.type).header)} onClick={() => setSelectedItem(item)}>
                                         <img
@@ -945,7 +822,7 @@ export default function AydenTowersListing() {
                                             )}
                                         </div>
                                         <div className="absolute bottom-3 left-3">
-                                            <span className="bg-white/90 text-[#154279] text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide">
+                                            <span className="bg-[#efeeee]/90 text-[#154279] text-[10px] px-2.5 py-1 rounded-none font-bold uppercase tracking-wide">
                                                 {item.type}
                                             </span>
                                         </div>
@@ -964,17 +841,17 @@ export default function AydenTowersListing() {
                                         </div>
 
                                         <div className="flex flex-col gap-2 mb-4">
-                                            <div className={cn("flex items-center gap-2 p-2 rounded-lg", getCardTheme(item.type).innerBox)}>
+                                            <div className={cn("flex items-center gap-2 p-2 rounded-none", getCardTheme(item.type).innerBox)}>
                                                 <Home size={14} className={getCardTheme(item.type).icon} />
                                                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider w-20">Property:</span>
                                                 <span className="text-xs font-semibold text-[#154279] line-clamp-1">{item.propertyName}</span>
                                             </div>
-                                            <div className={cn("flex items-center gap-2 p-2 rounded-lg", getCardTheme(item.type).innerBox)}>
+                                            <div className={cn("flex items-center gap-2 p-2 rounded-none", getCardTheme(item.type).innerBox)}>
                                                 <BedDouble size={14} className={getCardTheme(item.type).icon} />
                                                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider w-20">Unit Type:</span>
                                                 <span className="text-xs font-semibold text-[#154279]">{item.type}</span>
                                             </div>
-                                            <div className={cn("flex items-center gap-2 p-2 rounded-lg", getCardTheme(item.type).innerBox)}>
+                                            <div className={cn("flex items-center gap-2 p-2 rounded-none", getCardTheme(item.type).innerBox)}>
                                                 <FileText size={14} className={getCardTheme(item.type).icon} />
                                                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider w-20">Unit No:</span>
                                                 <span className="text-xs font-semibold text-[#154279]">{item.unitNumber}</span>
@@ -1007,13 +884,13 @@ export default function AydenTowersListing() {
                                                             });
                                                             window.location.href = `/applications?${params.toString()}`;
                                                         }}
-                                                        className="px-3 py-2 bg-[#F96302] hover:bg-[#e55a00] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-lg"
+                                                        className="px-3 py-2 bg-[#F96302] hover:bg-[#e55a00] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#ab4401,inset_-2px_-2px_4px_#ff8203]"
                                                     >
                                                         Apply <ArrowRight size={12}/>
                                                     </button>
                                                     <button 
                                                         onClick={() => setSelectedItem(item)}
-                                                        className="px-3 py-2 bg-[#154279] hover:bg-[#11325c] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-lg"
+                                                        className="px-3 py-2 bg-[#154279] hover:bg-[#11325c] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#0e2a4f,inset_-2px_-2px_4px_#1c5aa3]"
                                                     >
                                                         View <ChevronRight size={12}/>
                                                     </button>
@@ -1032,10 +909,10 @@ export default function AydenTowersListing() {
                             <button 
                                 onClick={() => setCurrentPage(1)}
                                 className={cn(
-                                    "w-10 h-10 rounded-lg font-medium text-sm transition-all",
+                                    "w-10 h-10 rounded-none font-medium text-sm transition-all",
                                     currentPage === 1 
                                         ? 'bg-[#154279] text-white' 
-                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        : 'bg-[#efeeee] border-transparent border-transparent  text-slate-600 hover:bg-[#efeeee]'
                                 )}
                             >
                                 1
@@ -1043,10 +920,10 @@ export default function AydenTowersListing() {
                             <button 
                                 onClick={() => setCurrentPage(2)}
                                 className={cn(
-                                    "w-10 h-10 rounded-lg font-medium text-sm transition-all",
+                                    "w-10 h-10 rounded-none font-medium text-sm transition-all",
                                     currentPage === 2 
                                         ? 'bg-[#154279] text-white' 
-                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        : 'bg-[#efeeee] border-transparent border-transparent  text-slate-600 hover:bg-[#efeeee]'
                                 )}
                             >
                                 2
@@ -1054,7 +931,7 @@ export default function AydenTowersListing() {
                             {totalPages > 2 && (
                                 <button 
                                     onClick={() => setCurrentPage(currentPage < totalPages ? currentPage + 1 : totalPages)}
-                                    className="px-4 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all flex items-center gap-2"
+                                    className="px-4 h-10 rounded-none bg-[#efeeee] border-transparent border-transparent  text-slate-600 font-medium text-sm hover:bg-[#efeeee] transition-all flex items-center gap-2 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"
                                 >
                                     Next <ChevronRight size={16} />
                                 </button>

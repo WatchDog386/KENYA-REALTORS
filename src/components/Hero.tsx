@@ -453,18 +453,18 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm overflow-y-auto custom-scroll font-nunito"
     >
       {/* Header / Nav inside Modal */}
-      <div className="sticky top-0 bg-white shadow-lg shadow-slate-200/50 z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-slate-200 font-nunito">
+      <div className="sticky top-0 bg-[#efeeee]  shadow-slate-200/50 z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-transparent  font-nunito">
         <div className="font-bold text-xl text-[#154279] tracking-tighter uppercase">AYDEN<span className="text-[#F96302]">HOMES</span></div>
         <button
           onClick={onClose}
-          className="w-8 h-8 rounded-none bg-gray-100 hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all"
+          className="w-8 h-8 rounded-none bg-gray-100 hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
         >
           <X size={18} />
         </button>
       </div>
-      <div className="max-w-7xl mx-auto bg-white min-h-screen pb-20 shadow-2xl font-nunito">
+      <div className="max-w-7xl mx-auto bg-[#efeeee] min-h-screen pb-20  font-nunito">
         {/* 1. Title Header Section */}
-        <div className="p-6 md:p-10 pb-4 flex flex-col md:flex-row justify-between items-start border-b border-slate-200 bg-slate-50/50">
+        <div className="p-6 md:p-10 pb-4 flex flex-col md:flex-row justify-between items-start border-b border-transparent  bg-[#efeeee]/50">
           <div>
             <div className="flex gap-2 mb-3">
               <span className="bg-gradient-to-r from-[#154279] to-[#0f325e] text-white text-xs font-bold px-3 py-1 rounded-none uppercase tracking-wider">For Rent</span>
@@ -485,7 +485,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 h-[400px]">
             <div className="md:col-span-2 relative group overflow-hidden rounded-none">
               <img src={item.gallery ? item.gallery[0] : item.img} alt="Main" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-              <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-none text-xs font-bold shadow flex items-center gap-2 cursor-pointer hover:bg-[#F96302] hover:text-white transition-colors">
+              <div className="absolute bottom-4 right-4 bg-[#efeeee]/90 backdrop-blur px-3 py-1.5 rounded-none text-xs font-bold shadow flex items-center gap-2 cursor-pointer hover:bg-[#F96302] hover:text-white transition-colors">
                 <Maximize size={14} /> View Photos
               </div>
             </div>
@@ -500,7 +500,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
           {/* LEFT COLUMN: Details */}
           <div className="lg:col-span-2">
             {/* Quick Overview Badges */}
-            <div className="bg-slate-50 p-6 rounded-none flex flex-wrap gap-6 md:gap-12 mb-8 border border-slate-200 shadow-sm">
+            <div className="bg-[#efeeee] p-6 rounded-none flex flex-wrap gap-6 md:gap-12 mb-8 border-transparent border-transparent  ">
               <div className="flex items-center gap-3">
                 <BedDouble size={22} className="text-[#F96302]" />
                 <div>
@@ -525,7 +525,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
             </div>
             {/* Description */}
             <div className="mb-8">
-              <h3 className="text-lg font-bold text-[#154279] mb-4 border-b border-slate-200 pb-2 uppercase tracking-widest">Description</h3>
+              <h3 className="text-lg font-bold text-[#154279] mb-4 border-b border-transparent  pb-2 uppercase tracking-widest">Description</h3>
               <p className="text-gray-600 leading-relaxed text-sm font-medium">
                 {item.description}
                 <br /><br />
@@ -535,7 +535,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
             </div>
 
             {/* Property Details Table */}
-            <div className="bg-slate-50 p-6 rounded-none mb-8 border border-slate-200 shadow-md">
+            <div className="bg-[#efeeee] p-6 rounded-none mb-8 border-transparent border-transparent  ">
               <h3 className="text-base font-bold text-[#154279] mb-4 uppercase tracking-widest">Property Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 text-sm">
                 <div className="flex justify-between border-b border-gray-200 pb-2">
@@ -567,10 +567,10 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
           </div>
           {/* RIGHT COLUMN: Contact Form */}
           <div className="lg:col-span-1">
-            <div className="bg-gradient-to-br from-[#154279] to-[#0f325e] border border-[#154279] rounded-none p-6 shadow-lg sticky top-24">
+            <div className="bg-gradient-to-br from-[#154279] to-[#0f325e] border-transparent border-[#154279] rounded-none p-6  sticky top-24">
               <h4 className="text-base font-bold text-white mb-4 uppercase tracking-widest">Schedule a Tour</h4>
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden">
+                <div className="w-12 h-12 bg-gray-200 rounded-full overflow-hidden shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                   <img src="https://i.pravatar.cc/150?u=property" alt="Agent" />
                 </div>
                 <div>
@@ -585,7 +585,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
                   onChange={handleInputChange}
                   type="text" 
                   placeholder="Your Name" 
-                  className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium"
+                  className="w-full bg-[#efeeee]/10 border-transparent border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                   required
                 />
                 <input 
@@ -594,7 +594,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
                   onChange={handleInputChange}
                   type="email" 
                   placeholder="Your Email" 
-                  className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium"
+                  className="w-full bg-[#efeeee]/10 border-transparent border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                   required
                 />
                 <input 
@@ -603,7 +603,7 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
                   onChange={handleInputChange}
                   type="tel" 
                   placeholder="Your Phone" 
-                  className="w-full bg-white/10 border border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium"
+                  className="w-full bg-[#efeeee]/10 border-transparent border-white/30 rounded-none px-3 py-3 text-sm text-white placeholder:text-white/60 focus:ring-1 focus:ring-white/50 outline-none font-medium shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                   required
                 />
                 <textarea 
@@ -612,16 +612,16 @@ const DetailModal = ({ item, onClose }: { item: any; onClose: () => void }) => {
                   onChange={handleInputChange}
                   rows={3} 
                   placeholder="I am interested in this property..." 
-                  className="w-full bg-white border border-gray-200 rounded-none px-3 py-3 text-sm focus:border-[#F96302] outline-none font-medium"
+                  className="w-full bg-[#efeeee] border-transparent border-gray-200 rounded-none px-3 py-3 text-sm focus:border-[#F96302] outline-none font-medium shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                 ></textarea>
                 <button 
                   type="submit" 
                   disabled={isSubmitting}
-                  className="w-full bg-[#F96302] text-white font-bold py-3 rounded-none hover:bg-[#d85502] transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-[#F96302] text-white font-bold py-3 rounded-none hover:bg-[#d85502] transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-wider disabled:opacity-75 disabled:cursor-not-allowed shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Request'}
                 </button>
-                <button type="button" className="w-full border-2 border-white text-white font-bold py-3 rounded-none hover:bg-white hover:text-[#154279] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+                <button type="button" className="w-full border-2 border-white text-white font-bold py-3 rounded-none hover:bg-[#efeeee] hover:text-[#154279] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]">
                   <Phone size={16} /> Call Us
                 </button>
               </form>
@@ -646,16 +646,16 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
   
   return (
     <div
-      className={`bg-white rounded-none overflow-hidden border transition-all duration-300 group flex flex-col font-nunito shadow-md cursor-pointer ${isActive ? 'border-[#F96302] shadow-lg ring-1 ring-[#F96302]/20' : 'border-slate-200 hover:border-[#154279] hover:shadow-lg'}`}
+      className={`bg-[#efeeee] rounded-none overflow-hidden border-transparent transition-all duration-300 group flex flex-col font-nunito  cursor-pointer ${isActive ? 'border-[#F96302]  ring-1 ring-[#F96302]/20' : 'border-transparent  hover:border-[#154279] hover:'}`}
       onClick={handleViewProperty}
     >
       <div className="relative h-48 overflow-hidden cursor-pointer" onClick={handleViewProperty}>
         <img src={data.img} alt={data.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-        <div className="absolute top-4 left-4 bg-[#154279] text-white text-xs font-bold px-3 py-1 rounded-none uppercase tracking-wider shadow-md">
+        <div className="absolute top-4 left-4 bg-[#154279] text-white text-xs font-bold px-3 py-1 rounded-none uppercase tracking-wider ">
           {data.beds === 0 ? "Studio" : `${data.beds} Bedroom`}
         </div>
 
-        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm px-2 py-1 rounded-none text-xs font-bold flex items-center gap-1 shadow-md">
+        <div className="absolute bottom-4 right-4 bg-[#efeeee]/95 backdrop-blur-sm px-2 py-1 rounded-none text-xs font-bold flex items-center gap-1 ">
           <Maximize size={12} /> 3
         </div>
         <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent p-3 pt-8">
@@ -688,7 +688,7 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
           <span className="text-xs text-gray-600 font-bold">({data.reviews} reviews)</span>
         </div>
 
-        <div className="flex justify-between items-center border-t border-slate-200 pt-3 mt-auto">
+        <div className="flex justify-between items-center border-t border-transparent  pt-3 mt-auto">
           <div className="flex gap-4 text-xs font-bold text-[#154279]">
             <span className="flex items-center gap-1"><Bed size={13} /> {data.beds}</span>
             <span className="flex items-center gap-1"><Bath size={13} /> {data.baths}</span>
@@ -696,7 +696,7 @@ const ListingCard = ({ data, onClick, isActive }: { data: any; onClick: () => vo
           </div>
           <button
             onClick={handleViewProperty}
-            className="text-[#F96302] text-xs font-bold uppercase hover:text-[#d85502] transition-colors flex items-center gap-1 hover:underline"
+            className="text-[#F96302] text-xs font-bold uppercase hover:text-[#d85502] transition-colors flex items-center gap-1 hover:underline shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
           >
             Open in New <ChevronRight size={14} />
           </button>
@@ -764,9 +764,9 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
   }
   
   return (
-    <section className="w-full bg-[#f4f4f4] border-b border-slate-200 font-nunito pt-12 md:pt-16">
+    <section className="w-full bg-[#efeeee] border-b border-transparent font-nunito pt-12 md:pt-16">
       <div className="w-full max-w-[1660px] mx-auto px-2 md:px-3 lg:px-4 py-4 md:py-6">
-        <div className="relative overflow-hidden border border-[#d8d8d8] bg-white shadow-[0_12px_32px_rgba(15,35,65,0.14)]">
+        <div className="relative overflow-hidden border-none bg-[#efeeee] shadow-[10px_10px_20px_#d1d1d1,-10px_-10px_20px_#ffffff]">
           <AnimatePresence initial={false} custom={direction} mode="popLayout">
             <motion.div
               key={page}
@@ -778,7 +778,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
               transition={{ x: { type: "spring", stiffness: 280, damping: 28 }, opacity: { duration: 0.2 } }}
               className="grid grid-cols-1 lg:grid-cols-12 min-h-[540px] md:min-h-[580px]"
             >
-              <div className="lg:col-span-5 p-4 md:p-6 lg:p-7 flex flex-col bg-white relative">
+              <div className="lg:col-span-5 p-4 md:p-6 lg:p-7 flex flex-col bg-[#efeeee] relative">
                 <div className="mb-2">
                   <span className="inline-flex items-center gap-2 bg-[#0f335f] text-white text-[10px] md:text-xs font-black uppercase tracking-[0.16em] px-3 py-1">
                     <ShoppingCart size={12} />
@@ -796,22 +796,22 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                 </p>
 
                 <div className="mt-3 space-y-2">
-                  <div className="inline-flex items-center gap-2 bg-[#fff4ec] text-[#a74412] text-[11px] font-bold px-2.5 py-1 border border-[#ffd7bd]">
+                  <div className="inline-flex items-center gap-2 bg-[#fff4ec] text-[#a74412] text-[11px] font-bold px-2.5 py-1 border-transparent border-[#ffd7bd]">
                     <MapPin size={14} />
                     {currentSlide.location}
                   </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    onClick={() => navigate('/features')}
-                    className="col-span-2 border-2 border-[#0f335f] text-[#0f335f] font-black py-3 px-3 uppercase tracking-[0.12em] text-[10px] md:text-[11px] hover:bg-[#0f335f] hover:text-white transition-colors"
-                  >
-                    Browse Homes
-                  </button>
-                </div>
+                <div className="mt-3 flex justify-start">
+                    <button
+                      onClick={() => navigate('/features')}
+                      className="bg-[#F96302] hover:bg-[#e55a00] text-white font-black h-11 px-8 flex items-center justify-center uppercase tracking-[0.12em] text-[10px] md:text-[11px] transition-all shadow-[4px_4px_8px_rgba(0,0,0,0.3)] hover:shadow-[inset_2px_2px_4px_#ab4401,inset_-2px_-2px_4px_#ff8203]"
+                    >
+                      Browse Homes
+                    </button>
+                  </div>
 
-                <div className="mt-4 border border-[#e3e3e3] bg-[#f8f8f8] p-3 md:p-4">
+                <div className="mt-4 border-transparent border-[#e3e3e3] bg-[#f8f8f8] p-3 md:p-4">
                   <p className="text-[9px] font-black text-[#0f335f] uppercase tracking-[0.2em]">Quick Search</p>
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-5 gap-2">
                     <div className="sm:col-span-3 relative">
@@ -820,7 +820,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                         type="text"
                         readOnly
                         value={currentSlide.location || "Nairobi"}
-                        className="w-full h-11 border border-slate-300 bg-white pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-700 focus:outline-none"
+                        className="w-full h-11 border-transparent border-transparent  bg-[#efeeee] pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-700 focus:outline-none shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
                       />
                     </div>
                     <button
@@ -839,7 +839,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                 <div className="absolute inset-0 bg-gradient-to-l from-black/45 via-transparent to-transparent"></div>
 
                 <div className="absolute bottom-0 left-0 right-0 p-3 md:p-4 lg:p-5">
-                  <div className="max-w-xl bg-black/45 backdrop-blur-[2px] border border-white/15 p-3 md:p-4">
+                  <div className="max-w-xl bg-black/45 backdrop-blur-[2px] border-transparent border-white/15 p-3 md:p-4">
                     <p className="text-[10px] md:text-xs font-black text-[#ffd6bd] uppercase tracking-[0.2em]">{currentSlide.subhead}</p>
                     <p className="mt-1.5 text-white text-sm md:text-xl font-black uppercase leading-tight">
                       {currentSlide.specs || "Ready-to-move units"}
@@ -853,7 +853,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                       </button>
                       <button
                         onClick={() => navigate('/pricing')}
-                        className="bg-white text-[#0f335f] text-[10px] md:text-xs font-black uppercase tracking-[0.12em] px-3 py-1.5 hover:bg-slate-100 transition-colors"
+                        className="bg-[#efeeee] text-[#0f335f] text-[10px] md:text-xs font-black uppercase tracking-[0.12em] px-3 py-1.5 hover:bg-[#efeeee] transition-colors"
                       >
                         Financing
                       </button>
@@ -864,14 +864,14 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                 <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 flex items-center gap-2">
                   <button
                     onClick={() => paginate(-1)}
-                    className="w-10 h-10 bg-white/90 hover:bg-white text-[#0f335f] border border-white/60 transition-colors flex items-center justify-center"
+                    className="w-10 h-10 bg-[#efeeee]/90 hover:bg-[#efeeee] text-[#0f335f] border-transparent border-white/60 transition-colors flex items-center justify-center"
                     aria-label="Previous slide"
                   >
                     <ChevronRight size={18} className="rotate-180" />
                   </button>
                   <button
                     onClick={() => paginate(1)}
-                    className="w-10 h-10 bg-white/90 hover:bg-white text-[#0f335f] border border-white/60 transition-colors flex items-center justify-center"
+                    className="w-10 h-10 bg-[#efeeee]/90 hover:bg-[#efeeee] text-[#0f335f] border-transparent border-white/60 transition-colors flex items-center justify-center"
                     aria-label="Next slide"
                   >
                     <ChevronRight size={18} />
@@ -883,7 +883,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                     <button
                       key={slide.id || index}
                       onClick={() => goToSlide(index)}
-                      className={`h-1.5 transition-all ${slideIndex === index ? 'w-8 bg-[#F96302]' : 'w-4 bg-white/60 hover:bg-white'}`}
+                      className={`h-1.5 transition-all ${slideIndex === index ? 'w-8 bg-[#F96302]' : 'w-4 bg-[#efeeee]/60 hover:bg-[#efeeee]'}`}
                       aria-label={`Go to slide ${index + 1}`}
                     />
                   ))}
@@ -1133,7 +1133,7 @@ const HomePage = () => {
           <FeaturesSection />
           {(selectedAmenities.length > 0 || selectedBedroom || selectedPrice || selectedLocation) ? (
             <div className="mb-6">
-              <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-2">
+              <div className="flex items-center justify-between mb-4 border-b border-transparent  pb-2">
                 <h2 className="text-base font-bold text-[#154279] flex items-center gap-2 uppercase tracking-widest">
                   <Home className="text-[#F96302]" size={18} />
                   Available Properties {filteredListings.length > 0 && `(${filteredListings.length} available)`}
@@ -1179,7 +1179,7 @@ const HomePage = () => {
                 )}
               </div>
               {/* Info Box */}
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-none flex items-center gap-2.5 text-[#154279]">
+              <div className="mt-4 p-3 bg-blue-50 border-transparent border-blue-100 rounded-none flex items-center gap-2.5 text-[#154279]">
                 <AlertCircle size={16} className="shrink-0 text-[#F96302]" />
                 <p className="text-[11px] leading-relaxed font-bold">
                   Click any property above to view details. Vacant units are listed below by unit type and property.
@@ -1188,7 +1188,7 @@ const HomePage = () => {
 
               {/* Vacant Units Section */}
               {filteredListings.length > 0 && (
-                <div className="mt-12 pt-8 border-t-2 border-slate-200/40">
+                <div className="mt-12 pt-8 border-t-2 border-transparent ">
                   <div className="flex items-center gap-2 mb-6">
                     <Layers className="text-[#F96302]" size={22} />
                     <h3 className="text-lg font-bold text-[#154279] uppercase tracking-widest">Available Vacant Units</h3>
@@ -1218,7 +1218,7 @@ const HomePage = () => {
                       
                       if (vacantUnitsList.length === 0) {
                         return (
-                          <div className="col-span-full text-center py-8 bg-slate-50 border border-slate-200 rounded-lg">
+                          <div className="col-span-full text-center py-8 bg-[#efeeee] border-transparent border-transparent  rounded-none shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                             <p className="text-sm font-bold text-slate-600">No vacant units available for the selected filters</p>
                           </div>
                         );
@@ -1227,7 +1227,7 @@ const HomePage = () => {
                       return vacantUnitsList.map((unit, idx) => (
                         <div 
                           key={idx}
-                          className="bg-white border-l-4 border-l-[#F96302] p-4 rounded-lg shadow-md hover:shadow-lg transition-all hover:border-l-[#d85502] cursor-pointer"
+                          className="bg-[#efeeee] border-l-4 border-l-[#F96302] p-4 rounded-none  hover: transition-all hover:border-l-[#d85502] cursor-pointer shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"
                           onClick={() => openPreview(unit)}
                         >
                           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
@@ -1263,11 +1263,11 @@ const HomePage = () => {
                           </div>
 
                           {/* Status Badge */}
-                          <div className="mt-3 pt-3 border-t border-slate-200 flex items-center justify-between">
-                            <span className="inline-block bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                          <div className="mt-3 pt-3 border-t border-transparent  flex items-center justify-between">
+                            <span className="inline-block bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
                               ✓ Available
                             </span>
-                            <button className="text-xs font-bold text-[#F96302] hover:text-[#d85502] uppercase tracking-wider flex items-center gap-1">
+                            <button className="text-xs font-bold text-[#F96302] hover:text-[#d85502] uppercase tracking-wider flex items-center gap-1 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]">
                               View Details <ChevronRight size={14} />
                             </button>
                           </div>
@@ -1293,3 +1293,4 @@ const HomePage = () => {
 };
 
 export default HomePage;
+

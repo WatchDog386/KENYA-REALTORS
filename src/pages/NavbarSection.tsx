@@ -458,60 +458,67 @@ const Navbar = () => {
 
             </div>
 
-            {/* CHECK VISIBILITY: Sleek Rounded Design - Hidden on tablet/mobile */}
-            <div className="hidden lg:flex flex-1 w-full relative group z-30 ml-4 lg:ml-8">
-                <div className={`w-full flex items-center bg-slate-50 border border-slate-200 rounded-full pl-1 pr-1 py-1 transition-all duration-300 shadow-sm group-hover:shadow-md focus-within:border-[${COLORS.secondary}] focus-within:shadow-[0_4px_15px_rgba(249,99,2,0.2)] focus-within:ring-1 focus-within:ring-[${COLORS.secondary}]/30`}>
-                <div className="relative flex-1">
-                  <div className={`absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[${COLORS.secondary}] transition-colors pointer-events-none`}>
-                    <FaSearch size={16} />
-                  </div>
-                  <input 
-                    type="text"
-                    placeholder="Search by location..."
-                    onFocus={() => setShowLocations(true)}
-                    onBlur={() => setTimeout(() => setShowLocations(false), 200)}
-                    className="w-full h-10 pl-11 pr-4 border-none outline-none text-[15px] placeholder:text-slate-500 font-medium bg-transparent text-slate-900"
-                  />
-                </div>
-                <button className={`bg-[${COLORS.secondary}] hover:bg-[${COLORS.primary}] text-white px-6 h-10 font-bold text-[16px] transition-all duration-300 rounded-full shadow-md hover:shadow-lg flex items-center gap-2 transform hover:-translate-y-0.5`}>
-                  <span className="hidden md:block">SEARCH</span>
-                  <FaSearch size={12} className="md:hidden" />
-                </button>
+            {/* NAVIGATION LIST (Moved from Sub-Nav) */}
+            <div className="hidden lg:flex flex-1 w-full justify-center items-center gap-10 relative z-30 ml-4 lg:ml-8">
+              {NAVIGATION_SECTIONS.map((item) => {
+                const IconComponent = item.icon;
+                const isTenantSupport = item.id === "faq";
+                
+                return (
+                  <div key={item.id} className="relative group">
+                    <button
+                      onClick={() => {
+                        if (isTenantSupport) {
+                          setShowTenantDropdown(!showTenantDropdown);
+                        } else {
+                          handleNavClick(item.id);
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-2 py-2.5 rounded-none transition-all duration-200 ${
+                        isTenantSupport ? "group-hover:text-[#F96302]" : ""
+                      }`}
+                    >
+                      <span className={`text-[${COLORS.secondary}]`}>
+                        <IconComponent size={item.iconSize} />
+                      </span>
+                      <span className={`font-semibold text-[15px] text-[${COLORS.primary}] hover:text-[${COLORS.secondary}] transition-colors`}>
+                        {item.name}
+                      </span>
+                      {isTenantSupport && (
+                        <FaChevronDown size={12} className="text-slate-600 group-hover:text-[#F96302] transition-colors" />
+                      )}
+                    </button>
 
-                {/* LOCATION DROPDOWN */}
-                {showLocations && (
-                  <div className="absolute top-full left-0 w-full bg-white shadow-xl border border-gray-100 mt-2 max-h-[350px] overflow-y-auto rounded-lg z-50">
-                    <div className="px-4 py-2 bg-slate-50 text-[10px] uppercase font-bold text-gray-500 tracking-wider sticky top-0 border-b border-gray-100">
-                      Available Areas
-                    </div>
-                    {LOCATION_AREAS.map((location, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setShowLocations(false);
-                          navigate("/features");
-                        }}
-                        className="w-full px-4 py-3 hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-0 text-left group/loc"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="text-sm font-bold text-[#154279] group-hover/loc:text-[#F96302] transition-colors">{location.name}</h4>
-                            <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                              <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                {location.vacancies} Vacant
-                              </span>
-                              <span>•</span>
-                              <span>{location.rentals} Total</span>
-                            </div>
-                          </div>
-                          <ChevronRight size={16} className="text-[#F96302] opacity-0 group-hover/loc:opacity-100 transition-opacity" />
+                    {/* Tenant Support Dropdown */}
+                    {isTenantSupport && (
+                      <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                        <div className="bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                          <button
+                            onClick={() => {
+                              handleNavClick("faq");
+                              setShowTenantDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3 border-b border-slate-100"
+                          >
+                            <span>❓</span>
+                            FAQ Section
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigate("/contact");
+                              setShowTenantDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3"
+                          >
+                            <span>📧</span>
+                            Contact Us
+                          </button>
                         </div>
-                      </button>
-                    ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })}
             </div>
 
             {/* Desktop Account & Cart Area */}
@@ -577,72 +584,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Sub-Nav (Desktop) */}
-      <div className={`hidden lg:block ${isScrolled ? 'bg-white border-b border-slate-200' : 'bg-black/20 backdrop-blur-sm border-b border-white/10'} h-14 transition-all duration-300`}>
-        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-center h-full">
-          <div className="flex items-center gap-10">
-            {NAVIGATION_SECTIONS.map((item) => {
-              const IconComponent = item.icon;
-              const isTenantSupport = item.id === "faq";
-              
-              return (
-                <div key={item.id} className="relative group">
-                  <button
-                    onClick={() => {
-                      if (isTenantSupport) {
-                        setShowTenantDropdown(!showTenantDropdown);
-                      } else {
-                        handleNavClick(item.id);
-                      }
-                    }}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-none transition-all duration-200 ${
-                      isTenantSupport ? "group-hover:text-[#F96302]" : ""
-                    }`}
-                  >
-                    <span className={`text-[${COLORS.secondary}]`}>
-                      <IconComponent size={item.iconSize} />
-                    </span>
-                    <span className={`font-semibold text-sm text-[${COLORS.primary}]`}>
-                      {item.name}
-                    </span>
-                    {isTenantSupport && (
-                      <FaChevronDown size={12} className="text-slate-600 group-hover:text-[#F96302] transition-colors" />
-                    )}
-                  </button>
-
-                  {/* Tenant Support Dropdown */}
-                  {isTenantSupport && (
-                    <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-                      <div className="bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
-                        <button
-                          onClick={() => {
-                            handleNavClick("faq");
-                            setShowTenantDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3 border-b border-slate-100"
-                        >
-                          <span>❓</span>
-                          FAQ Section
-                        </button>
-                        <button
-                          onClick={() => {
-                            navigate("/contact");
-                            setShowTenantDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3"
-                        >
-                          <span>📧</span>
-                          Contact Us
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Sub-Nav (Desktop) Removed and moved into Main Nav Bar */}
 
       {/* Mobile Menu Drawer */}
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
