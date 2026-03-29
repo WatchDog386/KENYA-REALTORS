@@ -646,11 +646,34 @@ const MakePaymentPage: React.FC = () => {
 
       // After first-payment onboarding, send tenant directly to dashboard.
       if (shouldOpenDashboard) {
-        navigate("/portal/tenant");
+        // Force a small delay to ensure finalization is committed
+        setTimeout(() => {
+          navigate("/portal/tenant");
+        }, 1000);
       } else {
         if (onboardingInvoiceResult.paidInvoices.length > 0) {
-          toast.warning('Payment is confirmed, but assignment sync is still in progress. Please refresh shortly.');
+          toast.warning('Payment is confirmed. If pages remain locked for more than 5 seconds, please refresh the page.');
         }
+        // Navigate to payments but stay on the page for up to 10 seconds
+        // to allow finalization to complete
+        const startTime = Date.now();
+        const checkInterval = setInterval(async () => {
+          try {
+            const latestState = await getTenantPortalAccessState(user.id);
+            if (!latestState.isLocked) {
+              clearInterval(checkInterval);
+              navigate("/portal/tenant");
+            }
+          } catch (err) {
+            console.warn('Error checking access state for auto-unlock:', err);
+          }
+          
+          if (Date.now() - startTime > 10000) {
+            clearInterval(checkInterval);
+            navigate("/portal/tenant/payments?tab=receipts");
+          }
+        }, 1000);
+        
         navigate("/portal/tenant/payments?tab=receipts");
       }
     } catch (err) {

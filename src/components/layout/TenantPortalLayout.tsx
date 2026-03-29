@@ -110,7 +110,22 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
     };
 
     loadAccessState();
-  }, [user?.id]);
+    
+    // Periodically refresh access state every 5 seconds while locked
+    // This helps detect when finalization completes after payment
+    const refreshInterval = setInterval(async () => {
+      if (accessState?.isLocked) {
+        try {
+          const freshState = await getTenantPortalAccessState(user!.id);
+          setAccessState(freshState);
+        } catch (error) {
+          console.warn('Periodic access state refresh failed:', error);
+        }
+      }
+    }, 5000);
+    
+    return () => clearInterval(refreshInterval);
+  }, [user?.id, accessState?.isLocked]);
 
   useEffect(() => {
     if (accessLoading) return;

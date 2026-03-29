@@ -465,33 +465,56 @@ const finalizeTenantAssignmentViaRpc = async (
   invoiceId: string,
   transactionReference?: string
 ): Promise<{ unitId: string; propertyId: string; tenantProfileId: string; applicationId?: string } | null> => {
-  const { data, error } = await supabase.rpc("finalize_tenant_onboarding_invoice", {
-    p_invoice_id: invoiceId,
-    p_payment_reference: transactionReference || null,
-  });
+  try {
+    const { data, error } = await supabase.rpc("finalize_tenant_onboarding_invoice", {
+      p_invoice_id: invoiceId,
+      p_payment_reference: transactionReference || null,
+    });
 
-  if (error) {
-    const message = String(error.message || "").toLowerCase();
-    const rpcMissing =
-      error.code === "PGRST202" ||
-      message.includes("could not find the function") ||
-      message.includes("finalize_tenant_onboarding_invoice");
+    if (error) {
+      const message = String(error.message || "").toLowerCase();
+      const rpcMissing =
+        error.code === "PGRST202" ||
+        message.includes("could not find the function") ||
+        message.includes("finalize_tenant_onboarding_invoice");
 
-    if (rpcMissing) return null;
-    throw error;
+      if (rpcMissing) {
+        console.warn('RPC function not found - likely needs migration');
+        return null;
+      }
+      
+      console.error('RPC error details:', {
+        code: (error as any).code,
+        message: error.message,
+        hint: (error as any).hint,
+        details: (error as any).details
+      });
+      throw error;
+    }
+
+    const payload = (data || {}) as any;
+    if (!payload?.success) {
+      const errorMsg = payload?.message || "Failed to finalize tenant onboarding assignment.";
+      console.error('RPC returned success=false:', { payload, invoiceId });
+      throw new Error(errorMsg);
+    }
+
+    console.log('🎉 RPC finalization returned success:', {
+      unitId: payload.unit_id,
+      propertyId: payload.property_id,
+      tenantProfileId: payload.tenant_profile_id
+    });
+
+    return {
+      unitId: String(payload.unit_id || ""),
+      propertyId: String(payload.property_id || ""),
+      tenantProfileId: String(payload.tenant_profile_id || ""),
+      applicationId: payload.lease_application_id ? String(payload.lease_application_id) : undefined,
+    };
+  } catch (err) {
+    console.error('RPC call exception:', err);
+    throw err;
   }
-
-  const payload = (data || {}) as any;
-  if (!payload?.success) {
-    throw new Error(payload?.message || "Failed to finalize tenant onboarding assignment.");
-  }
-
-  return {
-    unitId: String(payload.unit_id || ""),
-    propertyId: String(payload.property_id || ""),
-    tenantProfileId: String(payload.tenant_profile_id || ""),
-    applicationId: payload.lease_application_id ? String(payload.lease_application_id) : undefined,
-  };
 };
 
 const computeTenantPortalAccessState = async (
@@ -897,12 +920,23 @@ export const finalizeTenantAssignmentFromInvoice = async (
 ) => {
   let recoverableRpcMetadataFailure = false;
   try {
+    console.log('🔄 Attempting RPC finalization for invoice:', invoice.id);
     const rpcResult = await finalizeTenantAssignmentViaRpc(invoice.id, transactionReference);
     if (rpcResult?.unitId && rpcResult?.propertyId && rpcResult?.tenantProfileId) {
+      console.log('✅ RPC finalization succeeded:', rpcResult);
       return rpcResult;
     }
+    console.warn('⚠️ RPC returned incomplete data:', rpcResult);
   } catch (rpcError: any) {
     const rpcMessage = String(rpcError?.message || "").toLowerCase();
+    const rpcCode = (rpcError as any)?.code;
+    console.error('❌ RPC finalization error:', {
+      message: rpcError?.message,
+      code: rpcCode,
+      invoiceId: invoice.id,
+      invoiceNotes: invoice.notes ? invoice.notes.substring(0, 200) : 'none'
+    });
+    
     recoverableRpcMetadataFailure =
       rpcMessage.includes("missing unit metadata") ||
       rpcMessage.includes("missing property metadata") ||
