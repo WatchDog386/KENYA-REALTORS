@@ -128,7 +128,7 @@ const Navbar = () => {
 
   return (
     <div 
-      className={`fixed top-0 w-full z-50 bg-white transition-all duration-300 ${isScrolled ? "shadow-md border-b border-slate-200" : ""}`}
+      className={`fixed top-0 w-full z-50 transition-all duration-300 bg-[#efeeee] ${isScrolled ? "shadow-md border-b border-[#d9d9d9]" : ""}`}
       style={{
         '--navbar-height-mobile': NAVBAR_HEIGHTS.mobile,
         '--navbar-height-desktop': NAVBAR_HEIGHTS.desktop
@@ -136,7 +136,13 @@ const Navbar = () => {
     >
         
       {/* Top Utility Strip: Deep Blue Background - Brighter */}
-      <div className={`bg-[${COLORS.primary}] text-white text-xs hidden lg:block border-b border-slate-200`}>
+      <div
+        className="text-white text-xs hidden lg:block border-b border-slate-200"
+        style={{
+          background: `linear-gradient(180deg, ${COLORS.primary} 0%, #0f335e 100%)`,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -1px 0 rgba(0,0,0,0.24)",
+        }}
+      >
         <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-between h-10">
           <div className="flex items-center gap-6 text-white font-medium">
             {UTILITY_BAR.location.enabled && (
@@ -178,7 +184,13 @@ const Navbar = () => {
       </div>
 
       {/* Main Nav Bar */}
-      <div className={`bg-white relative z-20 transition-all duration-300 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"} py-2 md:py-4 md:rounded-none rounded-b-[2rem] shadow-sm md:shadow-none`}>
+      <div
+        className={`relative z-20 transition-all duration-300 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"} py-2 md:py-4 md:rounded-none rounded-b-[2rem] md:shadow-none`}
+        style={{
+          background: "#efeeee",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75), 0 8px 16px rgba(0,0,0,0.08)",
+        }}
+      >
         <div className="max-w-[1440px] mx-auto px-4 lg:px-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-8">
             
@@ -187,7 +199,7 @@ const Navbar = () => {
                {/* 1. Left: Hamburger */}
                <button 
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-1 hover:bg-slate-100 rounded-lg text-[#154279]"
+                className="p-2 rounded-xl text-[#154279] bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all"
                >
                  <FaBars size={24} />
                </button>
@@ -258,14 +270,14 @@ const Navbar = () => {
                <div className="relative">
                  <button 
                     onClick={() => setShowTenantDropdown(!showTenantDropdown)}
-                    className="p-1 hover:bg-slate-100 rounded-lg text-[#154279] relative z-20"
+                    className="p-2 rounded-xl text-[#154279] relative z-20 bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all"
                  >
                    <FaUser size={22} />
                  </button>
                  
                  {/* Mobile Account Dropdown */}
                  {showTenantDropdown && (
-                   <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-slate-100 overflow-hidden z-30 shadow-xl rounded-2xl">
+                   <div className="absolute top-full right-0 mt-2 w-48 border border-[#d9d9d9] overflow-hidden z-30 rounded-2xl bg-[#efeeee] shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff]">
                       {ACCOUNT_DROPDOWN.items.map((item) => (
                         <button 
                           key={item.id}
@@ -421,7 +433,7 @@ const Navbar = () => {
               
               {/* Account Dropdown - Blue/Orange */}
               <div className="relative group h-full py-2">
-                <button className="flex flex-col items-start outline-none">
+                <button className="flex flex-col items-start outline-none px-3 py-2 rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] group-hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-black font-bold uppercase tracking-wider">Account</span>
                     <FaChevronDown size={8} className={`text-[${COLORS.secondary}] group-hover:rotate-180 transition-transform duration-300`} />
@@ -433,7 +445,7 @@ const Navbar = () => {
 
                 {/* Dropdown Menu - Rounded & Smooth */}
                   <div className="absolute top-full right-0 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 w-64 z-50">
-                  <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden p-2">
+                  <div className="rounded-2xl border border-[#d9d9d9] overflow-hidden p-2 bg-[#efeeee] shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff]">
                     <div className="px-4 py-3 border-b border-slate-100 mb-1">
                         <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">{ACCOUNT_DROPDOWN.title}</p>
                     </div>
@@ -458,7 +470,7 @@ const Navbar = () => {
               </div>
 
               {/* Cart Button */}
-              <button className={`flex items-center gap-3 group relative pl-6 border-l border-slate-200`}>
+              <button className={`flex items-center gap-3 group relative pl-6 border-l border-slate-300 pr-3 py-2 rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all`}>
                 <div className="relative">
                   <FaShoppingCart size={24} className={`text-[${COLORS.secondary}] group-hover:text-[${COLORS.primary}] transition-colors duration-300`} />
                   {cart.count > 0 && (
@@ -480,7 +492,7 @@ const Navbar = () => {
       </div>
 
       {/* Sub-Nav (Desktop) */}
-      <div className={`hidden lg:block ${isScrolled ? 'bg-white border-b border-slate-200' : 'bg-black/20 backdrop-blur-sm border-b border-white/10'} h-14 transition-all duration-300`}>
+      <div className="hidden lg:block h-14 transition-all duration-300 bg-[#efeeee] border-b border-[#d9d9d9]">
         <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-center h-full">
           <div className="flex items-center gap-10">
             {NAVIGATION_SECTIONS.map((item) => {
@@ -499,7 +511,7 @@ const Navbar = () => {
                     }}
                     className={`flex items-center gap-3 px-4 py-2.5 rounded-none transition-all duration-200 ${
                       isTenantSupport ? "group-hover:text-[#F96302]" : ""
-                    }`}
+                    } rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]`}
                   >
                     <span className={`text-[${COLORS.secondary}]`}>
                       <IconComponent size={item.iconSize} />
@@ -515,13 +527,13 @@ const Navbar = () => {
                   {/* Tenant Support Dropdown */}
                   {isTenantSupport && (
                     <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-                      <div className="bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                      <div className="bg-[#efeeee] border border-[#d9d9d9] rounded-xl shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff] overflow-hidden min-w-[220px]">
                         <button
                           onClick={() => {
                             handleNavClick("faq");
                             setShowTenantDropdown(false);
                           }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3 border-b border-slate-100"
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] transition-colors flex items-center gap-3 border-b border-slate-200 hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
                         >
                           <span>❓</span>
                           FAQ Section
@@ -531,7 +543,7 @@ const Navbar = () => {
                             navigate("/contact");
                             setShowTenantDropdown(false);
                           }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#F96302] transition-colors flex items-center gap-3"
+                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] transition-colors flex items-center gap-3 hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
                         >
                           <span>📧</span>
                           Contact Us
