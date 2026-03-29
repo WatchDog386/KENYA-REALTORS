@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import PaystackPaymentDialog from "@/components/dialogs/PaystackPaymentDialog";
 import { downloadReceiptPDF, formatReceiptData, processPaymentWithReceipt, ReceiptData } from "../../../utils/receiptGenerator";
-import { getTenantPortalAccessState, reconcileInitialAllocationInvoicesForTenant } from "@/services/tenantOnboardingService";
+import { applyOnboardingInvoiceFilter, getTenantPortalAccessState, reconcileInitialAllocationInvoicesForTenant } from "@/services/tenantOnboardingService";
 import { extractInvoiceLineItems } from "@/utils/invoiceLineItems";
 
 interface OutstandingItem {
@@ -85,24 +85,65 @@ const MakePaymentPage: React.FC = () => {
           return;
         }
 
-        const { data: tenantRow } = await supabase
+        const { data: tenantRows } = await supabase
           .from('tenants')
-          .select('id')
+          .select('id, status, property_id')
           .eq('user_id', user.id)
-          .eq('status', 'active')
-          .maybeSingle();
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        const tenantRow = (tenantRows || []).find((row: any) => row.status === 'active') || (tenantRows || [])[0] || null;
+        let scopedPropertyId = tenantRow?.property_id || null;
+
+        if (!scopedPropertyId) {
+          const { data: latestApplications } = await supabase
+            .from('lease_applications')
+            .select('property_id, status')
+            .eq('applicant_id', user.id)
+            .in('status', ['pending', 'under_review', 'approved', 'manager_approved', 'invoice_sent'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          scopedPropertyId = latestApplications?.[0]?.property_id || null;
+        }
 
         const tenantIdentifiers = [user.id, tenantRow?.id].filter(Boolean) as string[];
 
-        const { data, error } = await supabase
+        let onboardingInvoiceQuery = supabase
           .from('invoices')
           .select('id, reference_number, amount, due_date, status, items, notes')
-          .eq('id', onboardingInvoiceId)
-          .in('tenant_id', tenantIdentifiers)
-          .maybeSingle();
+          .eq('id', onboardingInvoiceId);
+
+        onboardingInvoiceQuery = applyOnboardingInvoiceFilter(onboardingInvoiceQuery, tenantIdentifiers);
+
+        if (scopedPropertyId) {
+          onboardingInvoiceQuery = onboardingInvoiceQuery.eq('property_id', scopedPropertyId);
+        }
+
+        let { data, error } = await onboardingInvoiceQuery.maybeSingle();
 
         if (error) {
           throw error;
+        }
+
+        if (!data) {
+          // Fallback: rely on invoice RLS (no explicit tenant_id filter) for mixed tenant_id mappings.
+          let relaxedQuery = supabase
+            .from('invoices')
+            .select('id, reference_number, amount, due_date, status, items, notes')
+            .eq('id', onboardingInvoiceId);
+
+          relaxedQuery = applyOnboardingInvoiceFilter(relaxedQuery, tenantIdentifiers);
+
+          if (scopedPropertyId) {
+            relaxedQuery = relaxedQuery.eq('property_id', scopedPropertyId);
+          }
+
+          const relaxedResp = await relaxedQuery.maybeSingle();
+          if (relaxedResp.error) {
+            throw relaxedResp.error;
+          }
+          data = relaxedResp.data || null;
         }
 
         setOnboardingInvoiceDetails(data || null);
@@ -147,11 +188,20 @@ const MakePaymentPage: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      const { data: tenant } = await supabase
+      const { data: tenantRows, error: tenantError } = await supabase
         .from('tenants')
-        .select('id, unit_id')
+        .select('id, unit_id, property_id, status')
         .eq('user_id', user.id)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (tenantError) throw tenantError;
+
+      const tenant =
+        (tenantRows || []).find((row: any) => row.status === 'active' && row.unit_id) ||
+        (tenantRows || []).find((row: any) => row.unit_id) ||
+        (tenantRows || [])[0] ||
+        null;
 
       if (!tenant?.unit_id) {
         setOutstandingItems([]);
@@ -240,25 +290,31 @@ const MakePaymentPage: React.FC = () => {
       throw new Error('User not authenticated');
     }
 
-    const { data: existingTenant, error: existingTenantError } = await supabase
+    const { data: tenantRows, error: existingTenantError } = await supabase
       .from('tenants')
-      .select('id, unit_id, property_id')
+      .select('id, unit_id, property_id, status')
       .eq('user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(10);
 
     if (existingTenantError) throw existingTenantError;
+    const existingTenant =
+      (tenantRows || []).find((row: any) => row.status === 'active' && row.property_id && row.unit_id) ||
+      (tenantRows || []).find((row: any) => row.property_id && row.unit_id) ||
+      null;
+
     if (existingTenant) return existingTenant;
 
-    const { data: latestApplication, error: latestApplicationError } = await supabase
+    const { data: latestApplications, error: latestApplicationError } = await supabase
       .from('lease_applications')
-      .select('property_id, unit_id')
+      .select('property_id, unit_id, status')
       .eq('applicant_id', user.id)
+      .in('status', ['pending', 'under_review', 'approved', 'manager_approved', 'invoice_sent'])
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (latestApplicationError) throw latestApplicationError;
+    const latestApplication = (latestApplications || [])[0] || null;
     if (!latestApplication?.property_id || !latestApplication?.unit_id) {
       return null;
     }

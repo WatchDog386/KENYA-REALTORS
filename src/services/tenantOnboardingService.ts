@@ -74,6 +74,7 @@ export interface PendingInitialInvoice {
 export interface TenantPortalAccessState {
   hasActiveAssignment: boolean;
   hasPendingApplication: boolean;
+  hasPaidOnboardingInvoice: boolean;
   isLocked: boolean;
   pendingInitialInvoices: PendingInitialInvoice[];
   initialInvoiceTotal: number;
@@ -99,6 +100,115 @@ const APPLICATION_STATUS_LOOKUP = [
 const INITIAL_MOVE_IN_INVOICE_NOTES_FILTER =
   "notes.ilike.%BILLING_EVENT:unit_allocation%,notes.ilike.%BILLING_EVENT:first_payment%";
 const ENABLE_CLIENT_FINALIZATION_FALLBACK = false;
+
+export const applyOnboardingInvoiceFilter = <T>(query: T, tenantIdentifiers: string[] = []) => {
+  const filters = [INITIAL_MOVE_IN_INVOICE_NOTES_FILTER];
+
+  const scopedTenantIds = (tenantIdentifiers || []).filter(Boolean);
+  if (scopedTenantIds.length > 0) {
+    // Quote UUIDs to avoid parsing issues in PostgREST filter expansion.
+    const quotedIds = scopedTenantIds.map((id) => `"${id}"`).join(",");
+    filters.push(`tenant_id.in.(${quotedIds})`);
+  }
+
+  return (query as any).or(filters.join(","));
+};
+
+const isSuperAdminFirstPaymentInvoice = (notes?: string | null): boolean =>
+  /BILLING_EVENT:first_payment/i.test(String(notes || ""));
+
+const prioritizeSuperAdminOnboardingInvoices = <T extends { notes?: string | null }>(rows: T[]): T[] => {
+  const source = rows || [];
+  if (source.length === 0) return [];
+
+  const firstPaymentRows = source.filter((row) => isSuperAdminFirstPaymentInvoice(row.notes));
+  return firstPaymentRows.length > 0 ? firstPaymentRows : source;
+};
+
+const isInvoiceRelevantToCurrentOnboarding = (
+  row: { notes?: string | null; property_id?: string | null; tenant_id?: string | null; created_at?: string | null },
+  tenantProfileId: string,
+  applicationRow: any,
+  scopedOnboardingPropertyId?: string | null
+) => {
+  const metadata = parseInvoiceMetadata(row?.notes);
+  const appId = String(applicationRow?.id || "");
+  const appUnitId = String(applicationRow?.unit_id || "");
+  const appPropertyId = String(applicationRow?.property_id || scopedOnboardingPropertyId || "");
+
+  // If metadata explicitly names another applicant, this invoice is not for this tenant.
+  if (metadata.APPLICANT_ID && metadata.APPLICANT_ID !== tenantProfileId) {
+    return false;
+  }
+
+  // Prefer application/unit/property-congruent invoices when metadata is present.
+  if (appId && metadata.LEASE_APPLICATION_ID && metadata.LEASE_APPLICATION_ID !== appId) {
+    return false;
+  }
+
+  if (appUnitId && metadata.UNIT_ID && metadata.UNIT_ID !== appUnitId) {
+    return false;
+  }
+
+  if (appPropertyId) {
+    if (metadata.PROPERTY_ID && metadata.PROPERTY_ID !== appPropertyId) {
+      return false;
+    }
+    if (!metadata.PROPERTY_ID && row?.property_id && String(row.property_id) !== appPropertyId) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const sortOnboardingInvoicesByRelevance = (
+  rows: any[],
+  tenantProfileId: string,
+  applicationRow: any
+) => {
+  const appId = String(applicationRow?.id || "");
+  const appUnitId = String(applicationRow?.unit_id || "");
+
+  return [...(rows || [])].sort((a, b) => {
+    const ma = parseInvoiceMetadata(a?.notes);
+    const mb = parseInvoiceMetadata(b?.notes);
+
+    const score = (m: InvoiceMetadata) => {
+      let value = 0;
+      if (m.APPLICANT_ID === tenantProfileId) value += 8;
+      if (appId && m.LEASE_APPLICATION_ID === appId) value += 10;
+      if (appUnitId && m.UNIT_ID === appUnitId) value += 6;
+      if (String(m.BILLING_EVENT || "").toLowerCase() === "first_payment") value += 4;
+      return value;
+    };
+
+    const diff = score(mb) - score(ma);
+    if (diff !== 0) return diff;
+
+    const aTime = new Date(a?.updated_at || a?.created_at || 0).getTime();
+    const bTime = new Date(b?.updated_at || b?.created_at || 0).getTime();
+    return bTime - aTime;
+  });
+};
+
+const resolveLatestRelevantApplication = async (tenantProfileId: string) => {
+  if (!tenantProfileId) return null;
+
+  const { data, error } = await supabase
+    .from("lease_applications")
+    .select("id, property_id, unit_id, status, created_at")
+    .eq("applicant_id", tenantProfileId)
+    .in("status", APPLICATION_STATUS_LOOKUP)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || [])[0] || null;
+};
 
 const resolveTenantRowsByUser = async (tenantProfileId: string): Promise<TenantIdentityRow[]> => {
   if (!tenantProfileId) return [];
@@ -391,6 +501,7 @@ const computeTenantPortalAccessState = async (
   const defaultState: TenantPortalAccessState = {
     hasActiveAssignment: false,
     hasPendingApplication: false,
+    hasPaidOnboardingInvoice: false,
     isLocked: false,
     pendingInitialInvoices: [],
     initialInvoiceTotal: 0,
@@ -403,55 +514,62 @@ const computeTenantPortalAccessState = async (
   const tenantRows = await resolveTenantRowsByUser(tenantProfileId);
   const tenantIdentifiers = buildTenantIdentifierSet(tenantProfileId, tenantRows);
 
-  const [leaseResp, unpaidInvoiceResp, appResp, paidInvoiceResp] = await Promise.all([
+  const applicationRow = await resolveLatestRelevantApplication(tenantProfileId);
+  const hasPendingApplication = Boolean((applicationRow as any)?.id);
+  const onboardingApplicationCreatedAt = (applicationRow as any)?.created_at || null;
+  const activeTenantCandidate =
+    tenantRows.find((row) => row.status === "active") ||
+    tenantRows.find((row) => Boolean(row.property_id && row.unit_id)) ||
+    null;
+
+  const scopedOnboardingPropertyId =
+    activeTenantCandidate?.property_id ||
+    (applicationRow as any)?.property_id ||
+    null;
+
+  let unpaidInvoiceQuery = supabase
+    .from("invoices")
+    .select("id, amount, due_date, status, reference_number, property_id, notes, items")
+    .in("status", ["unpaid", "overdue", "pending"]);
+
+  unpaidInvoiceQuery = applyOnboardingInvoiceFilter(unpaidInvoiceQuery, tenantIdentifiers);
+
+  if (scopedOnboardingPropertyId) {
+    unpaidInvoiceQuery = unpaidInvoiceQuery.eq("property_id", scopedOnboardingPropertyId);
+  }
+
+  let paidInvoiceQuery = supabase
+    .from("invoices")
+    .select("id, amount, due_date, status, reference_number, property_id, notes, items, tenant_id")
+    .eq("status", "paid");
+
+  paidInvoiceQuery = applyOnboardingInvoiceFilter(paidInvoiceQuery, tenantIdentifiers);
+
+  if (scopedOnboardingPropertyId) {
+    paidInvoiceQuery = paidInvoiceQuery.eq("property_id", scopedOnboardingPropertyId);
+  }
+
+  const [leaseResp, unpaidInvoiceResp, paidInvoiceResp] = await Promise.all([
     supabase
       .from("tenant_leases")
       .select("id, unit_id, status")
       .in("tenant_id", tenantIdentifiers)
       .in("status", ACTIVE_LEASE_STATUSES)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("invoices")
-      .select("id, amount, due_date, status, reference_number, property_id, notes, items")
-      .in("tenant_id", tenantIdentifiers)
-      .in("status", ["unpaid", "overdue"])
-      .or(INITIAL_MOVE_IN_INVOICE_NOTES_FILTER)
-      .order("due_date", { ascending: true }),
-    supabase
-      .from("lease_applications")
-      .select("id")
-      .eq("applicant_id", tenantProfileId)
-      .in("status", ACTIVE_OR_PENDING_APPLICATION_STATUSES)
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("invoices")
-      .select("id, amount, due_date, status, reference_number, property_id, notes, items, tenant_id")
-      .in("tenant_id", tenantIdentifiers)
-      .eq("status", "paid")
-      .or(INITIAL_MOVE_IN_INVOICE_NOTES_FILTER)
-      .order("updated_at", { ascending: false }),
+      .limit(1),
+    unpaidInvoiceQuery.order("due_date", { ascending: true }),
+    paidInvoiceQuery.order("updated_at", { ascending: false }),
   ]);
 
-  if (leaseResp.error && leaseResp.error.code !== "PGRST116") {
+  if (leaseResp.error) {
     throw leaseResp.error;
   }
   if (unpaidInvoiceResp.error) {
     throw unpaidInvoiceResp.error;
   }
-  if (appResp.error && appResp.error.code !== "PGRST116") {
-    throw appResp.error;
-  }
   if (paidInvoiceResp.error) {
     throw paidInvoiceResp.error;
   }
-
-  const activeTenantCandidate =
-    tenantRows.find((row) => row.status === "active") ||
-    tenantRows.find((row) => Boolean(row.property_id && row.unit_id)) ||
-    null;
 
   const activeTenantRow = activeTenantCandidate
     ? {
@@ -462,9 +580,152 @@ const computeTenantPortalAccessState = async (
     : null;
 
   const activeLeaseRow =
-    (leaseResp.data as { id: string; unit_id: string | null; status: string | null } | null) || null;
+    ((leaseResp.data || [])[0] as { id: string; unit_id: string | null; status: string | null } | undefined) || null;
 
-  const pendingInitialInvoices: PendingInitialInvoice[] = (unpaidInvoiceResp.data || []).map((row: any) => {
+  const hasActiveAssignment =
+    Boolean(activeTenantRow?.property_id && activeTenantRow?.unit_id) ||
+    Boolean(activeLeaseRow?.unit_id);
+
+  const runFallbackInvoiceLookup = async (
+    status: "paid" | "unpaid_overdue",
+    applyPropertyScope: boolean,
+    applyTenantIdentifierFilter: boolean
+  ) => {
+    let fallbackQuery = supabase
+      .from("invoices")
+      .select("id, amount, due_date, status, reference_number, property_id, notes, items, tenant_id");
+
+    // Force fallback to only hit first_payment or unit_allocation invoices and keep notes-based ownership.
+    fallbackQuery = applyOnboardingInvoiceFilter(
+      fallbackQuery,
+      applyTenantIdentifierFilter ? tenantIdentifiers : []
+    );
+
+    if (status === "paid") {
+      fallbackQuery = fallbackQuery.eq("status", "paid");
+    } else {
+      fallbackQuery = fallbackQuery.in("status", ["unpaid", "overdue"]);
+    }
+
+    if (applyPropertyScope && scopedOnboardingPropertyId) {
+      fallbackQuery = fallbackQuery.eq("property_id", scopedOnboardingPropertyId);
+    }
+
+    if (onboardingApplicationCreatedAt) {
+      fallbackQuery = fallbackQuery.gte("created_at", onboardingApplicationCreatedAt);
+    }
+
+    return status === "paid"
+      ? fallbackQuery.order("updated_at", { ascending: false })
+      : fallbackQuery.order("due_date", { ascending: true });
+  };
+
+  let onboardingUnpaidRows = (unpaidInvoiceResp.data || []) as any[];
+  let onboardingPaidRows = (paidInvoiceResp.data || []) as any[];
+
+  if (!hasActiveAssignment && hasPendingApplication) {
+    if (onboardingUnpaidRows.length === 0) {
+      let fallbackUnpaidResp = await runFallbackInvoiceLookup("unpaid_overdue", true, true);
+      if (fallbackUnpaidResp.error) {
+        throw fallbackUnpaidResp.error;
+      }
+
+      onboardingUnpaidRows = (fallbackUnpaidResp.data || []) as any[];
+
+      if (onboardingUnpaidRows.length === 0 && scopedOnboardingPropertyId) {
+        fallbackUnpaidResp = await runFallbackInvoiceLookup("unpaid_overdue", false, true);
+        if (fallbackUnpaidResp.error) {
+          throw fallbackUnpaidResp.error;
+        }
+        onboardingUnpaidRows = (fallbackUnpaidResp.data || []) as any[];
+      }
+
+      if (onboardingUnpaidRows.length === 0) {
+        fallbackUnpaidResp = await runFallbackInvoiceLookup("unpaid_overdue", true, false);
+        if (fallbackUnpaidResp.error) {
+          throw fallbackUnpaidResp.error;
+        }
+        onboardingUnpaidRows = (fallbackUnpaidResp.data || []) as any[];
+      }
+
+      if (onboardingUnpaidRows.length === 0 && scopedOnboardingPropertyId) {
+        fallbackUnpaidResp = await runFallbackInvoiceLookup("unpaid_overdue", false, false);
+        if (fallbackUnpaidResp.error) {
+          throw fallbackUnpaidResp.error;
+        }
+        onboardingUnpaidRows = (fallbackUnpaidResp.data || []) as any[];
+      }
+    }
+
+    if (onboardingPaidRows.length === 0) {
+      let fallbackPaidResp = await runFallbackInvoiceLookup("paid", true, true);
+      if (fallbackPaidResp.error) {
+        throw fallbackPaidResp.error;
+      }
+
+      onboardingPaidRows = (fallbackPaidResp.data || []) as any[];
+
+      if (onboardingPaidRows.length === 0 && scopedOnboardingPropertyId) {
+        fallbackPaidResp = await runFallbackInvoiceLookup("paid", false, true);
+        if (fallbackPaidResp.error) {
+          throw fallbackPaidResp.error;
+        }
+        onboardingPaidRows = (fallbackPaidResp.data || []) as any[];
+      }
+
+      if (onboardingPaidRows.length === 0) {
+        fallbackPaidResp = await runFallbackInvoiceLookup("paid", true, false);
+        if (fallbackPaidResp.error) {
+          throw fallbackPaidResp.error;
+        }
+        onboardingPaidRows = (fallbackPaidResp.data || []) as any[];
+      }
+
+      if (onboardingPaidRows.length === 0 && scopedOnboardingPropertyId) {
+        fallbackPaidResp = await runFallbackInvoiceLookup("paid", false, false);
+        if (fallbackPaidResp.error) {
+          throw fallbackPaidResp.error;
+        }
+        onboardingPaidRows = (fallbackPaidResp.data || []) as any[];
+      }
+    }
+
+    if (onboardingUnpaidRows.length === 0) {
+      // Metadata-only fallback: find first-payment/unit-allocation invoices visible under RLS
+      // even when tenant_id linkage is legacy/mixed.
+      let metadataQuery = supabase
+        .from("invoices")
+        .select("id, amount, due_date, status, reference_number, property_id, notes, items, tenant_id, created_at, updated_at")
+        .in("status", ["unpaid", "overdue", "pending"]);
+
+      metadataQuery = applyOnboardingInvoiceFilter(metadataQuery, tenantIdentifiers);
+
+      if (scopedOnboardingPropertyId) {
+        metadataQuery = metadataQuery.eq("property_id", scopedOnboardingPropertyId);
+      }
+
+      if (onboardingApplicationCreatedAt) {
+        metadataQuery = metadataQuery.gte("created_at", onboardingApplicationCreatedAt);
+      }
+
+      const metadataResp = await metadataQuery.order("created_at", { ascending: false });
+      if (metadataResp.error) {
+        throw metadataResp.error;
+      }
+
+      onboardingUnpaidRows = (metadataResp.data || []) as any[];
+    }
+  }
+
+  const relevantUnpaidRows = (onboardingUnpaidRows || []).filter((row) =>
+    isInvoiceRelevantToCurrentOnboarding(row, tenantProfileId, applicationRow, scopedOnboardingPropertyId)
+  );
+
+  const preferredUnpaidInvoices = prioritizeSuperAdminOnboardingInvoices(
+    sortOnboardingInvoicesByRelevance(relevantUnpaidRows, tenantProfileId, applicationRow)
+  );
+
+  const pendingInitialInvoices: PendingInitialInvoice[] = preferredUnpaidInvoices.map((row: any) => {
     const metadata = parseInvoiceMetadata(row.notes);
     return {
       id: row.id,
@@ -479,7 +740,15 @@ const computeTenantPortalAccessState = async (
     };
   });
 
-  const paidOnboardingInvoices: InvoiceLike[] = (paidInvoiceResp.data || []).map((row: any) => ({
+  const relevantPaidRows = (onboardingPaidRows || []).filter((row) =>
+    isInvoiceRelevantToCurrentOnboarding(row, tenantProfileId, applicationRow, scopedOnboardingPropertyId)
+  );
+
+  const preferredPaidInvoices = prioritizeSuperAdminOnboardingInvoices(
+    sortOnboardingInvoicesByRelevance(relevantPaidRows, tenantProfileId, applicationRow)
+  );
+
+  const paidOnboardingInvoices: InvoiceLike[] = preferredPaidInvoices.map((row: any) => ({
     id: row.id,
     amount: Number(row.amount || 0),
     property_id: row.property_id,
@@ -487,10 +756,6 @@ const computeTenantPortalAccessState = async (
     notes: row.notes,
     items: row.items,
   }));
-
-  const hasActiveAssignment =
-    Boolean(activeTenantRow?.property_id && activeTenantRow?.unit_id) ||
-    Boolean(activeLeaseRow?.unit_id);
 
   if (allowAutoFinalize && !hasActiveAssignment && paidOnboardingInvoices.length > 0) {
     let finalizationAttempted = false;
@@ -517,11 +782,14 @@ const computeTenantPortalAccessState = async (
     }
   }
 
-  const hasPendingApplication = Boolean(appResp.data?.id);
   const hasPaidOnboardingInvoice = paidOnboardingInvoices.length > 0;
+  const hasOutstandingOnboardingInvoices = pendingInitialInvoices.length > 0;
+
+  // Keep the portal locked only while money is still due, or while approval exists with no paid onboarding invoice.
+  // If onboarding is already paid, do not trap the tenant in a permanent lock while assignment sync catches up.
   const isLocked =
-    pendingInitialInvoices.length > 0 ||
-    (!hasActiveAssignment && (hasPendingApplication || hasPaidOnboardingInvoice));
+    hasOutstandingOnboardingInvoices ||
+    (!hasActiveAssignment && hasPendingApplication && !hasPaidOnboardingInvoice);
 
   const initialInvoiceTotal = pendingInitialInvoices.reduce(
     (sum, invoice) => sum + Number(invoice.amount || 0),
@@ -531,6 +799,7 @@ const computeTenantPortalAccessState = async (
   return {
     hasActiveAssignment,
     hasPendingApplication,
+    hasPaidOnboardingInvoice,
     isLocked,
     pendingInitialInvoices,
     initialInvoiceTotal,
@@ -559,16 +828,15 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
 
   const moveInNotesFilter = `${INITIAL_MOVE_IN_INVOICE_NOTES_FILTER},notes.ilike.%${appIdTag}%`;
 
-  const { data: existingInvoice, error: invoiceLookupError } = await supabase
+  const { data: existingInvoices, error: invoiceLookupError } = await supabase
     .from("invoices")
-    .select("id, notes")
+    .select("id, notes, created_at")
     .in("tenant_id", applicantIdentifiers)
     .eq("property_id", application.property_id)
     .in("status", ["unpaid", "overdue"])
     .or(moveInNotesFilter)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(25);
 
   if (invoiceLookupError && invoiceLookupError.code !== "PGRST116") {
     throw invoiceLookupError;
@@ -587,77 +855,23 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
     applicantEmail: application.applicant_email,
   });
 
-  let linkedInvoiceId = existingInvoice?.id || null;
+  const preferredExistingInvoice = prioritizeSuperAdminOnboardingInvoices((existingInvoices || []) as any[])[0] ||
+    (existingInvoices || [])[0] ||
+    null;
+
+  let linkedInvoiceId = preferredExistingInvoice?.id || null;
 
   if (linkedInvoiceId) {
-    const normalizedNotes = String((existingInvoice as any)?.notes || "");
+    const normalizedNotes = String((preferredExistingInvoice as any)?.notes || "");
 
     // Ensure onboarding marker exists so tenant payment reconciliation can detect this invoice.
     if (!/BILLING_EVENT:(first_payment|unit_allocation)/i.test(normalizedNotes)) {
-      await appendInvoiceNote(linkedInvoiceId, "BILLING_EVENT:unit_allocation");
+      await appendInvoiceNote(linkedInvoiceId, "BILLING_EVENT:first_payment");
     }
 
     for (const tag of metadataTags) {
       await appendInvoiceNote(linkedInvoiceId, tag);
     }
-  } else {
-    const monthlyRent = await readUnitRent(application.unit_id);
-    const securityDeposit = monthlyRent;
-    const initialCharges = await readInitialChargeTemplates(application.property_id);
-
-    const additionalChargesMap = initialCharges.reduce((acc: Record<string, number>, item: any) => {
-      acc[item.name] = Number(item.amount || 0);
-      return acc;
-    }, {});
-
-    const initialChargesTotal = initialCharges.reduce(
-      (sum: number, item: any) => sum + Number(item.amount || 0),
-      0
-    );
-
-    const amount = Number(monthlyRent || 0) + Number(securityDeposit || 0) + Number(initialChargesTotal || 0);
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 1);
-
-    const notes = buildOnboardingNotes({
-      unitId: application.unit_id,
-      propertyId: application.property_id,
-      applicantId: application.applicant_id,
-      applicationId: application.id,
-      unitNumber: application.unit_number || unitDetails.unitNumber,
-      unitTypeId: application.unit_type_id || unitDetails.unitTypeId,
-      unitTypeName: application.unit_type_name || unitDetails.unitTypeName,
-      propertyName: application.property_name || unitDetails.propertyName,
-      applicantName: application.applicant_name,
-      applicantEmail: application.applicant_email,
-    });
-
-    const { data: insertedInvoice, error: insertInvoiceError } = await supabase
-      .from("invoices")
-      .insert({
-        reference_number: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-        property_id: application.property_id,
-        tenant_id: application.applicant_id,
-        amount,
-        due_date: dueDate.toISOString().split("T")[0],
-        issued_date: new Date().toISOString().split("T")[0],
-        status: "unpaid",
-        items: {
-          monthly_rent: Number(monthlyRent || 0),
-          security_deposit: Number(securityDeposit || 0),
-          initial_charges: initialCharges,
-          additional_charges: additionalChargesMap,
-        },
-        notes,
-      })
-      .select("id")
-      .single();
-
-    if (insertInvoiceError) {
-      throw insertInvoiceError;
-    }
-
-    linkedInvoiceId = insertedInvoice?.id || null;
   }
 
   await supabase
@@ -987,21 +1201,88 @@ export const reconcileInitialAllocationInvoicesForTenant = async (
 
   const tenantRows = await resolveTenantRowsByUser(tenantProfileId);
   const tenantIdentifiers = buildTenantIdentifierSet(tenantProfileId, tenantRows);
+  const activeTenantCandidate =
+    tenantRows.find((row) => row.status === "active") ||
+    tenantRows.find((row) => Boolean(row.property_id && row.unit_id)) ||
+    null;
+  const applicationRow = await resolveLatestRelevantApplication(tenantProfileId);
+  const scopedOnboardingPropertyId =
+    activeTenantCandidate?.property_id ||
+    (applicationRow as any)?.property_id ||
+    null;
 
-  const { data: invoices, error: invoicesError } = await supabase
+  let invoicesQuery = supabase
     .from("invoices")
     .select("id, amount, property_id, tenant_id, status, notes, items")
-    .in("tenant_id", tenantIdentifiers)
-    .in("status", ["unpaid", "overdue"])
-    .or(INITIAL_MOVE_IN_INVOICE_NOTES_FILTER)
-    .order("due_date", { ascending: true });
+    .in("status", ["unpaid", "overdue", "pending"]);
+
+  invoicesQuery = applyOnboardingInvoiceFilter(invoicesQuery, tenantIdentifiers);
+
+  if (scopedOnboardingPropertyId) {
+    invoicesQuery = invoicesQuery.eq("property_id", scopedOnboardingPropertyId);
+  }
+
+  const { data: invoices, error: invoicesError } = await invoicesQuery.order("due_date", { ascending: true });
 
   if (invoicesError) throw invoicesError;
+
+  let onboardingCandidateRows = (invoices || []) as any[];
+  const onboardingApplicationCreatedAt = (applicationRow as any)?.created_at || null;
+  const hasPendingApplication = Boolean((applicationRow as any)?.id);
+  const hasActiveAssignment = Boolean(activeTenantCandidate?.property_id && activeTenantCandidate?.unit_id);
+
+  if (onboardingCandidateRows.length === 0 && hasPendingApplication && !hasActiveAssignment) {
+    const runFallbackLookup = async (applyPropertyScope: boolean, applyTenantIdentifierFilter: boolean) => {
+      let fallbackQuery = supabase
+        .from("invoices")
+        .select("id, amount, property_id, tenant_id, status, notes, items")
+        .in("status", ["unpaid", "overdue", "pending"]);
+
+      fallbackQuery = applyOnboardingInvoiceFilter(
+        fallbackQuery,
+        applyTenantIdentifierFilter ? tenantIdentifiers : []
+      );
+
+      if (applyPropertyScope && scopedOnboardingPropertyId) {
+        fallbackQuery = fallbackQuery.eq("property_id", scopedOnboardingPropertyId);
+      }
+
+      if (onboardingApplicationCreatedAt) {
+        fallbackQuery = fallbackQuery.gte("created_at", onboardingApplicationCreatedAt);
+      }
+
+      return fallbackQuery.order("due_date", { ascending: true });
+    };
+
+    let fallbackResp = await runFallbackLookup(true, true);
+    if (fallbackResp.error) throw fallbackResp.error;
+    onboardingCandidateRows = (fallbackResp.data || []) as any[];
+
+    if (onboardingCandidateRows.length === 0 && scopedOnboardingPropertyId) {
+      fallbackResp = await runFallbackLookup(false, true);
+      if (fallbackResp.error) throw fallbackResp.error;
+      onboardingCandidateRows = (fallbackResp.data || []) as any[];
+    }
+
+    if (onboardingCandidateRows.length === 0) {
+      fallbackResp = await runFallbackLookup(true, false);
+      if (fallbackResp.error) throw fallbackResp.error;
+      onboardingCandidateRows = (fallbackResp.data || []) as any[];
+    }
+
+    if (onboardingCandidateRows.length === 0 && scopedOnboardingPropertyId) {
+      fallbackResp = await runFallbackLookup(false, false);
+      if (fallbackResp.error) throw fallbackResp.error;
+      onboardingCandidateRows = (fallbackResp.data || []) as any[];
+    }
+  }
 
   let remaining = paymentAmount;
   const paidInvoices: InvoiceLike[] = [];
 
-  for (const invoice of invoices || []) {
+  const prioritizedInvoices = prioritizeSuperAdminOnboardingInvoices(onboardingCandidateRows);
+
+  for (const invoice of prioritizedInvoices) {
     const invoiceAmount = Number((invoice as any).amount || 0);
     if (invoiceAmount <= 0) continue;
     if (remaining + 0.001 < invoiceAmount) continue;

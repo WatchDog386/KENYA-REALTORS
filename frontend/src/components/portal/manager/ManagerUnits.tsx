@@ -149,6 +149,15 @@ const openEditUnit = (unit: Unit) => {
     setIsEditUnitOpen(true);
 };
 
+  const openAddTenantDialog = (unit: Unit) => {
+    setSelectedUnit(unit);
+    setSelectedTenant('');
+    setSelectedApplicantId('');
+    setAddTenantMode('from_applicants');
+    setIsAssignOpen(false);
+    setIsAddTenantOpen(true);
+  };
+
 const handleSaveUnitChanges = async () => {
     if (!unitToEdit) return;
     
@@ -258,7 +267,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<string>('');
   const [savingUnit, setSavingUnit] = useState(false);
   const [isCreatingTenantUser, setIsCreatingTenantUser] = useState(false);
-  const [addTenantMode, setAddTenantMode] = useState<'create_user' | 'from_applicants'>('create_user');
+  const [addTenantMode, setAddTenantMode] = useState<'create_user' | 'from_applicants'>('from_applicants');
   const [applicantCandidates, setApplicantCandidates] = useState<ApplicantCandidate[]>([]);
   const [selectedApplicantId, setSelectedApplicantId] = useState('');
   const [newTenantForm, setNewTenantForm] = useState({
@@ -1055,7 +1064,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               </div>
               <Button
                 onClick={() => {
-                  setAddTenantMode('create_user');
+                  setAddTenantMode('from_applicants');
                   setSelectedApplicantId('');
                   setIsAddTenantOpen(true);
                 }}
@@ -1701,12 +1710,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             <p className="text-slate-500 text-sm mb-4 font-medium">Unit is currently vacant.</p>
                                             <Button 
                                                 onClick={() => {
-                                                    setSelectedTenant('');
-                                                    setIsAssignOpen(true);
+                                          if (!selectedUnit) return;
+                                          openAddTenantDialog(selectedUnit);
                                                 }}
                                                 className="w-full bg-orange-500 hover:bg-orange-600 text-white shadow-sm font-bold border-orange-600 border-b-2 active:translate-y-[1px] active:border-b-0 transition-all"
                                             >
-                                                <Plus className="w-4 h-4 mr-2" /> Assign Tenant
+                                        <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
                                             </Button>
                                         </div>
                                     </div>
@@ -1896,11 +1905,10 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                         size="sm"
                                         className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
                                         onClick={() => { 
-                                            setSelectedUnit(unit);
-                                            setIsAssignOpen(true);
+                                            openAddTenantDialog(unit);
                                         }}
                                     >
-                                        Assign
+                                  <UserPlus className="w-3.5 h-3.5 mr-1" /> Add Tenant
                                     </Button>
                                 </>
                              )}
@@ -2102,11 +2110,10 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0 h-9"
                                     onClick={(e) => { 
                                         e.stopPropagation(); 
-                                        setSelectedUnit(unit);
-                                        setIsAssignOpen(true);
+                                        openAddTenantDialog(unit);
                                     }}
                                 >
-                                    Assign
+                                  <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
                                 </Button>
                             </>
                          )}

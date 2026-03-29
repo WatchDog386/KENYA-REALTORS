@@ -403,7 +403,16 @@ const RoleBasedRoute = ({
    SUPER ADMIN PORTAL WRAPPER
 ====================== */
 const SuperAdminPortalWrapper = () => {
-  const { getUserRole, isAdmin, user } = useAuth();
+  const { getUserRole, isAdmin, user, supabaseUser, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+
+  // Keep current interface stable while profile hydration catches up.
+  if (!user && supabaseUser) {
+    return <GlobalLoader />;
+  }
 
   // Get user role
   const userRole = getUserRole();
@@ -434,7 +443,16 @@ const SuperAdminPortalWrapper = () => {
    MANAGER PORTAL WRAPPER
 ====================== */
 const ManagerPortalWrapper = () => {
-  const { getUserRole } = useAuth();
+  const { getUserRole, user, supabaseUser, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+
+  // Keep current interface stable while profile hydration catches up.
+  if (!user && supabaseUser) {
+    return <GlobalLoader />;
+  }
 
   const userRole = getUserRole();
 
@@ -464,7 +482,16 @@ const ManagerPortalWrapper = () => {
    TENANT PORTAL WRAPPER
 ====================== */
 const TenantPortalWrapper = () => {
-  const { getUserRole } = useAuth();
+  const { getUserRole, user, supabaseUser, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+
+  // Keep current interface stable while profile hydration catches up.
+  if (!user && supabaseUser) {
+    return <GlobalLoader />;
+  }
 
   const userRole = getUserRole();
 

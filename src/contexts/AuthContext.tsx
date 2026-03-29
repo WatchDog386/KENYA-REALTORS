@@ -454,32 +454,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
       console.log("🔄 Auth state changed:", event);
 
-      setIsLoading(true);
+      const isInteractiveAuthEvent = event === "SIGNED_IN" || event === "SIGNED_OUT";
+
+      if (isInteractiveAuthEvent) {
+        setIsLoading(true);
+      }
+
       setSession(session);
       setSupabaseUser(session?.user || null);
 
-      if (session?.user) {
-        setTimeout(async () => {
-          try {
-            const profile = await fetchUserProfileFromDB(session.user.id);
-            setUser(profile);
+      if (!session?.user) {
+        setUser(null);
+        if (isInteractiveAuthEvent) {
+          setIsLoading(false);
+        }
+        return;
+      }
 
-            // Redirect on both SIGNED_IN (fresh login) and INITIAL_SESSION (page refresh)
-            if (profile && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
-              handlePostLoginRedirect(profile);
-            } else if (!profile && event === "SIGNED_IN") {
-              await createProfileIfMissing();
-            }
-          } catch (err) {
-            console.error("Error during auth state change:", err);
-          } finally {
+      setTimeout(async () => {
+        try {
+          const profile = await fetchUserProfileFromDB(session.user.id);
+          setUser(profile);
+
+          // Only explicit sign-in should trigger role-based redirect.
+          if (profile && event === "SIGNED_IN") {
+            handlePostLoginRedirect(profile);
+          } else if (!profile && event === "SIGNED_IN") {
+            await createProfileIfMissing();
+          }
+        } catch (err) {
+          console.error("Error during auth state change:", err);
+        } finally {
+          if (isInteractiveAuthEvent) {
             setIsLoading(false);
           }
-        }, 500);
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
+        }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();

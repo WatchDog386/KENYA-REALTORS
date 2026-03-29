@@ -22,7 +22,8 @@ import {
   LayoutGrid,
   Users,
   Eye,
-  Pencil
+  Pencil,
+  X
 } from "lucide-react";
 import {
   Dialog,
@@ -159,6 +160,8 @@ const PropertyManager: React.FC = () => {
     description: '',
     amenities: '',
     number_of_floors: 1,
+    security_deposit_months: 1,
+    initial_charge_templates: [],
     units: [{ name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
   });
 
@@ -393,6 +396,63 @@ const PropertyManager: React.FC = () => {
     return Math.floor(parsed);
   };
 
+  const normalizeSecurityDepositMonths = (value: string | number) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.max(1, Math.round(parsed));
+  };
+
+  const handleAddInitialChargeTemplate = () => {
+    const nextTemplate = {
+      id: `tpl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: '',
+      charge_type: 'deposit' as const,
+      amount: 0,
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      initial_charge_templates: [...(prev.initial_charge_templates || []), nextTemplate],
+    }));
+  };
+
+  const handleRemoveInitialChargeTemplate = (id: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      initial_charge_templates: (prev.initial_charge_templates || []).filter((item) => item.id !== id),
+    }));
+  };
+
+  const handleInitialChargeTemplateChange = (
+    id: string,
+    field: 'name' | 'charge_type' | 'amount',
+    value: string
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      initial_charge_templates: (prev.initial_charge_templates || []).map((item) => {
+        if (item.id !== id) return item;
+        if (field === 'charge_type') {
+          return {
+            ...item,
+            charge_type: value === 'fee' ? 'fee' : 'deposit',
+          };
+        }
+        if (field === 'amount') {
+          const parsed = Number(value);
+          return {
+            ...item,
+            amount: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
+          };
+        }
+        return {
+          ...item,
+          name: value,
+        };
+      }),
+    }));
+  };
+
   const getLivePropertySnapshot = async (property: Property): Promise<Property> => {
     const [unitsResponse, unitTypesResponse] = await Promise.all([
       supabase
@@ -544,6 +604,8 @@ const PropertyManager: React.FC = () => {
         description: '',
         amenities: '',
         number_of_floors: 1,
+        security_deposit_months: 1,
+        initial_charge_templates: [],
         units: [{ name: '', units_count: 0, price_per_unit: 0, sample_image_url: '' }]
       });
       setUnitSampleUrlDrafts({});
@@ -666,6 +728,20 @@ const PropertyManager: React.FC = () => {
       description: liveProperty.description || '',
       amenities: liveProperty.amenities || '',
       number_of_floors: liveProperty.number_of_floors || 1,
+      security_deposit_months: Math.max(
+        1,
+        Math.round(Number((liveProperty as any)?.first_payment_defaults?.security_deposit_months || 1)) || 1
+      ),
+      initial_charge_templates: Array.isArray((liveProperty as any)?.initial_charge_templates)
+        ? (liveProperty as any).initial_charge_templates
+            .map((item: any, index: number) => ({
+              id: String(item?.id || `tpl-${Date.now()}-${index}`),
+              name: String(item?.name || ''),
+              charge_type: item?.charge_type === 'fee' ? 'fee' : 'deposit',
+              amount: Number(item?.amount || 0),
+            }))
+            .filter((item: any) => item.name)
+        : [],
       units: liveProperty.property_unit_types?.map((u: any) => ({
         id: u.id,
         name: u.name,
@@ -1009,7 +1085,105 @@ const PropertyManager: React.FC = () => {
 
                         <Separator className="bg-blue-200" />
 
-                        {/* Section 2: Unit Configuration */}
+                        {/* Section 2: First-Time Move-In Breakdown */}
+                        <div className="space-y-5">
+                            <div className="flex justify-between items-end">
+                                <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
+                                First-Time Move-In Breakdown
+                                </h3>
+                                <Button
+                                  size="sm"
+                                  type="button"
+                                  onClick={handleAddInitialChargeTemplate}
+                                  className="h-8 border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 rounded-lg gap-1.5 text-xs font-bold transition-all"
+                                >
+                                  <Plus className="w-3.5 h-3.5" /> Add Deposit / Fee
+                                </Button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold text-blue-700">Security Deposit Months</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  value={formData.security_deposit_months || 1}
+                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                    setFormData({
+                                      ...formData,
+                                      security_deposit_months: normalizeSecurityDepositMonths(e.target.value),
+                                    })
+                                  }
+                                  className="h-9 border-blue-300 bg-white text-sm font-medium text-right focus:border-blue-600 focus:ring-blue-600 rounded-md shadow-sm"
+                                />
+                              </div>
+                              <div className="md:col-span-2 text-xs text-blue-600 pb-1">
+                                First-time security deposit will be calculated as monthly rent x this value. You can use any number from 1 upward.
+                              </div>
+                            </div>
+
+                            {(formData.initial_charge_templates || []).length === 0 ? (
+                              <div className="border border-dashed border-blue-300 rounded-lg p-4 text-xs text-blue-600 bg-blue-50">
+                                No extra deposits or fees added yet.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {(formData.initial_charge_templates || []).map((item) => (
+                                  <div key={item.id} className="grid grid-cols-12 gap-3 items-end bg-blue-50/50 p-3 rounded-lg border border-blue-300">
+                                    <div className="col-span-12 md:col-span-5 space-y-1.5">
+                                      <Label className="text-xs font-semibold text-blue-700">Charge Name</Label>
+                                      <Input
+                                        value={item.name}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                          handleInitialChargeTemplateChange(item.id, 'name', e.target.value)
+                                        }
+                                        placeholder="e.g. Water Deposit"
+                                        className="h-9 border-blue-300 bg-white text-sm font-medium"
+                                      />
+                                    </div>
+                                    <div className="col-span-6 md:col-span-3 space-y-1.5">
+                                      <Label className="text-xs font-semibold text-blue-700">Type</Label>
+                                      <select
+                                        value={item.charge_type}
+                                        onChange={(e) => handleInitialChargeTemplateChange(item.id, 'charge_type', e.target.value)}
+                                        className="h-9 w-full border border-blue-300 rounded-md px-2 bg-white text-sm"
+                                      >
+                                        <option value="deposit">Deposit</option>
+                                        <option value="fee">Fee</option>
+                                      </select>
+                                    </div>
+                                    <div className="col-span-5 md:col-span-3 space-y-1.5">
+                                      <Label className="text-xs font-semibold text-blue-700">Amount (KES)</Label>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={item.amount}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                          handleInitialChargeTemplateChange(item.id, 'amount', e.target.value)
+                                        }
+                                        className="h-9 border-blue-300 bg-white text-sm text-right"
+                                      />
+                                    </div>
+                                    <div className="col-span-1 flex justify-end pb-1">
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        onClick={() => handleRemoveInitialChargeTemplate(item.id)}
+                                        className="h-7 w-7 text-red-600 bg-red-50 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors border border-red-300"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+
+                        <Separator className="bg-blue-200" />
+
+                        {/* Section 3: Unit Configuration */}
                         <div className="space-y-5">
                             <div className="flex justify-between items-end">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">

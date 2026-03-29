@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,7 +28,6 @@ interface SelectedUnitDetails {
 
 export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
 
   const propertyId = searchParams.get("propertyId") || "";
@@ -73,18 +72,31 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
 
       try {
         setUnitDetailsLoading(true);
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 10000);
 
         const { data, error } = await supabase
           .from("units")
           .select(
             `
-            *,
+            id,
+            property_id,
+            unit_number,
+            unit_type_id,
+            status,
+            floor_number,
+            price,
+            description,
+            features,
             properties:property_id(name, location),
-            property_unit_types:unit_type_id(*)
+            property_unit_types:unit_type_id(id, unit_type_name, name, price_per_unit)
           `
           )
           .eq("id", unitId)
+          .abortSignal(controller.signal)
           .maybeSingle();
+
+        window.clearTimeout(timeoutId);
 
         if (error) throw error;
 
@@ -158,7 +170,12 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
           property_to_let: `${resolvedPropertyName} - Unit ${resolvedUnitNumber}`,
         }));
       } catch (error) {
-        console.error("Failed to load full unit details:", error);
+        const errorMessage = String((error as any)?.message || "").toLowerCase();
+        if (errorMessage.includes("abort")) {
+          console.warn("Unit details request timed out; using URL fallback details.");
+        } else {
+          console.error("Failed to load full unit details:", error);
+        }
 
         const fallbackRent = Number(rentParam || 0);
         setUnitDetails({
@@ -223,44 +240,95 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
     setIsSubmitting(true);
     try {
       let applicantId = user?.id || null;
+      let accountAction: "existing" | "created" = "existing";
+      const applicantEmail = form.applicant_email.trim().toLowerCase();
 
       if (!applicantId) {
         const [firstName, ...lastNameParts] = form.applicant_name.trim().split(/\s+/);
         const lastName = lastNameParts.join(" ").trim();
+        let existingAccountByEmail: boolean | null = null;
 
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: form.applicant_email.trim().toLowerCase(),
-          password: form.password,
-          options: {
-            data: {
-              first_name: firstName || form.applicant_name,
-              last_name: lastName || "Tenant",
-              phone: form.telephone_numbers,
-              role: "tenant",
-              status: "active",
-            },
-          },
-        });
+        // If policy allows, this avoids auth probe errors by selecting the correct path first.
+        const { data: profileByEmail, error: profileLookupError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", applicantEmail)
+          .maybeSingle();
 
-        if (authError) {
-          throw new Error(authError.message || "Could not register applicant account.");
+        if (!profileLookupError) {
+          existingAccountByEmail = !!profileByEmail;
         }
 
-        applicantId = authData.user?.id || null;
-        if (!applicantId) {
-          throw new Error("Registration did not return an applicant account. Please try again.");
+        if (existingAccountByEmail === true) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: applicantEmail,
+            password: form.password,
+          });
+
+          if (signInError || !signInData.user?.id) {
+            throw new Error("This email is already registered, but the password is incorrect. Use the correct password or reset it, then apply again.");
+          }
+
+          applicantId = signInData.user.id;
+        } else {
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: applicantEmail,
+            password: form.password,
+            options: {
+              data: {
+                first_name: firstName || form.applicant_name,
+                last_name: lastName || "Tenant",
+                phone: form.telephone_numbers,
+                role: "tenant",
+                status: "active",
+              },
+            },
+          });
+
+          if (authError) {
+            const authMessage = String(authError.message || "").toLowerCase();
+            if (authMessage.includes("already registered") || authMessage.includes("user already registered")) {
+              // If profile lookup is unavailable/blocked by RLS and user exists, recover with sign-in.
+              const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email: applicantEmail,
+                password: form.password,
+              });
+
+              if (signInError || !signInData.user?.id) {
+                throw new Error("This email is already registered, but the password is incorrect. Use the correct password or reset it, then apply again.");
+              }
+
+              applicantId = signInData.user.id;
+              accountAction = "existing";
+            } else {
+              throw new Error(authError.message || "Could not register applicant account.");
+            }
+          }
+
+          if (!applicantId) {
+            applicantId = authData.user?.id || null;
+            if (!applicantId) {
+              throw new Error("Registration succeeded, but no user ID was returned. Please verify your email, sign in, and apply again.");
+            }
+            accountAction = "created";
+          }
         }
       }
+
+      const selectedUnitSummary = unitDetails
+        ? `${unitDetails.propertyName} - Unit ${unitDetails.unitNumber} (PROPERTY_ID:${unitDetails.propertyId || propertyId};UNIT_ID:${unitDetails.id};UNIT_TYPE_ID:${unitDetails.unitTypeId || unitTypeIdParam};UNIT_TYPE:${unitDetails.unitTypeName || 'N/A'})`
+        : `${propertyName || 'Unknown Property'} - Unit ${unitNumber || 'N/A'} (PROPERTY_ID:${propertyId};UNIT_ID:${unitId};UNIT_TYPE_ID:${unitTypeIdParam || 'N/A'};UNIT_TYPE:${unitTypeNameParam || 'N/A'})`;
 
       const applicationData = {
         applicant_id: applicantId,
         property_id: propertyId,
         unit_id: unitId,
         status: "pending",
+        property_to_let: selectedUnitSummary,
         applicant_name: form.applicant_name,
         physical_address: form.physical_address,
         po_box: form.po_box,
-        applicant_email: form.applicant_email,
+        applicant_email: applicantEmail,
         employer_details: form.employer_details,
         telephone_numbers: form.telephone_numbers,
         marital_status: form.marital_status,
@@ -280,12 +348,27 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         .from("lease_applications")
         .insert([applicationData]);
 
-      // Backward compatibility for deployments that haven't applied next_of_kin_email migration yet.
-      if (error && String(error.message || '').toLowerCase().includes('next_of_kin_email')) {
-        const { next_of_kin_email, ...fallbackData } = applicationData as any;
-        ({ error } = await supabase
-          .from("lease_applications")
-          .insert([fallbackData]));
+      // Backward compatibility for deployments missing optional columns.
+      if (error) {
+        const errorText = String(error.message || '').toLowerCase();
+        const fallbackData = { ...(applicationData as any) };
+        let shouldRetry = false;
+
+        if (errorText.includes('next_of_kin_email')) {
+          delete fallbackData.next_of_kin_email;
+          shouldRetry = true;
+        }
+
+        if (errorText.includes('property_to_let')) {
+          delete fallbackData.property_to_let;
+          shouldRetry = true;
+        }
+
+        if (shouldRetry) {
+          ({ error } = await supabase
+            .from("lease_applications")
+            .insert([fallbackData]));
+        }
       }
 
       if (error) {
@@ -306,9 +389,11 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
         return;
       }
       
-      toast.success(user?.id
-        ? "Application submitted successfully! We'll review it shortly."
-        : "Application submitted and account created successfully. You'll use this email/password to sign in.");
+      toast.success(
+        user?.id || accountAction === "existing"
+          ? "Application submitted successfully! We'll review it shortly."
+          : "Application submitted and account created successfully. You'll use this email/password to sign in."
+      );
       setForm({
         property_to_let: "",
         applicant_name: "",
@@ -377,14 +462,6 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs text-slate-500 mb-1">Unit ID</p>
-              <p className="text-sm font-semibold text-slate-800 break-all">{unitDetails?.id || unitId || "N/A"}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs text-slate-500 mb-1">Property ID</p>
-              <p className="text-sm font-semibold text-slate-800 break-all">{unitDetails?.propertyId || propertyId || "N/A"}</p>
-            </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs text-slate-500 mb-1">Property Name</p>
               <p className="text-sm font-semibold text-slate-800">{unitDetails?.propertyName || propertyName || "N/A"}</p>

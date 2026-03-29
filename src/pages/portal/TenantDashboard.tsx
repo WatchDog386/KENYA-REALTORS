@@ -154,6 +154,7 @@ const TenantDashboard: React.FC = () => {
   const [tenantPortalLocked, setTenantPortalLocked] = useState(false);
   const [pendingInitialInvoices, setPendingInitialInvoices] = useState<PendingInitialInvoice[]>([]);
   const [initialInvoiceTotal, setInitialInvoiceTotal] = useState(0);
+  const [hasPaidOnboardingInvoice, setHasPaidOnboardingInvoice] = useState(false);
 
   const [stats, setStats] = useState({
     currentBalance: 0,
@@ -421,6 +422,7 @@ const TenantDashboard: React.FC = () => {
       setTenantPortalLocked(accessState.isLocked);
       setPendingInitialInvoices(accessState.pendingInitialInvoices);
       setInitialInvoiceTotal(accessState.initialInvoiceTotal);
+      setHasPaidOnboardingInvoice(accessState.hasPaidOnboardingInvoice);
 
       if (accessState.isLocked) {
         setTenantInfo(null);
@@ -832,11 +834,13 @@ const TenantDashboard: React.FC = () => {
               {pendingInitialInvoices.length === 0 ? (
                 <div className="space-y-3">
                   <div className="text-sm text-slate-700">
-                    Payment is confirmed. We are finalizing your unit assignment and lease activation.
+                    {hasPaidOnboardingInvoice
+                      ? "Payment is confirmed. We are finalizing your unit assignment and lease activation."
+                      : "No initial invoice is available yet. Your approval is complete, and billing is preparing your move-in invoice."}
                   </div>
                   <Button onClick={handleRefresh} className="bg-[#154279] hover:bg-[#0f305a]" size="sm">
                     <RefreshCw className={cn("w-4 h-4 mr-2", refreshing ? "animate-spin" : "")} />
-                    {refreshing ? "Refreshing..." : "Refresh Assignment Status"}
+                    {refreshing ? "Refreshing..." : hasPaidOnboardingInvoice ? "Refresh Assignment Status" : "Refresh Invoice Status"}
                   </Button>
                 </div>
               ) : (

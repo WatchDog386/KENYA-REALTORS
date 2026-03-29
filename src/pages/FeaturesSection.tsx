@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { 
     MapPin, BedDouble, Bath, X, Search, ShoppingCart, Menu,
     ChevronRight, CheckCircle2, Maximize, User, Phone, 
-    ArrowRight, PlayCircle, Home, Shield, Zap, Wifi, Clock, FileText
+    ArrowRight, PlayCircle, Home, Shield, Zap, Wifi, Clock, FileText, ArrowLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -166,8 +167,25 @@ const FilterSidebar = ({ filters, setFilters, allListings, loading, properties, 
 };
 
 const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
+    const navigate = useNavigate();
     const [manager, setManager] = React.useState<any>(null);
     const [activeImageIndex, setActiveImageIndex] = React.useState(0);
+
+    const handleApply = () => {
+        const params = new URLSearchParams({
+            propertyId: item.propertyId || item.properties?.id || '',
+            unitId: item.id || '',
+            propertyName: item.propertyName || item.properties?.name || item.title || '',
+            unitNumber: item.unitNumber || item.unit_number || '',
+            location: item.location || item.properties?.location || '',
+            unitTypeId: item.typeId ? String(item.typeId) : '',
+            unitTypeName: item.type || '',
+            rent: item.price ? String(item.price) : '',
+            status: item.rawStatus || item.status || 'available'
+        });
+
+        navigate(`/applications?${params.toString()}`);
+    };
 
     React.useEffect(() => {
         const fetchManager = async () => {
@@ -221,7 +239,16 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
         >
             {/* Header / Nav inside Modal */}
             <div className="sticky top-0 bg-[#efeeee]  z-50 px-4 md:px-8 h-16 flex items-center justify-between border-b border-transparent ">
-                <div className="font-semibold text-xl text-[#154279] tracking-tight">AYDEN<span className="text-[#F96302]">HOMES</span></div>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={onClose}
+                        className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#154279] bg-[#efeeee] hover:text-white hover:bg-[#154279] transition-all shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"
+                    >
+                        <ArrowLeft size={14} />
+                        Back
+                    </button>
+                    <div className="font-semibold text-xl text-[#154279] tracking-tight">AYDEN<span className="text-[#F96302]">HOMES</span></div>
+                </div>
                 <button 
                     onClick={onClose}
                     className="w-10 h-10 rounded-none bg-[#efeeee] hover:bg-[#F96302] hover:text-white flex items-center justify-center transition-all shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]"
@@ -438,6 +465,29 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
                     </div>
 
                 </div>
+
+                <div className="px-6 md:px-10 pb-10">
+                    <div className="bg-[#efeeee] border border-transparent p-4 md:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff]">
+                        <p className="text-sm md:text-base font-semibold text-[#154279]">
+                            Ready to apply for this unit?
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2.5 border border-[#154279]/30 text-[#154279] text-xs font-bold uppercase tracking-wide hover:bg-[#154279]/5 transition-colors"
+                            >
+                                Back
+                            </button>
+                            <button
+                                onClick={handleApply}
+                                className="px-5 py-2.5 bg-[#F96302] hover:bg-[#e55a00] text-white text-xs font-bold uppercase tracking-wide inline-flex items-center gap-2 transition-colors"
+                            >
+                                Apply Now
+                                <ArrowRight size={14} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </motion.div>
     );
@@ -445,6 +495,7 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
 
 // --- 4. MAIN PAGE COMPONENT ---
 export default function AydenTowersListing() {
+    const navigate = useNavigate();
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [allListings, setAllListings] = useState<any[]>([]);
     const [properties, setProperties] = useState<any[]>([]);
@@ -882,7 +933,7 @@ export default function AydenTowersListing() {
                                                                 rent: item.price ? String(item.price) : '',
                                                                 status: item.rawStatus || 'available'
                                                             });
-                                                            window.location.href = `/applications?${params.toString()}`;
+                                                            navigate(`/applications?${params.toString()}`);
                                                         }}
                                                         className="px-3 py-2 bg-[#F96302] hover:bg-[#e55a00] text-white font-bold text-[9px] uppercase tracking-[0.1em] transition-all flex items-center gap-1 shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#ab4401,inset_-2px_-2px_4px_#ff8203]"
                                                     >

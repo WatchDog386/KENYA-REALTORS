@@ -29,6 +29,9 @@ export interface Property {
   number_of_floors?: number;
   property_unit_types?: PropertyUnitType[];
   initial_charge_templates?: PropertyInitialChargeTemplate[];
+  first_payment_defaults?: {
+    security_deposit_months?: number;
+  };
   // Computed on frontend
   total_units?: number;
   expected_income?: number;
@@ -50,6 +53,7 @@ export interface CreatePropertyDTO {
     sample_image_url?: string;
   }[];
   initial_charge_templates?: PropertyInitialChargeTemplate[];
+  security_deposit_months?: number;
 }
 
 export const propertyService = {
@@ -133,6 +137,11 @@ export const propertyService = {
       }))
       .filter((item) => item.name && item.amount >= 0);
 
+    const normalizedSecurityDepositMonths = Math.max(
+      1,
+      Math.round(Number(property.security_deposit_months || 1)) || 1
+    );
+
     const basePropertyPayload = {
       name: property.name,
       location: property.location,
@@ -150,22 +159,44 @@ export const propertyService = {
       .insert({
         ...basePropertyPayload,
         initial_charge_templates: sanitizedTemplates,
+        first_payment_defaults: {
+          security_deposit_months: normalizedSecurityDepositMonths,
+        },
       })
       .select()
       .single();
 
     if (insertWithTemplates.error) {
-      const missingColumn = String(insertWithTemplates.error.message || '').toLowerCase().includes('initial_charge_templates');
-      if (!missingColumn) throw insertWithTemplates.error;
+      const errorText = String(insertWithTemplates.error.message || '').toLowerCase();
+      const missingTemplates = errorText.includes('initial_charge_templates');
+      const missingDefaults = errorText.includes('first_payment_defaults');
 
-      const retryWithoutTemplates = await supabase
+      if (!missingTemplates && !missingDefaults) throw insertWithTemplates.error;
+
+      const fallbackPayload = {
+        ...basePropertyPayload,
+        ...(missingTemplates
+          ? {}
+          : {
+              initial_charge_templates: sanitizedTemplates,
+            }),
+        ...(missingDefaults
+          ? {}
+          : {
+              first_payment_defaults: {
+                security_deposit_months: normalizedSecurityDepositMonths,
+              },
+            }),
+      };
+
+      const retryWithoutMissingColumns = await supabase
         .from('properties')
-        .insert(basePropertyPayload)
+        .insert(fallbackPayload)
         .select()
         .single();
 
-      if (retryWithoutTemplates.error) throw retryWithoutTemplates.error;
-      propData = retryWithoutTemplates.data;
+      if (retryWithoutMissingColumns.error) throw retryWithoutMissingColumns.error;
+      propData = retryWithoutMissingColumns.data;
     } else {
       propData = insertWithTemplates.data;
     }

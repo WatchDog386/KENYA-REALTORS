@@ -8,6 +8,7 @@ import {
   Download,
   AlertCircle,
   CheckCircle2,
+  Check,
   Loader2,
   Search,
   Filter,
@@ -30,7 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { downloadReceiptPDF, formatReceiptData } from "@/utils/receiptGenerator";
+import { downloadReceiptPDF, formatReceiptData, generateReceiptPDF } from "@/utils/receiptGenerator";
 
 import {
   Card,
@@ -143,6 +144,7 @@ type BillingEventType = 'first_payment' | 'vacating_switching';
 
 interface FirstPaymentCandidate {
   lease_id: string;
+  lease_application_id?: string;
   tenant_id: string;
   tenant_name: string;
   tenant_email: string;
@@ -183,6 +185,7 @@ interface TransitionBillingCandidate {
 interface SpecialInvoiceDraft {
   eventType: BillingEventType;
   sourceId: string;
+  lease_application_id?: string;
   tenant_id: string;
   tenant_name: string;
   tenant_email?: string;
@@ -194,6 +197,7 @@ interface SpecialInvoiceDraft {
   unit_type_name?: string;
   baseRent: number;
   securityDeposit: number;
+  securityDepositMonths: number;
   initialCharges: InitialChargeLineItem[];
   cleaningFee: number;
   damageCharges: number;
@@ -204,6 +208,18 @@ interface SpecialInvoiceDraft {
   dueDate: string;
   notes: string;
 }
+
+const DEFAULT_SECURITY_DEPOSIT_MONTHS = 1;
+
+const normalizeSecurityDepositMonths = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_SECURITY_DEPOSIT_MONTHS;
+  return Math.max(DEFAULT_SECURITY_DEPOSIT_MONTHS, Math.round(parsed));
+};
+
+const calculateSecurityDepositAmount = (baseRent: number, months: number): number => {
+  return Number(baseRent || 0) * normalizeSecurityDepositMonths(months);
+};
 
 const SuperAdminUtilitiesManager = () => {
   const [settings, setSettings] = useState<UtilitySettings>({
@@ -244,13 +260,27 @@ const SuperAdminUtilitiesManager = () => {
   const [transitionCandidates, setTransitionCandidates] = useState<TransitionBillingCandidate[]>([]);
   const [specialInvoiceDraft, setSpecialInvoiceDraft] = useState<SpecialInvoiceDraft | null>(null);
   const [savingSpecialInvoice, setSavingSpecialInvoice] = useState(false);
+  const [savingFirstPaymentDefaults, setSavingFirstPaymentDefaults] = useState(false);
   const [propertyInitialChargesMap, setPropertyInitialChargesMap] = useState<Record<string, InitialChargeLineItem[]>>({});
+  const [propertyDepositMonthsMap, setPropertyDepositMonthsMap] = useState<Record<string, number>>({});
+  const [selectedPropertyForInitialConfig, setSelectedPropertyForInitialConfig] = useState<string>('');
+  const [tempDepositMonths, setTempDepositMonths] = useState(1);
+  const [tempAdditionalCharges, setTempAdditionalCharges] = useState<Array<{ name: string; type: 'deposit' | 'fee'; amount: number }>>([]);
+  const [newChargeNameStandard, setNewChargeNameStandard] = useState('');
+  const [newChargeTypeStandard, setNewChargeTypeStandard] = useState<'deposit' | 'fee'>('deposit');
+  const [newChargeAmountStandard, setNewChargeAmountStandard] = useState('');
   const [newInitialChargeName, setNewInitialChargeName] = useState('');
   const [newInitialChargeAmount, setNewInitialChargeAmount] = useState('');
   const [newInitialChargeType, setNewInitialChargeType] = useState<'deposit' | 'fee'>('deposit');
   const [newSpecialChargeName, setNewSpecialChargeName] = useState('');
   const [newSpecialChargeAmount, setNewSpecialChargeAmount] = useState('');
   const [autoChecklistDamageByUnit, setAutoChecklistDamageByUnit] = useState<Record<string, number>>({});
+  const [existingFirstPaymentInvoice, setExistingFirstPaymentInvoice] = useState<any>(null);
+  const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
+  const [loadingExistingInvoice, setLoadingExistingInvoice] = useState(false);
+  const [existingFirstPaymentInvoicesList, setExistingFirstPaymentInvoicesList] = useState<any[]>([]);
+  const [loadingExistingInvoicesList, setLoadingExistingInvoicesList] = useState(false);
+  const [selectedExistingInvoiceForEdit, setSelectedExistingInvoiceForEdit] = useState<any>(null);
 
   // Fetch utility settings and constants
   useEffect(() => {
@@ -302,6 +332,9 @@ const SuperAdminUtilitiesManager = () => {
         if (!newUtilityPropertyId && mappedProperties.length > 0) {
           setNewUtilityPropertyId(mappedProperties[0].id);
         }
+        if (!selectedPropertyForInitialConfig && mappedProperties.length > 0) {
+          setSelectedPropertyForInitialConfig(mappedProperties[0].id);
+        }
 
         const { data: propertyUtilitiesData, error: propertyUtilitiesError } = await supabase
           .from('property_utilities')
@@ -343,6 +376,24 @@ const SuperAdminUtilitiesManager = () => {
               .filter((item: InitialChargeLineItem) => item.name && item.amount >= 0);
           });
           setPropertyInitialChargesMap(templateMap);
+        }
+
+        const db = supabase as any;
+        const { data: propertyDefaultsData, error: propertyDefaultsError } = await db
+          .from('properties')
+          .select('id, first_payment_defaults');
+
+        if (propertyDefaultsError) {
+          const missingColumn = String(propertyDefaultsError.message || '').toLowerCase().includes('first_payment_defaults');
+          if (!missingColumn) throw propertyDefaultsError;
+          setPropertyDepositMonthsMap({});
+        } else {
+          const defaultsMap: Record<string, number> = {};
+          (propertyDefaultsData || []).forEach((row: any) => {
+            const months = normalizeSecurityDepositMonths(row?.first_payment_defaults?.security_deposit_months);
+            defaultsMap[String(row.id)] = months;
+          });
+          setPropertyDepositMonthsMap(defaultsMap);
         }
       } catch (err: any) {
         console.error("Error fetching utility settings:", err);
@@ -430,6 +481,54 @@ const SuperAdminUtilitiesManager = () => {
     img.onerror = () => URL.revokeObjectURL(svgUrl);
     img.src = svgUrl;
   }, []);
+
+  // Load property-specific initial invoice configuration
+  useEffect(() => {
+    if (!selectedPropertyForInitialConfig) {
+      setTempDepositMonths(1);
+      setTempAdditionalCharges([]);
+      return;
+    }
+
+    const loadPropertyConfig = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('properties')
+          .select('first_payment_defaults, initial_charge_templates')
+          .eq('id', selectedPropertyForInitialConfig)
+          .maybeSingle();
+
+        if (error && error.code !== 'PGRST116') throw error;
+
+        if (data) {
+          // Load security deposit months
+          const months = normalizeSecurityDepositMonths(data?.first_payment_defaults?.security_deposit_months);
+          setTempDepositMonths(months);
+
+          // Load additional charges
+          const templates = Array.isArray(data?.initial_charge_templates) ? data.initial_charge_templates : [];
+          const charges = templates
+            .map((item: any) => ({
+              name: String(item?.name || '').trim(),
+              type: item?.charge_type === 'fee' ? 'fee' : 'deposit',
+              amount: Number(item?.amount || 0),
+            }))
+            .filter((item: any) => item.name && item.amount >= 0);
+          setTempAdditionalCharges(charges);
+        }
+      } catch (err: any) {
+        console.error('Error loading property configuration:', err);
+      }
+    };
+
+    loadPropertyConfig();
+  }, [selectedPropertyForInitialConfig]);
+
+  useEffect(() => {
+    if (selectedPropertyId === 'all') return;
+    if (selectedPropertyForInitialConfig === selectedPropertyId) return;
+    setSelectedPropertyForInitialConfig(selectedPropertyId);
+  }, [selectedPropertyId, selectedPropertyForInitialConfig]);
 
 
   const loadTenantReadings = async () => {
@@ -683,6 +782,21 @@ const SuperAdminUtilitiesManager = () => {
 
       if (leaseError) throw leaseError;
 
+      const { data: applicationRows, error: appError } = await supabase
+        .from('lease_applications')
+        .select(`
+          id,
+          applicant_id,
+          unit_id,
+          property_id,
+          status,
+          created_at
+        `)
+        .in('status', ['manager_approved', 'approved', 'under_review', 'invoice_sent'])
+        .order('created_at', { ascending: false });
+
+      if (appError) throw appError;
+
       const { data: vacancyRows, error: vacancyError } = await supabase
         .from('vacancy_notices')
         .select('id, tenant_id, property_id, unit_id, move_out_date, status, reason, created_at')
@@ -691,8 +805,38 @@ const SuperAdminUtilitiesManager = () => {
 
       if (vacancyError && vacancyError.code !== 'PGRST116') throw vacancyError;
 
+      const unitIds = Array.from(
+        new Set(
+          [
+            ...(leaseRows || []).map((row: any) => row?.unit_id),
+            ...(applicationRows || []).map((row: any) => row?.unit_id),
+            ...(vacancyRows || []).map((row: any) => row?.unit_id),
+          ].filter(Boolean)
+        )
+      ) as string[];
+
+      let unitById = new Map<string, any>();
+      if (unitIds.length > 0) {
+        const { data: unitsData, error: unitsError } = await supabase
+          .from('units')
+          .select(`
+            id,
+            unit_number,
+            property_id,
+            unit_type_id,
+            price,
+            property_unit_types:unit_type_id(name, unit_type_name, price_per_unit),
+            properties:property_id(name)
+          `)
+          .in('id', unitIds);
+
+        if (unitsError && unitsError.code !== 'PGRST116') throw unitsError;
+        unitById = new Map((unitsData || []).map((row: any) => [row.id, row]));
+      }
+
       const tenantIds = new Set<string>();
       (leaseRows || []).forEach((row: any) => row?.tenant_id && tenantIds.add(row.tenant_id));
+      (applicationRows || []).forEach((row: any) => row?.applicant_id && tenantIds.add(row.applicant_id));
       (vacancyRows || []).forEach((row: any) => row?.tenant_id && tenantIds.add(row.tenant_id));
 
       let profilesMap = new Map<string, any>();
@@ -717,6 +861,8 @@ const SuperAdminUtilitiesManager = () => {
         const notes = String(inv?.notes || '');
         const firstMatch = notes.match(/LEASE_ID:([a-f0-9-]+)/i);
         if (firstMatch?.[1]) firstPaymentMarkers.add(firstMatch[1]);
+        const firstAppMatch = notes.match(/LEASE_APPLICATION_ID:([a-f0-9-]+)/i);
+        if (firstAppMatch?.[1]) firstPaymentMarkers.add(firstAppMatch[1]);
         const transitionMatch = notes.match(/VACANCY_NOTICE_ID:([a-f0-9-]+)/i);
         if (transitionMatch?.[1]) transitionMarkers.add(transitionMatch[1]);
       });
@@ -724,7 +870,7 @@ const SuperAdminUtilitiesManager = () => {
       const now = Date.now();
       const recentWindowMs = 45 * 24 * 60 * 60 * 1000;
 
-      const firstCandidates: FirstPaymentCandidate[] = (leaseRows || [])
+      const firstCandidatesFromLeases: FirstPaymentCandidate[] = (leaseRows || [])
         .filter((lease: any) => {
           if (!lease?.id || firstPaymentMarkers.has(lease.id)) return false;
           const leaseCreatedAt = lease?.created_at ? new Date(lease.created_at).getTime() : 0;
@@ -734,7 +880,7 @@ const SuperAdminUtilitiesManager = () => {
         })
         .map((lease: any) => {
           const profile = profilesMap.get(lease.tenant_id) || {};
-          const unit = Array.isArray(lease.units) ? lease.units[0] : lease.units;
+          const unit = unitById.get(lease.unit_id) || (Array.isArray(lease.units) ? lease.units[0] : lease.units);
           const propertyName = unit?.properties
             ? (Array.isArray(unit.properties) ? unit.properties[0]?.name : unit.properties?.name)
             : 'Unknown Property';
@@ -744,6 +890,7 @@ const SuperAdminUtilitiesManager = () => {
 
           return {
             lease_id: lease.id,
+            lease_application_id: undefined,
             tenant_id: lease.tenant_id,
             tenant_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Tenant',
             tenant_email: profile.email || '',
@@ -760,6 +907,66 @@ const SuperAdminUtilitiesManager = () => {
           };
         })
         .filter((c) => c.tenant_id && c.property_id && c.unit_id);
+
+      const firstCandidatesFromApplications: FirstPaymentCandidate[] = (applicationRows || [])
+        .filter((application: any) => {
+          if (!application?.id || firstPaymentMarkers.has(application.id)) return false;
+          const applicationCreatedAt = application?.created_at ? new Date(application.created_at).getTime() : 0;
+          return applicationCreatedAt > 0 && now - applicationCreatedAt <= recentWindowMs;
+        })
+        .map((application: any) => {
+          const profile = profilesMap.get(application.applicant_id) || {};
+          const unit = unitById.get(application.unit_id);
+          const propertyName = unit?.properties
+            ? (Array.isArray(unit.properties) ? unit.properties[0]?.name : unit.properties?.name)
+            : 'Unknown Property';
+          const unitType = unit?.property_unit_types
+            ? (Array.isArray(unit.property_unit_types) ? unit.property_unit_types[0] : unit.property_unit_types)
+            : null;
+
+          return {
+            lease_id: application.id,
+            lease_application_id: application.id,
+            tenant_id: application.applicant_id,
+            tenant_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Tenant',
+            tenant_email: profile.email || '',
+            tenant_phone: profile.phone || '',
+            property_id: application.property_id || unit?.property_id || '',
+            property_name: propertyName || 'Unknown Property',
+            unit_id: application.unit_id,
+            unit_number: unit?.unit_number || 'N/A',
+            unit_type_id: unit?.unit_type_id || '',
+            unit_type_name: unitType?.name || unitType?.unit_type_name || '',
+            rent_amount: Number(unit?.price ?? unitType?.price_per_unit ?? 0),
+            lease_start_date: undefined,
+            assigned_at: application.created_at,
+          };
+        })
+        .filter((c) => c.tenant_id && c.property_id && c.unit_id);
+
+      const firstCandidateMap = new Map<string, FirstPaymentCandidate>();
+      [...firstCandidatesFromApplications, ...firstCandidatesFromLeases].forEach((candidate) => {
+        const key = `${candidate.tenant_id}:${candidate.unit_id}`;
+        const existing = firstCandidateMap.get(key);
+        if (!existing) {
+          firstCandidateMap.set(key, candidate);
+          return;
+        }
+
+        const existingTime = new Date(existing.assigned_at || 0).getTime();
+        const nextTime = new Date(candidate.assigned_at || 0).getTime();
+        const prefersLeaseCandidate = Boolean(existing.lease_application_id) && !candidate.lease_application_id;
+
+        if (prefersLeaseCandidate || nextTime > existingTime) {
+          firstCandidateMap.set(key, candidate);
+        }
+      });
+
+      const firstCandidates = Array.from(firstCandidateMap.values()).sort((a, b) => {
+        const aTime = new Date(a.assigned_at || a.lease_start_date || 0).getTime();
+        const bTime = new Date(b.assigned_at || b.lease_start_date || 0).getTime();
+        return bTime - aTime;
+      });
 
       const transitionList: TransitionBillingCandidate[] = (vacancyRows || [])
         .filter((notice: any) => notice?.id && !transitionMarkers.has(notice.id))
@@ -837,6 +1044,7 @@ const SuperAdminUtilitiesManager = () => {
   useEffect(() => {
     loadTenantReadings();
     loadSpecialBillingCandidates();
+    loadExistingFirstPaymentInvoicesList();
 
     // Setup real-time subscription for utility readings
     const readingsChannel = supabase
@@ -853,6 +1061,7 @@ const SuperAdminUtilitiesManager = () => {
           // Refresh all readings when any change occurs
           await loadTenantReadings();
           await loadSpecialBillingCandidates();
+          await loadExistingFirstPaymentInvoicesList();
         }
       )
       .subscribe();
@@ -894,6 +1103,8 @@ const SuperAdminUtilitiesManager = () => {
       charge_type: item.charge_type,
       amount: Number(item.amount || 0),
     }));
+    const securityDepositMonths = normalizeSecurityDepositMonths(propertyDepositMonthsMap[candidate.property_id]);
+    const baseRent = Number(candidate.rent_amount || 0);
 
     setNewInitialChargeName('');
     setNewInitialChargeAmount('');
@@ -903,6 +1114,7 @@ const SuperAdminUtilitiesManager = () => {
     setSpecialInvoiceDraft({
       eventType: 'first_payment',
       sourceId: candidate.lease_id,
+      lease_application_id: candidate.lease_application_id,
       tenant_id: candidate.tenant_id,
       tenant_name: candidate.tenant_name,
       tenant_email: candidate.tenant_email,
@@ -912,8 +1124,9 @@ const SuperAdminUtilitiesManager = () => {
       unit_number: candidate.unit_number,
       unit_type_id: candidate.unit_type_id,
       unit_type_name: candidate.unit_type_name,
-      baseRent: Number(candidate.rent_amount || 0),
-      securityDeposit: Number(candidate.rent_amount || 0),
+      baseRent,
+      securityDeposit: calculateSecurityDepositAmount(baseRent, securityDepositMonths),
+      securityDepositMonths,
       initialCharges: propertyTemplates,
       cleaningFee: 0,
       damageCharges: 0,
@@ -940,6 +1153,7 @@ const SuperAdminUtilitiesManager = () => {
       unit_number: candidate.unit_number,
       baseRent: 0,
       securityDeposit: 0,
+      securityDepositMonths: DEFAULT_SECURITY_DEPOSIT_MONTHS,
       initialCharges: [],
       cleaningFee: 0,
       damageCharges: 0,
@@ -962,8 +1176,146 @@ const SuperAdminUtilitiesManager = () => {
         return prev;
       }
       const parsed = Number(value);
-      return { ...prev, [field]: Number.isNaN(parsed) ? 0 : parsed } as SpecialInvoiceDraft;
+      const numericValue = Number.isNaN(parsed) ? 0 : parsed;
+      const nextDraft = { ...prev, [field]: numericValue } as SpecialInvoiceDraft;
+
+      if (field === 'baseRent' && prev.eventType === 'first_payment') {
+        nextDraft.securityDeposit = calculateSecurityDepositAmount(
+          numericValue,
+          prev.securityDepositMonths || DEFAULT_SECURITY_DEPOSIT_MONTHS
+        );
+      }
+
+      return nextDraft;
     });
+  };
+
+  const handleSecurityDepositMonthsChange = (value: string) => {
+    setSpecialInvoiceDraft((prev) => {
+      if (!prev || prev.eventType !== 'first_payment') return prev;
+      const months = normalizeSecurityDepositMonths(value);
+      return {
+        ...prev,
+        securityDepositMonths: months,
+        securityDeposit: calculateSecurityDepositAmount(prev.baseRent, months),
+      };
+    });
+  };
+
+  const persistFirstPaymentDefaultsForProperty = async (
+    propertyId: string,
+    initialCharges: InitialChargeLineItem[],
+    securityDepositMonths: number
+  ) => {
+    if (!propertyId) return;
+
+    const sanitizedCharges = (initialCharges || [])
+      .map((item, index) => ({
+        id: String(item.id || `tpl-${Date.now()}-${index}`),
+        name: String(item.name || '').trim(),
+        charge_type: item.charge_type === 'fee' ? 'fee' : 'deposit',
+        amount: Number(item.amount || 0),
+      }))
+      .filter((item) => item.name && item.amount >= 0);
+
+    const normalizedMonths = normalizeSecurityDepositMonths(securityDepositMonths);
+
+    const applyLocalPropertyState = () => {
+      setPropertyInitialChargesMap((prev) => ({
+        ...prev,
+        [propertyId]: sanitizedCharges,
+      }));
+      setPropertyDepositMonthsMap((prev) => ({
+        ...prev,
+        [propertyId]: normalizedMonths,
+      }));
+    };
+
+    const db = supabase as any;
+    const fullPayload = {
+      initial_charge_templates: sanitizedCharges,
+      first_payment_defaults: { security_deposit_months: normalizedMonths },
+    };
+
+    const updatePropertyConfig = async (payload: Record<string, unknown>) => {
+      const { data, error } = await db
+        .from('properties')
+        .update(payload)
+        .eq('id', propertyId)
+        .select('id')
+        .maybeSingle();
+
+      return {
+        data,
+        error,
+        matched: Boolean(data?.id),
+      };
+    };
+
+    const { error: updateError, matched } = await updatePropertyConfig(fullPayload);
+
+    if (!updateError) {
+      if (!matched) {
+        throw new Error('No property row was updated. Re-select the property and save again.');
+      }
+      applyLocalPropertyState();
+      return;
+    }
+
+    const errorText = String(updateError.message || '').toLowerCase();
+    const missingTemplates = errorText.includes('initial_charge_templates');
+    const missingDefaults = errorText.includes('first_payment_defaults');
+
+    if (missingTemplates && missingDefaults) {
+      throw new Error('Property invoice configuration columns are missing in the database. Run the latest migration and retry.');
+    }
+
+    if (missingDefaults) {
+      const { error: fallbackError, matched: fallbackMatched } = await updatePropertyConfig({ initial_charge_templates: sanitizedCharges });
+      if (!fallbackError) {
+        if (!fallbackMatched) {
+          throw new Error('No property row was updated. Re-select the property and save again.');
+        }
+        applyLocalPropertyState();
+        return;
+      }
+      if (String(fallbackError.message || '').toLowerCase().includes('initial_charge_templates')) return;
+      throw fallbackError;
+    }
+
+    if (missingTemplates) {
+      const { error: fallbackError, matched: fallbackMatched } = await updatePropertyConfig({ first_payment_defaults: { security_deposit_months: normalizedMonths } });
+      if (!fallbackError) {
+        if (!fallbackMatched) {
+          throw new Error('No property row was updated. Re-select the property and save again.');
+        }
+        applyLocalPropertyState();
+        return;
+      }
+      if (String(fallbackError.message || '').toLowerCase().includes('first_payment_defaults')) return;
+      throw fallbackError;
+    }
+
+    throw updateError;
+  };
+
+  const handleSaveFirstPaymentDefaults = async () => {
+    if (!specialInvoiceDraft || specialInvoiceDraft.eventType !== 'first_payment') return;
+
+    try {
+      setSavingFirstPaymentDefaults(true);
+      await persistFirstPaymentDefaultsForProperty(
+        specialInvoiceDraft.property_id,
+        specialInvoiceDraft.initialCharges || [],
+        specialInvoiceDraft.securityDepositMonths
+      );
+      toast.success('First-payment defaults saved for this property.');
+    } catch (error: any) {
+      console.error('Error saving first-payment defaults:', error);
+      toast.error(error?.message || 'Failed to save first-payment defaults');
+    } finally {
+      setSavingFirstPaymentDefaults(false);
+    }
   };
 
   const calculateSpecialInvoiceTotal = (draft: SpecialInvoiceDraft) => {
@@ -1120,8 +1472,11 @@ const SuperAdminUtilitiesManager = () => {
 
       const reference = `INV-${Date.now()}`;
       const cleanMetadata = (value?: string | null) => String(value || '').replace(/[;\r\n]/g, ' ').trim();
+      const leaseApplicationTag = specialInvoiceDraft.eventType === 'first_payment' && specialInvoiceDraft.lease_application_id
+        ? `;LEASE_APPLICATION_ID:${specialInvoiceDraft.lease_application_id}`
+        : '';
       const marker = specialInvoiceDraft.eventType === 'first_payment'
-        ? `BILLING_EVENT:first_payment;LEASE_ID:${specialInvoiceDraft.sourceId};UNIT_ID:${specialInvoiceDraft.unit_id};PROPERTY_ID:${specialInvoiceDraft.property_id};APPLICANT_ID:${specialInvoiceDraft.tenant_id};UNIT_NUMBER:${cleanMetadata(specialInvoiceDraft.unit_number)};UNIT_TYPE_ID:${cleanMetadata(specialInvoiceDraft.unit_type_id)};UNIT_TYPE_NAME:${cleanMetadata(specialInvoiceDraft.unit_type_name)};PROPERTY_NAME:${cleanMetadata(specialInvoiceDraft.property_name)};APPLICANT_NAME:${cleanMetadata(specialInvoiceDraft.tenant_name)};APPLICANT_EMAIL:${cleanMetadata(specialInvoiceDraft.tenant_email)}`
+        ? `BILLING_EVENT:first_payment;LEASE_ID:${specialInvoiceDraft.sourceId}${leaseApplicationTag};UNIT_ID:${specialInvoiceDraft.unit_id};PROPERTY_ID:${specialInvoiceDraft.property_id};APPLICANT_ID:${specialInvoiceDraft.tenant_id};UNIT_NUMBER:${cleanMetadata(specialInvoiceDraft.unit_number)};UNIT_TYPE_ID:${cleanMetadata(specialInvoiceDraft.unit_type_id)};UNIT_TYPE_NAME:${cleanMetadata(specialInvoiceDraft.unit_type_name)};PROPERTY_NAME:${cleanMetadata(specialInvoiceDraft.property_name)};APPLICANT_NAME:${cleanMetadata(specialInvoiceDraft.tenant_name)};APPLICANT_EMAIL:${cleanMetadata(specialInvoiceDraft.tenant_email)};SECURITY_DEPOSIT_MONTHS:${normalizeSecurityDepositMonths(specialInvoiceDraft.securityDepositMonths)}`
         : `BILLING_EVENT:vacating_switching;VACANCY_NOTICE_ID:${specialInvoiceDraft.sourceId}`;
 
       const initialCharges = (specialInvoiceDraft.initialCharges || [])
@@ -1172,6 +1527,19 @@ const SuperAdminUtilitiesManager = () => {
 
       if (error) throw error;
 
+      if (specialInvoiceDraft.eventType === 'first_payment') {
+        try {
+          await persistFirstPaymentDefaultsForProperty(
+            specialInvoiceDraft.property_id,
+            initialCharges,
+            specialInvoiceDraft.securityDepositMonths
+          );
+        } catch (defaultsError) {
+          console.warn('Invoice was created, but first-payment defaults could not be saved:', defaultsError);
+          toast.warning('Invoice created, but property defaults were not saved. You can retry with Save Defaults.');
+        }
+      }
+
       toast.success('Invoice generated successfully');
       setSpecialInvoiceDraft(null);
       await loadSpecialBillingCandidates();
@@ -1180,6 +1548,244 @@ const SuperAdminUtilitiesManager = () => {
       toast.error(err.message || 'Failed to generate invoice');
     } finally {
       setSavingSpecialInvoice(false);
+    }
+  };
+
+  const loadExistingFirstPaymentInvoice = async (candidate: FirstPaymentCandidate) => {
+    setLoadingExistingInvoice(true);
+    try {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, reference_number, amount, due_date, status, items, notes, created_at')
+        .eq('tenant_id', candidate.tenant_id)
+        .eq('property_id', candidate.property_id)
+        .or('notes.ilike.%BILLING_EVENT:first_payment%')
+        .eq('status', 'unpaid')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setExistingFirstPaymentInvoice(data);
+      } else {
+        toast.info('No existing first-payment invoice found for this tenant');
+        setExistingFirstPaymentInvoice(null);
+      }
+    } catch (err: any) {
+      console.error('Error loading invoice:', err);
+      toast.error('Failed to load invoice');
+    } finally {
+      setLoadingExistingInvoice(false);
+    }
+  };
+
+  const deleteLineItemFromInvoice = async (invoiceId: string, lineItemIndex: number) => {
+    try {
+      if (!existingFirstPaymentInvoice?.items) return;
+      
+      const updatedItems = { ...existingFirstPaymentInvoice.items };
+      const initialCharges = updatedItems.initial_charges || [];
+      
+      if (initialCharges[lineItemIndex]) {
+        initialCharges.splice(lineItemIndex, 1);
+        updatedItems.initial_charges = initialCharges;
+        
+        // Recalculate additional_charges map
+        const additionalChargesMap: Record<string, number> = {};
+        initialCharges.forEach((item: any) => {
+          additionalChargesMap[item.name] = Number(item.amount || 0);
+        });
+        updatedItems.additional_charges = additionalChargesMap;
+
+        // Recalculate invoice amount
+        const newAmount = 
+          (Number(updatedItems.monthly_rent) || 0) +
+          (Number(updatedItems.security_deposit) || 0) +
+          initialCharges.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+
+        const { error } = await supabase
+          .from('invoices')
+          .update({
+            items: updatedItems,
+            amount: newAmount,
+          })
+          .eq('id', invoiceId);
+
+        if (error) throw error;
+        
+        setExistingFirstPaymentInvoice({
+          ...existingFirstPaymentInvoice,
+          items: updatedItems,
+          amount: newAmount,
+        });
+        toast.success('Line item deleted');
+      }
+    } catch (err: any) {
+      console.error('Error deleting line item:', err);
+      toast.error('Failed to delete line item');
+    }
+  };
+
+  const updateLineItemInInvoice = async (invoiceId: string, lineItemIndex: number, field: string, value: any) => {
+    try {
+      if (!existingFirstPaymentInvoice?.items) return;
+      
+      const updatedItems = { ...existingFirstPaymentInvoice.items };
+      const initialCharges = updatedItems.initial_charges || [];
+      
+      if (initialCharges[lineItemIndex]) {
+        initialCharges[lineItemIndex] = {
+          ...initialCharges[lineItemIndex],
+          [field]: field === 'amount' ? Number(value) : value,
+        };
+        updatedItems.initial_charges = initialCharges;
+        
+        // Update additional_charges map
+        const additionalChargesMap: Record<string, number> = {};
+        initialCharges.forEach((item: any) => {
+          additionalChargesMap[item.name] = Number(item.amount || 0);
+        });
+        updatedItems.additional_charges = additionalChargesMap;
+
+        // Recalculate invoice amount
+        const newAmount = 
+          (Number(updatedItems.monthly_rent) || 0) +
+          (Number(updatedItems.security_deposit) || 0) +
+          initialCharges.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+
+        const { error } = await supabase
+          .from('invoices')
+          .update({
+            items: updatedItems,
+            amount: newAmount,
+          })
+          .eq('id', invoiceId);
+
+        if (error) throw error;
+        
+        setExistingFirstPaymentInvoice({
+          ...existingFirstPaymentInvoice,
+          items: updatedItems,
+          amount: newAmount,
+        });
+        toast.success('Line item updated');
+      }
+    } catch (err: any) {
+      console.error('Error updating line item:', err);
+      toast.error('Failed to update line item');
+    }
+  };
+
+  const loadExistingFirstPaymentInvoicesList = async () => {
+    setLoadingExistingInvoicesList(true);
+    try {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, reference_number, tenant_id, property_id, amount, due_date, status, items, notes, created_at')
+        .or('notes.ilike.%BILLING_EVENT:first_payment%')
+        .eq('status', 'unpaid')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Hide legacy invoices generated before metadata tags were standardized.
+      const modernInvoices = (data || []).filter((invoice: any) => {
+        const notes = String(invoice?.notes || '');
+        if (!/BILLING_EVENT:first_payment/i.test(notes)) return false;
+        return /UNIT_ID:/i.test(notes) && /PROPERTY_ID:/i.test(notes) && /APPLICANT_ID:/i.test(notes);
+      });
+
+      // Fetch tenant and profile names
+      const tenantIds = modernInvoices.map(inv => inv.tenant_id).filter(Boolean);
+      let tenantMap = new Map<string, any>();
+      let profileMap = new Map<string, any>();
+      let unitNumberMap = new Map<string, string>();
+      
+      if (tenantIds.length > 0) {
+        const { data: tenants, error: tenantsError } = await supabase
+          .from('tenants')
+          .select('id, user_id, property_id, unit_id, status')
+          .in('id', tenantIds);
+
+        if (tenantsError && tenantsError.code !== 'PGRST116') {
+          throw tenantsError;
+        }
+        
+        if (tenants) {
+          tenantMap = new Map(tenants.map(t => [t.id, t]));
+
+          // Resolve unit numbers separately to avoid relying on a tenants->units embedded relation.
+          const unitIds = Array.from(new Set(tenants.map(t => t.unit_id).filter(Boolean)));
+          if (unitIds.length > 0) {
+            const { data: units } = await supabase
+              .from('units')
+              .select('id, unit_number')
+              .in('id', unitIds);
+
+            if (units) {
+              unitNumberMap = new Map(units.map((u: any) => [u.id, u.unit_number || 'N/A']));
+            }
+          }
+          
+          // Fetch profiles for additional name details
+          const userIds = Array.from(new Set([
+            ...tenants.map(t => t.user_id).filter(Boolean),
+            ...tenantIds,
+          ]));
+          if (userIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email, phone')
+              .in('id', userIds);
+            
+            if (profiles) {
+              profileMap = new Map(profiles.map(p => [p.id, p]));
+            }
+          }
+        }
+      }
+
+      // Fetch property names
+      const propertyIds = modernInvoices.map(inv => inv.property_id).filter(Boolean);
+      let propertyMap = new Map<string, any>();
+      if (propertyIds.length > 0) {
+        const { data: properties } = await supabase
+          .from('properties')
+          .select('id, name')
+          .in('id', propertyIds);
+        
+        if (properties) {
+          propertyMap = new Map(properties.map(p => [p.id, p]));
+        }
+      }
+
+      // Format invoices with proper tenant/property names
+      const formatted = modernInvoices.map(inv => {
+        const tenant = tenantMap.get(inv.tenant_id);
+        const profile = tenant?.user_id ? profileMap.get(tenant.user_id) : profileMap.get(inv.tenant_id);
+        
+        // Resolve tenant identity from linked profile row.
+        const firstName = profile?.first_name || '';
+        const lastName = profile?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        const tenantName = fullName && fullName !== '' ? fullName : profile?.email || 'Unknown Tenant';
+        
+        return {
+          ...inv,
+          tenant_name: tenantName,
+          tenant_email: profile?.email || '',
+          unit_number: tenant?.unit_id ? (unitNumberMap.get(tenant.unit_id) || 'N/A') : 'N/A',
+          property_name: propertyMap.get(inv.property_id)?.name || 'Unknown Property',
+        };
+      });
+
+      setExistingFirstPaymentInvoicesList(formatted);
+    } catch (err: any) {
+      console.error('Error loading existing invoices:', err);
+      toast.error('Failed to load existing invoices');
+    } finally {
+      setLoadingExistingInvoicesList(false);
     }
   };
 
@@ -1607,6 +2213,56 @@ const SuperAdminUtilitiesManager = () => {
     };
   };
 
+  const buildInvoiceDraftForDownload = (tenant: TenantWithReadings): InvoiceDraft => {
+    const draft = buildInvoiceDraft(tenant);
+    if (draft) return draft;
+
+    const nowIso = new Date().toISOString();
+    const fallbackReading: UtilityReading = {
+      id: '',
+      tenant_id: tenant.tenant_id,
+      unit_id: tenant.unit_id || '',
+      property_id: tenant.property_id || '',
+      reading_month: nowIso,
+      previous_reading: 0,
+      current_reading: 0,
+      electricity_usage: 0,
+      electricity_bill: 0,
+      electricity_rate: 0,
+      water_previous_reading: 0,
+      water_current_reading: 0,
+      water_rate: 0,
+      water_bill: 0,
+      garbage_fee: 0,
+      security_fee: 0,
+      service_fee: 0,
+      custom_utilities: {},
+      other_charges: Number(tenant.utility_total || 0),
+      total_bill: Number(tenant.utility_total || 0),
+      status: tenant.status,
+      tenant_name: tenant.tenant_name,
+      tenant_email: tenant.tenant_email,
+      tenant_phone: tenant.tenant_phone,
+      unit_number: tenant.unit_number,
+      property_name: tenant.property_name,
+    };
+
+    return {
+      tenant,
+      reading: fallbackReading,
+      rentAmount: Number(tenant.rent_amount || 0),
+      electricityBill: 0,
+      waterBill: 0,
+      garbageFee: 0,
+      securityFee: 0,
+      serviceFee: 0,
+      otherCharges: Number(tenant.utility_total || 0),
+      customUtilities: {},
+      dueDate: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString().split('T')[0],
+      notes: 'Generated without a recorded utility reading. Utility breakdown was unavailable for this billing period.',
+    };
+  };
+
   const openInvoiceEditor = (tenant: TenantWithReadings) => {
     const draft = buildInvoiceDraft(tenant);
     if (!draft) {
@@ -1673,12 +2329,13 @@ const SuperAdminUtilitiesManager = () => {
   };
 
   const downloadInvoicePdf = (draft: InvoiceDraft) => {
-    const total = calculateDraftTotal(draft);
-    const doc = new jsPDF();
-    const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`;
-    const issueDate = new Date().toLocaleDateString();
-    const dueDate = new Date(draft.dueDate).toLocaleDateString();
-    const primaryColor: [number, number, number] = [21, 66, 121];
+    try {
+      const total = calculateDraftTotal(draft);
+      const doc = new jsPDF();
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`;
+      const issueDate = new Date().toLocaleDateString();
+      const dueDate = new Date(draft.dueDate).toLocaleDateString();
+      const primaryColor: [number, number, number] = [21, 66, 121];
 
     // Header bar
     doc.setFillColor(...primaryColor);
@@ -1844,9 +2501,14 @@ const SuperAdminUtilitiesManager = () => {
     doc.text('support@kenyarealtors.com  •  0711493222  •  www.kenyarealtors.com', 105, footerY + 6, { align: 'center' });
     doc.text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 105, footerY + 12, { align: 'center' });
 
-    const fileName = `Invoice_${draft.tenant.tenant_name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
-    toast.success('Invoice PDF downloaded successfully');
+      const safeTenantName = String(draft.tenant.tenant_name || 'Tenant').trim() || 'Tenant';
+      const fileName = `Invoice_${safeTenantName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      toast.success('Invoice PDF downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading invoice PDF:', error);
+      toast.error('Failed to download invoice PDF');
+    }
   };
 
   const downloadReceiptPdf = (tenant: TenantWithReadings) => {
@@ -2452,6 +3114,424 @@ const SuperAdminUtilitiesManager = () => {
         </Card>
       </motion.div>
 
+      {/* PROPERTY-SPECIFIC INITIAL INVOICE CONFIGURATION */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}>
+        <Card className="border-2 border-purple-300 bg-gradient-to-r from-purple-50 to-indigo-50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-purple-900">
+              <Settings className="w-5 h-5" />
+              Property-Specific Initial Invoice Configuration
+            </CardTitle>
+            <CardDescription>
+              Configure first-time tenant invoice deposits and charges per property
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Property Selector */}
+            <div className="bg-white p-4 rounded-lg border border-purple-200">
+              <Label className="text-base font-semibold text-purple-900 mb-2 block">
+                Select Property
+              </Label>
+              {selectedPropertyId !== 'all' ? (
+                <>
+                  <Input
+                    readOnly
+                    value={propertyOptions.find((prop) => prop.id === selectedPropertyId)?.name || 'Selected Property'}
+                    className="w-full h-11 border border-purple-300 rounded-md px-3 bg-purple-50 text-slate-900 font-semibold"
+                  />
+                  <p className="text-xs text-purple-700 mt-2">Property is locked to the selection from the workspace cards above.</p>
+                </>
+              ) : (
+                <select
+                  value={selectedPropertyForInitialConfig}
+                  onChange={(e) => setSelectedPropertyForInitialConfig(e.target.value)}
+                  className="w-full h-11 border border-purple-300 rounded-md px-3 bg-white text-slate-900 font-semibold"
+                >
+                  <option value="">Choose a property...</option>
+                  {propertyOptions.map(prop => (
+                    <option key={prop.id} value={prop.id}>
+                      {prop.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {selectedPropertyForInitialConfig && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left: Security Deposit Months */}
+                  <div>
+                    <Label className="text-base font-semibold text-purple-900 mb-3 block">
+                      Security Deposit (Months of Rent)
+                    </Label>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={tempDepositMonths}
+                          onChange={(e) => setTempDepositMonths(normalizeSecurityDepositMonths(e.target.value))}
+                          className="w-full h-10 border border-purple-300 rounded-md px-3 bg-white text-slate-900 font-semibold"
+                        />
+                      </div>
+                      <span className="text-sm text-purple-700 font-semibold">For this property</span>
+                    </div>
+                  </div>
+
+                  {/* Right: Additional Charges Header */}
+                  <div>
+                    <Label className="text-base font-semibold text-purple-900 mb-3 block">
+                      Additional Charges
+                    </Label>
+                    <p className="text-xs text-purple-700">Add deposits, fees, and other charges</p>
+                  </div>
+                </div>
+
+                {/* Additional Charges List */}
+                {tempAdditionalCharges.length > 0 && (
+                  <div className="border-t border-purple-200 pt-4">
+                    <p className="text-sm font-semibold text-slate-900 mb-3">Current Charges:</p>
+                    <div className="space-y-2">
+                      {tempAdditionalCharges.map((charge, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-white rounded border border-purple-200">
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-900">{charge.name}</p>
+                            <p className="text-xs text-slate-500 capitalize">{charge.type}</p>
+                          </div>
+                          <p className="font-bold text-purple-700">{formatKES(charge.amount)}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setTempAdditionalCharges(tempAdditionalCharges.filter((_, i) => i !== idx))}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add New Charge */}
+                <div className="border-t border-purple-200 pt-4">
+                  <p className="text-sm font-semibold text-slate-900 mb-3">Add New Charge:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <Input
+                      type="text"
+                      value={newChargeNameStandard}
+                      onChange={(e) => setNewChargeNameStandard(e.target.value)}
+                      placeholder="e.g., Water Deposit"
+                      className="h-10"
+                    />
+                    <select
+                      value={newChargeTypeStandard}
+                      onChange={(e) => setNewChargeTypeStandard(e.target.value as 'deposit' | 'fee')}
+                      className="h-10 border border-slate-300 rounded-md px-2 bg-white"
+                    >
+                      <option value="deposit">Deposit</option>
+                      <option value="fee">Fee</option>
+                    </select>
+                    <Input
+                      type="number"
+                      value={newChargeAmountStandard}
+                      onChange={(e) => setNewChargeAmountStandard(e.target.value)}
+                      placeholder="Amount"
+                      className="h-10"
+                    />
+                    <Button
+                      onClick={() => {
+                        if (newChargeNameStandard && newChargeAmountStandard) {
+                          setTempAdditionalCharges([...tempAdditionalCharges, {
+                            name: newChargeNameStandard,
+                            type: newChargeTypeStandard,
+                            amount: Number(newChargeAmountStandard)
+                          }]);
+                          setNewChargeNameStandard('');
+                          setNewChargeAmountStandard('');
+                          setNewChargeTypeStandard('deposit');
+                        }
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Plus size={16} />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={async () => {
+                      try {
+                        setSavingFirstPaymentDefaults(true);
+                        const effectivePropertyId = selectedPropertyId !== 'all'
+                          ? selectedPropertyId
+                          : selectedPropertyForInitialConfig;
+
+                        if (!effectivePropertyId) {
+                          throw new Error('Please select a property before saving.');
+                        }
+
+                        const normalizedCharges: InitialChargeLineItem[] = (tempAdditionalCharges || [])
+                          .map((charge, idx) => ({
+                            id: `${effectivePropertyId}-${idx}-${Date.now()}`,
+                            name: String(charge.name || '').trim(),
+                            charge_type: charge.type === 'fee' ? 'fee' : 'deposit',
+                            amount: Number(charge.amount || 0),
+                          }))
+                          .filter((charge) => charge.name && charge.amount >= 0);
+
+                        await persistFirstPaymentDefaultsForProperty(
+                          effectivePropertyId,
+                          normalizedCharges,
+                          tempDepositMonths
+                        );
+
+                        setSelectedPropertyForInitialConfig(effectivePropertyId);
+                        setTempAdditionalCharges(
+                          normalizedCharges.map((charge) => ({
+                            name: charge.name,
+                            type: charge.charge_type,
+                            amount: Number(charge.amount || 0),
+                          }))
+                        );
+                        setTempDepositMonths(normalizeSecurityDepositMonths(tempDepositMonths));
+                        
+                        toast.success('Property configuration saved successfully');
+                      } catch (err: any) {
+                        console.error('Error saving property configuration:', err);
+                        toast.error('Failed to save configuration');
+                      } finally {
+                        setSavingFirstPaymentDefaults(false);
+                      }
+                    }}
+                    disabled={savingFirstPaymentDefaults}
+                    className="bg-purple-600 hover:bg-purple-700 gap-2"
+                  >
+                    {savingFirstPaymentDefaults ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={16} />
+                        Save Configuration for This Property
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Current Status */}
+                <div className="bg-purple-100 border border-purple-300 rounded p-3">
+                  <p className="text-sm text-purple-900">
+                    ✓ Configuration: <span className="font-semibold">{tempDepositMonths} month(s) deposit</span> + {tempAdditionalCharges.length} additional charge(s)
+                  </p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Existing First-Time Move-In Invoices */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32 }}>
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <Edit3 className="w-5 h-5" />
+              Existing First-Time Invoices (View / Edit)
+            </CardTitle>
+            <CardDescription>
+              View and edit line items on unpaid initial invoices. Changes save immediately.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingExistingInvoicesList ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : existingFirstPaymentInvoicesList.length === 0 ? (
+              <p className="text-sm text-blue-700">No existing unpaid first-time invoices found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-blue-300 bg-blue-100">
+                      <th className="text-left py-2 px-3 font-semibold text-blue-900">Tenant</th>
+                      <th className="text-left py-2 px-3 font-semibold text-blue-900">Property / Unit</th>
+                      <th className="text-left py-2 px-3 font-semibold text-blue-900">Invoice</th>
+                      <th className="text-right py-2 px-3 font-semibold text-blue-900">Amount (KES)</th>
+                      <th className="text-left py-2 px-3 font-semibold text-blue-900">Due Date</th>
+                      <th className="text-center py-2 px-3 font-semibold text-blue-900">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {existingFirstPaymentInvoicesList.map((invoice) => (
+                      <tr key={invoice.id} className="border-b border-blue-200 hover:bg-blue-100 transition">
+                        <td className="py-2 px-3">
+                          <p className="font-semibold text-slate-900">{invoice.tenant_name}</p>
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          {invoice.property_name && invoice.unit_number ? `${invoice.property_name} - ${invoice.unit_number}` : 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600 font-mono text-xs">
+                          {invoice.reference_number}
+                        </td>
+                        <td className="py-2 px-3 text-right font-semibold text-slate-900">
+                          {Number(invoice.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600">
+                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <Button 
+                            size="sm" 
+                            onClick={() => setSelectedExistingInvoiceForEdit(invoice)}
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <Edit3 size={14} className="mr-1" />
+                            Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Existing Invoice Edit Modal */}
+      {selectedExistingInvoiceForEdit && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        >
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between border-b">
+              <div>
+                <CardTitle>Edit First-Time Invoice</CardTitle>
+                <CardDescription>
+                  {selectedExistingInvoiceForEdit.reference_number} - {selectedExistingInvoiceForEdit.tenant_name}
+                </CardDescription>
+              </div>
+              <button onClick={() => setSelectedExistingInvoiceForEdit(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-4">
+              <div className="grid grid-cols-3 gap-3 p-3 bg-blue-50 rounded border border-blue-200">
+                <div>
+                  <p className="text-xs text-blue-600 font-semibold">Total Amount</p>
+                  <p className="font-bold text-lg text-blue-900">{formatKES(selectedExistingInvoiceForEdit.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-blue-600 font-semibold">Due Date</p>
+                  <p className="font-semibold text-slate-900">{new Date(selectedExistingInvoiceForEdit.due_date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-blue-600 font-semibold">Status</p>
+                  <Badge className="capitalize">{selectedExistingInvoiceForEdit.status}</Badge>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-bold text-slate-900 mb-3">Line Items</h3>
+                <div className="space-y-3">
+                  {/* Rent and Deposit */}
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded border border-slate-200">
+                    <div>
+                      <p className="text-xs text-slate-600">Monthly Rent</p>
+                      <p className="font-semibold text-slate-900">{formatKES(selectedExistingInvoiceForEdit.items?.monthly_rent || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600">Security Deposit</p>
+                      <p className="font-semibold text-slate-900">{formatKES(selectedExistingInvoiceForEdit.items?.security_deposit || 0)}</p>
+                    </div>
+                  </div>
+
+                  {/* Additional Charges */}
+                  {(selectedExistingInvoiceForEdit.items?.initial_charges || []).length > 0 ? (
+                    <div className="space-y-2 p-3 bg-slate-50 rounded border border-slate-200">
+                      <p className="text-sm font-semibold text-slate-900">Additional Charges (Editable)</p>
+                      {(selectedExistingInvoiceForEdit.items.initial_charges || []).map((item: any, idx: number) => (
+                        <div key={`edit-line-${idx}`} className="flex items-center gap-2 p-2 bg-white rounded border border-slate-200">
+                          <Input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => {
+                              const updated = { ...selectedExistingInvoiceForEdit };
+                              updated.items.initial_charges[idx].name = e.target.value;
+                              setSelectedExistingInvoiceForEdit(updated);
+                            }}
+                            placeholder="Charge name"
+                            className="flex-1 h-8 text-sm"
+                          />
+                          <select
+                            value={item.charge_type}
+                            onChange={(e) => {
+                              const updated = { ...selectedExistingInvoiceForEdit };
+                              updated.items.initial_charges[idx].charge_type = e.target.value;
+                              setSelectedExistingInvoiceForEdit(updated);
+                            }}
+                            className="h-8 border border-slate-300 rounded px-2 bg-white text-sm"
+                          >
+                            <option value="deposit">Deposit</option>
+                            <option value="fee">Fee</option>
+                          </select>
+                          <Input
+                            type="number"
+                            value={item.amount}
+                            onChange={(e) => {
+                              const updated = { ...selectedExistingInvoiceForEdit };
+                              updated.items.initial_charges[idx].amount = Number(e.target.value);
+                              setSelectedExistingInvoiceForEdit(updated);
+                            }}
+                            placeholder="Amount"
+                            className="w-24 h-8 text-sm"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteLineItemFromInvoice(selectedExistingInvoiceForEdit.id, idx)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 p-3 bg-slate-50 rounded border border-slate-200">No additional charges on this invoice</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="gap-3 border-t">
+              <Button variant="outline" onClick={() => setSelectedExistingInvoiceForEdit(null)}>
+                Close
+              </Button>
+              <Button onClick={() => {
+                setSelectedExistingInvoiceForEdit(null);
+                loadExistingFirstPaymentInvoicesList();
+              }} className="bg-blue-600 hover:bg-blue-700">
+                <Check size={16} className="mr-1" />
+                Done
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      )}
+
       {/* First-Time Move-In Payments */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.34 }}>
         <Card>
@@ -2736,8 +3816,11 @@ const SuperAdminUtilitiesManager = () => {
                             </button>
                             <button
                               onClick={() => {
-                                const draft = buildInvoiceDraft(tenant);
-                                if (!draft) return;
+                                const hasReading = Boolean(tenant.latest_reading);
+                                const draft = buildInvoiceDraftForDownload(tenant);
+                                if (!hasReading) {
+                                  toast.warning('No utility reading found. Downloading invoice with rent and total utility amount only.');
+                                }
                                 downloadInvoicePdf(draft);
                               }}
                               className="inline-flex items-center gap-1 px-2 py-1 hover:bg-green-50 rounded text-green-700 transition text-xs font-semibold"
@@ -2961,6 +4044,106 @@ const SuperAdminUtilitiesManager = () => {
               </button>
             </CardHeader>
 
+            {specialInvoiceDraft.eventType === 'first_payment' && (
+              <div className="border-b bg-blue-50 p-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const candidate = firstPaymentCandidates.find(c => c.tenant_id === specialInvoiceDraft.tenant_id);
+                    if (candidate) loadExistingFirstPaymentInvoice(candidate);
+                  }}
+                  disabled={loadingExistingInvoice}
+                  className="gap-2"
+                >
+                  {loadingExistingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                  {existingFirstPaymentInvoice ? 'Viewing Existing Invoice' : 'View Existing Invoice'}
+                </Button>
+                {existingFirstPaymentInvoice && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExistingFirstPaymentInvoice(null)}
+                    className="ml-2"
+                  >
+                    Close Invoice View
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {existingFirstPaymentInvoice && specialInvoiceDraft.eventType === 'first_payment' && (
+              <div className="border-b bg-slate-50 p-4 space-y-4">
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-3">Current Invoice Line Items</h3>
+                  <p className="text-xs text-slate-500 mb-3">Invoice: {existingFirstPaymentInvoice.reference_number}</p>
+                  
+                  <div className="space-y-3">
+                    {/* Rent and Deposit Summary */}
+                    <div className="grid grid-cols-2 gap-3 p-3 bg-white rounded border border-slate-200">
+                      <div>
+                        <p className="text-xs text-slate-500">Monthly Rent</p>
+                        <p className="font-semibold text-slate-900">{formatKES(existingFirstPaymentInvoice.items?.monthly_rent || 0)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500">Security Deposit</p>
+                        <p className="font-semibold text-slate-900">{formatKES(existingFirstPaymentInvoice.items?.security_deposit || 0)}</p>
+                      </div>
+                    </div>
+
+                    {/* Initial Charges (Editable) */}
+                    {(existingFirstPaymentInvoice.items?.initial_charges || []).length > 0 ? (
+                      <div className="space-y-2 p-3 bg-white rounded border border-slate-200">
+                        <p className="text-sm font-semibold text-slate-900">Additional Charges</p>
+                        {(existingFirstPaymentInvoice.items.initial_charges || []).map((item: any, idx: number) => (
+                          <div key={`existing-line-${idx}`} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
+                            <Input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) => updateLineItemInInvoice(existingFirstPaymentInvoice.id, idx, 'name', e.target.value)}
+                              placeholder="Charge name"
+                              className="flex-1 h-8 text-sm"
+                            />
+                            <select
+                              value={item.charge_type}
+                              onChange={(e) => updateLineItemInInvoice(existingFirstPaymentInvoice.id, idx, 'charge_type', e.target.value)}
+                              className="h-8 border border-slate-300 rounded px-2 bg-white text-sm"
+                            >
+                              <option value="deposit">Deposit</option>
+                              <option value="fee">Fee</option>
+                            </select>
+                            <Input
+                              type="number"
+                              value={item.amount}
+                              onChange={(e) => updateLineItemInInvoice(existingFirstPaymentInvoice.id, idx, 'amount', e.target.value)}
+                              placeholder="Amount"
+                              className="w-24 h-8 text-sm"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteLineItemFromInvoice(existingFirstPaymentInvoice.id, idx)}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 p-3 bg-white rounded border border-slate-200">No additional charges on this invoice</p>
+                    )}
+
+                    {/* Total */}
+                    <div className="p-3 bg-blue-50 rounded border border-blue-200 font-bold text-slate-900">
+                      Total Invoice: {formatKES(existingFirstPaymentInvoice.amount)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <CardContent className="pt-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -2976,21 +4159,51 @@ const SuperAdminUtilitiesManager = () => {
 
               {specialInvoiceDraft.eventType === 'first_payment' ? (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label>First Month Rent</Label>
                       <Input type="number" value={specialInvoiceDraft.baseRent} onChange={(e) => handleSpecialInvoiceDraftChange('baseRent', e.target.value)} className="mt-1" />
                     </div>
                     <div>
-                      <Label>Security Deposit</Label>
-                      <Input type="number" value={specialInvoiceDraft.securityDeposit} onChange={(e) => handleSpecialInvoiceDraftChange('securityDeposit', e.target.value)} className="mt-1" />
+                      <Label>Security Deposit Months</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={specialInvoiceDraft.securityDepositMonths}
+                        onChange={(e) => handleSecurityDepositMonthsChange(e.target.value)}
+                        className="mt-1 h-10 w-full border border-slate-300 rounded-md px-2 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <Label>Security Deposit (Auto)</Label>
+                      <Input type="number" value={specialInvoiceDraft.securityDeposit} readOnly disabled className="mt-1 bg-slate-100" />
+                      <p className="text-[11px] text-slate-500 mt-1">Calculated as first month rent x selected months.</p>
                     </div>
                   </div>
 
                   <div className="border border-slate-200 rounded-lg p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-sm font-semibold">Property Initial Charges (Deposits / Fees)</Label>
-                      <span className="text-xs text-slate-500">These are linked to this property profile</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500">Saved to this property and reused for future first-time tenants</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSaveFirstPaymentDefaults}
+                          disabled={savingFirstPaymentDefaults}
+                        >
+                          {savingFirstPaymentDefaults ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin mr-1" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save Defaults'
+                          )}
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-[1fr_140px_180px_auto] gap-2">

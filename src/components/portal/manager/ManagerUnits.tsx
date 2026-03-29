@@ -89,6 +89,7 @@ const ManagerUnits = () => {
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterUnitType, setFilterUnitType] = useState<string>('all');
   const [filterPriceRange, setFilterPriceRange] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [propertyId, setPropertyId] = useState<string>('');
   const [propertyName, setPropertyName] = useState<string>('');
   const [properties, setProperties] = useState<{id: string, name: string}[]>([]);
@@ -149,6 +150,15 @@ const openEditUnit = (unit: Unit) => {
     });
     setIsEditUnitOpen(true);
 };
+
+  const openAddTenantDialog = (unit: Unit) => {
+    setSelectedUnit(unit);
+    setSelectedTenant('');
+    setSelectedApplicantId('');
+    setAddTenantMode('from_applicants');
+    setIsAssignOpen(false);
+    setIsAddTenantOpen(true);
+  };
 
 const handleSaveUnitChanges = async () => {
     if (!unitToEdit) return;
@@ -259,7 +269,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<string>('');
   const [savingUnit, setSavingUnit] = useState(false);
   const [isCreatingTenantUser, setIsCreatingTenantUser] = useState(false);
-  const [addTenantMode, setAddTenantMode] = useState<'create_user' | 'from_applicants'>('create_user');
+  const [addTenantMode, setAddTenantMode] = useState<'create_user' | 'from_applicants'>('from_applicants');
   const [applicantCandidates, setApplicantCandidates] = useState<ApplicantCandidate[]>([]);
   const [selectedApplicantId, setSelectedApplicantId] = useState('');
   const [newTenantForm, setNewTenantForm] = useState({
@@ -837,8 +847,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to update applicant profile: ${profileUpdateError.message}`);
       }
 
-      const linkedInvoiceId = await createMoveInAllocationInvoice(candidate.applicant_id, candidate.application_id);
-
       const { error: appStatusError } = await supabase
         .from('lease_applications')
         .update({ status: 'under_review' })
@@ -848,11 +856,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
       setSelectedTenant(candidate.applicant_id);
       setIsAddTenantOpen(false);
-      if (linkedInvoiceId) {
-        toast.success('Tenant linked to Super Admin invoice. Unit allocation will happen automatically after successful payment.');
-      } else {
-        toast.success('Applicant moved to under review. Awaiting Super Admin Billing invoice before checkout.');
-      }
+      toast.success('Applicant moved to under review. Super Admin will issue the onboarding invoice.');
     } catch (error: any) {
       console.error('Error adding tenant from applicants:', error);
       toast.error(error.message || 'Failed to add tenant from applicants');
@@ -956,7 +960,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         sub_location: newTenantForm.sub_location.trim() || null,
       };
 
-      let { data: newApplication, error: newApplicationError } = await supabase
+      let { error: newApplicationError } = await supabase
         .from('lease_applications')
         .insert(applicationInsertPayload)
         .select('id')
@@ -964,7 +968,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
       if (newApplicationError && String(newApplicationError.message || '').toLowerCase().includes('next_of_kin_email')) {
         const { next_of_kin_email, ...fallbackPayload } = applicationInsertPayload as any;
-        ({ data: newApplication, error: newApplicationError } = await supabase
+        ({ error: newApplicationError } = await supabase
           .from('lease_applications')
           .insert(fallbackPayload)
           .select('id')
@@ -974,8 +978,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       if (newApplicationError) {
         throw new Error(`Failed to create lease application: ${newApplicationError.message}`);
       }
-
-      const linkedInvoiceId = await createMoveInAllocationInvoice(tenantUserId, newApplication?.id);
 
       setSelectedTenant(tenantUserId);
       setNewTenantForm({
@@ -1000,11 +1002,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         sub_location: '',
       });
       setIsAddTenantOpen(false);
-      if (linkedInvoiceId) {
-        toast.success('Tenant created and linked to Super Admin invoice. Unit allocation will happen after payment is confirmed.');
-      } else {
-        toast.success('Tenant created and moved to under review. Awaiting Super Admin Billing invoice before checkout.');
-      }
+      toast.success('Tenant created and moved to under review. Super Admin will issue the onboarding invoice.');
     } catch (error: any) {
       console.error('Error creating tenant user:', error);
       toast.error(error.message || 'Failed to create tenant user');
@@ -1086,6 +1084,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     const matchesSearch = unit.unit_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesProperty = filterProperty === 'all' || unit.property_id === filterProperty;
     const matchesUnitType = filterUnitType === 'all' || unit.unit_type_id === filterUnitType;
+    const displayStatus = (unit.active_lease ? 'occupied' : unit.status)?.toLowerCase() || 'vacant';
+    const normalizedStatus = displayStatus === 'available' ? 'vacant' : displayStatus;
+    const matchesStatus = filterStatus === 'all' || normalizedStatus === filterStatus;
     
     let matchesPrice = true;
     if (filterPriceRange !== 'all') {
@@ -1096,7 +1097,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       else if (filterPriceRange === '50000+') matchesPrice = price > 50000;
     }
 
-    return matchesSearch && matchesProperty && matchesUnitType && matchesPrice;
+    return matchesSearch && matchesProperty && matchesUnitType && matchesStatus && matchesPrice;
   });
 
   const assignedTenantIds = new Set(
@@ -1155,16 +1156,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   <List size={18} />
                 </button>
               </div>
-              <Button
-                onClick={() => {
-                  setAddTenantMode('create_user');
-                  setSelectedApplicantId('');
-                  setIsAddTenantOpen(true);
-                }}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-              >
-                <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
-              </Button>
             </div>
           </div>
           <p className="text-slate-500 ml-1">Manage all units across your properties</p>
@@ -1412,7 +1403,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                <DialogHeader>
                    <DialogTitle className="text-slate-800">Add Tenant</DialogTitle>
                    <DialogDescription className="text-slate-500">
-                     Create a tenant or pick an applicant, then send the initial invoice. Assignment completes automatically after payment.
+                     Add from applicants by default, or create a new tenant profile. Super Admin issues the onboarding invoice.
                    </DialogDescription>
                </DialogHeader>
 
@@ -1590,6 +1581,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                       <div className="sm:col-span-2">
                         <Label className="text-slate-700 mb-1 block">Employer Details</Label>
                         <Textarea
+                          className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
                           value={newTenantForm.employer_details}
                           onChange={(e) => setNewTenantForm((prev) => ({ ...prev, employer_details: e.target.value }))}
                           placeholder="Employer name and address"
@@ -1642,7 +1634,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   )}
 
                   <div className="rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs p-3">
-                    The tenant receives an initial invoice first. Unit allocation is completed automatically after successful payment.
+                    Super Admin Billing handles onboarding invoices after tenant/application review.
                   </div>
                </div>
 
@@ -1653,7 +1645,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                      disabled={isCreatingTenantUser}
                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold"
                    >
-                     {isCreatingTenantUser ? 'Processing...' : 'Create / Send Invoice'}
+                     {isCreatingTenantUser ? 'Processing...' : 'Submit Tenant'}
                    </Button>
                </DialogFooter>
            </DialogContent>
@@ -1945,17 +1937,16 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                 ) : ( // Vacant State
                                     <div className="space-y-4">
                                         <div className="p-5 bg-slate-50 rounded-xl border border-slate-100 text-center">
-                                            <p className="text-slate-500 text-sm mb-4 font-medium">Unit is currently vacant.</p>
-                                            <Button 
-                                                onClick={() => {
-                                                setAddTenantMode('from_applicants');
-                                                setSelectedApplicantId('');
-                                                setIsAddTenantOpen(true);
-                                                }}
-                                                className="w-full bg-orange-500 hover:bg-orange-600 text-white shadow-sm font-bold border-orange-600 border-b-2 active:translate-y-[1px] active:border-b-0 transition-all"
-                                            >
-                                              <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
-                                            </Button>
+                                      <p className="text-slate-500 text-sm mb-4 font-medium">Unit is currently vacant.</p>
+                                      <Button 
+                                        onClick={() => {
+                                          if (!selectedUnit) return;
+                                          openAddTenantDialog(selectedUnit);
+                                        }}
+                                        className="w-full bg-orange-500 hover:bg-orange-600 text-white shadow-sm font-bold border-orange-600 border-b-2 active:translate-y-[1px] active:border-b-0 transition-all"
+                                      >
+                                        <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
+                                      </Button>
                                         </div>
                                     </div>
                                 )}
@@ -2013,6 +2004,19 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   <SelectItem value="10000-20000">10,000 - 20,000</SelectItem>
                   <SelectItem value="20000-50000">20,000 - 50,000</SelectItem>
                   <SelectItem value="50000+">50,000+</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="occupied">Occupied</SelectItem>
+                  <SelectItem value="vacant">Vacant</SelectItem>
+                  <SelectItem value="booked">Booked</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
           </div>
@@ -2140,18 +2144,15 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                     >
                                         Details
                                     </Button>
-                                    <Button 
-                                        size="sm"
-                                        className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
-                                        onClick={() => { 
-                                            setSelectedUnit(unit);
-                                        setAddTenantMode('from_applicants');
-                                        setSelectedApplicantId('');
-                                        setIsAddTenantOpen(true);
-                                        }}
-                                    >
-                                      Add Tenant
-                                    </Button>
+                                <Button 
+                                  size="sm"
+                                  className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
+                                  onClick={() => { 
+                                    openAddTenantDialog(unit);
+                                  }}
+                                >
+                                  <UserPlus className="w-3.5 h-3.5 mr-1" /> Add Tenant
+                                </Button>
                                 </>
                              )}
                           </div>
@@ -2352,11 +2353,10 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0 h-9"
                                     onClick={(e) => { 
                                         e.stopPropagation(); 
-                                        setSelectedUnit(unit);
-                                        setIsAssignOpen(true);
+                                        openAddTenantDialog(unit);
                                     }}
                                 >
-                                    Assign
+                                  <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
                                 </Button>
                             </>
                          )}

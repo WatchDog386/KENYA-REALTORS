@@ -15,13 +15,20 @@ interface AddPropertyModalProps {
 }
 
 const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, onSave }) => {
+  const normalizeSecurityDepositMonths = (value: unknown) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.max(1, Math.round(parsed));
+  };
+
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CreatePropertyDTO>({
     name: '',
     location: '',
     image_url: '',
     units: [{ name: '', units_count: 0, price_per_unit: 0 }],
-    initial_charge_templates: []
+    initial_charge_templates: [],
+    security_deposit_months: 1,
   });
 
   const handleAddInitialChargeTemplate = () => {
@@ -98,7 +105,8 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, on
         location: '',
         image_url: '',
         units: [{ name: '', units_count: 0, price_per_unit: 0 }],
-        initial_charge_templates: []
+        initial_charge_templates: [],
+        security_deposit_months: 1,
       });
     } catch (error) {
       console.error(error);
@@ -206,6 +214,28 @@ const AddPropertyModal: React.FC<AddPropertyModalProps> = ({ isOpen, onClose, on
             <p className="text-xs text-slate-500">
               First Month Rent and Security Deposit are automatic. Add any extra named deposits or one-time fees for this property (for example, Water Deposit, Service Deposit, Key Fee).
             </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-500">Security Deposit Months</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={formData.security_deposit_months || 1}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      security_deposit_months: normalizeSecurityDepositMonths(e.target.value),
+                    })
+                  }
+                  className="h-9 border-slate-200 bg-white text-sm text-right"
+                />
+              </div>
+              <div className="md:col-span-2 text-xs text-slate-500 pb-1">
+                This value is saved to first payment defaults and controls deposit as rent x months for first-time invoices.
+              </div>
+            </div>
 
             {(formData.initial_charge_templates || []).length === 0 ? (
               <div className="border border-dashed border-slate-200 rounded-lg p-4 text-xs text-slate-500 bg-slate-50">

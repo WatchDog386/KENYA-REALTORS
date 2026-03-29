@@ -21,9 +21,11 @@ import {
   Trash2,
   HelpCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Eye,
+  X
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -107,6 +109,8 @@ const PaymentsPage: React.FC = () => {
   const [onboardingLocked, setOnboardingLocked] = useState(false);
   const [pendingInitialInvoices, setPendingInitialInvoices] = useState<PendingInitialInvoice[]>([]);
   const [initialInvoiceTotal, setInitialInvoiceTotal] = useState(0);
+  const [hasPaidOnboardingInvoice, setHasPaidOnboardingInvoice] = useState(false);
+  const [selectedInitialInvoice, setSelectedInitialInvoice] = useState<PendingInitialInvoice | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -256,6 +260,7 @@ const PaymentsPage: React.FC = () => {
       setOnboardingLocked(accessState.isLocked);
       setPendingInitialInvoices(accessState.pendingInitialInvoices);
       setInitialInvoiceTotal(accessState.initialInvoiceTotal);
+      setHasPaidOnboardingInvoice(accessState.hasPaidOnboardingInvoice);
 
       if (accessState.isLocked) {
         setRentPayments([]);
@@ -278,8 +283,25 @@ const PaymentsPage: React.FC = () => {
       const unitId = tenantData?.unit_id;
       const propertyId = tenantData?.property_id;
       const tenantId = tenantData?.id;
+      let onboardingPropertyId = propertyId || null;
       let leaseMonthlyRent = 0;
       let latestReadingRent = 0;
+
+      if (!onboardingPropertyId) {
+        const { data: latestApplications, error: latestApplicationError } = await supabase
+          .from('lease_applications')
+          .select('property_id, status')
+          .eq('applicant_id', user.id)
+          .in('status', ['pending', 'under_review', 'approved', 'manager_approved', 'invoice_sent'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (latestApplicationError) {
+          console.warn('Unable to resolve latest application property for onboarding invoices:', latestApplicationError);
+        } else {
+          onboardingPropertyId = latestApplications?.[0]?.property_id || null;
+        }
+      }
 
       let unitMonthlyRent = 0;
       if (unitId) {
@@ -311,6 +333,17 @@ const PaymentsPage: React.FC = () => {
 
       setTenantUnitMonthlyRent(leaseMonthlyRent);
 
+      const selectPreferredOnboardingInvoices = (rows: any[]): any[] => {
+        const sourceRows = rows || [];
+        if (sourceRows.length === 0) return [];
+
+        const firstPaymentRows = sourceRows.filter((invoice: any) =>
+          /BILLING_EVENT:first_payment/i.test(String(invoice?.notes || ""))
+        );
+
+        return firstPaymentRows.length > 0 ? firstPaymentRows : sourceRows;
+      };
+
       const mapPaidInvoicesToPayments = (rows: any[]): Payment[] => {
         return (rows || []).map((invoice: any) => ({
           id: `invoice-${invoice.id}`,
@@ -328,12 +361,18 @@ const PaymentsPage: React.FC = () => {
         }));
       };
 
-      const { data: paidOnboardingInvoicesByProfile, error: paidOnboardingInvoicesError } = await supabase
+      let paidOnboardingByProfileQuery = supabase
         .from('invoices')
         .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes')
         .eq('tenant_id', user.id)
         .eq('status', 'paid')
-        .or(ONBOARDING_INVOICE_NOTES_FILTER)
+        .or(ONBOARDING_INVOICE_NOTES_FILTER);
+
+      if (onboardingPropertyId) {
+        paidOnboardingByProfileQuery = paidOnboardingByProfileQuery.eq('property_id', onboardingPropertyId);
+      }
+
+      const { data: paidOnboardingInvoicesByProfile, error: paidOnboardingInvoicesError } = await paidOnboardingByProfileQuery
         .order('updated_at', { ascending: false });
 
       if (paidOnboardingInvoicesError) {
@@ -343,12 +382,18 @@ const PaymentsPage: React.FC = () => {
       let paidOnboardingInvoices = paidOnboardingInvoicesByProfile || [];
 
       if ((paidOnboardingInvoices.length === 0) && tenantId && tenantId !== user.id) {
-        const { data: paidOnboardingInvoicesByTenantId, error: paidOnboardingInvoicesByTenantIdError } = await supabase
+        let paidOnboardingByTenantIdQuery = supabase
           .from('invoices')
           .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes')
           .eq('tenant_id', tenantId)
           .eq('status', 'paid')
-          .or(ONBOARDING_INVOICE_NOTES_FILTER)
+          .or(ONBOARDING_INVOICE_NOTES_FILTER);
+
+        if (onboardingPropertyId) {
+          paidOnboardingByTenantIdQuery = paidOnboardingByTenantIdQuery.eq('property_id', onboardingPropertyId);
+        }
+
+        const { data: paidOnboardingInvoicesByTenantId, error: paidOnboardingInvoicesByTenantIdError } = await paidOnboardingByTenantIdQuery
           .order('updated_at', { ascending: false });
 
         if (paidOnboardingInvoicesByTenantIdError) {
@@ -358,7 +403,9 @@ const PaymentsPage: React.FC = () => {
         }
       }
 
-      setPaidInitialInvoices(mapPaidInvoicesToPayments(paidOnboardingInvoices));
+      setPaidInitialInvoices(
+        mapPaidInvoicesToPayments(selectPreferredOnboardingInvoices(paidOnboardingInvoices))
+      );
 
       // 2. Fetch Rent Payments
       let rentQuery = supabase
@@ -785,17 +832,21 @@ const PaymentsPage: React.FC = () => {
           <CardContent className="space-y-3">
             {pendingInitialInvoices.length === 0 ? (
               <div className="space-y-3">
-                <p className="text-sm text-slate-700">Payment is confirmed. We are finalizing your unit assignment and lease activation.</p>
+                <p className="text-sm text-slate-700">
+                  {hasPaidOnboardingInvoice
+                    ? 'Payment is confirmed. We are finalizing your unit assignment and lease activation.'
+                    : 'No initial invoice is available yet. Billing is still preparing your move-in invoice.'}
+                </p>
                 <Button
                   onClick={fetchData}
                   className="bg-[#154279] hover:bg-[#0f305a]"
                 >
-                  Refresh Assignment Status
+                  {hasPaidOnboardingInvoice ? 'Refresh Assignment Status' : 'Refresh Invoice Status'}
                 </Button>
               </div>
             ) : (
               pendingInitialInvoices.map((invoice) => (
-                <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div key={invoice.id} className="rounded-xl border border-slate-200 bg-white p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedInitialInvoice(invoice)}>
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
@@ -807,12 +858,23 @@ const PaymentsPage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <p className="font-bold text-[#154279]">{formatCurrency(invoice.amount)}</p>
-                      <Button
-                        onClick={() => navigate(`/portal/tenant/payments/make?type=custom&amount=${invoice.amount}&onboardingInvoiceId=${invoice.id}`)}
-                        className="bg-[#154279] hover:bg-[#0f305a]"
-                      >
-                        Proceed To Payment
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setSelectedInitialInvoice(invoice); }}
+                          className="gap-1"
+                        >
+                          <Eye size={14} />
+                          View
+                        </Button>
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/portal/tenant/payments/make?type=custom&amount=${invoice.amount}&onboardingInvoiceId=${invoice.id}`); }}
+                          className="bg-[#154279] hover:bg-[#0f305a]"
+                        >
+                          Pay Now
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -1289,7 +1351,106 @@ const PaymentsPage: React.FC = () => {
           <TenantReceipts tenantId={user?.id || ''} />
         </TabsContent>
       </Tabs>
-      
+
+      {/* Initial Invoice Detail Modal */}
+      {selectedInitialInvoice && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        >
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between border-b">
+              <div>
+                <CardTitle>Initial Move-In Invoice Details</CardTitle>
+                <CardDescription>
+                  Invoice {selectedInitialInvoice.reference_number || selectedInitialInvoice.id.slice(0, 8)}
+                </CardDescription>
+              </div>
+              <button onClick={() => setSelectedInitialInvoice(null)} className="text-slate-400 hover:text-slate-600">
+                <X size={24} />
+              </button>
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500 mb-1">Invoice ID</p>
+                  <p className="font-semibold text-slate-900">{selectedInitialInvoice.reference_number || selectedInitialInvoice.id.slice(0, 12)}</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500 mb-1">Due Date</p>
+                  <p className="font-semibold text-slate-900">
+                    {selectedInitialInvoice.due_date ? formatDate(selectedInitialInvoice.due_date) : 'Immediately'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500 mb-1">Status</p>
+                  <Badge className={cn("capitalize", selectedInitialInvoice.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
+                    {selectedInitialInvoice.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="border-t pt-5">
+                <h3 className="font-bold text-slate-900 mb-4">Invoice Line Items</h3>
+                <div className="space-y-3">
+                  {buildInitialInvoiceBreakdown(selectedInitialInvoice).length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 rounded-lg">
+                      <p className="text-sm text-slate-500">
+                        Line items configured by Super Admin Billing will appear here.
+                      </p>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Details include rent, deposits, fees, and any other onboarding charges.
+                      </p>
+                    </div>
+                  ) : (
+                    buildInitialInvoiceBreakdown(selectedInitialInvoice).map((line, index) => (
+                      <div key={`${selectedInitialInvoice.id}-detail-line-${index}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{line.label}</p>
+                          {line.description && <p className="text-xs text-slate-500">{line.description}</p>}
+                        </div>
+                        <p className="font-semibold text-slate-900">{formatCurrency(line.amount)}</p>
+                      </div>
+                    ))
+                  )}
+                  
+                  <div className="border-t-2 border-slate-300 pt-3 mt-4 flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                    <p className="font-bold text-lg text-slate-900">Total Invoice Amount</p>
+                    <p className="font-bold text-2xl text-blue-600">{formatCurrency(selectedInitialInvoice.amount)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Alert className="bg-blue-50 border-blue-300">
+                <AlertDescription className="text-blue-900 text-sm">
+                  <strong>Note:</strong> This invoice was configured by your Property Super Admin. All charges including security deposit, initial rent, and onboarding fees are visible above.
+                </AlertDescription>
+              </Alert>
+            </CardContent>
+
+            <CardFooter className="gap-3 border-t flex-wrap justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedInitialInvoice(null)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  navigate(`/portal/tenant/payments/make?type=custom&amount=${selectedInitialInvoice.amount}&onboardingInvoiceId=${selectedInitialInvoice.id}`);
+                  setSelectedInitialInvoice(null);
+                }}
+                className="bg-[#154279] hover:bg-[#0f305a]"
+              >
+                <CreditCard size={18} className="mr-2" />
+                Proceed to Payment
+              </Button>
+            </CardFooter>
+          </Card>
+        </motion.div>
+      )}
     </div>
   );
 };

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PropertyGrid from '@/components/marketplace/PropertyGrid';
 import PropertyFilters, { FilterOptions } from '@/components/marketplace/PropertyFilters';
 import { useProperties } from '@/hooks/useProperties';
 import { Search, Filter } from 'lucide-react';
 
 const ListingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<FilterOptions>({
     search: '',
     minPrice: 0,
@@ -25,8 +27,8 @@ const ListingsPage: React.FC = () => {
     setFilters(newFilters);
   };
 
-  const handlePropertyClick = (property: any) => {
-    window.location.href = `/marketplace/${property.id}`;
+  const handlePropertyClick = (propertyId: string) => {
+    navigate(`/marketplace/${propertyId}`);
   };
 
   if (isLoading) {

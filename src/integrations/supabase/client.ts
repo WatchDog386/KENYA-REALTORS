@@ -63,8 +63,9 @@ if (isBrowser) {
 }
 
 // Ensure WebCrypto API is available for browser environments
-if (isBrowser && !globalThis.crypto) {
-  console.warn("⚠️ WebCrypto API not available, using fallback");
+const supportsSecurePkce = !isBrowser || (window.isSecureContext && !!globalThis.crypto?.subtle);
+if (isDev && !supportsSecurePkce) {
+  console.warn("⚠️ Secure WebCrypto not available; Supabase auth flowType will use implicit.");
 }
 
 // ------------------
@@ -76,7 +77,7 @@ export const supabase: SupabaseClient<Database> = createClient(SUPABASE_URL, SUP
     persistSession: true, 
     autoRefreshToken: true, 
     detectSessionInUrl: true, 
-    flowType: "pkce",
+    flowType: supportsSecurePkce ? "pkce" : "implicit",
     storageKey: AUTH_STORAGE_KEY,
   },
   global: { headers: { "x-application": "realtors-kenya", "x-client": "web", "x-site-url": currentSiteUrl } },

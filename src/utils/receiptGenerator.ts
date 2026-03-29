@@ -92,6 +92,7 @@ export const generateReceiptPDF = (data: ReceiptData): Blob => {
   doc.setFont(undefined, "normal");
   
   const formatAmount = (amt: number) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES" }).format(amt || 0);
+  const amountStr = formatAmount(Number(data.amount || 0));
 
   if (data.items && data.items.length > 0) {
     data.items.forEach((item: any) => {

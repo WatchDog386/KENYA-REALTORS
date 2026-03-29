@@ -248,13 +248,13 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       </section>
 
       <div className="max-w-[1400px] mx-auto px-6 space-y-8">
+      <Tabs
+        value={selectedMetric}
+        onValueChange={setSelectedMetric}
+        className="w-full"
+      >
       {/* Timeframe Selector */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border-2 border-slate-200">
-        <Tabs
-          value={selectedMetric}
-          onValueChange={setSelectedMetric}
-          className="w-full"
-        >
           <TabsList className="bg-slate-100 rounded-lg p-1">
             <TabsTrigger value="overview" className="rounded-md transition-all">Overview</TabsTrigger>
             <TabsTrigger value="financial" className="rounded-md transition-all">Financial</TabsTrigger>
@@ -262,7 +262,6 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <TabsTrigger value="users" className="rounded-md transition-all">Users</TabsTrigger>
             <TabsTrigger value="performance" className="rounded-md transition-all">Performance</TabsTrigger>
           </TabsList>
-        </Tabs>
 
         <div className="flex items-center gap-3 ml-auto">
           <Select
@@ -809,6 +808,7 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </Card>
         </div>
       </TabsContent>
+      </Tabs>
     </div>
     </div>
   );
