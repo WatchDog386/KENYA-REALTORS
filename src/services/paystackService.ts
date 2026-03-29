@@ -44,9 +44,47 @@ export interface PaystackVerificationResponse {
   };
 }
 
-const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+let PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 const ENABLE_PAYSTACK_SERVER_VERIFICATION =
   String(import.meta.env.VITE_PAYSTACK_SERVER_VERIFY || "false").toLowerCase() === "true";
+
+// Cache for fetched public key to avoid repeated calls
+let paystackPublicKeyCache: string | null = null;
+
+/**
+ * Get Paystack public key from environment or backend as fallback
+ * This ensures the payment system works in both local and hosted environments
+ */
+export const getPaystackPublicKey = async (): Promise<string> => {
+  // Return from environment if available
+  if (PAYSTACK_PUBLIC_KEY) {
+    return PAYSTACK_PUBLIC_KEY;
+  }
+
+  // Return from cache if already fetched
+  if (paystackPublicKeyCache) {
+    return paystackPublicKeyCache;
+  }
+
+  // Fetch from backend as last resort
+  try {
+    const { data, error } = await supabase.functions.invoke("get-paystack-config");
+
+    if (error || !data?.publicKey) {
+      throw new Error("Failed to retrieve Paystack configuration from server");
+    }
+
+    // Cache the result
+    paystackPublicKeyCache = data.publicKey;
+    return data.publicKey;
+  } catch (error) {
+    console.error("Error fetching Paystack public key:", error);
+    throw new Error(
+      "Paystack is not configured. Please contact support. Error: " +
+      (error instanceof Error ? error.message : "Configuration unavailable")
+    );
+  }
+};
 
 /**
  * Initialize a Paystack transaction using backend Edge Function

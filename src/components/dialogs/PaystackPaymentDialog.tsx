@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { initializePaystackPayment, verifyPaystackTransaction } from "@/services/paystackService";
+import { initializePaystackPayment, verifyPaystackTransaction, getPaystackPublicKey } from "@/services/paystackService";
 import { toast } from "sonner";
 
 export interface PaystackPaymentDialogProps {
@@ -19,8 +19,6 @@ export interface PaystackPaymentDialogProps {
   onPaymentSuccess: (transactionRef: string, details: any) => void;
   onPaymentError?: (error: string) => void;
 }
-
-const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
 const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   open,
@@ -39,6 +37,27 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   >("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transactionReference, setTransactionReference] = useState<string | null>(null);
+  const [paystackPublicKey, setPaystackPublicKey] = useState<string | null>(null);
+  const [keyLoadingError, setKeyLoadingError] = useState<string | null>(null);
+
+  // Load Paystack public key
+  useEffect(() => {
+    const loadPaystackKey = async () => {
+      try {
+        const key = await getPaystackPublicKey();
+        setPaystackPublicKey(key);
+        setKeyLoadingError(null);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Failed to load Paystack configuration";
+        setKeyLoadingError(errorMsg);
+        console.error("Failed to load Paystack public key:", errorMsg);
+      }
+    };
+
+    if (open) {
+      loadPaystackKey();
+    }
+  }, [open]);
 
   // Initialize Paystack script
   useEffect(() => {
@@ -76,8 +95,8 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   };
 
   const handlePayment = async () => {
-    if (!PAYSTACK_PUBLIC_KEY) {
-      const error = "Paystack public key is not configured";
+    if (!paystackPublicKey) {
+      const error = keyLoadingError || "Paystack public key is not configured";
       setErrorMessage(error);
       setTransactionStatus("error");
       onPaymentError?.(error);
@@ -101,7 +120,7 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
       }
 
       const handler = PaystackPop.setup({
-        key: PAYSTACK_PUBLIC_KEY,
+        key: paystackPublicKey,
         email: email,
         amount: Math.round(amount * 100), // Convert to kobo/cents
         currency: 'KES',
