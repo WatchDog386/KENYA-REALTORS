@@ -728,7 +728,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             if (linkedInvoiceId) {
               toast.success('Tenant linked to existing Super Admin billing invoice.');
             } else {
-              toast.info('Tenant assigned. Super Admin should issue the onboarding invoice from Billing and Invoicing.');
+              toast.info('Tenant assigned. First-time invoice will auto-generate when the application is approved.');
             }
           } catch (invoiceError: any) {
             console.error('Failed to create initial invoice:', invoiceError);
@@ -856,7 +856,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
       setSelectedTenant(candidate.applicant_id);
       setIsAddTenantOpen(false);
-      toast.success('Applicant moved to under review. Super Admin will issue the onboarding invoice.');
+      toast.success('Applicant moved to under review. First-time invoice will auto-send once approved.');
     } catch (error: any) {
       console.error('Error adding tenant from applicants:', error);
       toast.error(error.message || 'Failed to add tenant from applicants');
@@ -1002,7 +1002,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         sub_location: '',
       });
       setIsAddTenantOpen(false);
-      toast.success('Tenant created and moved to under review. Super Admin will issue the onboarding invoice.');
+      toast.success('Tenant created and moved to under review. First-time invoice will auto-send once approved.');
     } catch (error: any) {
       console.error('Error creating tenant user:', error);
       toast.error(error.message || 'Failed to create tenant user');
@@ -1403,7 +1403,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                <DialogHeader>
                    <DialogTitle className="text-slate-800">Add Tenant</DialogTitle>
                    <DialogDescription className="text-slate-500">
-                     Add from applicants by default, or create a new tenant profile. Super Admin issues the onboarding invoice.
+                     Add from applicants by default, or create a new tenant profile. First-time invoice auto-generates after manager approval.
                    </DialogDescription>
                </DialogHeader>
 
@@ -1634,7 +1634,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   )}
 
                   <div className="rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs p-3">
-                    Super Admin Billing handles onboarding invoices after tenant/application review.
+                    On manager approval, the first-time invoice is sent automatically to the tenant dashboard.
                   </div>
                </div>
 

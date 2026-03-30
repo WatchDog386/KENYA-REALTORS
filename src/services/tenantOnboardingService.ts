@@ -445,6 +445,30 @@ const readInitialChargeTemplates = async (propertyId: string) => {
     .filter((item: any) => item.name && item.amount >= 0);
 };
 
+const normalizeSecurityDepositMonths = (value: unknown): number => {
+  const parsed = Math.round(Number(value || 1));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const readSecurityDepositMonths = async (propertyId: string): Promise<number> => {
+  const { data, error } = await supabase
+    .from("properties")
+    .select("first_payment_defaults")
+    .eq("id", propertyId)
+    .maybeSingle();
+
+  if (error) {
+    const errorText = String(error.message || "").toLowerCase();
+    const missingDefaultsColumn = error.code === "42703" || errorText.includes("first_payment_defaults");
+    if (missingDefaultsColumn) {
+      return 1;
+    }
+    throw error;
+  }
+
+  return normalizeSecurityDepositMonths((data as any)?.first_payment_defaults?.security_deposit_months);
+};
+
 const appendInvoiceNote = async (invoiceId: string, extraLine: string) => {
   const { data: existing, error: readError } = await supabase
     .from("invoices")
@@ -895,6 +919,66 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
     for (const tag of metadataTags) {
       await appendInvoiceNote(linkedInvoiceId, tag);
     }
+  } else {
+    const monthlyRent = await readUnitRent(application.unit_id);
+    if (monthlyRent <= 0) {
+      throw new Error("Unit rent is not configured. Set the unit rent before approving this application.");
+    }
+
+    const securityDepositMonths = await readSecurityDepositMonths(application.property_id);
+    const securityDeposit = monthlyRent * securityDepositMonths;
+
+    const initialCharges = await readInitialChargeTemplates(application.property_id);
+    const additionalCharges = initialCharges.reduce((acc: Record<string, number>, charge: any) => {
+      acc[charge.name] = Number(charge.amount || 0);
+      return acc;
+    }, {});
+
+    const initialChargesTotal = initialCharges.reduce(
+      (sum: number, charge: any) => sum + Number(charge.amount || 0),
+      0
+    );
+
+    const totalAmount = monthlyRent + securityDeposit + initialChargesTotal;
+    const referenceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0")}`;
+    const issuedDate = new Date().toISOString().split("T")[0];
+
+    const marker = [
+      "BILLING_EVENT:first_payment",
+      ...metadataTags,
+      `SECURITY_DEPOSIT_MONTHS:${securityDepositMonths}`,
+    ].join(";");
+
+    const { data: createdInvoice, error: createInvoiceError } = await supabase
+      .from("invoices")
+      .insert([
+        {
+          reference_number: referenceNumber,
+          property_id: application.property_id,
+          tenant_id: application.applicant_id,
+          amount: totalAmount,
+          due_date: issuedDate,
+          issued_date: issuedDate,
+          status: "unpaid",
+          items: {
+            monthly_rent: monthlyRent,
+            security_deposit: securityDeposit,
+            initial_charges: initialCharges,
+            additional_charges: additionalCharges,
+          },
+          notes: `${marker}\nAuto-generated after manager approval`,
+        },
+      ])
+      .select("id")
+      .maybeSingle();
+
+    if (createInvoiceError) {
+      throw createInvoiceError;
+    }
+
+    linkedInvoiceId = createdInvoice?.id || null;
   }
 
   await supabase

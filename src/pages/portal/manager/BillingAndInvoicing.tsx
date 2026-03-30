@@ -364,6 +364,9 @@ const BillingAndInvoicing = () => {
         <div>
           <h1 className="text-3xl font-light text-[#00356B] tracking-tight">Billing & Invoicing</h1>
           <p className="text-gray-600 text-[13px] font-medium">Rent, bill names, and payment tracking</p>
+          <div className="mt-3 inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+            Property-Isolated Billing Update Active
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -432,6 +435,9 @@ const BillingAndInvoicing = () => {
       {/* Filters */}
       <Card>
         <CardHeader>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900 font-medium mb-3">
+            Property note: recurring utilities and rates are scoped per property. Use the property filter below to review each property independently.
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <CardTitle>Billing Details</CardTitle>

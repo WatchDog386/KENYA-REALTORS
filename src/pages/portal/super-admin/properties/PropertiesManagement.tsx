@@ -196,32 +196,39 @@ const PropertiesManagement: React.FC = () => {
       setSavingUtilities(true);
 
       const normalizedName = newPropertyUtilityName.trim();
-      let utilityId = '';
+      const propertyAssignedIds = propertyUtilityMap[selectedPropertyForUtilities.id] || [];
+      const duplicateInProperty = utilityOptions
+        .filter((item) => propertyAssignedIds.includes(item.id))
+        .some((item) => item.utility_name.toLowerCase() === normalizedName.toLowerCase());
 
-      const existing = utilityOptions.find(
-        (item) => item.utility_name.toLowerCase() === normalizedName.toLowerCase()
-      );
-
-      if (existing) {
-        utilityId = existing.id;
-      } else {
-        const { data: createdUtility, error: createError } = await supabase
-          .from('utility_constants')
-          .insert([
-            {
-              utility_name: normalizedName,
-              is_metered: newPropertyUtilityIsRated,
-              constant: newPropertyUtilityIsRated ? Number(newPropertyUtilityRate) : 1,
-              price: newPropertyUtilityIsRated ? null : Number(newPropertyUtilityPrice),
-              description: newPropertyUtilityIsRated ? `Rated utility - ${normalizedName}` : `Fixed utility - ${normalizedName}`,
-            },
-          ])
-          .select('id')
-          .single();
-
-        if (createError) throw createError;
-        utilityId = createdUtility.id;
+      if (duplicateInProperty) {
+        toast.error('This utility name already exists for the selected property');
+        return;
       }
+
+      const { data: createdUtility, error: createError } = await supabase
+        .from('utility_constants')
+        .insert([
+          {
+            utility_name: normalizedName,
+            is_metered: newPropertyUtilityIsRated,
+            constant: newPropertyUtilityIsRated ? Number(newPropertyUtilityRate) : 1,
+            price: newPropertyUtilityIsRated ? null : Number(newPropertyUtilityPrice),
+            description: newPropertyUtilityIsRated ? `Rated utility - ${normalizedName}` : `Fixed utility - ${normalizedName}`,
+          },
+        ])
+        .select('id')
+        .single();
+
+      if (createError) {
+        const message = String(createError?.message || '').toLowerCase();
+        if (message.includes('utility_name') && message.includes('duplicate')) {
+          throw new Error('Database still enforces globally unique utility names. Apply the property-scoped utility migration first.');
+        }
+        throw createError;
+      }
+
+      const utilityId = createdUtility.id;
 
       const { error: assignmentError } = await supabase
         .from('property_utilities')
@@ -261,6 +268,10 @@ const PropertiesManagement: React.FC = () => {
     const matchesSearch = prop.name.toLowerCase().includes(searchQuery.toLowerCase()) || prop.location.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
+
+  const selectedPropertyUtilityOptions = selectedPropertyForUtilities
+    ? utilityOptions.filter((utility) => (propertyUtilityMap[selectedPropertyForUtilities.id] || []).includes(utility.id))
+    : [];
 
   if (loading && properties.length === 0) {
     return (
@@ -583,11 +594,11 @@ const PropertiesManagement: React.FC = () => {
                 </div>
               </div>
 
-              {utilityOptions.length === 0 ? (
+              {selectedPropertyUtilityOptions.length === 0 ? (
                 <p className="text-sm text-slate-500">No utilities found. Add utilities from Billing and Invoicing page first.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {utilityOptions.map((utility) => (
+                  {selectedPropertyUtilityOptions.map((utility) => (
                     <label
                       key={utility.id}
                       className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 cursor-pointer hover:border-[#154279]/40"

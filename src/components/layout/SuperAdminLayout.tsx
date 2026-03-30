@@ -144,7 +144,7 @@ const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
       title: "Billing and Invoicing",
       path: "/portal/super-admin/utilities",
       icon: "zap",
-      description: "Manage billing and invoicing",
+      description: "Manage billing and invoicing (Property-Isolated)",
       permission: "manage_utilities",
     },
   ];

@@ -127,7 +127,7 @@ const ManagerApplications = () => {
       }
 
       let finalStatus = newStatus;
-      const shouldGenerateInvoice = newStatus === 'under_review' || newStatus === 'approved';
+      const shouldGenerateInvoice = newStatus === 'approved';
 
       let linkedToBillingInvoice = false;
 
@@ -167,10 +167,12 @@ const ManagerApplications = () => {
       
       if (shouldGenerateInvoice) {
         if (linkedToBillingInvoice) {
-          toast.success('Invoice prepared successfully. Tenant can now complete first-payment onboarding.');
+          toast.success('Application approved. First-time invoice has been sent to the tenant dashboard.');
         } else {
-          toast.success('Application updated. Awaiting Super Admin Billing invoice before tenant checkout.');
+          toast.warning('Application approved, but invoice generation is pending. Please retry approval.');
         }
+      } else if (finalStatus === 'under_review') {
+        toast.success('Application moved to under review. Invoice will auto-send after manager approval.');
       } else {
         toast.success(`Application marked as ${finalStatus}`);
       }
@@ -418,8 +420,8 @@ const ManagerApplications = () => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="pending">Mark Pending</SelectItem>
-                              <SelectItem value="under_review">Send Invoice / Under Review</SelectItem>
-                              <SelectItem value="approved">Mark Approved</SelectItem>
+                              <SelectItem value="under_review">Move to Under Review</SelectItem>
+                              <SelectItem value="approved">Approve Application</SelectItem>
                                 <SelectItem value="rejected">Reject Application</SelectItem>
                             </SelectContent>
                         </Select>

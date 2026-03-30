@@ -776,7 +776,7 @@ const App = () => {
                   <Route path="leave-requests" element={<ManagerLeaveRequestsPage />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />
                   <Route path="utilities" element={<SuperAdminUtilitiesManager />} />
-                  <Route path="utilities/settings" element={<SuperAdminUtilities />} />
+                  <Route path="utilities/settings" element={<Navigate to="/portal/super-admin/utilities" replace />} />
                   <Route path="settings" element={<SystemSettings />} />
                   <Route path="reports" element={<Reports />} /> {/* ADDED THIS LINE */}
                   <Route path="leases" element={<LeasesManagement />} />
