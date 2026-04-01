@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CalendarCheck2, CheckCircle2, CircleX, RefreshCw } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { CalendarCheck2, CheckCircle2, CircleX, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { leaveRequestService, LeaveRequestRecord, LeaveRequestStatus } from '@/services/leaveRequestService';
+import { leaveRequestService, LeavePropertyOption, LeaveRequestRecord, LeaveRequestStatus } from '@/services/leaveRequestService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -28,6 +29,14 @@ const ManagerLeaveRequestsPage = () => {
   const [activeFilter, setActiveFilter] = useState<'all' | LeaveRequestStatus>('pending');
   const [notesById, setNotesById] = useState<Record<string, string>>({});
   const [shareById, setShareById] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [properties, setProperties] = useState<LeavePropertyOption[]>([]);
+  const [formData, setFormData] = useState({
+    property_id: '',
+    start_date: '',
+    end_date: '',
+    reason: '',
+  });
 
   const loadRequests = async () => {
     try {
@@ -41,8 +50,23 @@ const ManagerLeaveRequestsPage = () => {
     }
   };
 
+  const loadProperties = async () => {
+    try {
+      const availableProperties = await leaveRequestService.getAssignableProperties();
+      setProperties(availableProperties);
+
+      if (!formData.property_id && availableProperties.length === 1) {
+        setFormData((prev) => ({ ...prev, property_id: availableProperties[0].id }));
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load properties for leave request');
+    }
+  };
+
   useEffect(() => {
     loadRequests();
+    loadProperties();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredRequests = useMemo(() => {
@@ -68,9 +92,120 @@ const ManagerLeaveRequestsPage = () => {
     }
   };
 
+  const handleSubmitLeaveRequest = async (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!formData.start_date || !formData.end_date || !formData.reason.trim()) {
+      toast.error('Start date, end date and reason are required');
+      return;
+    }
+
+    if (new Date(formData.end_date) < new Date(formData.start_date)) {
+      toast.error('End date must be after start date');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await leaveRequestService.submitLeaveRequest({
+        property_id: formData.property_id || null,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        reason: formData.reason.trim(),
+      });
+
+      setFormData((prev) => ({
+        ...prev,
+        start_date: '',
+        end_date: '',
+        reason: '',
+      }));
+
+      toast.success('Leave request submitted successfully');
+      await loadRequests();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to submit leave request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
+        <Card className="border-none shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-[#154279]">Submit Leave Request</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmitLeaveRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="manager-leave-property">Property (optional)</Label>
+                <select
+                  id="manager-leave-property"
+                  className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                  value={formData.property_id}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, property_id: event.target.value }))
+                  }
+                >
+                  <option value="">General / Not property-specific</option>
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}{property.location ? ` - ${property.location}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="manager-leave-start">Start Date</Label>
+                <Input
+                  id="manager-leave-start"
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, start_date: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="manager-leave-end">End Date</Label>
+                <Input
+                  id="manager-leave-end"
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, end_date: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="manager-leave-reason">Reason</Label>
+                <Textarea
+                  id="manager-leave-reason"
+                  rows={3}
+                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500"
+                  value={formData.reason}
+                  onChange={(event) =>
+                    setFormData((prev) => ({ ...prev, reason: event.target.value }))
+                  }
+                  placeholder="State why you are requesting leave."
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <Button type="submit" className="bg-[#154279] hover:bg-[#10355f]" disabled={submitting}>
+                  <Send className="w-4 h-4 mr-2" />
+                  {submitting ? 'Submitting...' : 'Submit Leave Request'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
         <Card className="border-none shadow-lg">
           <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
