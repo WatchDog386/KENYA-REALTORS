@@ -127,12 +127,12 @@ const ManagerUtilityReadings = () => {
   const [utilitySettings, setUtilitySettings] = useState<UtilitySettings>({
     water_fee: 0,
     water_rate: 0,
-    electricity_rate: 140,
+    electricity_rate: 0,
     garbage_fee: 0,
     security_fee: 0,
     service_fee: 0,
-    water_constant: 1,
-    electricity_constant: 1,
+    water_constant: 0,
+    electricity_constant: 0,
     custom_utilities: {},
   });
   const [utilityConstants, setUtilityConstants] = useState<UtilityConstant[]>([]);
@@ -154,7 +154,7 @@ const ManagerUtilityReadings = () => {
     reading_month: new Date().toISOString().split('T')[0].substring(0, 7),
     previous_reading: 0,
     current_reading: 0,
-    electricity_rate: 140,
+    electricity_rate: 0,
     water_previous_reading: 0,
     water_current_reading: 0,
     water_rate: 0,
@@ -167,6 +167,7 @@ const ManagerUtilityReadings = () => {
     other_charges: 0,
     status: 'pending',
   });
+  const [autoPreviousSource, setAutoPreviousSource] = useState<{ electricityMonth?: string; waterMonth?: string }>({});
 
   const getFloorSortValue = (floor: string | number | null | undefined): number => {
     const floorKey = String(floor ?? 'G').trim().toUpperCase();
@@ -215,17 +216,38 @@ const ManagerUtilityReadings = () => {
     });
   };
 
-  // Helpers are declared early to avoid TDZ issues when used for derived state
+  const CORE_UTILITY_NAMES = ['Electricity', 'Water', 'Garbage', 'Security', 'Service'];
+  const METERED_BASE_UTILITY_NAMES = ['Electricity', 'Water'];
+
+  const isMatch = (dbName: string, coreName: string) => {
+    const lower = dbName.toLowerCase().trim();
+    if (coreName === 'Electricity') return lower.includes('electric');
+    if (coreName === 'Water') return lower.includes('water');
+    if (coreName === 'Garbage') return lower.includes('garbage') || lower.includes('gabbage');
+    if (coreName === 'Security') return lower.includes('securit');
+    if (coreName === 'Service') return lower.includes('service');
+    return lower === coreName.toLowerCase();
+  };
+
+  const getCoreType = (dbName: string) => {
+    for (const coreName of CORE_UTILITY_NAMES) {
+      if (isMatch(dbName, coreName)) return coreName;
+    }
+    return null;
+  };
+
   function buildCustomUtilityValues(propertyId?: string) {
-    const hasAssignments = Object.keys(propertyUtilityMap).length > 0;
-    const assignedIds = propertyId ? (propertyUtilityMap[propertyId] || []) : [];
+    if (!propertyId) return {};
+
+    const assignedIds = propertyUtilityMap[propertyId] || [];
+    if (assignedIds.length === 0) return {};
+
     const values: Record<string, number> = {};
     utilityConstants
       .filter(u => {
-        const isCustom = !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name);
+        const coreType = getCoreType(u.utility_name);
+        const isCustom = !coreType;
         if (!isCustom) return false;
-        if (!hasAssignments) return true;
-        if (!propertyId) return false;
         return assignedIds.includes(u.id);
       })
       .forEach(u => {
@@ -235,11 +257,8 @@ const ManagerUtilityReadings = () => {
   }
 
   const getUtilityConstant = (name: string, propertyId?: string) => {
-    const candidates = utilityConstants.filter((u) => u.utility_name === name);
+    const candidates = utilityConstants.filter((u) => isMatch(u.utility_name, name));
     if (candidates.length === 0) return undefined;
-
-    const hasAnyAssignments = Object.keys(propertyUtilityMap).length > 0;
-    if (!hasAnyAssignments) return candidates[0];
 
     const resolvedPropertyId =
       propertyId ||
@@ -247,28 +266,41 @@ const ManagerUtilityReadings = () => {
       units.find((u) => u.id === formData.unit_id)?.property_id;
 
     if (!resolvedPropertyId) {
-      return hasAnyAssignments ? undefined : candidates[0];
+      return METERED_BASE_UTILITY_NAMES.includes(name) ? candidates[0] : undefined;
     }
 
     const assignedIds = new Set(propertyUtilityMap[resolvedPropertyId] || []);
     const assignedMatch = candidates.find((u) => assignedIds.has(u.id));
     if (assignedMatch) return assignedMatch;
 
-    return hasAnyAssignments ? undefined : candidates[0];
+    // If a property has no explicit assignments yet, allow only base metered
+    // utilities to fall back so managers can still capture readings.
+    if (assignedIds.size === 0 && METERED_BASE_UTILITY_NAMES.includes(name)) {
+      return candidates[0];
+    }
+
+    return undefined;
   };
 
-  const CORE_UTILITY_NAMES = ['Electricity', 'Water', 'Garbage', 'Security', 'Service'];
+  const getFixedUtilityPrice = (name: 'Garbage' | 'Security' | 'Service', propertyId?: string) => {
+    return Math.abs(Number(getUtilityConstant(name, propertyId)?.price) || 0);
+  };
+
+  const getMeteredUtilityRate = (name: 'Electricity' | 'Water', propertyId?: string) => {
+    const utilityConstantValue = Number(getUtilityConstant(name, propertyId)?.constant);
+    if (Number.isFinite(utilityConstantValue) && utilityConstantValue > 0) {
+      return utilityConstantValue;
+    }
+    return 0;
+  };
 
   function isUtilityActiveForProperty(utilityName: string, propertyId?: string) {
+    if (METERED_BASE_UTILITY_NAMES.includes(utilityName)) {
+      return true;
+    }
+
     const utility = getUtilityConstant(utilityName, propertyId);
     if (!utility) return false;
-
-    // Core utilities should always be available for billing forms.
-    // Property assignments are mainly used to scope custom utilities.
-    if (CORE_UTILITY_NAMES.includes(utilityName)) return true;
-
-    const hasAnyAssignments = Object.keys(propertyUtilityMap).length > 0;
-    if (!hasAnyAssignments) return true;
     if (!propertyId) return false;
 
     const assignedIds = propertyUtilityMap[propertyId] || [];
@@ -276,20 +308,21 @@ const ManagerUtilityReadings = () => {
   }
 
   function getActiveUtilitiesForProperty(propertyId?: string) {
-    const coreUtilities = CORE_UTILITY_NAMES
+    if (!propertyId) return [];
+
+    const assignedIds = new Set(propertyUtilityMap[propertyId] || []);
+    const assignedUtilities = utilityConstants.filter((utility) => assignedIds.has(utility.id));
+
+    const meteredFallbackUtilities = METERED_BASE_UTILITY_NAMES
       .map((name) => getUtilityConstant(name, propertyId))
       .filter((utility): utility is UtilityConstant => Boolean(utility));
 
-    const hasAnyAssignments = Object.keys(propertyUtilityMap).length > 0;
-    if (!hasAnyAssignments) return utilityConstants;
-    if (!propertyId) return coreUtilities;
+    const byId = new Map<string, UtilityConstant>();
+    [...meteredFallbackUtilities, ...assignedUtilities].forEach((utility) => {
+      byId.set(utility.id, utility);
+    });
 
-    const assignedIds = propertyUtilityMap[propertyId] || [];
-    const assignedCustomUtilities = utilityConstants.filter(
-      (u) => !CORE_UTILITY_NAMES.includes(u.utility_name) && assignedIds.includes(u.id)
-    );
-
-    return [...coreUtilities, ...assignedCustomUtilities];
+    return Array.from(byId.values());
   }
 
   function getUnitRent(unitId?: string, propertyId?: string) {
@@ -357,18 +390,18 @@ const ManagerUtilityReadings = () => {
     const serviceEnabled = isUtilityActiveForProperty('Service', propertyId);
 
     // Get constants from utility_constants table with utility_settings fallback
-    const waterConstant = getUtilityConstant('Water', propertyId)?.constant || utilitySettings.water_constant || 1;
-    const electricityConstant = getUtilityConstant('Electricity', propertyId)?.constant || utilitySettings.electricity_constant || 1;
-    const garbagePrice = garbageEnabled ? Math.abs(getUtilityConstant('Garbage', propertyId)?.price ?? utilitySettings.garbage_fee ?? reading.garbage_fee ?? 0) : 0;
-    const securityPrice = securityEnabled ? Math.abs(getUtilityConstant('Security', propertyId)?.price ?? utilitySettings.security_fee ?? reading.security_fee ?? 0) : 0;
-    const servicePrice = serviceEnabled ? Math.abs(getUtilityConstant('Service', propertyId)?.price ?? utilitySettings.service_fee ?? (reading.service_fee ?? 0)) : 0;
+    const waterConstant = getMeteredUtilityRate('Water', propertyId);
+    const electricityConstant = getMeteredUtilityRate('Electricity', propertyId);
+    const garbagePrice = garbageEnabled ? getFixedUtilityPrice('Garbage', propertyId) : 0;
+    const securityPrice = securityEnabled ? getFixedUtilityPrice('Security', propertyId) : 0;
+    const servicePrice = serviceEnabled ? getFixedUtilityPrice('Service', propertyId) : 0;
     
     // Calculate usage as the range/magnitude between readings (absolute difference)
     const electricityUsage = electricityEnabled ? Math.abs(reading.current_reading - reading.previous_reading) : 0;
-    const electricityBill = electricityEnabled ? electricityUsage * (reading.electricity_rate || electricityConstant) : 0;
+    const electricityBill = electricityEnabled ? electricityUsage * electricityConstant : 0;
     
     const waterUsage = waterEnabled ? Math.abs((reading.water_current_reading || 0) - (reading.water_previous_reading || 0)) : 0;
-    const waterBill = waterEnabled ? waterUsage * (reading.water_rate || waterConstant) : 0;
+    const waterBill = waterEnabled ? waterUsage * waterConstant : 0;
 
     const customUtilityValues = buildCustomUtilityValues(propertyId);
     let customUtilitiesTotal = 0;
@@ -417,10 +450,23 @@ const ManagerUtilityReadings = () => {
     };
   }, [showForm]);
 
-  // Fetch utility settings
+  // Fetch utility settings and property-scoped constants
   useEffect(() => {
     const fetchUtilitySettings = async () => {
+      if (!user?.id) return;
+
       try {
+        // First, get the manager's assigned property IDs
+        const { data: assignments, error: assignError } = await supabase
+          .from('property_manager_assignments')
+          .select('property_id')
+          .eq('property_manager_id', user.id);
+
+        if (assignError) throw assignError;
+
+        const managerPropertyIds = (assignments || []).map(a => a.property_id);
+        
+        // Fetch global utility settings as fallback
         const { data, error } = await supabase
           .from('utility_settings')
           .select('*')
@@ -433,51 +479,60 @@ const ManagerUtilityReadings = () => {
           setUtilitySettings({
             water_fee: Number(data.water_fee) || 0,
             water_rate: Number(data.water_rate) || 0,
-            electricity_rate: Number(data.electricity_rate) || 140,
+            electricity_rate: Number(data.electricity_rate) || 0,
             garbage_fee: Number(data.garbage_fee) || 0,
             security_fee: Number(data.security_fee) || 0,
             service_fee: Number(data.service_fee) || 0,
-            water_constant: Number(data.water_constant) || 1,
-            electricity_constant: Number(data.electricity_constant) || 1,
+            water_constant: Number(data.water_constant) || 0,
+            electricity_constant: Number(data.electricity_constant) || 0,
             custom_utilities: data.custom_utilities || {},
           });
           // Set form default values
           setFormData(prev => ({
             ...prev,
-            water_rate: Number(data.water_rate) || 0,
-            electricity_rate: Number(data.electricity_rate) || 140,
-            water_bill: Number(data.water_fee) || 0,
-            garbage_fee: Number(data.garbage_fee) || 0,
-            security_fee: Number(data.security_fee) || 0,
-            service_fee: Number(data.service_fee) || 0,
-            custom_utilities: data.custom_utilities || {},
           }));
         }
 
-        // Fetch utility constants
-        const { data: constants, error: constantsError } = await supabase
-          .from('utility_constants')
-          .select('*')
-          .order('utility_name');
-
-        if (constantsError && constantsError.code !== 'PGRST116') throw constantsError;
-
-        const finalConstants = constants || [];
-        setUtilityConstants(finalConstants);
-        console.log('Final utility constants:', finalConstants);
-
+        // Fetch property utilities ONLY for manager's assigned properties
         const { data: propertyUtilities, error: propertyUtilitiesError } = await supabase
           .from('property_utilities')
           .select('property_id, utility_constant_id');
 
-        if (!propertyUtilitiesError && propertyUtilities) {
-          const mapped: Record<string, string[]> = {};
-          propertyUtilities.forEach((item: any) => {
+        if (propertyUtilitiesError && propertyUtilitiesError.code !== 'PGRST116') {
+          throw propertyUtilitiesError;
+        }
+
+        // Build map - only for manager's properties
+        const managedPropertyIds = new Set(managerPropertyIds);
+        const mapped: Record<string, string[]> = {};
+        const relevantUtilityIds = new Set<string>();
+        
+        (propertyUtilities || []).forEach((item: any) => {
+          if (managedPropertyIds.has(item.property_id)) {
             if (!mapped[item.property_id]) mapped[item.property_id] = [];
             mapped[item.property_id].push(item.utility_constant_id);
-          });
-          setPropertyUtilityMap(mapped);
+            relevantUtilityIds.add(item.utility_constant_id);
+          }
+        });
+        
+        setPropertyUtilityMap(mapped);
+
+        // Fetch utility constants ONLY for the manager's properties
+        let constants: any[] = [];
+        if (relevantUtilityIds.size > 0) {
+          const relevantIds = Array.from(relevantUtilityIds);
+          const { data: fetchedConstants, error: constantsError } = await supabase
+            .from('utility_constants')
+            .select('*')
+            .in('id', relevantIds)
+            .order('utility_name');
+
+          if (constantsError && constantsError.code !== 'PGRST116') throw constantsError;
+          constants = fetchedConstants || [];
         }
+        
+        setUtilityConstants(constants);
+        console.log('Property-scoped utility constants:', constants);
       } catch (err) {
         console.error('Error fetching utility settings:', err);
       }
@@ -493,18 +548,49 @@ const ManagerUtilityReadings = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'utility_constants',
+          table: 'property_utilities',
         },
         async () => {
-          // Refresh all constants when any change occurs
-          const { data: updatedConstants } = await supabase
-            .from('utility_constants')
-            .select('*')
-            .order('utility_name');
+          // Refresh when property_utilities change
+          if (!user?.id) return;
+          
+          const { data: assignments } = await supabase
+            .from('property_manager_assignments')
+            .select('property_id')
+            .eq('property_manager_id', user.id);
 
-          if (updatedConstants) {
-            console.log('Utility constants updated on manager:', updatedConstants);
-            setUtilityConstants(updatedConstants);
+          const managerPropertyIds = (assignments || []).map((a: any) => a.property_id);
+          
+          const { data: propertyUtilities } = await supabase
+            .from('property_utilities')
+            .select('property_id, utility_constant_id');
+
+          const managedPropertyIds = new Set(managerPropertyIds);
+          const mapped: Record<string, string[]> = {};
+          const relevantUtilityIds = new Set<string>();
+          
+          (propertyUtilities || []).forEach((item: any) => {
+            if (managedPropertyIds.has(item.property_id)) {
+              if (!mapped[item.property_id]) mapped[item.property_id] = [];
+              mapped[item.property_id].push(item.utility_constant_id);
+              relevantUtilityIds.add(item.utility_constant_id);
+            }
+          });
+          
+          setPropertyUtilityMap(mapped);
+
+          if (relevantUtilityIds.size > 0) {
+            const relevantIds = Array.from(relevantUtilityIds);
+            const { data: fetchedConstants } = await supabase
+              .from('utility_constants')
+              .select('*')
+              .in('id', relevantIds)
+              .order('utility_name');
+
+            if (fetchedConstants) {
+              console.log('Property utilities updated on manager:', fetchedConstants);
+              setUtilityConstants(fetchedConstants);
+            }
           }
         }
       )
@@ -514,16 +600,16 @@ const ManagerUtilityReadings = () => {
     return () => {
       channel.unsubscribe();
     };
-  }, []);
+  }, [user?.id]);
 
   // Keep all prices and constants locked to server values so users cannot alter them
   useEffect(() => {
     const resolvedPropertyId = formData.property_id || units.find((u) => u.id === formData.unit_id)?.property_id;
-    const garbagePrice = getUtilityConstant('Garbage', resolvedPropertyId)?.price || 0;
-    const securityPrice = getUtilityConstant('Security', resolvedPropertyId)?.price || 0;
-    const servicePrice = getUtilityConstant('Service', resolvedPropertyId)?.price || 0;
-    const electricityConstant = getUtilityConstant('Electricity', resolvedPropertyId)?.constant || utilitySettings.electricity_constant || 1;
-    const waterConstant = getUtilityConstant('Water', resolvedPropertyId)?.constant || utilitySettings.water_constant || 1;
+    const garbagePrice = getFixedUtilityPrice('Garbage', resolvedPropertyId);
+    const securityPrice = getFixedUtilityPrice('Security', resolvedPropertyId);
+    const servicePrice = getFixedUtilityPrice('Service', resolvedPropertyId);
+    const electricityConstant = getMeteredUtilityRate('Electricity', resolvedPropertyId);
+    const waterConstant = getMeteredUtilityRate('Water', resolvedPropertyId);
     const customUtilityValues = buildCustomUtilityValues(resolvedPropertyId);
 
     setFormData(prev => ({
@@ -535,7 +621,7 @@ const ManagerUtilityReadings = () => {
       electricity_rate: electricityConstant,
       water_rate: waterConstant,
     }));
-  }, [utilityConstants, propertyUtilityMap, formData.property_id, formData.unit_id, units, utilitySettings.electricity_constant, utilitySettings.water_constant]);
+  }, [utilityConstants, propertyUtilityMap, formData.property_id, formData.unit_id, units, utilitySettings.electricity_constant, utilitySettings.water_constant, utilitySettings.electricity_rate, utilitySettings.water_rate]);
 
   // Fetch managed properties and their units
   useEffect(() => {
@@ -651,9 +737,9 @@ const ManagerUtilityReadings = () => {
               const readingRent = Math.abs(latestReading.rent_amount ?? rentAmount);
 
               // Fetch fresh prices from superadmin settings
-              const garbagePrice = Math.abs(getUtilityConstant('Garbage', unit.property_id)?.price ?? utilitySettings.garbage_fee ?? latestReading.garbage_fee ?? 0);
-              const securityPrice = Math.abs(getUtilityConstant('Security', unit.property_id)?.price ?? utilitySettings.security_fee ?? latestReading.security_fee ?? 0);
-              const servicePrice = Math.abs(getUtilityConstant('Service', unit.property_id)?.price ?? utilitySettings.service_fee ?? (latestReading.service_fee ?? 0));
+              const garbagePrice = getFixedUtilityPrice('Garbage', unit.property_id);
+              const securityPrice = getFixedUtilityPrice('Security', unit.property_id);
+              const servicePrice = getFixedUtilityPrice('Service', unit.property_id);
 
               let customUtilitiesTotal = 0;
               if (latestReading.custom_utilities) {
@@ -730,9 +816,9 @@ const ManagerUtilityReadings = () => {
                     const readingRent = Math.abs(newLatestReading.rent_amount ?? rentAmount);
                     
                     // Fetch fresh garbage/security/service fees from superadmin settings
-                    const garbagePrice = Math.abs(getUtilityConstant('Garbage', unit.property_id)?.price ?? utilitySettings.garbage_fee ?? newLatestReading.garbage_fee ?? 0);
-                    const securityPrice = Math.abs(getUtilityConstant('Security', unit.property_id)?.price ?? utilitySettings.security_fee ?? newLatestReading.security_fee ?? 0);
-                    const servicePrice = Math.abs(getUtilityConstant('Service', unit.property_id)?.price ?? utilitySettings.service_fee ?? (newLatestReading.service_fee ?? 0));
+                    const garbagePrice = getFixedUtilityPrice('Garbage', unit.property_id);
+                    const securityPrice = getFixedUtilityPrice('Security', unit.property_id);
+                    const servicePrice = getFixedUtilityPrice('Service', unit.property_id);
                     
                     let customUtilitiesTotal = 0;
                     if (newLatestReading.custom_utilities) {
@@ -794,16 +880,57 @@ const ManagerUtilityReadings = () => {
     setFilteredReadings(filtered);
   }, [readings, searchTerm, filterProperty, filterStatus]);
 
+  const applyPreviousReadingsFromHistory = async (unitId: string, readingMonth: string) => {
+    if (!unitId || !readingMonth || editingReading) return;
+
+    const readingMonthStart = `${readingMonth}-01`;
+
+    const { data: priorReading, error } = await supabase
+      .from('utility_readings')
+      .select('reading_month, current_reading, water_current_reading')
+      .eq('unit_id', unitId)
+      .lt('reading_month', readingMonthStart)
+      .order('reading_month', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Unable to auto-load previous readings:', error);
+      return;
+    }
+
+    if (priorReading) {
+      setFormData((prev) => ({
+        ...prev,
+        previous_reading: Number(priorReading.current_reading || 0),
+        water_previous_reading: Number(priorReading.water_current_reading || 0),
+      }));
+      setAutoPreviousSource({
+        electricityMonth: priorReading.reading_month,
+        waterMonth: priorReading.reading_month,
+      });
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      previous_reading: 0,
+      water_previous_reading: 0,
+    }));
+    setAutoPreviousSource({});
+  };
+
   const handleAddReading = () => {
     setEditingReading(null);
+    setAutoPreviousSource({});
     
     // Get fixed utility prices from database via utility_constants
     const currentPropertyId = formData.property_id || units.find((u) => u.id === formData.unit_id)?.property_id;
-    const garbagePrice = getUtilityConstant('Garbage', currentPropertyId)?.price || utilitySettings.garbage_fee || 0;
-    const securityPrice = getUtilityConstant('Security', currentPropertyId)?.price || utilitySettings.security_fee || 0;
-    const servicePrice = getUtilityConstant('Service', currentPropertyId)?.price || utilitySettings.service_fee || 0;
-    const electricityConstant = getUtilityConstant('Electricity', currentPropertyId)?.constant || utilitySettings.electricity_constant || 1;
-    const waterConstant = getUtilityConstant('Water', currentPropertyId)?.constant || utilitySettings.water_constant || 1;
+    const garbagePrice = getFixedUtilityPrice('Garbage', currentPropertyId);
+    const securityPrice = getFixedUtilityPrice('Security', currentPropertyId);
+    const servicePrice = getFixedUtilityPrice('Service', currentPropertyId);
+    const electricityConstant = getMeteredUtilityRate('Electricity', currentPropertyId);
+    const waterConstant = getMeteredUtilityRate('Water', currentPropertyId);
     const customUtilityValues = buildCustomUtilityValues(currentPropertyId);
     
     setFormData({
@@ -817,7 +944,7 @@ const ManagerUtilityReadings = () => {
       water_previous_reading: 0,
       water_current_reading: 0,
       water_rate: waterConstant,
-      water_bill: utilitySettings.water_fee || 0,
+      water_bill: 0,
       garbage_fee: garbagePrice,
       security_fee: securityPrice,
       service_fee: servicePrice,
@@ -830,9 +957,10 @@ const ManagerUtilityReadings = () => {
   };
 
   const handleEditReading = (reading: UtilityReading) => {
+    setAutoPreviousSource({});
     const customUtilityValues = buildCustomUtilityValues(reading.property_id);
-    const electricityConstant = getUtilityConstant('Electricity', reading.property_id)?.constant || utilitySettings.electricity_constant || 1;
-    const waterConstant = getUtilityConstant('Water', reading.property_id)?.constant || utilitySettings.water_constant || 1;
+    const electricityConstant = getMeteredUtilityRate('Electricity', reading.property_id);
+    const waterConstant = getMeteredUtilityRate('Water', reading.property_id);
 
     setEditingReading(reading);
     setFormData({
@@ -842,9 +970,9 @@ const ManagerUtilityReadings = () => {
       water_rate: waterConstant,
       rent_amount: reading.rent_amount ?? getUnitRent(reading.unit_id, reading.property_id),
       custom_utilities: customUtilityValues,
-      garbage_fee: getUtilityConstant('Garbage', reading.property_id)?.price ?? utilitySettings.garbage_fee ?? reading.garbage_fee ?? 0,
-      security_fee: getUtilityConstant('Security', reading.property_id)?.price ?? utilitySettings.security_fee ?? reading.security_fee ?? 0,
-      service_fee: getUtilityConstant('Service', reading.property_id)?.price ?? utilitySettings.service_fee ?? (reading.service_fee ?? 0),
+      garbage_fee: getFixedUtilityPrice('Garbage', reading.property_id),
+      security_fee: getFixedUtilityPrice('Security', reading.property_id),
+      service_fee: getFixedUtilityPrice('Service', reading.property_id),
     });
     setShowForm(true);
   };
@@ -856,11 +984,11 @@ const ManagerUtilityReadings = () => {
       const rentAmount = Math.abs(selectedUnit.rent_amount ?? selectedUnit.unit_price ?? selectedUnit.unit_type_price ?? 0);
       
       // Get fixed utility prices from superadmin settings (utility_constants table)
-      const garbagePrice = getUtilityConstant('Garbage', selectedUnit.property_id)?.price || utilitySettings.garbage_fee || 0;
-      const securityPrice = getUtilityConstant('Security', selectedUnit.property_id)?.price || utilitySettings.security_fee || 0;
-      const servicePrice = getUtilityConstant('Service', selectedUnit.property_id)?.price || utilitySettings.service_fee || 0;
-      const electricityConstant = getUtilityConstant('Electricity', selectedUnit.property_id)?.constant || utilitySettings.electricity_constant || 1;
-      const waterConstant = getUtilityConstant('Water', selectedUnit.property_id)?.constant || utilitySettings.water_constant || 1;
+      const garbagePrice = getFixedUtilityPrice('Garbage', selectedUnit.property_id);
+      const securityPrice = getFixedUtilityPrice('Security', selectedUnit.property_id);
+      const servicePrice = getFixedUtilityPrice('Service', selectedUnit.property_id);
+      const electricityConstant = getMeteredUtilityRate('Electricity', selectedUnit.property_id);
+      const waterConstant = getMeteredUtilityRate('Water', selectedUnit.property_id);
       
       setFormData(prev => ({
         ...prev,
@@ -875,6 +1003,8 @@ const ManagerUtilityReadings = () => {
         electricity_rate: electricityConstant,
         water_rate: waterConstant,
       }));
+
+      void applyPreviousReadingsFromHistory(unitId, formData.reading_month);
     }
   };
 
@@ -949,9 +1079,9 @@ const ManagerUtilityReadings = () => {
               const electricityBill = electricityUsage * updatedReading.electricity_rate;
               const waterUsage = Math.abs((updatedReading.water_current_reading || 0) - (updatedReading.water_previous_reading || 0));
               const waterBill = waterUsage * (updatedReading.water_rate || 0);
-              const garbagePrice = Math.abs(getUtilityConstant('Garbage', unit.property_id)?.price ?? utilitySettings.garbage_fee ?? updatedReading.garbage_fee ?? 0);
-              const securityPrice = Math.abs(getUtilityConstant('Security', unit.property_id)?.price ?? utilitySettings.security_fee ?? updatedReading.security_fee ?? 0);
-              const servicePrice = Math.abs(getUtilityConstant('Service', unit.property_id)?.price ?? utilitySettings.service_fee ?? (updatedReading.service_fee ?? 0));
+              const garbagePrice = getFixedUtilityPrice('Garbage', unit.property_id);
+              const securityPrice = getFixedUtilityPrice('Security', unit.property_id);
+              const servicePrice = getFixedUtilityPrice('Service', unit.property_id);
               let customUtilitiesTotal = 0;
               if (updatedReading.custom_utilities) {
                 Object.values(updatedReading.custom_utilities).forEach(val => {
@@ -1006,9 +1136,9 @@ const ManagerUtilityReadings = () => {
                 const electricityBill = electricityUsage * overwrittenReading.electricity_rate;
                 const waterUsage = Math.abs((overwrittenReading.water_current_reading || 0) - (overwrittenReading.water_previous_reading || 0));
                 const waterBill = waterUsage * (overwrittenReading.water_rate || 0);
-                const garbagePrice = Math.abs(getUtilityConstant('Garbage', unit.property_id)?.price ?? utilitySettings.garbage_fee ?? overwrittenReading.garbage_fee ?? 0);
-                const securityPrice = Math.abs(getUtilityConstant('Security', unit.property_id)?.price ?? utilitySettings.security_fee ?? overwrittenReading.security_fee ?? 0);
-                const servicePrice = Math.abs(getUtilityConstant('Service', unit.property_id)?.price ?? utilitySettings.service_fee ?? (overwrittenReading.service_fee ?? 0));
+                const garbagePrice = getFixedUtilityPrice('Garbage', unit.property_id);
+                const securityPrice = getFixedUtilityPrice('Security', unit.property_id);
+                const servicePrice = getFixedUtilityPrice('Service', unit.property_id);
                 let customUtilitiesTotal = 0;
                 if (overwrittenReading.custom_utilities) {
                   Object.values(overwrittenReading.custom_utilities).forEach(val => {
@@ -1048,9 +1178,9 @@ const ManagerUtilityReadings = () => {
                 const electricityBill = electricityUsage * newReading.electricity_rate;
                 const waterUsage = Math.abs((newReading.water_current_reading || 0) - (newReading.water_previous_reading || 0));
                 const waterBill = waterUsage * (newReading.water_rate || 0);
-                const garbagePrice = Math.abs(getUtilityConstant('Garbage', unit.property_id)?.price ?? utilitySettings.garbage_fee ?? newReading.garbage_fee ?? 0);
-                const securityPrice = Math.abs(getUtilityConstant('Security', unit.property_id)?.price ?? utilitySettings.security_fee ?? newReading.security_fee ?? 0);
-                const servicePrice = Math.abs(getUtilityConstant('Service', unit.property_id)?.price ?? utilitySettings.service_fee ?? (newReading.service_fee ?? 0));
+                const garbagePrice = getFixedUtilityPrice('Garbage', unit.property_id);
+                const securityPrice = getFixedUtilityPrice('Security', unit.property_id);
+                const servicePrice = getFixedUtilityPrice('Service', unit.property_id);
                 let customUtilitiesTotal = 0;
                 if (newReading.custom_utilities) {
                   Object.values(newReading.custom_utilities).forEach(val => {
@@ -1102,10 +1232,22 @@ const ManagerUtilityReadings = () => {
   const displayedUnits = sortUnitsChronologically(units);
   const properties = [...new Set(displayedUnits.map(u => u.property_name))];
   const currentPropertyId = formData.property_id || displayedUnits.find(u => u.id === formData.unit_id)?.property_id;
+  const isElectricityPreviousLocked = !editingReading && Boolean(autoPreviousSource.electricityMonth);
+  const isWaterPreviousLocked = !editingReading && Boolean(autoPreviousSource.waterMonth);
   const activeUtilitiesForCurrentProperty = getActiveUtilitiesForProperty(currentPropertyId);
   const activeCustomUtilitiesForCurrentProperty = activeUtilitiesForCurrentProperty.filter(
     (u) => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name)
   );
+  const fixedUtilityFeesForCurrentProperty = [
+    { key: 'Garbage' as const, label: 'Garbage Fee' },
+    { key: 'Security' as const, label: 'Security Fee' },
+    { key: 'Service' as const, label: 'Service Fee' },
+  ]
+    .map((fee) => ({
+      ...fee,
+      amount: getFixedUtilityPrice(fee.key, currentPropertyId),
+    }))
+    .filter((fee) => fee.amount > 0);
 
   const handleManualRefresh = async () => {
     if (!user?.id) return;
@@ -1200,7 +1342,10 @@ const ManagerUtilityReadings = () => {
                 customUtilitiesTotal += Number(val) || 0;
               });
             }
-            totalBill = readingRent + electricityBill + waterBill + latestReading.garbage_fee + latestReading.security_fee + (latestReading.service_fee || 0) + customUtilitiesTotal + latestReading.other_charges;
+            const garbagePrice = getFixedUtilityPrice('Garbage', unit.property_id);
+            const securityPrice = getFixedUtilityPrice('Security', unit.property_id);
+            const servicePrice = getFixedUtilityPrice('Service', unit.property_id);
+            totalBill = readingRent + electricityBill + waterBill + garbagePrice + securityPrice + servicePrice + customUtilitiesTotal + latestReading.other_charges;
           }
 
           return {
@@ -1302,7 +1447,7 @@ const ManagerUtilityReadings = () => {
                     <div className="mt-3 space-y-1 text-sm text-slate-600">
                       {activeUtilitiesForCurrentProperty.filter(u => u.is_metered).map(u => (
                         <div key={u.id}>
-                          <span className="font-semibold text-slate-800">{u.utility_name}:</span> (Current - Previous) × {u.constant} = Bill
+                          <span className="font-semibold text-slate-800">{u.utility_name}:</span> (Current - Previous) × {u.utility_name === 'Electricity' || u.utility_name === 'Water' ? getMeteredUtilityRate(u.utility_name as 'Electricity' | 'Water', currentPropertyId) : (Number(u.constant) || 0)} = Bill
                         </div>
                       ))}
                       {activeUtilitiesForCurrentProperty.filter(u => !u.is_metered).map(u => (
@@ -1366,9 +1511,13 @@ const ManagerUtilityReadings = () => {
                       id="reading_month"
                       type="month"
                       value={formData.reading_month}
-                      onChange={e =>
-                        setFormData(prev => ({...prev, reading_month: e.target.value}))
-                      }
+                      onChange={e => {
+                        const month = e.target.value;
+                        setFormData(prev => ({...prev, reading_month: month}));
+                        if (!editingReading && formData.unit_id) {
+                          void applyPreviousReadingsFromHistory(formData.unit_id, month);
+                        }
+                      }}
                       className="w-full mt-2 px-3 py-2 border border-slate-300 rounded-lg"
                     />
                   </div>
@@ -1390,6 +1539,7 @@ const ManagerUtilityReadings = () => {
                         type="number"
                         step="0.01"
                         value={formData.previous_reading}
+                        readOnly={isElectricityPreviousLocked}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
@@ -1398,6 +1548,11 @@ const ManagerUtilityReadings = () => {
                         }
                         className="mt-2"
                       />
+                      {isElectricityPreviousLocked && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Auto-filled from previous month ({new Date(autoPreviousSource.electricityMonth || '').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}).
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -1418,9 +1573,9 @@ const ManagerUtilityReadings = () => {
                     </div>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <Label className="text-sm text-slate-600 font-medium">Metering Constant (Set by SuperAdmin)</Label>
+                    <Label className="text-sm text-slate-600 font-medium">Rate per Unit (Set by SuperAdmin)</Label>
                     <div className="mt-2 text-xl font-semibold text-slate-900">
-                      {getUtilityConstant('Electricity', currentPropertyId)?.constant || utilitySettings.electricity_constant || 1}
+                      {getMeteredUtilityRate('Electricity', currentPropertyId)}
                     </div>
                     <p className="text-xs text-slate-500 mt-2">Fixed by admin - cannot be changed</p>
                   </div>
@@ -1442,6 +1597,7 @@ const ManagerUtilityReadings = () => {
                         type="number"
                         step="0.01"
                         value={formData.water_previous_reading || 0}
+                        readOnly={isWaterPreviousLocked}
                         onChange={e =>
                           setFormData(prev => ({
                             ...prev,
@@ -1450,6 +1606,11 @@ const ManagerUtilityReadings = () => {
                         }
                         className="mt-2"
                       />
+                      {isWaterPreviousLocked && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Auto-filled from previous month ({new Date(autoPreviousSource.waterMonth || '').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}).
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -1470,9 +1631,9 @@ const ManagerUtilityReadings = () => {
                     </div>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <Label className="text-sm text-slate-600 font-medium">Metering Constant (Set by SuperAdmin)</Label>
+                    <Label className="text-sm text-slate-600 font-medium">Rate per Unit (Set by SuperAdmin)</Label>
                     <div className="mt-2 text-xl font-semibold text-slate-900">
-                      {getUtilityConstant('Water', currentPropertyId)?.constant || utilitySettings.water_constant || 1}
+                      {getMeteredUtilityRate('Water', currentPropertyId)}
                     </div>
                     <p className="text-xs text-slate-500 mt-2">Fixed by admin - cannot be changed</p>
                   </div>
@@ -1480,42 +1641,22 @@ const ManagerUtilityReadings = () => {
                 )}
                 </div>
 
-                {(isUtilityActiveForProperty('Garbage', currentPropertyId) || isUtilityActiveForProperty('Security', currentPropertyId) || isUtilityActiveForProperty('Service', currentPropertyId)) && (
+                {fixedUtilityFeesForCurrentProperty.length > 0 && (
                 <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-4">
                   <h4 className="font-semibold text-slate-900 text-base flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-green-600" />
                     Fixed Utility Fees (Set by SuperAdmin)
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {isUtilityActiveForProperty('Garbage', currentPropertyId) && (
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <Label className="text-sm text-slate-600 font-medium">Garbage Fee</Label>
+                    {fixedUtilityFeesForCurrentProperty.map((fee) => (
+                      <div key={fee.key} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                        <Label className="text-sm text-slate-600 font-medium">{fee.label}</Label>
                         <div className="mt-2 text-2xl font-semibold text-slate-900">
-                          {formatKES(getUtilityConstant('Garbage', currentPropertyId)?.price ?? utilitySettings.garbage_fee ?? 0)}
+                          {formatKES(fee.amount)}
                         </div>
                         <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
                       </div>
-                    )}
-
-                    {isUtilityActiveForProperty('Security', currentPropertyId) && (
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <Label className="text-sm text-slate-600 font-medium">Security Fee</Label>
-                        <div className="mt-2 text-2xl font-semibold text-slate-900">
-                          {formatKES(getUtilityConstant('Security', currentPropertyId)?.price ?? utilitySettings.security_fee ?? 0)}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
-                      </div>
-                    )}
-
-                    {isUtilityActiveForProperty('Service', currentPropertyId) && (
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <Label className="text-sm text-slate-600 font-medium">Service Fee</Label>
-                        <div className="mt-2 text-2xl font-semibold text-slate-900">
-                          {formatKES(getUtilityConstant('Service', currentPropertyId)?.price ?? utilitySettings.service_fee ?? 0)}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-2">Cannot be modified - set by admin</p>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
                 )}
@@ -1662,19 +1803,21 @@ const ManagerUtilityReadings = () => {
                             <span className="text-slate-700">Monthly Rent</span>
                             <span className="font-semibold">KES {billDetails.rentAmount.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-700">Garbage Fee</span>
-                            <span className="font-semibold">KES {billDetails.garbagePrice.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-700">Security Fee</span>
-                            <span className="font-semibold">KES {billDetails.securityPrice.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-700">Service Fee</span>
-                            <span className="font-semibold">KES {billDetails.servicePrice.toFixed(2)}</span>
-                          </div>
-                          {billDetails.customUtilityValues && Object.entries(billDetails.customUtilityValues).map(([key, value]) => (
+                          {[
+                            { label: 'Garbage Fee', value: billDetails.garbagePrice },
+                            { label: 'Security Fee', value: billDetails.securityPrice },
+                            { label: 'Service Fee', value: billDetails.servicePrice },
+                          ]
+                            .filter((fee) => fee.value > 0)
+                            .map((fee) => (
+                            <div key={fee.label} className="flex justify-between">
+                              <span className="text-slate-700">{fee.label}</span>
+                              <span className="font-semibold">KES {fee.value.toFixed(2)}</span>
+                            </div>
+                          ))}
+                          {billDetails.customUtilityValues && Object.entries(billDetails.customUtilityValues)
+                            .filter(([, value]) => Number(value || 0) > 0)
+                            .map(([key, value]) => (
                             <div key={key} className="flex justify-between">
                               <span className="text-slate-700 capitalize">{key.replace(/_/g, ' ')}</span>
                               <span className="font-semibold">KES {Number(value || 0).toFixed(2)}</span>
