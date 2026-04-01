@@ -199,16 +199,16 @@ const ManagerUtilityReadings = () => {
 
   const sortUnitsChronologically = (items: Unit[]) => {
     return [...items].sort((a, b) => {
-      const propertyDiff = String(a.property_name || '').localeCompare(String(b.property_name || ''), undefined, {
-        numeric: true,
-        sensitivity: 'base',
-      });
-      if (propertyDiff !== 0) return propertyDiff;
-
       const floorDiff = getFloorSortValue(a.floor_number) - getFloorSortValue(b.floor_number);
       if (floorDiff !== 0) return floorDiff;
 
-      return String(a.unit_number || '').trim().localeCompare(String(b.unit_number || '').trim(), undefined, {
+      const unitDiff = String(a.unit_number || '').trim().localeCompare(String(b.unit_number || '').trim(), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      if (unitDiff !== 0) return unitDiff;
+
+      return String(a.property_name || '').localeCompare(String(b.property_name || ''), undefined, {
         numeric: true,
         sensitivity: 'base',
       });
