@@ -221,7 +221,7 @@ const ManagerUtilityReadings = () => {
 
   const isMatch = (dbName: string, coreName: string) => {
     const lower = dbName.toLowerCase().trim();
-    if (coreName === 'Electricity') return lower.includes('electric');
+    if (coreName === 'Electricity') return lower.includes('electric') || lower.includes('electirc');
     if (coreName === 'Water') return lower.includes('water');
     if (coreName === 'Garbage') return lower.includes('garbage') || lower.includes('gabbage');
     if (coreName === 'Security') return lower.includes('securit');
@@ -1236,7 +1236,7 @@ const ManagerUtilityReadings = () => {
   const isWaterPreviousLocked = !editingReading && Boolean(autoPreviousSource.waterMonth);
   const activeUtilitiesForCurrentProperty = getActiveUtilitiesForProperty(currentPropertyId);
   const activeCustomUtilitiesForCurrentProperty = activeUtilitiesForCurrentProperty.filter(
-    (u) => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name)
+    (u) => !getCoreType(u.utility_name)
   );
   const fixedUtilityFeesForCurrentProperty = [
     { key: 'Garbage' as const, label: 'Garbage Fee' },
