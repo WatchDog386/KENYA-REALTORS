@@ -424,7 +424,7 @@ const TenantPortalLayout = ({ children }: { children: ReactNode }) => {
     user?.email?.split("@")[0] || "Tenant";
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="adminlte-shell wrapper min-h-screen bg-gray-50 text-gray-900 font-sans">
       {/* Font & Scrollbar Styles */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
@@ -485,7 +485,7 @@ const TenantPortalLayout = ({ children }: { children: ReactNode }) => {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full bg-gradient-to-b from-[#154279] to-[#0f325e] text-white z-40 transition-all duration-300 ease-in-out shadow-2xl flex flex-col",
+          "adminlte-sidebar main-sidebar sidebar-dark-primary elevation-4 fixed top-0 left-0 h-full bg-gradient-to-b from-[#154279] to-[#0f325e] text-white z-40 transition-all duration-300 ease-in-out shadow-2xl flex flex-col",
           sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full",
           "lg:translate-x-0 lg:w-72"
         )}
@@ -694,12 +694,12 @@ const TenantPortalLayout = ({ children }: { children: ReactNode }) => {
       {/* Main Content */}
       <main
         className={cn(
-          "transition-all duration-300 min-h-screen flex flex-col",
+          "adminlte-main content-wrapper transition-all duration-300 min-h-screen flex flex-col",
           sidebarOpen ? "lg:ml-72" : "lg:ml-0"
         )}
       >
         {/* Desktop Header */}
-        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <header className="adminlte-header main-header navbar navbar-expand navbar-white navbar-light hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -917,8 +917,8 @@ const TenantPortalLayout = ({ children }: { children: ReactNode }) => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-x-hidden custom-scroll">
-          <div className="p-4 md:p-6 lg:p-8 pt-20 lg:pt-0">{children}</div>
+        <div className="adminlte-content-surface flex-1 overflow-x-hidden custom-scroll">
+          <div className="adminlte-content-inner adminlte-content-inner--padded p-4 md:p-6 lg:p-8 pt-20 lg:pt-0">{children}</div>
         </div>
 
         {/* Footer */}

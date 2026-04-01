@@ -62,6 +62,17 @@ const BillingAndInvoicing = () => {
     unitsWithArrears: 0,
   });
 
+  const sortBillingsByUnitNumber = (items: BillingRecord[]) => {
+    return [...items].sort((a, b) => {
+      const aUnit = String(a.unit_number || '').trim();
+      const bUnit = String(b.unit_number || '').trim();
+      return aUnit.localeCompare(bUnit, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    });
+  };
+
   useEffect(() => {
     fetchBillings();
   }, []);
@@ -240,12 +251,10 @@ const BillingAndInvoicing = () => {
         };
       });
 
-      // Sort chronologically/numerically by unit number
-      billingRecords.sort((a, b) => {
-        return String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'});
-      });
+      // Keep unit ordering in natural chronological unit-number order.
+      const sortedBillingRecords = sortBillingsByUnitNumber(billingRecords);
 
-      setBillings(billingRecords);
+      setBillings(sortedBillingRecords);
 
       const requestUnitById = new Map<string, string>(
         (completionRequests || [])
@@ -284,7 +293,7 @@ const BillingAndInvoicing = () => {
       }
 
       const unitById = new Map<string, any>((units || []).map((unit: any) => [unit.id, unit]));
-      const billingByUnit = new Map<string, BillingRecord>(billingRecords.map((record) => [record.unit_id, record]));
+      const billingByUnit = new Map<string, BillingRecord>(sortedBillingRecords.map((record) => [record.unit_id, record]));
 
       const mappedRefundCases: DepositRefundCase[] = (vacancyNotices || []).map((notice: any) => {
         const unit = unitById.get(notice.unit_id);
@@ -309,11 +318,11 @@ const BillingAndInvoicing = () => {
       setRefundCases(mappedRefundCases);
 
       // Calculate stats
-      const totalExpected = billingRecords.reduce((sum, b) => sum + (b.monthly_rent + b.water_bill + b.other_utilities), 0);
-      const totalPaid = billingRecords.reduce((sum, b) => sum + b.total_paid, 0);
-      const totalArrears = billingRecords.reduce((sum, b) => sum + b.total_arrears, 0);
-      const totalOverpayment = billingRecords.reduce((sum, b) => sum + b.overpayment, 0);
-      const unitsWithArrears = billingRecords.filter(b => b.total_arrears > 0).length;
+      const totalExpected = sortedBillingRecords.reduce((sum, b) => sum + (b.monthly_rent + b.water_bill + b.other_utilities), 0);
+      const totalPaid = sortedBillingRecords.reduce((sum, b) => sum + b.total_paid, 0);
+      const totalArrears = sortedBillingRecords.reduce((sum, b) => sum + b.total_arrears, 0);
+      const totalOverpayment = sortedBillingRecords.reduce((sum, b) => sum + b.overpayment, 0);
+      const unitsWithArrears = sortedBillingRecords.filter(b => b.total_arrears > 0).length;
 
       setStats({
         totalExpected,
@@ -330,7 +339,7 @@ const BillingAndInvoicing = () => {
     }
   };
 
-  const filteredBillings = billings.filter(b => {
+  const filteredBillings = sortBillingsByUnitNumber(billings.filter(b => {
     const matchesSearch = 
       b.unit_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       b.tenant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -345,7 +354,7 @@ const BillingAndInvoicing = () => {
       (filterStatus === 'overpaid' && b.overpayment > 0);
 
     return matchesSearch && matchesProperty && matchesStatus;
-  });
+  }));
 
   if (loading) {
     return (

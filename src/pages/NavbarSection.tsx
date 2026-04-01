@@ -58,7 +58,21 @@ const Navbar = () => {
   const [showResults, setShowResults] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [filteredResults, setFilteredResults] = useState<typeof SEARCH_DATA>([]);
+
+  const resolveRoute = (action?: string) => {
+    const normalized = (action || "").trim();
+    if (!normalized) return "/";
+    return normalized.startsWith("/") ? normalized : `/${normalized}`;
+  };
+
+  const goToRoute = (action?: string) => {
+    setMenuOpen(false);
+    setShowTenantDropdown(false);
+    setShowAccountDropdown(false);
+    navigate(resolveRoute(action));
+  };
 
   // Cart logic
   const [cart, setCart] = useState(() => {
@@ -210,15 +224,8 @@ const Navbar = () => {
             {UTILITY_BAR.buttons.map((btn, idx) => (
               <button 
                 key={idx} 
-                onClick={() => {
-                  if (btn.action.startsWith('applications')) {
-                    navigate(`/${btn.action}`);
-                  } else if (btn.action === 'login') {
-                    navigate('/login');
-                  } else {
-                    navigate('/');
-                  }
-                }} 
+                type="button"
+                onClick={() => goToRoute(btn.action)} 
                 className={`text-white hover:text-[#F96302] transition-colors uppercase ${btn.size}`}
               >
                 {btn.label}
@@ -458,7 +465,8 @@ const Navbar = () => {
                         {/* Footer Actions */}
                         <div className="p-6 bg-white border-t border-slate-200">
                            <button 
-                             onClick={() => navigate('/login')}
+                             type="button"
+                             onClick={() => goToRoute('/login')}
                              className="w-full bg-[#154279] text-white py-3 font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-transform flex items-center justify-center gap-2 rounded-none"
                            >
                              <FaSignInAlt /> Portal Login
@@ -537,19 +545,26 @@ const Navbar = () => {
             <div className="hidden lg:flex items-center gap-8 shrink-0">
               
               {/* Account Dropdown - Blue/Orange */}
-              <div className="relative group h-full py-2">
-                <button className="flex flex-col items-start outline-none px-3 py-2 rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] group-hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all">
+              <div className="relative h-full py-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAccountDropdown((prev) => !prev)}
+                  className="flex flex-col items-start outline-none px-3 py-2 rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all"
+                >
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-black font-bold uppercase tracking-wider">Account</span>
-                    <FaChevronDown size={8} className={`text-[${COLORS.secondary}] group-hover:rotate-180 transition-transform duration-300`} />
+                    <FaChevronDown
+                      size={8}
+                      className={`text-[${COLORS.secondary}] transition-transform duration-300 ${showAccountDropdown ? "rotate-180" : ""}`}
+                    />
                   </div>
-                  <span className={`text-[14px] text-[${COLORS.primary}] font-bold group-hover:text-[${COLORS.secondary}] transition-colors`}>
+                  <span className={`text-[14px] text-[${COLORS.primary}] font-bold hover:text-[${COLORS.secondary}] transition-colors`}>
                     Hello, Guest
                   </span>
                 </button>
 
                 {/* Dropdown Menu - Rounded & Smooth */}
-                  <div className="absolute top-full right-0 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 w-64 z-50">
+                <div className={`absolute top-full right-0 pt-3 transition-all duration-300 transform w-64 z-50 ${showAccountDropdown ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-2"}`}>
                   <div className="rounded-2xl border border-[#d9d9d9] overflow-hidden p-2 bg-[#efeeee] shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff]">
                     <div className="px-4 py-3 border-b border-slate-100 mb-1">
                         <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">{ACCOUNT_DROPDOWN.title}</p>
@@ -558,7 +573,8 @@ const Navbar = () => {
                     {ACCOUNT_DROPDOWN.items.map((item) => (
                       <button 
                         key={item.id}
-                        onClick={() => navigate(`/${item.action}`)}
+                        type="button"
+                        onClick={() => goToRoute(item.action)}
                         className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl transition-all group/item mt-1"
                       >
                         <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-full group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
@@ -572,6 +588,13 @@ const Navbar = () => {
                     ))}
                   </div>
                 </div>
+
+                {showAccountDropdown && (
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowAccountDropdown(false)}
+                  />
+                )}
               </div>
 
               {/* Cart Button */}
@@ -696,7 +719,7 @@ const Navbar = () => {
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-200 hidden">
-            <button onClick={() => { setMenuOpen(false); navigate('/login'); }} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-xl transition-all px-4 justify-center`}>
+            <button type="button" onClick={() => goToRoute('/login')} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-xl transition-all px-4 justify-center`}>
               <FaSignOutAlt /> {LOGOUT_BUTTON.label}
             </button>
           </div>

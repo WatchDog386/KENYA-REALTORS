@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap');
+
+.adminlte-shell {
+  font-family: 'Source Sans 3', 'Nunito', sans-serif !important;
+  background-color: #f4f6f9 !important;
+  color: #212529;
+}
+
+.adminlte-shell .adminlte-sidebar {
+  background-color: #ffffff !important;
+  border-right: 1px solid #d9dee3 !important;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+}
+
+.adminlte-shell .adminlte-main {
+  background-color: #f4f6f9 !important;
+}
+
+.adminlte-shell .adminlte-header {
+  border-bottom: 1px solid #d9dee3 !important;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05) !important;
+}
+
+.adminlte-shell .adminlte-content-surface {
+  background-color: #f4f6f9 !important;
+}
+
+.adminlte-shell .adminlte-content-inner {
+  background: #ffffff;
+  border: 1px solid #dfe4ea;
+  border-radius: 0.6rem;
+  box-shadow: 0 0.125rem 0.375rem rgba(0, 0, 0, 0.06);
+}
+
+.adminlte-shell .adminlte-content-inner--padded {
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .adminlte-shell .adminlte-content-inner--padded {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .adminlte-shell .adminlte-content-inner--padded {
+    padding: 1.5rem;
+  }
+}
+
+.adminlte-shell input,
+.adminlte-shell select,
+.adminlte-shell textarea {
+  border-color: #ced4da !important;
+  border-radius: 0.375rem !important;
+}
+
+.adminlte-shell button {
+  border-radius: 0.375rem;
+}
+
+.adminlte-shell .custom-scroll::-webkit-scrollbar-thumb {
+  background: #b6c2ce;
+}
+
+.adminlte-shell .custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9ba9b8;
+}
+
+@media (max-width: 1023px) {
+  .adminlte-shell .adminlte-content-inner {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+}

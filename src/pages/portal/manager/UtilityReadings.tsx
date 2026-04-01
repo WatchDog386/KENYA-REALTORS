@@ -75,6 +75,7 @@ interface UtilityReading {
 interface Unit {
   id: string;
   unit_number: string;
+  floor_number?: string | number | null;
   unit_type?: string;
   property_id: string;
   property_name: string;
@@ -166,6 +167,53 @@ const ManagerUtilityReadings = () => {
     other_charges: 0,
     status: 'pending',
   });
+
+  const getFloorSortValue = (floor: string | number | null | undefined): number => {
+    const floorKey = String(floor ?? 'G').trim().toUpperCase();
+    const floorOrder: Record<string, number> = {
+      B5: -5,
+      B4: -4,
+      B3: -3,
+      B2: -2,
+      B1: -1,
+      B: -1,
+      G: 0,
+      M: 0.5,
+      R: 10000,
+      ROOFTOP: 10000,
+      PH: 10001,
+      PENTHOUSE: 10001,
+    };
+
+    if (floorOrder[floorKey] !== undefined) {
+      return floorOrder[floorKey];
+    }
+
+    const parsed = Number(floorKey);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+
+    return 9999;
+  };
+
+  const sortUnitsChronologically = (items: Unit[]) => {
+    return [...items].sort((a, b) => {
+      const propertyDiff = String(a.property_name || '').localeCompare(String(b.property_name || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      if (propertyDiff !== 0) return propertyDiff;
+
+      const floorDiff = getFloorSortValue(a.floor_number) - getFloorSortValue(b.floor_number);
+      if (floorDiff !== 0) return floorDiff;
+
+      return String(a.unit_number || '').trim().localeCompare(String(b.unit_number || '').trim(), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    });
+  };
 
   // Helpers are declared early to avoid TDZ issues when used for derived state
   function buildCustomUtilityValues(propertyId?: string) {
@@ -520,6 +568,7 @@ const ManagerUtilityReadings = () => {
             `
             id,
             unit_number,
+            floor_number,
             property_id,
             price,
             properties(name),
@@ -619,6 +668,7 @@ const ManagerUtilityReadings = () => {
             return {
               id: unit.id,
               unit_number: unit.unit_number,
+              floor_number: unit.floor_number,
               unit_type: unit.property_unit_types?.unit_type_name || 'Unknown',
               property_id: unit.property_id,
               property_name: unit.properties?.name || 'Unknown',
@@ -634,10 +684,7 @@ const ManagerUtilityReadings = () => {
           });
         }
 
-        // Sort chronologically/numerically by unit number
-        enrichedUnits.sort((a,b) => String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'}));
-        
-        setUnits(enrichedUnits);
+        setUnits(sortUnitsChronologically(enrichedUnits));
       setReadings(readingsData || []);
 
         // Setup real-time subscription for utility readings
@@ -698,7 +745,7 @@ const ManagerUtilityReadings = () => {
                   }
                   return unit;
                 });
-                setUnits(updatedUnits);
+                setUnits(sortUnitsChronologically(updatedUnits));
               }
             }
           )
@@ -895,7 +942,7 @@ const ManagerUtilityReadings = () => {
         
         // Update units with new calculation
         setUnits(prevUnits =>
-          prevUnits.map(unit => {
+          sortUnitsChronologically(prevUnits.map(unit => {
             if (unit.id === updatedReading.unit_id) {
               const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
               const electricityUsage = Math.abs(updatedReading.current_reading - updatedReading.previous_reading);
@@ -916,7 +963,7 @@ const ManagerUtilityReadings = () => {
               return { ...unit, latestReading: updatedReading, totalBill };
             }
             return unit;
-          })
+          }))
         );
         
         toast.success('Reading updated successfully', { id: saveToastId });
@@ -952,7 +999,7 @@ const ManagerUtilityReadings = () => {
           
           // Update units with new calculation
           setUnits(prevUnits =>
-            prevUnits.map(unit => {
+            sortUnitsChronologically(prevUnits.map(unit => {
               if (unit.id === overwrittenReading.unit_id) {
                 const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
                 const electricityUsage = Math.abs(overwrittenReading.current_reading - overwrittenReading.previous_reading);
@@ -973,7 +1020,7 @@ const ManagerUtilityReadings = () => {
                 return { ...unit, latestReading: overwrittenReading, totalBill };
               }
               return unit;
-            })
+            }))
           );
           
           toast.success('Reading updated successfully', { id: saveToastId });
@@ -994,7 +1041,7 @@ const ManagerUtilityReadings = () => {
           
           // Update units with new reading
           setUnits(prevUnits =>
-            prevUnits.map(unit => {
+            sortUnitsChronologically(prevUnits.map(unit => {
               if (unit.id === newReading.unit_id) {
                 const rentAmount = Math.abs(unit.rent_amount ?? unit.unit_price ?? unit.unit_type_price ?? 0);
                 const electricityUsage = Math.abs(newReading.current_reading - newReading.previous_reading);
@@ -1015,7 +1062,7 @@ const ManagerUtilityReadings = () => {
                 return { ...unit, latestReading: newReading, totalBill };
               }
               return unit;
-            })
+            }))
           );
           
           toast.success('Reading created successfully', { id: saveToastId });
@@ -1052,8 +1099,9 @@ const ManagerUtilityReadings = () => {
     }
   };
 
-  const properties = [...new Set(units.map(u => u.property_name))];
-  const currentPropertyId = formData.property_id || units.find(u => u.id === formData.unit_id)?.property_id;
+  const displayedUnits = sortUnitsChronologically(units);
+  const properties = [...new Set(displayedUnits.map(u => u.property_name))];
+  const currentPropertyId = formData.property_id || displayedUnits.find(u => u.id === formData.unit_id)?.property_id;
   const activeUtilitiesForCurrentProperty = getActiveUtilitiesForProperty(currentPropertyId);
   const activeCustomUtilitiesForCurrentProperty = activeUtilitiesForCurrentProperty.filter(
     (u) => !['Electricity', 'Water', 'Garbage', 'Security', 'Service'].includes(u.utility_name)
@@ -1081,6 +1129,7 @@ const ManagerUtilityReadings = () => {
         .select(`
           id,
           unit_number,
+          floor_number,
           property_id,
           price,
           properties(name),
@@ -1157,6 +1206,7 @@ const ManagerUtilityReadings = () => {
           return {
             id: unit.id,
             unit_number: unit.unit_number,
+            floor_number: unit.floor_number,
             unit_type: unit.property_unit_types?.unit_type_name || 'Unknown',
             property_id: unit.property_id,
             property_name: unit.properties?.name || 'Unknown',
@@ -1172,8 +1222,7 @@ const ManagerUtilityReadings = () => {
         });
       }
 
-      enrichedUnits.sort((a,b) => String(a.unit_number).localeCompare(String(b.unit_number), undefined, {numeric: true, sensitivity: 'base'}));
-      setUnits(enrichedUnits);
+      setUnits(sortUnitsChronologically(enrichedUnits));
       setReadings(readingsData || []);
       toast.success('Data refreshed successfully');
     } catch (err: any) {
@@ -1303,7 +1352,7 @@ const ManagerUtilityReadings = () => {
                       disabled={!!editingReading}
                     >
                       <option value="">Select Unit</option>
-                      {units.map(unit => (
+                      {displayedUnits.map(unit => (
                         <option key={unit.id} value={unit.id}>
                           {unit.unit_number} - {unit.property_name}
                         </option>
@@ -1749,7 +1798,7 @@ const ManagerUtilityReadings = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {units.map(unit => (
+                    {displayedUnits.map(unit => (
                       <tr
                         key={unit.id}
                         className="border-b border-slate-100 hover:bg-slate-50 transition"

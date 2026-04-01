@@ -546,7 +546,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-[#154279] font-nunito selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="adminlte-shell wrapper min-h-screen bg-white text-[#154279] font-nunito selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 w-full bg-gradient-to-r from-[#154279] via-blue-700 to-[#154279] z-50 px-4 py-3 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">
@@ -587,7 +587,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       {/* Sidebar - Sleek White Background */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full bg-white text-[#154279] z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r-2 border-slate-200",
+          "adminlte-sidebar main-sidebar sidebar-light-primary elevation-4 fixed top-0 left-0 h-full bg-white text-[#154279] z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r-2 border-slate-200",
           sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full",
           "lg:translate-x-0 lg:w-72"
         )}
@@ -722,12 +722,12 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       {/* Main Content */}
       <main
         className={cn(
-          "transition-all duration-300 min-h-screen flex flex-col bg-white",
+          "adminlte-main content-wrapper transition-all duration-300 min-h-screen flex flex-col bg-white",
           sidebarOpen ? "lg:ml-72" : "lg:ml-0"
         )}
       >
         {/* Desktop Header */}
-        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b-2 border-slate-200 sticky top-0 z-30 transition-all duration-300 shadow-sm">
+        <header className="adminlte-header main-header navbar navbar-expand navbar-white navbar-light hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b-2 border-slate-200 sticky top-0 z-30 transition-all duration-300 shadow-sm">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-0.5">
               <h2 className="text-lg font-black text-[#154279] tracking-tight uppercase">
@@ -912,8 +912,8 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-x-hidden custom-scroll bg-slate-50">
-          <div className="p-4 md:p-6 lg:p-8">
+        <div className="adminlte-content-surface flex-1 overflow-x-hidden custom-scroll bg-slate-50">
+          <div className="adminlte-content-inner adminlte-content-inner--padded p-4 md:p-6 lg:p-8">
             {children}
           </div>
         </div>
