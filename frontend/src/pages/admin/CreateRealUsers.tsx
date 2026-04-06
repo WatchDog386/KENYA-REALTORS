@@ -220,8 +220,8 @@ const CreateRealUsers: React.FC = () => {
             User Creation Portal
           </CardTitle>
           <CardDescription>
-            Create new tenants or property managers. Tenants use the old system,
-            property managers use the new system.
+            Create new tenants or property managers. All user records are stored
+            in the unified profiles system.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -260,8 +260,8 @@ const CreateRealUsers: React.FC = () => {
             <CardHeader>
               <CardTitle>Create New Tenant</CardTitle>
               <CardDescription>
-                Tenant accounts use the simplified system with basic
-                information.
+                Tenant accounts are created in the same unified profile schema
+                as the rest of the platform.
               </CardDescription>
             </CardHeader>
             <CardContent>

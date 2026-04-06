@@ -55,6 +55,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { Textarea } from "@/components/ui/textarea";
+
 interface Property {
   id: string;
   name: string;
@@ -190,244 +192,255 @@ const PropertyManagementNew: React.FC = () => {
     }
   };
 
-  if (loading) {
+  const getStatusBadgeColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "active": return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "maintenance": return "bg-amber-50 text-amber-700 border-amber-200";
+      case "inactive": return "bg-slate-100 text-slate-600 border-slate-300";
+      default: return "bg-white text-slate-800 border-slate-300";
+    }
+  };
+
+  if (loading && properties.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
+      <div className="flex items-center justify-center min-h-[60vh] bg-[#F8F9FA]">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 font-nunito bg-slate-50 min-h-screen p-6 rounded-lg" style={{ fontFamily: "'Nunito', sans-serif" }}>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gradient-to-r from-[#154279] to-[#0f325e] p-8 rounded-xl shadow-lg text-white relative overflow-hidden">
-        <HeroBackground />
-        <div className="relative z-10">
-          <h2 className="text-3xl font-black tracking-tight">
-            Property Management
-          </h2>
-          <p className="text-slate-100 text-sm mt-2 font-medium">
-            Manage residential properties, units, and income projections
-          </p>
-        </div>
-        <div className="relative z-10">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-white text-[#154279] hover:bg-slate-100 font-bold rounded-xl shadow-lg hover:shadow-xl transition-all">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Property
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto bg-white border-2 border-slate-200">
-            <DialogHeader>
-              <DialogTitle className="text-[#154279] font-black text-xl">Add New Property</DialogTitle>
-              <DialogDescription className="text-slate-600 font-medium">
-                Create a new residential or commercial property with unit specifications
-              </DialogDescription>
-            </DialogHeader>
-            <PropertyForm
-              onSuccess={() => {
-                setIsDialogOpen(false);
-                loadProperties();
-                loadStats();
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold text-slate-700">
-              Total Properties
-            </CardTitle>
-            <Building className="h-5 w-5 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-[#154279]">{stats.totalProperties}</div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              {stats.totalUnits} total units
+    <div className="min-h-screen bg-[#F8F9FA] pb-20 font-sans">
+      {/* Sharp Enterprise Header */}
+      <div className="bg-white border-b border-slate-300 px-6 py-10 mb-8">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400">Realters Kenya Portfolio</h4>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+              Property Management
+            </h2>
+            <p className="text-slate-500 text-sm max-w-2xl pt-1">
+              Command center for residential and commercial assets. Manage structures, unit allocations, and income data.
             </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold text-slate-700">Occupancy</CardTitle>
-            <Home className="h-5 w-5 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-[#154279]">
-              {stats.totalUnits > 0
-                ? Math.round((stats.occupiedUnits / stats.totalUnits) * 100)
-                : 0}
-              %
-            </div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              {stats.occupiedUnits}/{stats.totalUnits} occupied
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold text-slate-700">Monthly Income</CardTitle>
-            <DollarSign className="h-5 w-5 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-[#154279]">
-              KSH {(stats.totalMonthlyIncome / 1000).toFixed(0)}K
-            </div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">All units at capacity</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold text-slate-700">
-              Projected Income
-            </CardTitle>
-            <BarChart3 className="h-5 w-5 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-[#154279]">
-              KSH {(stats.projectedMonthlyIncome / 1000).toFixed(0)}K
-            </div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              Current occupancy rate
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Properties List */}
-      <Card className="border-2 border-slate-200 bg-white shadow-lg">
-        <CardHeader className="border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle className="text-[#154279] font-black text-xl">Properties</CardTitle>
-              <CardDescription className="text-slate-600 font-medium mt-1">
-                Manage all residential and commercial properties
-              </CardDescription>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search properties..."
-                  className="pl-10 border-2 border-slate-200 rounded-xl focus:border-[#154279] focus:ring-0 bg-white"
-                  value={searchQuery}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+          </div>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-slate-900 hover:bg-black text-white rounded-none border border-black shadow-none h-11 px-6 font-semibold transition-colors">
+                <Plus className="w-4 h-4 mr-2" />
+                NEW PROPERTY
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto rounded-none border border-slate-300 shadow-2xl p-0">
+              <div className="p-6 border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
+                <DialogTitle className="text-xl font-bold text-slate-900 uppercase tracking-wide">Instantiate Asset</DialogTitle>
+                <DialogDescription className="text-slate-500 mt-1">
+                  Define structural parameters and unit specifications for the new property.
+                </DialogDescription>
+              </div>
+              <div className="p-6 bg-white">
+                <PropertyForm
+                  onSuccess={() => {
+                    setIsDialogOpen(false);
+                    loadProperties();
+                    loadStats();
+                  }}
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px] border-2 border-slate-200 rounded-xl bg-white">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-6 space-y-8">
+        {/* Strict Grid Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0 border border-slate-300 bg-white">
+          <div className="p-5 border-b lg:border-b-0 border-r border-slate-200 hover:bg-slate-50 transition-colors flex flex-col justify-between">
+            <div className="flex items-start justify-between mb-6">
+              <Building className="h-5 w-5 text-slate-400" />
+              <div className="text-right">
+                <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">{stats.totalProperties}</span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total Properties</h3>
+              <p className="text-xs text-slate-400 font-mono mt-1">{stats.totalUnits} aggregate units</p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {filteredProperties.length === 0 ? (
-            <Alert className="bg-amber-50 border-2 border-amber-200">
-              <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800 font-medium">
-                No properties found. Create your first property to get started.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="rounded-xl border-2 border-slate-200 overflow-hidden bg-white">
-              <Table>
-                <TableHeader className="bg-slate-50 border-b-2 border-slate-200">
-                  <TableRow className="hover:bg-slate-50">
-                    <TableHead className="text-[#154279] font-black">Property Name</TableHead>
-                    <TableHead className="text-[#154279] font-black">Location</TableHead>
-                    <TableHead className="text-[#154279] font-black">Units</TableHead>
-                    <TableHead className="text-[#154279] font-black">Occupancy</TableHead>
-                    <TableHead className="text-[#154279] font-black">Status</TableHead>
-                    <TableHead className="text-[#154279] font-black">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProperties.map((property) => (
-                    <TableRow key={property.id}>
-                      <TableCell className="font-medium">
-                        {property.name}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <MapPin className="h-3 w-3 text-gray-400" />
-                          {property.city}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {property.occupied_units}/{property.total_units}
-                      </TableCell>
-                      <TableCell>
-                        {property.total_units > 0
-                          ? Math.round(
-                              (property.occupied_units / property.total_units) *
-                                100
-                            )
-                          : 0}
-                        %
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            property.status === "active" ? "default" : "outline"
-                          }
-                        >
-                          {property.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProperty(property);
-                              // Navigate to property detail view
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleDeleteProperty(property.id)
-                            }
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+
+          <div className="p-5 border-b lg:border-b-0 border-r border-slate-200 hover:bg-slate-50 transition-colors flex flex-col justify-between">
+            <div className="flex items-start justify-between mb-6">
+              <Home className="h-5 w-5 text-emerald-500" />
+              <div className="text-right">
+                <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                  {stats.totalUnits > 0 ? Math.round((stats.occupiedUnits / stats.totalUnits) * 100) : 0}%
+                </span>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Global Occupancy</h3>
+              <p className="text-xs text-slate-400 font-mono mt-1">{stats.occupiedUnits} / {stats.totalUnits} leased</p>
+            </div>
+          </div>
+
+          <div className="p-5 border-b lg:border-b-0 border-r border-slate-200 hover:bg-slate-50 transition-colors flex flex-col justify-between">
+            <div className="flex items-start justify-between mb-6">
+              <DollarSign className="h-5 w-5 text-blue-500" />
+              <div className="text-right">
+                <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                  {(stats.totalMonthlyIncome / 1000).toFixed(0)}K
+                </span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Gross Potential Rent</h3>
+              <p className="text-xs text-slate-400 font-mono mt-1">Monthly capacity (KSH)</p>
+            </div>
+          </div>
+
+          <div className="p-5 hover:bg-slate-50 transition-colors flex flex-col justify-between">
+            <div className="flex items-start justify-between mb-6">
+              <BarChart3 className="h-5 w-5 text-orange-500" />
+              <div className="text-right">
+                <span className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                  {(stats.projectedMonthlyIncome / 1000).toFixed(0)}K
+                </span>
+              </div>
+            </div>
+            <div>
+              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Effective Yield</h3>
+              <p className="text-xs text-slate-400 font-mono mt-1">Current occupancy based</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sharp Properties Table Card */}
+        <Card className="rounded-none border border-slate-300 shadow-none bg-white">
+          <CardHeader className="border-b border-slate-300 p-5 bg-white">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-900 uppercase tracking-wide">Asset Registry</CardTitle>
+                <CardDescription className="text-slate-500 text-xs font-medium mt-1 uppercase tracking-wider">
+                  DISPLAYING {filteredProperties.length} OF {stats.totalProperties} STRUCTURES
+                </CardDescription>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Query nomenclature or zone..."
+                    className="pl-9 h-10 rounded-none border-slate-300 bg-white focus:border-slate-900 focus:ring-0 text-sm"
+                    value={searchQuery}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-[160px] h-10 rounded-none border-slate-300 bg-white focus:border-slate-900 focus:ring-0 uppercase text-xs font-bold tracking-widest">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-none border-slate-300 shadow-xl">
+                    <SelectItem value="all">ALL STATUSES</SelectItem>
+                    <SelectItem value="active">ACTIVE</SelectItem>
+                    <SelectItem value="maintenance">MAINTENANCE</SelectItem>
+                    <SelectItem value="inactive">INACTIVE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="p-0">
+            {filteredProperties.length === 0 ? (
+              <div className="p-12 text-center bg-white">
+                <Building className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">No Assets Found</h3>
+                <p className="text-sm text-slate-500 mt-1">Adjust search parameters or initialize a new property.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-slate-300 bg-slate-100 hover:bg-slate-100">
+                      <TableHead className="font-bold text-slate-900 text-xs uppercase tracking-widest h-12">Structure Identity</TableHead>
+                      <TableHead className="font-bold text-slate-900 text-xs uppercase tracking-widest h-12">Coordinates</TableHead>
+                      <TableHead className="font-bold text-slate-900 text-xs uppercase tracking-widest h-12">Capacity</TableHead>
+                      <TableHead className="font-bold text-slate-900 text-xs uppercase tracking-widest h-12">Load</TableHead>
+                      <TableHead className="font-bold text-slate-900 text-xs uppercase tracking-widest h-12">State</TableHead>
+                      <TableHead className="font-bold text-slate-900 text-xs uppercase tracking-widest h-12 text-right pr-6">Commands</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProperties.map((property) => (
+                      <TableRow key={property.id} className="border-b border-slate-200 hover:bg-slate-50 transition-none">
+                        <TableCell className="py-4">
+                          <span className="font-bold text-slate-900 text-sm block">
+                            {property.name}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block mt-0.5">
+                            ID: {property.id.split('-')[0]}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span className="truncate max-w-[150px]">{property.city}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 font-mono text-sm text-slate-700">
+                          {property.occupied_units} / {property.total_units}
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <span className="font-bold text-slate-900">
+                            {property.total_units > 0 ? Math.round((property.occupied_units / property.total_units) * 100) : 0}%
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <span className={`inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase tracking-widest border ${getStatusBadgeColor(property.status)}`}>
+                            {property.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4 text-right pr-6">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedProperty(property);
+                                // Implementation for detail view routing
+                              }}
+                              className="h-8 w-8 rounded-none text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                              title="Inspect Asset"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteProperty(property.id)}
+                              className="h-8 w-8 rounded-none text-slate-400 hover:text-red-600 hover:bg-red-50"
+                              title="Decommission Asset"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
 
-// PropertyForm Component
+// --------------------------------------------------------------------------------
+// PROPERTY FORM (Sharp Design)
+// --------------------------------------------------------------------------------
 interface PropertyFormProps {
   onSuccess: () => void;
 }
@@ -460,14 +473,12 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
     try {
       setLoading(true);
 
-      // Get current user
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         toast.error("Not authenticated");
         return;
       }
 
-      // Create property
       const { data: property, error: propertyError } = await supabase
         .from("properties")
         .insert({
@@ -485,7 +496,6 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
 
       if (propertyError) throw propertyError;
 
-      // Add unit specifications
       for (const unitType of unitTypes) {
         if (unitType.count > 0) {
           const { error: specError } = await supabase
@@ -503,82 +513,76 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
         }
       }
 
-      toast.success("Property created successfully");
+      toast.success("Asset instantiated successfully");
       onSuccess();
     } catch (error) {
       console.error("Error creating property:", error);
-      toast.error("Failed to create property");
+      toast.error("Failed to compile asset");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Basic Info */}
-      <div className="space-y-4">
-        <h3 className="font-semibold">Property Information</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="name">Property Name *</Label>
+      <div className="space-y-5">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-200 pb-2">Primary Specifications</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-xs font-bold uppercase tracking-widest text-slate-700">Designation <span className="text-red-500">*</span></Label>
             <Input
               id="name"
-              placeholder="e.g., Westlands Luxury Apartments"
+              className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 h-11"
+              placeholder="e.g., Alpha Tower"
               value={formData.name}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
-          <div>
-            <Label htmlFor="city">City *</Label>
+          <div className="space-y-2">
+            <Label htmlFor="city" className="text-xs font-bold uppercase tracking-widest text-slate-700">Zone / City <span className="text-red-500">*</span></Label>
             <Input
               id="city"
+              className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 h-11"
               placeholder="e.g., Nairobi"
               value={formData.city}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setFormData({ ...formData, city: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
             />
           </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="address">Full Address *</Label>
+          <div className="sm:col-span-2 space-y-2">
+            <Label htmlFor="address" className="text-xs font-bold uppercase tracking-widest text-slate-700">Coordinates / Address <span className="text-red-500">*</span></Label>
             <Input
               id="address"
-              placeholder="e.g., Mpaka Road, Westlands"
+              className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 h-11"
+              placeholder="e.g., Sector 4, Westlands"
               value={formData.address}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setFormData({ ...formData, address: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
           </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              placeholder="Property description"
-              value={formData.description}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-            />
+          <div className="sm:col-span-2 space-y-2">
+            <Label htmlFor="description" className="text-xs font-bold uppercase tracking-widest text-slate-700">Property Details & Notes</Label>
+              <Textarea
+                id="description"
+                className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 min-h-[100px]"
+                placeholder="Enter detailed property information here (e.g. Bank Account details for rent, Paybill number, policies, etc.)"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
           </div>
-          <div>
-            <Label htmlFor="type">Property Type</Label>
+          <div className="space-y-2">
+            <Label htmlFor="type" className="text-xs font-bold uppercase tracking-widest text-slate-700">Classification</Label>
             <Select
               value={formData.type}
-              onValueChange={(value: string) =>
-                setFormData({ ...formData, type: value })
-              }
+              onValueChange={(value: string) => setFormData({ ...formData, type: value })}
             >
-              <SelectTrigger>
+              <SelectTrigger className="rounded-none border-slate-300 focus:border-slate-900 focus:ring-0 h-11 uppercase text-sm">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="apartment">Apartment Complex</SelectItem>
-                <SelectItem value="commercial">Commercial</SelectItem>
-                <SelectItem value="house">House</SelectItem>
-                <SelectItem value="mixed">Mixed Use</SelectItem>
+              <SelectContent className="rounded-none border-slate-300 shadow-xl">
+                <SelectItem value="apartment">RESIDENTIAL COMPLEX</SelectItem>
+                <SelectItem value="commercial">COMMERCIAL</SelectItem>
+                <SelectItem value="house">DETACHED HOUSE</SelectItem>
+                <SelectItem value="mixed">MIXED USE</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -586,20 +590,21 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
       </div>
 
       {/* Unit Types Configuration */}
-      <div className="space-y-4">
-        <h3 className="font-semibold">Unit Types & Pricing</h3>
+      <div className="space-y-5">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900 border-b border-slate-200 pb-2">Volume & Valuation Metrics</h3>
         <div className="space-y-4">
           {unitTypes.map((unitType, index) => (
-            <div key={index} className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-medium">{unitType.name}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <Label className="text-xs">Total Units</Label>
+            <div key={index} className="border border-slate-300 bg-slate-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h4 className="font-bold text-slate-900 uppercase tracking-widest w-32">{unitType.name}</h4>
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Allocation (Qty)</Label>
                   <Input
                     type="number"
                     min="0"
-                    value={unitType.count}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    className="rounded-none border-slate-300 h-9 font-mono text-sm focus:border-slate-900 focus:ring-0 bg-white"
+                    value={unitType.count || ''}
+                    onChange={(e) => {
                       const newUnitTypes = [...unitTypes];
                       newUnitTypes[index].count = parseInt(e.target.value) || 0;
                       setUnitTypes(newUnitTypes);
@@ -607,26 +612,27 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
                     placeholder="0"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">Base Price (Monthly)</Label>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Base Tariff (KSH)</Label>
                   <Input
                     type="number"
                     min="0"
-                    value={unitType.basePrice}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    className="rounded-none border-slate-300 h-9 font-mono text-sm focus:border-slate-900 focus:ring-0 bg-white"
+                    value={unitType.basePrice || ''}
+                    onChange={(e) => {
                       const newUnitTypes = [...unitTypes];
-                      newUnitTypes[index].basePrice =
-                        parseInt(e.target.value) || 0;
+                      newUnitTypes[index].basePrice = parseInt(e.target.value) || 0;
                       setUnitTypes(newUnitTypes);
                     }}
                     placeholder="0"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">Size Range (sqft)</Label>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Area (SQFT)</Label>
                   <Input
                     type="text"
-                    placeholder="e.g., 300-400"
+                    placeholder="N/A"
+                    className="rounded-none border-slate-200 h-9 font-mono text-sm bg-slate-100 text-slate-400"
                     disabled
                   />
                 </div>
@@ -637,36 +643,34 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onSuccess }) => {
       </div>
 
       {/* Income Summary */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Expected Monthly Income</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-blue-600">
-            KSH{" "}
-            {unitTypes
-              .reduce((sum, u) => sum + u.count * u.basePrice, 0)
-              .toLocaleString()}
-          </div>
-          <p className="text-xs text-gray-600 mt-1">
-            Based on {unitTypes.reduce((sum, u) => sum + u.count, 0)} total
-            units at full occupancy
-          </p>
-        </CardContent>
-      </Card>
+      <div className="border border-blue-900 bg-slate-900 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Theoretical Gross Yield</h3>
+          <p className="text-xs text-slate-500 mt-1">Based on {unitTypes.reduce((sum, u) => sum + u.count, 0)} units at maximum load</p>
+        </div>
+        <div className="text-3xl font-black text-white tracking-tighter">
+          KSH {unitTypes.reduce((sum, u) => sum + u.count * u.basePrice, 0).toLocaleString()}
+        </div>
+      </div>
 
-      <DialogFooter>
+      <div className="flex gap-4 pt-6 border-t border-slate-200">
         <Button
           variant="outline"
+          className="flex-1 rounded-none border-slate-300 hover:bg-slate-100 h-12 text-xs font-bold uppercase tracking-widest"
           disabled={loading}
+          onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))}
         >
-          Cancel
+          Abort
         </Button>
-        <Button onClick={handleAddProperty} disabled={loading}>
+        <Button 
+          onClick={handleAddProperty} 
+          disabled={loading}
+          className="flex-1 bg-slate-900 hover:bg-black text-white rounded-none h-12 text-xs font-bold uppercase tracking-widest transition-colors"
+        >
           {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Create Property
+          Compile Asset
         </Button>
-      </DialogFooter>
+      </div>
     </div>
   );
 };

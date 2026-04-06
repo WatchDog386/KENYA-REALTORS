@@ -45,6 +45,10 @@ const PAYSTACK_API_URL = "https://api.paystack.co";
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 const PAYSTACK_SECRET_KEY = import.meta.env.VITE_PAYSTACK_SECRET_KEY;
 
+export const getPaystackPublicKey = (): string => {
+  return String(PAYSTACK_PUBLIC_KEY || "").trim();
+};
+
 /**
  * Initialize a Paystack transaction
  */
@@ -224,6 +228,7 @@ export const chargeAuthorization = async (
 };
 
 export default {
+  getPaystackPublicKey,
   initializePaystackPayment,
   verifyPaystackTransaction,
   getPaystackBanks,

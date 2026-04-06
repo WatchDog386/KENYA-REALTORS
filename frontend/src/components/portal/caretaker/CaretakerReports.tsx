@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { caretakerDutyService, CaretakerDuty } from '@/services/caretakerDutyService';
 import { caretakerService } from '@/services/caretakerService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -36,7 +38,10 @@ import {
   Send,
   X,
   ClipboardList,
-  Award
+  Award,
+  Plus,
+  ImagePlus,
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -46,11 +51,20 @@ interface DutyWithUI extends CaretakerDuty {
 
 const CaretakerReports = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [duties, setDuties] = useState<DutyWithUI[]>([]);
   const [caretakerId, setCaretakerId] = useState<string | null>(null);
+  const [propertyId, setPropertyId] = useState<string | null>(null);
   const [selectedDuty, setSelectedDuty] = useState<DutyWithUI | null>(null);
   const [reportText, setReportText] = useState('');
+  const [showNewReportDialog, setShowNewReportDialog] = useState(false);
+  const [newReport, setNewReport] = useState({
+    title: '',
+    description: '',
+    type: 'general',
+    priority: 'medium'
+  });
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
   const [statistics, setStatistics] = useState({
@@ -60,6 +74,46 @@ const CaretakerReports = () => {
     completed: 0,
     averageRating: 0
   });
+  const [reportImages, setReportImages] = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const uploadImage = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('duty-reports')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from('duty-reports')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const filesArray = Array.from(e.target.files);
+      setReportImages(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setReportImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+
 
   useEffect(() => {
     if (user) {
@@ -74,6 +128,9 @@ const CaretakerReports = () => {
       
       if (caretaker?.id) {
         setCaretakerId(caretaker.id);
+        if (caretaker.property_id) {
+            setPropertyId(caretaker.property_id);
+        }
         await Promise.all([
           fetchDuties(caretaker.id),
           fetchStatistics(caretaker.id)
@@ -128,12 +185,26 @@ const CaretakerReports = () => {
 
     try {
       setSubmitting(true);
+      
+      const imageUrls: string[] = [];
+      if (reportImages.length > 0) {
+        for (const file of reportImages) {
+          const url = await uploadImage(file);
+          imageUrls.push(url);
+        }
+      }
+
+      const allImages = [...existingImages, ...imageUrls];
+
       // Update the duty with report text but don't mark as submitted
       await caretakerDutyService.updateDuty(selectedDuty.id, {
-        report_text: reportText
+        report_text: reportText,
+        report_images: allImages
       });
       toast.success('Report draft saved');
       setReportText('');
+      setReportImages([]);
+      setExistingImages([]);
       setSelectedDuty(null);
       if (caretakerId) {
         await fetchDuties(caretakerId);
@@ -154,11 +225,25 @@ const CaretakerReports = () => {
 
     try {
       setSubmitting(true);
+      
+      const imageUrls: string[] = [];
+      if (reportImages.length > 0) {
+        for (const file of reportImages) {
+          const url = await uploadImage(file);
+          imageUrls.push(url);
+        }
+      }
+
+      const allImages = [...existingImages, ...imageUrls];
+
       await caretakerDutyService.submitReport(selectedDuty.id, {
-        report_text: reportText
+        report_text: reportText,
+        report_images: allImages
       });
       toast.success('Report submitted successfully to your property manager!');
       setReportText('');
+      setReportImages([]);
+      setExistingImages([]);
       setSelectedDuty(null);
       if (caretakerId) {
         await fetchDuties(caretakerId);
@@ -166,6 +251,60 @@ const CaretakerReports = () => {
       }
     } catch (error) {
       console.error('Error submitting report:', error);
+      toast.error('Failed to submit report');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateAdhocReport = async () => {
+    if (!newReport.title || !newReport.description) {
+      toast.error('Please enter a title and description for the report');
+      setSubmitting(false);
+      return;
+    }
+
+    if (!propertyId) {
+        toast.error('You are not assigned to a property.');
+        setSubmitting(false);
+        return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      const imageUrls: string[] = [];
+      if (reportImages.length > 0) {
+        for (const file of reportImages) {
+          const url = await uploadImage(file);
+          imageUrls.push(url);
+        }
+      }
+
+      await caretakerDutyService.createAdhocReport({
+        caretaker_id: caretakerId!,
+        property_id: propertyId!,
+        title: newReport.title,
+        description: newReport.description, // Initial description
+        duty_type: newReport.type as any,
+        priority: newReport.priority as any,
+        report_text: newReport.description, // Same text for the report
+        report_submitted: true,
+        recurring: false,
+        report_images: imageUrls
+      });
+
+      toast.success('Report submitted successfully!');
+      setShowNewReportDialog(false);
+      setNewReport({ title: '', description: '', type: 'general', priority: 'medium' });
+      setReportImages([]);
+      
+      if (caretakerId) {
+        await fetchDuties(caretakerId);
+        await fetchStatistics(caretakerId);
+      }
+    } catch (error) {
+      console.error('Error creating report:', error);
       toast.error('Failed to submit report');
     } finally {
       setSubmitting(false);
@@ -219,12 +358,136 @@ const CaretakerReports = () => {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <FileText className="w-8 h-8 text-[#154279]" />
-          <h1 className="text-3xl font-bold text-[#154279]">Daily Reports & Logs</h1>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <FileText className="w-8 h-8 text-[#154279]" />
+            <h1 className="text-3xl font-bold text-[#154279]">Daily Reports & Logs</h1>
+          </div>
+          <p className="text-slate-600">Manage your assigned duties and submit reports to your property manager</p>
         </div>
-        <p className="text-slate-600">Manage your assigned duties and submit reports to your property manager</p>
+
+        <Dialog 
+          open={showNewReportDialog} 
+          onOpenChange={(open) => {
+            setShowNewReportDialog(open);
+            if (!open) setReportImages([]);
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button onClick={() => {
+              setNewReport({ title: '', description: '', type: 'general', priority: 'medium' });
+              setReportImages([]);
+            }} className="bg-[#154279] hover:bg-[#0f2d5a] text-white">
+              <Plus className="w-4 h-4 mr-2" />
+              New Report
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle className="text-[#154279]">Create New Report</DialogTitle>
+              <DialogDescription>
+                Submit a new report for an issue, maintenance request, or update to the property manager.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block text-slate-700">Report Title *</label>
+                <Input 
+                  value={newReport.title}
+                  onChange={(e) => setNewReport({...newReport, title: e.target.value})}
+                  placeholder="e.g., Leaking Pipe in Unit 4B"
+                  className="border-slate-300"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-1 block text-slate-700">Type</label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-slate-300 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newReport.type}
+                    onChange={(e) => setNewReport({...newReport, type: e.target.value})}
+                  >
+                    <option value="general">General Update</option>
+                    <option value="maintenance">Maintenance Issue</option>
+                    <option value="security">Security Incident</option>
+                    <option value="inspection">Inspection</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block text-slate-700">Priority</label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-slate-300 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newReport.priority}
+                    onChange={(e) => setNewReport({...newReport, priority: e.target.value})}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1 block text-slate-700">Details *</label>
+                <Textarea 
+                  value={newReport.description}
+                  onChange={(e) => setNewReport({...newReport, description: e.target.value})}
+                  placeholder="Describe the situation in detail..."
+                  className="min-h-[150px] border-slate-300"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1 block text-slate-700">Attach Photos</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {reportImages.map((file, index) => (
+                    <div key={index} className="relative w-24 h-24 border rounded-md overflow-hidden group">
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt={`Preview ${index}`} 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-md flex flex-col items-center justify-center text-slate-400 hover:border-[#154279] hover:text-[#154279] transition-colors"
+                  >
+                    <ImagePlus className="w-6 h-6 mb-1" />
+                    <span className="text-xs">Add Photo</span>
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">
+                  You can upload multiple photos to help describe the issue.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowNewReportDialog(false);
+                setReportImages([]);
+              }}>Cancel</Button>
+              <Button 
+                onClick={handleCreateAdhocReport} 
+                disabled={submitting}
+                className="bg-[#154279] text-white"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                Submit Report
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Statistics Cards */}
@@ -350,6 +613,11 @@ const CaretakerReports = () => {
                               Due: {new Date(duty.due_date).toLocaleDateString()}
                             </Badge>
                           )}
+                          {duty.property?.name && (
+                            <Badge variant="outline" className="text-xs">
+                              {duty.property.name}
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Report Status */}
@@ -367,6 +635,15 @@ const CaretakerReports = () => {
                                 {duty.report_text && (
                                   <div className="text-sm bg-slate-50 p-2 rounded mt-2 max-h-32 overflow-y-auto">
                                     <strong>Report:</strong> {duty.report_text}
+                                  </div>
+                                )}
+                                {duty.report_images && duty.report_images.length > 0 && (
+                                  <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+                                    {duty.report_images.map((img, i) => (
+                                      <a key={i} href={img} target="_blank" rel="noopener noreferrer">
+                                        <img src={img} alt={`Report attachment ${i+1}`} className="h-16 w-16 object-cover rounded border hover:opacity-90" />
+                                      </a>
+                                    ))}
                                   </div>
                                 )}
                                 {duty.manager_feedback && (
@@ -400,6 +677,7 @@ const CaretakerReports = () => {
                                       onClick={() => {
                                         setSelectedDuty(duty);
                                         setReportText(duty.report_text || '');
+                                        setReportImages([]);
                                       }}
                                       className="bg-[#154279] hover:bg-[#0f2d5a] text-white"
                                       size="sm"
@@ -436,6 +714,57 @@ const CaretakerReports = () => {
                                           className="min-h-[200px] border-slate-300 focus:border-[#154279]"
                                         />
                                       </div>
+
+                                      <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                          Attach Photos
+                                        </label>
+                                        <div className="flex flex-wrap gap-2 mb-2">
+                                          {existingImages.map((url, index) => (
+                                            <div key={`existing-${index}`} className="relative w-24 h-24 border rounded-md overflow-hidden group">
+                                              <img 
+                                                src={url} 
+                                                alt={`Existing ${index}`} 
+                                                className="w-full h-full object-cover"
+                                              />
+                                              <button
+                                                onClick={() => removeExistingImage(index)}
+                                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 text-center">
+                                                Saved
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {reportImages.map((file, index) => (
+                                            <div key={`new-${index}`} className="relative w-24 h-24 border rounded-md overflow-hidden group">
+                                              <img 
+                                                src={URL.createObjectURL(file)} 
+                                                alt={`Preview ${index}`} 
+                                                className="w-full h-full object-cover"
+                                              />
+                                              <button
+                                                onClick={() => removeImage(index)}
+                                                className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                          <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-md flex flex-col items-center justify-center text-slate-400 hover:border-[#154279] hover:text-[#154279] transition-colors"
+                                          >
+                                            <ImagePlus className="w-6 h-6 mb-1" />
+                                            <span className="text-xs">Add Photo</span>
+                                          </button>
+                                        </div>
+                                        <p className="text-xs text-slate-500">
+                                          You can upload multiple photos to help describe the issue.
+                                        </p>
+                                      </div>
                                     </div>
 
                                     <DialogFooter className="flex gap-2">
@@ -443,6 +772,7 @@ const CaretakerReports = () => {
                                         variant="outline"
                                         onClick={() => {
                                           setReportText('');
+                                          setReportImages([]);
                                           setSelectedDuty(null);
                                         }}
                                       >
@@ -501,6 +831,32 @@ const CaretakerReports = () => {
                                 onClick={() => {
                                   setSelectedDuty(duty);
                                   setReportText(duty.report_text || '');
+                                  
+                                  // Safely handle report_images which might be a JSON string or array
+                                  let images: string[] = [];
+                                  const rawImages = duty.report_images as any;
+                                  
+                                  if (rawImages) {
+                                    if (Array.isArray(rawImages)) {
+                                      images = rawImages;
+                                    } else if (typeof rawImages === 'string') {
+                                      try {
+                                        // internal check for JSON string array format
+                                        if (rawImages.startsWith('[')) {
+                                            images = JSON.parse(rawImages);
+                                        } else {
+                                            // legacy single string handling if any? Unlikely but safe.
+                                            images = [rawImages];
+                                        }
+                                      } catch (e) {
+                                        console.error("Failed to parse report_images", e);
+                                        images = [];
+                                      }
+                                    }
+                                  }
+                                  
+                                  setExistingImages(images);
+                                  setReportImages([]);
                                 }}
                                 className="bg-[#154279] hover:bg-[#0f2d5a] text-white whitespace-nowrap"
                                 size="sm"
@@ -531,6 +887,57 @@ const CaretakerReports = () => {
                                     className="min-h-[200px] border-slate-300 focus:border-[#154279]"
                                   />
                                 </div>
+
+                                <div>
+                                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                    Attach Photos
+                                  </label>
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {existingImages.map((url, index) => (
+                                      <div key={`existing-${index}`} className="relative w-24 h-24 border rounded-md overflow-hidden group">
+                                        <img 
+                                          src={url} 
+                                          alt={`Existing ${index}`} 
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                          onClick={() => removeExistingImage(index)}
+                                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 text-center">
+                                          Saved
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {reportImages.map((file, index) => (
+                                      <div key={`new-${index}`} className="relative w-24 h-24 border rounded-md overflow-hidden group">
+                                        <img 
+                                          src={URL.createObjectURL(file)} 
+                                          alt={`Preview ${index}`} 
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                          onClick={() => removeImage(index)}
+                                          className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <button
+                                      onClick={() => fileInputRef.current?.click()}
+                                      className="w-24 h-24 border-2 border-dashed border-slate-300 rounded-md flex flex-col items-center justify-center text-slate-400 hover:border-[#154279] hover:text-[#154279] transition-colors"
+                                    >
+                                      <ImagePlus className="w-6 h-6 mb-1" />
+                                      <span className="text-xs">Add Photo</span>
+                                    </button>
+                                  </div>
+                                  <p className="text-xs text-slate-500">
+                                    You can upload multiple photos to help describe the issue.
+                                  </p>
+                                </div>
                               </div>
 
                               <DialogFooter className="flex gap-2">
@@ -538,6 +945,7 @@ const CaretakerReports = () => {
                                   variant="outline"
                                   onClick={() => {
                                     setReportText('');
+                                    setReportImages([]);
                                     setSelectedDuty(null);
                                   }}
                                 >
@@ -594,12 +1002,25 @@ const CaretakerReports = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <Button className="bg-[#F96302] hover:bg-[#d85502] text-white">
+          <Button 
+            onClick={() => navigate('/portal/caretaker/messages')}
+            className="bg-[#F96302] hover:bg-[#d85502] text-white"
+          >
             <Send className="w-4 h-4 mr-2" />
             Go to Messages
           </Button>
         </CardContent>
       </Card>
+
+      {/* Hidden file input for image uploads */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImageSelect}
+        className="hidden"
+        accept="image/*"
+        multiple
+      />
     </div>
   );
 };

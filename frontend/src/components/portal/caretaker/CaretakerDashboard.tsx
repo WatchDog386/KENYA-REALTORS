@@ -43,6 +43,7 @@ const CaretakerDashboard = () => {
   const [caretakerInfo, setCaretakerInfo] = useState<any>(null);
   const [maintenanceRequests, setMaintenanceRequests] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [tenantContacts, setTenantContacts] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -78,6 +79,28 @@ const CaretakerDashboard = () => {
           const maintenance = await maintenanceService.getPropertyMaintenanceRequests(caretaker.property_id);
           setMaintenanceRequests(maintenance || []);
 
+          // Load active tenant contacts attached to this caretaker's property.
+          const { data: leases } = await supabase
+            .from('tenant_leases')
+            .select('tenant_id, units!inner(property_id)')
+            .in('status', ['active', 'approved', 'pending_renewal'])
+            .eq('units.property_id', caretaker.property_id);
+
+          const tenantIds = Array.from(
+            new Set((leases || []).map((lease: any) => lease.tenant_id).filter(Boolean))
+          );
+
+          if (tenantIds.length > 0) {
+            const { data: tenantProfiles } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, phone, email')
+              .in('id', tenantIds);
+
+            setTenantContacts(tenantProfiles || []);
+          } else {
+            setTenantContacts([]);
+          }
+
           // Calculate stats from real data
           const pending = maintenance?.filter((m: any) => 
             m.status === 'pending' || m.status === 'assigned' || m.status === 'in_progress'
@@ -95,6 +118,7 @@ const CaretakerDashboard = () => {
           });
         } catch (error) {
           console.error("Error fetching maintenance:", error);
+          setTenantContacts([]);
            setStats({
             propertyName: caretaker.property?.name || 'N/A',
             location: caretaker.property?.location || 'N/A',
@@ -541,6 +565,24 @@ const CaretakerDashboard = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-lg font-bold text-[#154279] mb-4 tracking-tight">Attached Tenant Contacts</h3>
+              {tenantContacts.length === 0 ? (
+                <p className="text-sm text-slate-500">No active tenants linked to this property yet.</p>
+              ) : (
+                <div className="space-y-3 max-h-72 overflow-auto pr-1">
+                  {tenantContacts.slice(0, 8).map((tenant: any) => (
+                    <div key={tenant.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className="font-semibold text-slate-800 text-sm">
+                        {`${tenant.first_name || ''} ${tenant.last_name || ''}`.trim() || 'Tenant'}
+                      </div>
+                      <div className="text-xs text-slate-600">{tenant.phone || tenant.email || 'No contact provided'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>

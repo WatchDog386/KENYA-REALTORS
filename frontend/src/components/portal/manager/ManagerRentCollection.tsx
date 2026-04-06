@@ -148,13 +148,11 @@ const ManagerRentCollection = () => {
       setPropertyId(assignments.property_id);
       setPropertyName(assignments.properties?.name || 'Managed Property');
 
-      // 2. Fetch ALL Units with Type Info and Leases
-      // Using left join to leases manually or verify filtered lease
+      // 2. Fetch ALL Units and active leases
       const { data: units, error: unitsError } = await supabase
         .from('units')
         .select(`
-          id, unit_number, floor_number, status, property_id,
-          property_unit_types (name, price_per_unit),
+          id, unit_number, floor_number, status, property_id, unit_type_id, price,
           leases:tenant_leases (tenant_id, rent_amount, status)
         `)
         .eq('property_id', assignments.property_id)
@@ -166,6 +164,20 @@ const ManagerRentCollection = () => {
       }
       
       const safeUnits = units || [];
+
+      // Pull unit type metadata directly from property_unit_types so pricing matches Super Admin source values.
+      const { data: propertyUnitTypes, error: unitTypesError } = await supabase
+        .from('property_unit_types')
+        .select('id, name, unit_type_name, price_per_unit')
+        .eq('property_id', assignments.property_id);
+
+      if (unitTypesError) {
+        console.error('Property unit types fetch error:', unitTypesError);
+      }
+
+      const unitTypeById = new Map(
+        (propertyUnitTypes || []).map((unitType: any) => [unitType.id, unitType])
+      );
 
       // 3. Fetch Rent Payments and Bills for the selected month
       const startOfMonth = `${selectedMonth}-01`;
@@ -199,10 +211,12 @@ const ManagerRentCollection = () => {
         // Let's use flexible check.
         const leasesList = Array.isArray(unit.leases) ? unit.leases : [];
         const activeLease = leasesList.find((l: any) => l.status === 'active');
-        
-        const unitType = unit.property_unit_types?.name || 'Standard';
-        // Base rent from lease OR unit type price
-        const monthlyRent = activeLease?.rent_amount || unit.property_unit_types?.price_per_unit || 0;
+
+        const unitTypeMeta = unitTypeById.get(unit.unit_type_id);
+        const unitType = unitTypeMeta?.name || unitTypeMeta?.unit_type_name || 'Standard';
+        // Source of truth: Super Admin pricing (unit.price, then unit type price).
+        // Important: preserve explicit 0 values instead of falling back to old lease amounts.
+        const monthlyRent = Number(unit.price ?? unitTypeMeta?.price_per_unit ?? 0);
 
         // ... rest calculation...
         // Find records
@@ -215,7 +229,7 @@ const ManagerRentCollection = () => {
         const waterArrears = waterBillAmount - paidWaterBill;
 
         // Rent Calcs
-        const expectedRent = rentRecord?.amount || monthlyRent; // Use record amount if generated, else mock expected
+        const expectedRent = monthlyRent;
         const paidRent = rentRecord?.amount_paid || 0;
         
         // If lease exists, expect rent. 

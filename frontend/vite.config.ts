@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig(({ mode }) => ({
+  root: path.resolve(__dirname),
+  envDir: path.resolve(__dirname, ".."),
   server: {
     host: "::", // Listen on all IPv6 and IPv4 addresses
     port: 8082,
@@ -19,10 +21,10 @@ export default defineConfig(({ mode }) => ({
       "Access-Control-Allow-Credentials": "true",
     },
     // Enable HMR (Hot Module Replacement)
-    // hmr: {
-    //   protocol: "ws",
-    //   host: "localhost",
-    // },
+    hmr: {
+      protocol: "ws",
+      host: "localhost",
+    },
     // Proxy configuration for Supabase to avoid CORS
     proxy: {
       "/supabase-auth": {
@@ -78,7 +80,7 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     assetsDir: "assets",
   },
-  base: "./",
+  base: "/",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

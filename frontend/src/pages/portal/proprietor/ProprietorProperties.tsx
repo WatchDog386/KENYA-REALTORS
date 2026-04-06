@@ -4,9 +4,11 @@ import { proprietorService } from '@/services/proprietorService';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from "@/components/ui/badge";
-import { Building2, MapPin, Search, AlertCircle, Loader2, DollarSign, Users, Home } from 'lucide-react';
+import { Building2, MapPin, Search, AlertCircle, Percent, LayoutGrid, CalendarDays, Activity } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ProprietorProperties = () => {
     const { user } = useAuth();
@@ -14,7 +16,6 @@ const ProprietorProperties = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const [proprietorName, setProprietorName] = useState<string>('');
 
     useEffect(() => {
         loadProperties();
@@ -30,29 +31,12 @@ const ProprietorProperties = () => {
                 return;
             }
 
-            // Get proprietor record for this user
             const prop = await proprietorService.getProprietorByUserId(user.id);
-            
             if (!prop?.id) {
                 setError('No proprietor profile found. Please contact admin.');
-                console.warn('No proprietor profile for user:', user.id);
                 return;
             }
 
-            // Set proprietor name
-            const profile = prop.profile;
-            if (profile) {
-                const name = profile.first_name && profile.last_name 
-                    ? `${profile.first_name} ${profile.last_name}`
-                    : profile.first_name || 'Proprietor';
-                setProprietorName(name);
-            } else {
-                setProprietorName('Proprietor');
-            }
-
-            console.log('Proprietor found:', prop.id);
-
-            // Get properties assigned to this proprietor with full details
             const { data: assignments, error: assignError } = await supabase
                 .from('proprietor_properties')
                 .select(`
@@ -68,11 +52,7 @@ const ProprietorProperties = () => {
                         location,
                         type,
                         status,
-                        image_url,
-                        total_monthly_rental_expected,
-                        total_units,
-                        occupied_units,
-                        monthly_rent
+                        image_url
                     )
                 `)
                 .eq('proprietor_id', prop.id)
@@ -80,17 +60,13 @@ const ProprietorProperties = () => {
                 .order('assigned_at', { ascending: false });
 
             if (assignError) {
-                console.error('Error fetching proprietor assignments:', assignError);
                 setError('Failed to load assigned properties');
                 toast.error('Failed to load properties');
                 return;
             }
 
-            console.log('Assignments found:', assignments?.length || 0);
             setProperties(assignments || []);
-
         } catch (err: any) {
-            console.error('Error loading properties:', err);
             setError(err.message || 'Failed to load properties');
             toast.error('Failed to load properties');
         } finally {
@@ -103,29 +79,35 @@ const ProprietorProperties = () => {
         p.property?.location?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh] bg-slate-50">
-                <div className="text-center">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#154279]" />
-                    <p className="text-slate-600 text-sm font-medium">Loading your properties...</p>
-                </div>
-            </div>
-        );
-    }
+    const totalProperties = properties.length;
+    const activeProperties = properties.filter(p => p.property?.status?.toLowerCase() === 'active' || p.property?.status?.toLowerCase() === 'Active').length;
+    const avgOwnership = totalProperties > 0 
+        ? Math.round(properties.reduce((sum, p) => sum + (Number(p.ownership_percentage) || 0), 0) / totalProperties) 
+        : 0;
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        show: { y: 0, opacity: 1 }
+    };
 
     if (error) {
         return (
-            <div className="p-8 w-full space-y-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">My Properties</h1>
-                    <p className="text-slate-500">Manage and view your property portfolio</p>
-                </div>
-                <div className="flex items-center gap-4 p-6 bg-red-50 border border-red-200 rounded-2xl">
-                    <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+            <div className="p-8 max-w-7xl mx-auto space-y-6">
+                <div className="flex items-center gap-4 p-6 bg-red-50/50 border border-red-200 rounded-2xl">
+                    <AlertCircle className="w-8 h-8 text-red-500 flex-shrink-0" />
                     <div>
-                        <h3 className="font-semibold text-red-900">Error Loading Properties</h3>
-                        <p className="text-red-700 text-sm">{error}</p>
+                        <h3 className="text-lg font-semibold text-red-900">Error Loading Properties</h3>
+                        <p className="text-red-700 mt-1">{error}</p>
                     </div>
                 </div>
             </div>
@@ -133,129 +115,199 @@ const ProprietorProperties = () => {
     }
 
     return (
-        <div className="p-8 w-full space-y-6 bg-slate-50 min-h-screen">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">My Properties</h1>
-                    <p className="text-slate-500">Property portfolio for <span className="font-semibold text-[#154279]">{proprietorName}</span></p>
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100/80 border border-slate-200/60 text-slate-600 text-sm font-medium mb-2">
+                        <Building2 className="w-4 h-4" />
+                        Portfolio Overview
+                    </div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">My Properties</h1>
+                    <p className="text-slate-500 text-base md:text-lg max-w-2xl">
+                        Manage and monitor the performance of your real estate portfolio.
+                    </p>
                 </div>
-                <div className="relative w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                
+                <div className="relative group w-full md:w-80">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                    </div>
                     <Input 
-                        placeholder="Search properties..." 
-                        className="pl-10 bg-white"
+                        placeholder="Search by name or location..." 
+                        className="pl-10 h-12 bg-white border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500/20 text-base rounded-xl transition-all"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
             </div>
 
-            {filteredProperties.length === 0 ? (
-                <div className="text-center py-24 bg-white rounded-2xl border border-dashed border-slate-200">
-                    <Building2 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-slate-700">No properties found</h3>
-                    <p className="text-slate-500">You don't have any properties matching your search.</p>
-                </div>
-            ) : (
-                <div>
-                    <div className="mb-6 text-sm font-medium text-slate-600">
-                        Showing <span className="font-bold text-slate-900">{filteredProperties.length}</span> of <span className="font-bold text-slate-900">{properties.length}</span> properties
-                    </div>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredProperties.map((prop) => {
-                            const occupancyRate = prop.property?.total_units 
-                                ? Math.round((prop.property?.occupied_units || 0) / prop.property.total_units * 100)
-                                : 0;
-                            const monthlyRent = (prop.property?.monthly_rent || 0) * (prop.ownership_percentage / 100);
+            {/* Stats Overview */}
+            {!loading && properties.length > 0 && (
+                <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                >
+                    <Card className="bg-white border-slate-200/60 shadow-sm hover:shadow-md transition-shadow">
+                        <CardContent className="p-6 flex items-center gap-4">
+                            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                                <LayoutGrid className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Total Properties</p>
+                                <p className="text-2xl font-bold text-slate-900">{totalProperties}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-white border-slate-200/60 shadow-sm hover:shadow-md transition-shadow">
+                        <CardContent className="p-6 flex items-center gap-4">
+                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                                <Activity className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Active Properties</p>
+                                <p className="text-2xl font-bold text-slate-900">{activeProperties}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-white border-slate-200/60 shadow-sm hover:shadow-md transition-shadow">
+                        <CardContent className="p-6 flex items-center gap-4">
+                            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                                <Percent className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">Avg. Ownership</p>
+                                <p className="text-2xl font-bold text-slate-900">{avgOwnership}%</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
 
-                            return (
-                                <Card key={prop.id} className="overflow-hidden hover:shadow-xl hover:-translate-y-2 transition-all duration-300 group cursor-pointer border-slate-200 bg-white">
-                                    <div className="h-56 bg-gradient-to-br from-slate-200 to-slate-300 relative overflow-hidden">
+            {/* Content Section */}
+            {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <div key={i} className="animate-pulse flex flex-col bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm h-[420px]">
+                            <div className="h-52 bg-slate-200 w-full" />
+                            <div className="p-5 flex-1 flex flex-col gap-4">
+                                <div className="h-6 bg-slate-200 rounded-md w-3/4 max-w-[200px]" />
+                                <div className="h-4 bg-slate-200 rounded-md w-full" />
+                                <div className="h-4 bg-slate-200 rounded-md w-2/3" />
+                                <div className="mt-auto grid grid-cols-2 gap-3 pt-4">
+                                    <div className="h-16 bg-slate-100 rounded-xl" />
+                                    <div className="h-16 bg-slate-100 rounded-xl" />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : filteredProperties.length === 0 ? (
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center py-24 px-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl"
+                >
+                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-6">
+                        <Building2 className="w-10 h-10 text-slate-300" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">No properties found</h3>
+                    <p className="text-slate-500 text-center max-w-md">
+                        {searchTerm 
+                            ? "We couldn't find any properties matching your search criteria. Try adjusting your terms." 
+                            : "You don't have any properties assigned to your portfolio yet."}
+                    </p>
+                    {searchTerm && (
+                        <Button 
+                            variant="outline" 
+                            className="mt-6 border-slate-200 bg-white"
+                            onClick={() => setSearchTerm('')}
+                        >
+                            Clear search
+                        </Button>
+                    )}
+                </motion.div>
+            ) : (
+                <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="show"
+                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                >
+                    <AnimatePresence>
+                        {filteredProperties.map((prop) => (
+                            <motion.div key={prop.id} variants={itemVariants} layoutId={prop.id} className="h-full">
+                                <Card className="group overflow-hidden rounded-2xl border-slate-200/60 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-indigo-200 transition-all duration-300 h-full flex flex-col bg-white">
+                                    <div className="h-52 relative overflow-hidden bg-slate-100">
                                         {prop.property?.image_url ? (
-                                            <img src={prop.property.image_url} alt={prop.property.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                            <img 
+                                                src={prop.property.image_url} 
+                                                alt={prop.property.name} 
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-in-out" 
+                                            />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 text-slate-300">
-                                                <Building2 className="w-16 h-16" />
+                                            <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-100 group-hover:bg-slate-200 transition-colors">
+                                                <Building2 className="w-16 h-16 opacity-50" />
                                             </div>
                                         )}
-                                        <div className="absolute top-4 right-4">
-                                            <Badge className={`${
-                                                prop.property?.status === 'active' ? 'bg-emerald-500' :
-                                                prop.property?.status === 'inactive' ? 'bg-red-500' :
-                                                'bg-yellow-500'
-                                            } text-white shadow-md backdrop-blur-sm`}>
-                                                {prop.property?.status || 'Active'}
-                                            </Badge>
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                                            <h3 className="font-bold text-xl text-white">
+                                        
+                                        {/* Overlay Gradient */}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent flex flex-col justify-end p-5">
+                                            <div className="flex items-center justify-between gap-2 mb-2">
+                                                <Badge className={`backdrop-blur-md border-0 ${
+                                                    prop.property?.status?.toLowerCase() === 'active' 
+                                                    ? 'bg-emerald-500/90 text-white' 
+                                                    : 'bg-white/90 text-slate-800'
+                                                }`}>
+                                                    {prop.property?.status || 'Active'}
+                                                </Badge>
+                                                <Badge variant="outline" className="bg-black/40 backdrop-blur-md border-white/20 text-white gap-1 flex items-center shadow-lg">
+                                                    <Percent className="w-3 h-3" />
+                                                    {prop.ownership_percentage}% Owned
+                                                </Badge>
+                                            </div>
+                                            <h3 className="font-bold text-xl text-white line-clamp-1 group-hover:text-indigo-200 transition-colors">
                                                 {prop.property?.name}
                                             </h3>
-                                            <div className="flex items-center text-white/90 text-sm mt-1">
-                                                <MapPin className="w-4 h-4 mr-1" />
-                                                {prop.property?.location}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-5 flex-1 flex flex-col gap-5">
+                                        <div className="flex items-start text-slate-600 text-sm">
+                                            <MapPin className="w-4 h-4 mr-2 text-indigo-500 flex-shrink-0 mt-0.5" />
+                                            <span className="line-clamp-2 leading-relaxed">
+                                                {prop.property?.location || 'Location not specified'}
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 mt-auto">
+                                            <div className="flex flex-col justify-center p-3 bg-slate-50/80 rounded-xl border border-slate-100 group-hover:bg-indigo-50 transition-colors">
+                                                <span className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1.5 uppercase tracking-wider">
+                                                    <Building2 className="w-3.5 h-3.5" /> Property Type
+                                                </span>
+                                                <span className="font-semibold text-slate-700 capitalize text-sm truncate">
+                                                    {prop.property?.type || 'Standard Unit'}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col justify-center p-3 bg-slate-50/80 rounded-xl border border-slate-100 group-hover:bg-indigo-50 transition-colors">
+                                                <span className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1.5 uppercase tracking-wider">
+                                                    <CalendarDays className="w-3.5 h-3.5" /> Assigned Date
+                                                </span>
+                                                <span className="font-semibold text-slate-700 text-sm truncate">
+                                                    {new Date(prop.assigned_at).toLocaleDateString(undefined, {
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    })}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <CardContent className="p-5 space-y-4">
-                                        {/* Key Metrics */}
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                                <p className="text-xs text-blue-700 uppercase font-bold mb-1">Ownership</p>
-                                                <p className="font-bold text-slate-900 text-lg">{prop.ownership_percentage}%</p>
-                                            </div>
-                                            <div className="p-3 bg-orange-50 rounded-lg border border-orange-100">
-                                                <p className="text-xs text-orange-700 uppercase font-bold mb-1">Type</p>
-                                                <p className="font-semibold text-slate-800">{prop.property?.type || 'N/A'}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Units & Occupancy */}
-                                        {prop.property?.total_units && (
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <p className="text-xs text-purple-700 uppercase font-bold">Units</p>
-                                                        <Home className="w-3 h-3 text-purple-600" />
-                                                    </div>
-                                                    <p className="font-bold text-slate-900 text-lg">{prop.property.total_units}</p>
-                                                </div>
-                                                <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <p className="text-xs text-emerald-700 uppercase font-bold">Occupied</p>
-                                                        <Users className="w-3 h-3 text-emerald-600" />
-                                                    </div>
-                                                    <p className="font-bold text-slate-900 text-lg">{occupancyRate}%</p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Monthly Rent */}
-                                        {monthlyRent > 0 && (
-                                            <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <DollarSign className="w-4 h-4 text-emerald-600" />
-                                                        <p className="text-xs text-emerald-700 uppercase font-bold">Monthly (Your Share)</p>
-                                                    </div>
-                                                    <p className="font-bold text-emerald-700">KES {monthlyRent.toLocaleString()}</p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Footer */}
-                                        <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                                            <span className="text-slate-500 font-medium">Assigned Since</span>
-                                            <span className="font-semibold text-slate-700">
-                                                {new Date(prop.assigned_at).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </CardContent>
                                 </Card>
-                            );
-                        })}
-                    </div>
-                </div>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </motion.div>
             )}
         </div>
     );

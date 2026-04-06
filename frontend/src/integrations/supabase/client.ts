@@ -15,8 +15,11 @@ const getEnv = (key: string): string | undefined => {
   return undefined;
 };
 
-const SUPABASE_URL = getEnv("VITE_SUPABASE_URL") || getEnv("NEXT_PUBLIC_SUPABASE_URL") || getEnv("SUPABASE_URL");
+const BACKEND_URL = getEnv("VITE_BACKEND_URL")?.replace(/\/+$/, "");
+const PUBLIC_SUPABASE_URL = getEnv("VITE_SUPABASE_URL") || getEnv("NEXT_PUBLIC_SUPABASE_URL");
+const SUPABASE_URL = BACKEND_URL || PUBLIC_SUPABASE_URL || getEnv("SUPABASE_URL");
 const SUPABASE_ANON_KEY = getEnv("VITE_SUPABASE_ANON_KEY") || getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+const EFFECTIVE_ANON_KEY = SUPABASE_ANON_KEY || (BACKEND_URL ? "backend-proxy-anon" : undefined);
 const SUPABASE_SERVICE_ROLE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY");
 
 const getProjectRef = (url?: string): string => {
@@ -32,9 +35,9 @@ const getProjectRef = (url?: string): string => {
 const AUTH_STORAGE_KEY = `sb-${getProjectRef(SUPABASE_URL)}-auth-token`;
 
 if (!SUPABASE_URL) throw new Error("❌ Missing SUPABASE_URL.");
-if (isBrowser && !SUPABASE_ANON_KEY) throw new Error("❌ Missing SUPABASE_ANON_KEY for browser.");
+if (isBrowser && !EFFECTIVE_ANON_KEY) throw new Error("❌ Missing SUPABASE_ANON_KEY for browser.");
 
-if (isDev) console.log("✅ Supabase Config Loaded", { url: SUPABASE_URL, hasAnonKey: !!SUPABASE_ANON_KEY, hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY, runtime: isBrowser ? "browser" : "server" });
+if (isDev) console.log("✅ Supabase Config Loaded", { url: SUPABASE_URL, hasAnonKey: !!SUPABASE_ANON_KEY, hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY, usingBackendProxy: !!BACKEND_URL, runtime: isBrowser ? "browser" : "server" });
 
 const getSiteUrl = (): string => {
   if (isBrowser) {
@@ -63,20 +66,21 @@ if (isBrowser) {
 }
 
 // Ensure WebCrypto API is available for browser environments
-if (isBrowser && !globalThis.crypto) {
-  console.warn("⚠️ WebCrypto API not available, using fallback");
+const supportsSecurePkce = !isBrowser || (window.isSecureContext && !!globalThis.crypto?.subtle);
+if (isDev && !supportsSecurePkce) {
+  console.warn("⚠️ Secure WebCrypto not available; Supabase auth flowType will use implicit.");
 }
 
 // ------------------
 // MAIN SUPABASE CLIENT
 // ------------------
-export const supabase: SupabaseClient<Database> = createClient(SUPABASE_URL, SUPABASE_ANON_KEY!, {
+export const supabase: SupabaseClient<Database> = createClient(SUPABASE_URL, EFFECTIVE_ANON_KEY!, {
   auth: { 
     storage, 
     persistSession: true, 
     autoRefreshToken: true, 
     detectSessionInUrl: true, 
-    flowType: "pkce",
+    flowType: supportsSecurePkce ? "pkce" : "implicit",
     storageKey: AUTH_STORAGE_KEY,
   },
   global: { headers: { "x-application": "realtors-kenya", "x-client": "web", "x-site-url": currentSiteUrl } },
@@ -207,7 +211,8 @@ export const resetPasswordWithRedirect = async (email: string) => {
 // ------------------
 export const createServiceRoleClient = (): SupabaseClient<Database> => {
   if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error("❌ SUPABASE_SERVICE_ROLE_KEY is required for server operations");
-  return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { "x-client": "service-role", "x-site-url": currentSiteUrl } } });
+  const serviceBaseUrl = PUBLIC_SUPABASE_URL || getEnv("SUPABASE_URL") || SUPABASE_URL;
+  return createClient<Database>(serviceBaseUrl, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { "x-client": "service-role", "x-site-url": currentSiteUrl } } });
 };
 
 export const createEdgeClient = (accessToken: string): SupabaseClient<Database> => {

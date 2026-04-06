@@ -1,76 +1,35 @@
-// src/pages/portal/SuperAdminDashboard.tsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-  Building,
-  Users,
-  DollarSign,
-  TrendingUp,
-  BarChart3,
-  Settings,
-  FileText,
-  AlertTriangle,
-  RefreshCw,
-  Loader2,
-  Activity,
-  Shield,
-  Clock,
-  ArrowRight,
-  Plus,
-  Eye,
-  UserCheck,
-  ClipboardList,
-  CreditCard,
-  FileBarChart,
-  Home,
-  Calendar,
   AlertCircle,
+  AlertTriangle,
+  Building2,
   CheckCircle,
-  Wrench,
+  Clock,
+  CreditCard,
   Database,
-  Bell,
-  Key,
-  MessageSquare,
-  Download,
-  Filter,
+  Loader2,
+  RefreshCw,
   Search,
-  UserPlus,
-  FileCheck,
-  ShieldCheck,
-  Package,
-  ChevronRight,
-  Target,
-  Layers,
-  LayoutGrid,
-  Link,
-  Settings2,
+  Send,
+  UserCheck,
+  Users,
+  Wrench,
   X,
-  MapPin,
-  Zap,
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency, formatForDisplay } from "@/utils/formatCurrency";
 import { toast } from "sonner";
-
-// Import UI components
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import SuperAdminProfile from "@/components/portal/super-admin/SuperAdminProfile";
-import LoginActivityTracker from "@/components/portal/super-admin/LoginActivityTracker";
+import { supabase } from "@/integrations/supabase/client";
+import { formatForDisplay } from "@/utils/formatCurrency";
 
 interface DashboardStats {
   totalProperties: number;
+  totalUsers: number;
+  totalTenants: number;
+  totalPayments: number;
+  totalApprovals: number;
   activeUsers: number;
   pendingApprovals: number;
   totalRevenue: number;
@@ -83,517 +42,85 @@ interface DashboardStats {
   vacantUnits: number;
   totalLeases: number;
   pendingRequests: number;
-  systemHealth: number;
 }
 
 interface RecentItem {
   id: string;
   title: string;
   subtitle: string;
-  type: 'property' | 'user' | 'payment' | 'maintenance' | 'system' | 'approval' | 'lease';
+  type: "property" | "user" | "payment" | "maintenance" | "approval";
+  createdAt: string;
   time: string;
   action?: string;
-  data?: any;
 }
 
 interface SystemAlert {
   id: string;
   title: string;
   description: string;
-  type: 'warning' | 'error' | 'success' | 'info' | 'critical';
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  type: "warning" | "error" | "success" | "info" | "critical";
+  priority: "low" | "medium" | "high" | "critical";
   action?: string;
 }
 
+interface SystemStatus {
+  database: boolean;
+  api: boolean;
+  responseTime: number;
+  lastChecked: string;
+}
+
+type ActivityStatus = "PROPERTY" | "USER" | "PAYMENT" | "MAINTENANCE" | "APPROVAL";
+type RequestPriority = "HIGH" | "MEDIUM" | "NORMAL";
+
+const EMPTY_STATS: DashboardStats = {
+  totalProperties: 0,
+  totalUsers: 0,
+  totalTenants: 0,
+  totalPayments: 0,
+  totalApprovals: 0,
+  activeUsers: 0,
+  pendingApprovals: 0,
+  totalRevenue: 0,
+  totalUnits: 0,
+  occupiedUnits: 0,
+  occupancyRate: 0,
+  pendingMaintenance: 0,
+  overduePayments: 0,
+  collectionRate: 0,
+  vacantUnits: 0,
+  totalLeases: 0,
+  pendingRequests: 0,
+};
+
 const SuperAdminDashboard = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProperties: 0,
-    activeUsers: 0,
-    pendingApprovals: 0,
-    totalRevenue: 0,
-    totalUnits: 0,
-    occupiedUnits: 0,
-    occupancyRate: 0,
-    pendingMaintenance: 0,
-    overduePayments: 0,
-    collectionRate: 0,
-    vacantUnits: 0,
-    totalLeases: 0,
-    pendingRequests: 0,
-    systemHealth: 100,
-  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
-  const [systemStatus, setSystemStatus] = useState({
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     database: true,
     api: true,
-    uptime: "99.9%",
-    lastChecked: new Date().toISOString(),
     responseTime: 0,
+    lastChecked: new Date().toISOString(),
   });
 
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
   useEffect(() => {
-    let isMounted = true;
-
-    const initDashboard = async () => {
-      if (isMounted) {
-        await loadDashboardData();
-      }
-    };
-
-    initDashboard();
-    
-    // Set up real-time subscriptions for payment updates
-    const rentPaymentChannel = supabase
-      .channel('rent_payments_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'rent_payments'
-        },
-        () => {
-          if (isMounted) {
-            loadStats();
-            loadRecentItems();
-          }
-        }
-      )
-      .subscribe();
-
-    const utilityReadingChannel = supabase
-      .channel('utility_readings_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'utility_readings'
-        },
-        () => {
-          if (isMounted) {
-            loadStats();
-            loadRecentItems();
-          }
-        }
-      )
-      .subscribe();
-
-    const billsUtilitiesChannel = supabase
-      .channel('bills_utilities_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bills_and_utilities'
-        },
-        () => {
-          if (isMounted) {
-            loadStats();
-            loadRecentItems();
-          }
-        }
-      )
-      .subscribe();
-    
-    const interval = setInterval(() => {
-      if (isMounted) {
-        loadDashboardData();
-      }
-    }, 60000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-      supabase.removeChannel(rentPaymentChannel);
-      supabase.removeChannel(utilityReadingChannel);
-      supabase.removeChannel(billsUtilitiesChannel);
-    };
+    loadDashboardData();
   }, []);
 
-  const loadDashboardData = async () => {
-    if (refreshing) return;
-    
-    try {
-      setLoading(true);
-      await Promise.all([
-        loadStats(),
-        loadRecentItems(),
-        loadSystemAlerts(),
-        checkSystemStatus(),
-      ]);
-      
-      if (!loading) {
-        toast.success("Dashboard data refreshed");
-      }
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-      if (!loading) {
-        toast.error("Failed to refresh dashboard data");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      loadDashboardData({ silent: true });
+    }, 60000);
 
-  const loadStats = async () => {
-    try {
-      // Fetch properties and unit types separately to avoid PostgREST schema cache issues
-      const { data: properties, error: propertiesError } = await supabase
-        .from("properties")
-        .select("id, status");
-      
-      const { data: unitTypes } = await supabase
-        .from("property_unit_types")
-        .select("property_id, units_count, price_per_unit");
-
-      // Fetch actual units with their status
-      const { data: units = [] } = await supabase
-        .from("units")
-        .select("id, status");
-
-      const propertiesData = properties || [];
-      const unitsData = unitTypes || [];
-      
-      // Calculate occupied units from actual unit records
-      const occupiedUnits = units.filter((u: any) => u.status?.toLowerCase() === 'occupied').length; 
-      
-      // Calculate total units from actual units table
-      const totalUnits = units.length;
-      
-      // Calculate estimated monthly rent potential from the units
-       const estimatedMonthlyRent = propertiesData.reduce((sum, prop: any) => {
-          return sum + (prop.property_unit_types || []).reduce((subSum: number, u: any) => subSum + (u.units_count * u.price_per_unit), 0);
-       }, 0);
-       // We'll map this to 'totalRevenue' or wherever it was used. 
-       // Wait, the original code used 'monthly_rent' column. 
-       
-      const vacantUnits = totalUnits - occupiedUnits;
-      const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
-
-      const { count: activeUsersCount } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "active");
-
-      const { count: pendingApprovalsCount } = await supabase
-        .from("approvals")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
-
-      const { count: pendingMaintenanceCount } = await supabase
-        .from("maintenance_requests")
-        .select("*", { count: "exact", head: true })
-        .in("status", ["pending", "assigned"]);
-
-      const { count: overduePaymentsCount } = await supabase
-        .from("payments")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "failed");
-
-      const { count: totalLeasesCount } = await supabase
-        .from("leases")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "active");
-
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-
-      // Fetch revenue from multiple sources
-      const { data: rentPayments } = await supabase
-        .from("rent_payments")
-        .select("amount_paid")
-        .eq("status", "completed")
-        .gte("payment_date", startOfMonth.toISOString());
-
-      const { data: utilizyPayments } = await supabase
-        .from("utility_readings")
-        .select("total_bill")
-        .eq("status", "paid")
-        .gte("reading_month", startOfMonth.toISOString());
-
-      const { data: billPayments } = await supabase
-        .from("bills_and_utilities")
-        .select("total_amount")
-        .eq("status", "completed")
-        .gte("payment_date", startOfMonth.toISOString());
-
-      const rentRevenue = rentPayments?.reduce((sum, payment) => sum + (payment.amount_paid || 0), 0) || 0;
-      const utilityRevenue = utilizyPayments?.reduce((sum, payment) => sum + (payment.total_bill || 0), 0) || 0;
-      const billRevenue = billPayments?.reduce((sum, payment) => sum + (payment.total_amount || 0), 0) || 0;
-      const totalRevenue = rentRevenue + utilityRevenue + billRevenue;
-
-      const totalExpectedRevenue = propertiesData.reduce((sum, p: any) => {
-        // Use potential income calculated from unit types
-        const potential = (p.property_unit_types || []).reduce((acc: number, u: any) => acc + (u.units_count * u.price_per_unit), 0);
-        return sum + potential;
-      }, 0);
-
-      const collectionRate = totalExpectedRevenue > 0 ? (totalRevenue / totalExpectedRevenue) * 100 : 0;
-
-      const { count: pendingRequestsCount } = await supabase
-        .from("approvals")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
-
-      setStats({
-        totalProperties: propertiesData.length || 0,
-        activeUsers: activeUsersCount || 0,
-        pendingApprovals: pendingApprovalsCount || 0,
-        totalRevenue,
-        totalUnits,
-        occupiedUnits,
-        occupancyRate: parseFloat(occupancyRate.toFixed(1)),
-        pendingMaintenance: pendingMaintenanceCount || 0,
-        overduePayments: overduePaymentsCount || 0,
-        collectionRate: parseFloat(collectionRate.toFixed(1)),
-        vacantUnits,
-        totalLeases: totalLeasesCount || 0,
-        pendingRequests: pendingRequestsCount || 0,
-        systemHealth: 100,
-      });
-    } catch (error) {
-      console.error("Error loading stats:", error);
-    }
-  };
-
-  const loadRecentItems = async () => {
-    try {
-      const items: RecentItem[] = [];
-
-      const { data: recentProperties } = await supabase
-        .from("properties")
-        .select("id, name, status, created_at")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      
-      // Fetch all unit types for manual join
-      const { data: allUnitTypes } = await supabase
-        .from("property_unit_types")
-        .select("property_id, units_count");
-
-      if (recentProperties) {
-        recentProperties.forEach((prop: any) => {
-          const propUnits = (allUnitTypes || []).filter((u: any) => u.property_id === prop.id);
-          const totalUnits = propUnits.reduce((sum: number, u: any) => sum + (u.units_count || 0), 0);
-          items.push({
-            id: prop.id,
-            title: prop.name || 'Unnamed Property',
-            subtitle: `${prop.status} • ${totalUnits} units`,
-            type: 'property',
-            time: formatTimeAgo(prop.created_at),
-            action: `/portal/super-admin/properties`,
-          });
-        });
-      }
-
-      const { data: recentUsers } = await supabase
-        .from("profiles")
-        .select("id, email, first_name, last_name, role, status, created_at")
-        .neq("role", "super_admin")
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (recentUsers) {
-        recentUsers.forEach(userItem => {
-          items.push({
-            id: userItem.id,
-            title: `${userItem.first_name || ''} ${userItem.last_name || ''}`.trim() || userItem.email,
-            subtitle: `${userItem.role || 'User'} • ${userItem.status || 'active'}`,
-            type: 'user',
-            time: formatTimeAgo(userItem.created_at),
-            action: `/portal/super-admin/users`,
-          });
-        });
-      }
-
-      const { data: recentPayments } = await supabase
-        .from("rent_payments")
-        .select("id, amount_paid, payment_method, status, payment_date, created_at")
-        .eq("status", "completed")
-        .order("payment_date", { ascending: false })
-        .limit(2);
-
-      const { data: recentUtilityPayments } = await supabase
-        .from("utility_readings")
-        .select("id, total_bill, status, reading_month")
-        .eq("status", "paid")
-        .order("reading_month", { ascending: false })
-        .limit(1);
-
-      if (recentPayments) {
-        recentPayments.forEach(payment => {
-          items.push({
-            id: payment.id,
-            title: `Rent Payment of ${formatCurrency(payment.amount_paid || 0)}`,
-            subtitle: `${payment.payment_method || 'Online'} • ${payment.status}`,
-            type: 'payment',
-            time: formatTimeAgo(payment.created_at),
-            action: `/portal/super-admin/payments`,
-          });
-        });
-      }
-
-      if (recentUtilityPayments) {
-        recentUtilityPayments.forEach(payment => {
-          items.push({
-            id: payment.id,
-            title: `Utility Payment of ${formatCurrency(payment.total_bill || 0)}`,
-            subtitle: `Utilities • ${payment.status}`,
-            type: 'payment',
-            time: formatTimeAgo(payment.reading_month),
-            action: `/portal/super-admin/payments`,
-          });
-        });
-      }
-
-      const { data: recentApprovals } = await supabase
-        .from("approvals")
-        .select(`
-          id,
-          approval_type,
-          status,
-          created_at
-        `)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (recentApprovals) {
-        recentApprovals.forEach(approval => {
-          const titleMap: Record<string, string> = {
-            role_change: "Role Assignment",
-            manager_assignment: "Manager Assignment",
-            tenant_addition: "Tenant Addition",
-            tenant_removal: "Tenant Removal",
-          };
-          
-          items.push({
-            id: approval.id,
-            title: `Approval: ${titleMap[approval.approval_type] || approval.approval_type}`,
-            subtitle: `${approval.approval_type} • Pending Review`,
-            type: 'approval',
-            time: formatTimeAgo(approval.created_at),
-            action: `/portal/super-admin/approvals`,
-            data: approval,
-          });
-        });
-      }
-
-      setRecentItems(items.slice(0, 10));
-    } catch (error) {
-      console.error("Error loading recent items:", error);
-      setRecentItems([]);
-    }
-  };
-
-  const loadSystemAlerts = async () => {
-    try {
-      const alerts: SystemAlert[] = [];
-
-      const { data: emergencyMaintenance } = await supabase
-        .from("maintenance_requests")
-        .select("id, title, description, priority, status")
-        .eq("priority", "emergency")
-        .eq("status", "pending")
-        .limit(3);
-
-      if (emergencyMaintenance && emergencyMaintenance.length > 0) {
-        emergencyMaintenance.forEach(req => {
-          alerts.push({
-            id: `maintenance-${req.id}`,
-            title: `Emergency Maintenance: ${req.title}`,
-            description: req.description || "Emergency maintenance required",
-            type: 'critical',
-            priority: 'critical',
-            action: `/portal/super-admin/maintenance`
-          });
-        });
-      }
-
-      if (stats.overduePayments > 0) {
-        alerts.push({
-          id: "overdue-payments",
-          title: "Overdue Payments Alert",
-          description: `${stats.overduePayments} payments are overdue and require attention`,
-          type: 'error',
-          priority: 'high',
-          action: "/portal/super-admin/payments"
-        });
-      }
-
-      if (stats.vacantUnits > 0) {
-        alerts.push({
-          id: "vacant-units",
-          title: "Vacant Units",
-          description: `${stats.vacantUnits} units are currently vacant and need marketing`,
-          type: 'warning',
-          priority: 'medium',
-          action: "/portal/super-admin/properties"
-        });
-      }
-
-      if (stats.pendingRequests > 0) {
-        alerts.push({
-          id: "pending-approvals",
-          title: "Pending Approval Requests",
-          description: `${stats.pendingRequests} approval requests awaiting review`,
-          type: 'warning',
-          priority: 'high',
-          action: "/portal/super-admin/approvals"
-        });
-      }
-
-      if (alerts.length === 0) {
-        alerts.push({
-          id: "system-health",
-          title: "System Healthy",
-          description: "All systems operating normally. No critical issues detected.",
-          type: 'success',
-          priority: 'low',
-          action: "/portal/super-admin/settings"
-        });
-      }
-
-      setSystemAlerts(alerts);
-    } catch (error) {
-      console.error("Error loading system alerts:", error);
-    }
-  };
-
-  const checkSystemStatus = async () => {
-    try {
-      const startTime = Date.now();
-      const { error: dbError } = await supabase.from("profiles").select("id", { count: "exact", head: true }).limit(1);
-      const responseTime = Date.now() - startTime;
-
-      setSystemStatus({
-        database: !dbError,
-        api: responseTime < 2000,
-        uptime: "99.9%",
-        lastChecked: new Date().toISOString(),
-        responseTime,
-      });
-    } catch (error) {
-      console.error("Error checking system status:", error);
-      setSystemStatus({
-        database: false,
-        api: false,
-        uptime: "99.9%",
-        lastChecked: new Date().toISOString(),
-        responseTime: 0,
-      });
-    }
-  };
+    return () => window.clearInterval(interval);
+  }, []);
 
   const formatTimeAgo = (dateString: string): string => {
     try {
@@ -604,594 +131,888 @@ const SuperAdminDashboard = () => {
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
 
-      if (diffMins < 1) return "Just now";
+      if (diffMins < 1) return "Now";
       if (diffMins < 60) return `${diffMins}m ago`;
       if (diffHours < 24) return `${diffHours}h ago`;
       if (diffDays < 7) return `${diffDays}d ago`;
-      
-      if (diffDays < 30) {
-        const weeks = Math.floor(diffDays / 7);
-        return `${weeks}w ago`;
-      }
-      
-      if (diffDays < 365) {
-        const months = Math.floor(diffDays / 30);
-        return `${months}m ago`;
-      }
-      
-      return date.toLocaleDateString('en-KE', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      return date.toLocaleDateString("en-KE", {
+        month: "short",
+        day: "numeric",
+      });
     } catch {
       return "Recently";
     }
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadDashboardData();
-    setRefreshing(false);
-  };
+  const loadDashboardData = async (opts?: { silent?: boolean; showToast?: boolean }) => {
+    try {
+      if (!opts?.silent) {
+        setLoading(true);
+      }
 
-  const getItemIcon = (type: string) => {
-    switch (type) {
-      case 'property': return <Building className="w-4 h-4" />;
-      case 'user': return <Users className="w-4 h-4" />;
-      case 'payment': return <CreditCard className="w-4 h-4" />;
-      case 'maintenance': return <Wrench className="w-4 h-4" />;
-      case 'system': return <Database className="w-4 h-4" />;
-      case 'approval': return <FileCheck className="w-4 h-4" />;
-      case 'lease': return <FileText className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
+      const [nextStats, nextRecent, nextSystemStatus] = await Promise.all([
+        loadStats(),
+        loadRecentItems(),
+        checkSystemStatus(),
+      ]);
+      const nextAlerts = await loadSystemAlerts(nextStats);
+
+      setStats(nextStats);
+      setRecentItems(nextRecent);
+      setSystemStatus(nextSystemStatus);
+      setSystemAlerts(nextAlerts);
+
+      if (opts?.showToast) {
+        toast.success("Dashboard refreshed");
+      }
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      if (!opts?.silent) {
+        toast.error("Failed to load dashboard data");
+      }
+    } finally {
+      if (!opts?.silent) {
+        setLoading(false);
+      }
     }
   };
 
+  const loadStats = async (): Promise<DashboardStats> => {
+    try {
+      const [{ data: properties }, { data: units = [] }] = await Promise.all([
+        supabase.from("properties").select("id, status"),
+        supabase.from("units").select("id, status, price"),
+      ]);
+
+      const occupiedUnits = units.filter(
+        (u: any) => String(u.status || "").toLowerCase() === "occupied",
+      ).length;
+      const totalUnits = units.length;
+      const vacantUnits = Math.max(totalUnits - occupiedUnits, 0);
+      const occupancyRate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0;
+
+      const [
+        { count: totalUsersCount },
+        { count: activeUsersCount },
+        { count: totalApprovalsCount },
+        { count: pendingApprovalsCount },
+        { count: pendingMaintenanceCount },
+      ] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "active"),
+          supabase
+            .from("approvals")
+            .select("id", { count: "exact", head: true }),
+          supabase
+            .from("approvals")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "pending"),
+          supabase
+            .from("maintenance_requests")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["pending", "assigned"]),
+        ]);
+
+      const todayIso = new Date().toISOString().split("T")[0];
+      const { count: totalPaymentsCount } = await supabase
+        .from("rent_payments")
+        .select("id", { count: "exact", head: true });
+
+      const { count: overduePaymentsCount } = await supabase
+        .from("rent_payments")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["pending", "partial"])
+        .lt("due_date", todayIso);
+
+      const { count: totalTenantsCount } = await supabase
+        .from("tenants")
+        .select("id", { count: "exact", head: true });
+
+      const { count: totalLeasesCount } = await supabase
+        .from("leases")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active");
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { data: payments } = await supabase
+        .from("rent_payments")
+        .select("amount, amount_paid, status, created_at")
+        .in("status", ["paid", "partial", "completed"])
+        .gte("created_at", startOfMonth.toISOString());
+
+      const totalRevenue =
+        payments?.reduce((sum: number, payment: any) => {
+          const paidAmount = Number(payment.amount_paid || 0);
+          const fallbackAmount = Number(payment.amount || 0);
+          return sum + (paidAmount || fallbackAmount);
+        }, 0) || 0;
+
+      const totalExpectedRevenue = units
+        .filter((u: any) => String(u.status || "").toLowerCase() === "occupied")
+        .reduce((sum: number, u: any) => sum + Number(u.price || 0), 0);
+
+      const collectionRate = totalExpectedRevenue > 0 ? (totalRevenue / totalExpectedRevenue) * 100 : 0;
+
+      const pendingRequests = (pendingApprovalsCount || 0) + (pendingMaintenanceCount || 0);
+
+      return {
+        totalProperties: properties?.length || 0,
+        totalUsers: totalUsersCount || 0,
+        totalTenants: totalTenantsCount || 0,
+        totalPayments: totalPaymentsCount || 0,
+        totalApprovals: totalApprovalsCount || 0,
+        activeUsers: activeUsersCount || 0,
+        pendingApprovals: pendingApprovalsCount || 0,
+        totalRevenue,
+        totalUnits,
+        occupiedUnits,
+        occupancyRate: Number(occupancyRate.toFixed(1)),
+        pendingMaintenance: pendingMaintenanceCount || 0,
+        overduePayments: overduePaymentsCount || 0,
+        collectionRate: Number(collectionRate.toFixed(1)),
+        vacantUnits,
+        totalLeases: totalLeasesCount || 0,
+        pendingRequests,
+      };
+    } catch (error) {
+      console.error("Error loading stats:", error);
+      return EMPTY_STATS;
+    }
+  };
+
+  const loadRecentItems = async (): Promise<RecentItem[]> => {
+    try {
+      const items: RecentItem[] = [];
+
+      const [propertiesRes, usersRes, approvalsRes, paymentsRes] = await Promise.all([
+        supabase
+          .from("properties")
+          .select("id, name, status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("profiles")
+          .select("id, email, first_name, last_name, role, status, created_at")
+          .neq("role", "super_admin")
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("approvals")
+          .select("id, approval_type, status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("rent_payments")
+          .select("id, amount, amount_paid, status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(5),
+      ]);
+
+      const recentProperties = propertiesRes.data || [];
+      const recentUsers = usersRes.data || [];
+      const recentApprovals = approvalsRes.data || [];
+      const recentPayments = paymentsRes.data || [];
+
+      recentProperties.forEach((prop: any) => {
+        items.push({
+          id: `property-${prop.id}`,
+          title: prop.name || "Unnamed Property",
+          subtitle: `Property • ${prop.status || "active"}`,
+          type: "property",
+          createdAt: prop.created_at,
+          time: formatTimeAgo(prop.created_at),
+          action: "/portal/super-admin/properties",
+        });
+      });
+
+      recentUsers.forEach((usr: any) => {
+        const displayName = `${usr.first_name || ""} ${usr.last_name || ""}`.trim() || usr.email;
+        items.push({
+          id: `user-${usr.id}`,
+          title: displayName,
+          subtitle: `${usr.role || "user"} • ${usr.status || "active"}`,
+          type: "user",
+          createdAt: usr.created_at,
+          time: formatTimeAgo(usr.created_at),
+          action: "/portal/super-admin/users",
+        });
+      });
+
+      recentApprovals.forEach((approval: any) => {
+        items.push({
+          id: `approval-${approval.id}`,
+          title: `Approval ${approval.approval_type || "request"}`,
+          subtitle: `Approval • ${approval.status || "pending"}`,
+          type: "approval",
+          createdAt: approval.created_at,
+          time: formatTimeAgo(approval.created_at),
+          action: "/portal/super-admin/approvals",
+        });
+      });
+
+      recentPayments.forEach((payment: any) => {
+        const value = Number(payment.amount_paid || payment.amount || 0);
+        items.push({
+          id: `payment-${payment.id}`,
+          title: `Payment ${formatForDisplay(value, "KSH", true)}`,
+          subtitle: `Payment • ${payment.status || "pending"}`,
+          type: "payment",
+          createdAt: payment.created_at,
+          time: formatTimeAgo(payment.created_at),
+          action: "/portal/super-admin/payments",
+        });
+      });
+
+      return items
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 12);
+    } catch (error) {
+      console.error("Error loading recent items:", error);
+      return [];
+    }
+  };
+
+  const loadSystemAlerts = async (nextStats: DashboardStats): Promise<SystemAlert[]> => {
+    try {
+      const alerts: SystemAlert[] = [];
+
+      const { data: emergencyMaintenance } = await supabase
+        .from("maintenance_requests")
+        .select("id, title, description")
+        .eq("priority", "emergency")
+        .eq("status", "pending")
+        .limit(3);
+
+      (emergencyMaintenance || []).forEach((req: any) => {
+        alerts.push({
+          id: `em-${req.id}`,
+          title: `Emergency: ${req.title || "Maintenance request"}`,
+          description: req.description || "Immediate action required.",
+          type: "critical",
+          priority: "critical",
+          action: "/portal/super-admin/maintenance",
+        });
+      });
+
+      if (nextStats.overduePayments > 0) {
+        alerts.push({
+          id: "overdue-payments",
+          title: "Overdue payments",
+          description: `${nextStats.overduePayments} rent payment(s) are overdue.`,
+          type: "error",
+          priority: "high",
+          action: "/portal/super-admin/payments",
+        });
+      }
+
+      if (nextStats.pendingApprovals > 0) {
+        alerts.push({
+          id: "approvals",
+          title: "Pending approvals",
+          description: `${nextStats.pendingApprovals} approval item(s) are awaiting review.`,
+          type: "warning",
+          priority: "high",
+          action: "/portal/super-admin/approvals",
+        });
+      }
+
+      if (nextStats.vacantUnits > 0) {
+        alerts.push({
+          id: "vacancies",
+          title: "Vacant units",
+          description: `${nextStats.vacantUnits} unit(s) are currently vacant.`,
+          type: "info",
+          priority: "medium",
+          action: "/portal/super-admin/properties",
+        });
+      }
+
+      if (alerts.length === 0) {
+        alerts.push({
+          id: "healthy",
+          title: "System healthy",
+          description: "No high-priority issues detected.",
+          type: "success",
+          priority: "low",
+          action: "/portal/super-admin/dashboard",
+        });
+      }
+
+      return alerts;
+    } catch (error) {
+      console.error("Error loading alerts:", error);
+      return [
+        {
+          id: "fallback",
+          title: "Alerts unavailable",
+          description: "Could not load alerts right now.",
+          type: "warning",
+          priority: "medium",
+          action: "/portal/super-admin/settings",
+        },
+      ];
+    }
+  };
+
+  const checkSystemStatus = async (): Promise<SystemStatus> => {
+    try {
+      const startTime = Date.now();
+      const { error } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .limit(1);
+      const responseTime = Date.now() - startTime;
+
+      return {
+        database: !error,
+        api: responseTime < 2000,
+        responseTime,
+        lastChecked: new Date().toISOString(),
+      };
+    } catch {
+      return {
+        database: false,
+        api: false,
+        responseTime: 0,
+        lastChecked: new Date().toISOString(),
+      };
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboardData({ showToast: true });
+    setRefreshing(false);
+  };
+
+  const handleSendNote = () => {
+    if (!noteDraft.trim()) {
+      toast.info("Type a note first");
+      return;
+    }
+
+    toast.success("Note queued for admin log");
+    setNoteDraft("");
+  };
+
+  const resolveRequestStatus = (item: RecentItem): ActivityStatus => {
+    switch (item.type) {
+      case "property":
+        return "PROPERTY";
+      case "user":
+        return "USER";
+      case "approval":
+        return "APPROVAL";
+      case "maintenance":
+        return "MAINTENANCE";
+      case "payment":
+        return "PAYMENT";
+      default:
+        return "PROPERTY";
+    }
+  };
+
+  const resolveRequestPriority = (item: RecentItem): RequestPriority => {
+    if (item.type === "approval" || item.type === "maintenance") return "HIGH";
+    if (item.type === "payment") return "MEDIUM";
+    return "NORMAL";
+  };
+
+  const getStaffAlertTone = (type: SystemAlert["type"]) => {
+    switch (type) {
+      case "critical":
+      case "error":
+        return "border-[#d8606b] bg-[#ffe6e9] text-[#7f1f2a]";
+      case "warning":
+        return "border-[#e0a838] bg-[#fff4d8] text-[#6b4c05]";
+      case "success":
+        return "border-[#5db77b] bg-[#e5f8eb] text-[#1f5f35]";
+      default:
+        return "border-[#78a7ce] bg-[#eaf4ff] text-[#21486f]";
+    }
+  };
+
+  const getRecentItemTone = (type: RecentItem["type"]) => {
+    switch (type) {
+      case "user":
+        return "border-[#9aa5b5] bg-[#edf1f6] text-[#2f3f55]";
+      case "payment":
+        return "border-[#9d88e0] bg-[#efeaff] text-[#3f2a80]";
+      case "maintenance":
+        return "border-[#e0b352] bg-[#fff5df] text-[#6b4c08]";
+      case "approval":
+        return "border-[#72a8e5] bg-[#e8f2ff] text-[#184f8f]";
+      case "property":
+      default:
+        return "border-[#71be88] bg-[#e8f8ee] text-[#1f6a37]";
+    }
+  };
+
+  const getUserRoleTone = (role: string) => {
+    const normalizedRole = role.trim().toLowerCase();
+    if (normalizedRole === "tenant") return "bg-[#2fa7bf] text-white";
+    if (normalizedRole === "property_manager") return "bg-[#156ad8] text-white";
+    if (normalizedRole === "caretaker") return "bg-[#27a85b] text-white";
+    if (normalizedRole === "supplier") return "bg-[#f3bd11] text-[#1f2937]";
+    if (normalizedRole === "accountant") return "bg-[#6a4acb] text-white";
+    if (normalizedRole === "technician") return "bg-[#dc3545] text-white";
+    if (normalizedRole === "admin" || normalizedRole === "super_admin") return "bg-[#2f3d51] text-white";
+    return "bg-[#7b8895] text-white";
+  };
+
+  const filteredRecentItems = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return recentItems;
+
+    return recentItems.filter(
+      (item) =>
+        item.title.toLowerCase().includes(term) || item.subtitle.toLowerCase().includes(term),
+    );
+  }, [recentItems, searchQuery]);
+
+  const highPriorityCount = useMemo(
+    () => systemAlerts.filter((alert) => alert.priority === "high" || alert.priority === "critical").length,
+    [systemAlerts],
+  );
+
+  const inReviewCount = useMemo(
+    () => filteredRecentItems.filter((item) => resolveRequestStatus(item) === "APPROVAL").length,
+    [filteredRecentItems],
+  );
+
+  const pipelineLegend = useMemo(() => {
+    const data = [
+      { label: "Activities", value: Math.max(filteredRecentItems.length, 0), color: "#2fa7df" },
+      { label: "Maintenance", value: Math.max(stats.pendingMaintenance, 0), color: "#7b8895" },
+      { label: "Payments", value: Math.max(stats.overduePayments, 0), color: "#6a4acb" },
+      { label: "Approvals", value: Math.max(stats.pendingApprovals, 0), color: "#156ad8" },
+      { label: "Vacancies", value: Math.max(stats.vacantUnits, 0), color: "#f59e0b" },
+      { label: "Active Users", value: Math.max(stats.activeUsers - stats.pendingApprovals, 0), color: "#27a85b" },
+    ];
+
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    if (total === 0) {
+      return data.map((item, index) => ({ ...item, percent: index < 5 ? 20 : 0 }));
+    }
+
+    return data.map((item) => ({
+      ...item,
+      percent: Math.round((item.value / total) * 100),
+    }));
+  }, [filteredRecentItems.length, stats]);
+
+  const donutGradient = useMemo(() => {
+    const totalPercent = pipelineLegend.reduce((sum, item) => sum + item.percent, 0) || 100;
+    let cursor = 0;
+
+    const slices = pipelineLegend.map((item, index) => {
+      const start = cursor;
+      const raw = (item.percent / totalPercent) * 100;
+      const end = index === pipelineLegend.length - 1 ? 100 : start + raw;
+      cursor = end;
+      return `${item.color} ${start}% ${end}%`;
+    });
+
+    return `conic-gradient(${slices.join(",")})`;
+  }, [pipelineLegend]);
+
+  const topMetrics = [
+    {
+      title: "Properties",
+      value: stats.totalProperties.toLocaleString(),
+      bg: "bg-[#2aa8bf]",
+      footer: "bg-[#1f93a8]",
+      href: "/portal/super-admin/properties",
+    },
+    {
+      title: "Users",
+      value: stats.totalUsers.toLocaleString(),
+      bg: "bg-[#2daf4a]",
+      footer: "bg-[#24933d]",
+      href: "/portal/super-admin/users",
+    },
+    {
+      title: "Payments",
+      value: stats.totalPayments.toLocaleString(),
+      bg: "bg-[#f3bd11]",
+      footer: "bg-[#d6a409]",
+      href: "/portal/super-admin/payments",
+    },
+    {
+      title: "Approvals",
+      value: stats.pendingApprovals.toLocaleString(),
+      bg: "bg-[#dc3545]",
+      footer: "bg-[#c12c3a]",
+      href: "/portal/super-admin/approvals",
+    },
+  ];
+
+  const rightStats = [
+    {
+      title: "Tenants",
+      value: stats.totalTenants.toLocaleString(),
+      bg: "bg-[#f3bd11]",
+      icon: <Users className="h-5 w-5" />,
+    },
+    {
+      title: "Properties",
+      value: stats.totalProperties.toLocaleString(),
+      bg: "bg-[#dc3545]",
+      icon: <Building2 className="h-5 w-5" />,
+    },
+    {
+      title: "Payments Due",
+      value: stats.overduePayments.toLocaleString(),
+      bg: "bg-[#2dae49]",
+      icon: <CreditCard className="h-5 w-5" />,
+    },
+    {
+      title: "Approvals Pending",
+      value: stats.pendingApprovals.toLocaleString(),
+      bg: "bg-[#2fa7bf]",
+      icon: <CheckCircle className="h-5 w-5" />,
+    },
+  ];
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50 font-nunito">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#154279]" />
-          <p className="text-slate-600 text-[13px] font-medium">Loading dashboard data...</p>
+          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#2f3d51]" />
+          <p className="text-[13px] font-medium text-[#5f6b7c]">Loading dashboard data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
-        body { font-family: 'Nunito', sans-serif; }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
-      `}</style>
+    <div className="font-['Poppins','Segoe_UI',sans-serif] text-[#243041] p-4 md:p-6 bg-[#d7dce1] min-h-screen">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');`}</style>
 
-      {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg">
-        <div className="max-w-[1400px] mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-10">
-            <div className="md:w-1/2">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/30">
-                  System Admin
-                </span>
-                <span className="text-blue-100 text-[10px] font-semibold uppercase tracking-widest">
-                  v4.2.0
-                </span>
-              </div>
-              
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
-                Welcome back, <span className="text-[#F96302]">{user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` : user?.email?.split('@')[0] || 'Admin'}</span>
-              </h1>
-              
-              <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
-                Here's your system overview. Monitor properties, users, revenue, and system health in real-time with our modern dashboard.
-              </p>
-              
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleRefresh}
-                  className="group flex items-center gap-2 bg-white text-[#154279] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                  Refresh
-                </button>
-                
-                <button
-                  onClick={() => navigate("/portal/super-admin/reports")}
-                  className="group flex items-center gap-2 bg-white/20 border border-white/40 text-white px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/30 transition-all duration-300 rounded-xl shadow-sm hover:shadow-md"
-                >
-                  <FileBarChart className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-                  Reports
-                </button>
-              </div>
-            </div>
-            
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="md:w-1/2 w-full"
+      <div className="">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[#bcc3cd] pb-4">
+          <div>
+            <h1 className="text-[34px] font-bold leading-none text-[#1f2937]">
+              Dashboard
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#9aa4b1] bg-[#eef1f4] px-3 text-[11px] font-semibold uppercase tracking-wide text-[#334155] transition-colors hover:bg-white"
             >
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-slate-200 p-8 hover:shadow-2xl hover:border-[#F96302] transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-[#154279]/10 rounded-xl">
-                      <Shield className="w-6 h-6 text-[#154279]" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                        System Status
-                      </h3>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">Last updated: {formatTimeAgo(systemStatus.lastChecked)}</p>
-                    </div>
-                  </div>
-                  <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${systemStatus.database ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
-                    {systemStatus.uptime} Uptime
-                  </div>
-                </div>
-                
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Database</span>
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.database ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`} />
-                      <span className={`text-[12px] font-bold ${systemStatus.database ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {systemStatus.database ? 'Operational' : 'Offline'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="w-full h-px bg-slate-100" />
-                  
-                  <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">API Service</span>
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-2 h-2 rounded-full ring-4 ${systemStatus.api ? 'bg-emerald-500 ring-emerald-100' : 'bg-red-500 ring-red-100'}`} />
-                      <span className={`text-[12px] font-bold ${systemStatus.api ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {systemStatus.api ? 'Online' : 'Unavailable'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="w-full h-px bg-slate-100" />
-                  
-                  <div className="flex items-center justify-between group">
-                    <span className="text-[13px] font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Latency</span>
-                    <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-lg border ${systemStatus.responseTime < 500 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>
-                      {systemStatus.responseTime}ms
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowProfile(true)}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-[#2f3d51] bg-[#2f3d51] px-3 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#243041]"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              Profile
+            </button>
           </div>
         </div>
-      </section>
 
-      {/* KEY METRICS SECTION - ORANGE ICONS */}
-      <section className="bg-slate-50 py-14">
-        <div className="max-w-[1400px] mx-auto px-6">
-          <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-[#154279] tracking-tight mb-2">
-                Performance Overview
-              </h2>
-              <p className="text-sm text-slate-600 font-medium max-w-2xl">
-                Real-time metrics for your system's key performance indicators.
-              </p>
-            </div>
-            <div className="bg-white px-4 py-2 rounded-xl border-2 border-slate-200 flex items-center gap-2 shadow-sm">
-               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-               <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Live Updates</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                title: "Total Properties",
-                value: stats.totalProperties,
-                icon: <Building className="w-8 h-8 text-[#154279]" />,
-                metric: `${stats.totalUnits} Units`,
-                progress: stats.occupancyRate,
-                label: "Occupancy",
-                route: "/portal/super-admin/properties",
-                primaryColor: "#3b82f6",
-                secondaryColor: "#1e40af",
-                accentColor: "from-blue-50 via-blue-50/30 to-white",
-                borderHover: "hover:border-blue-400 hover:shadow-blue-500/20"
-              },
-              {
-                title: "Active Users",
-                value: stats.activeUsers,
-                icon: <Users className="w-8 h-8 text-[#154279]" />,
-                metric: `${stats.totalLeases} Leases`,
-                progress: (stats.totalLeases / (stats.totalUnits || 1)) * 100,
-                label: "Lease Rate",
-                route: "/portal/super-admin/users",
-                primaryColor: "#0ea5e9",
-                secondaryColor: "#0284c7",
-                accentColor: "from-cyan-50 via-cyan-50/30 to-white",
-                borderHover: "hover:border-cyan-400 hover:shadow-cyan-500/20"
-              },
-              {
-                title: "Monthly Revenue",
-                value: formatForDisplay(stats.totalRevenue, 'KSH', true),
-                icon: <DollarSign className="w-8 h-8 text-[#F96302]" />,
-                metric: `${stats.collectionRate.toFixed(0)}% Collection`,
-                progress: stats.collectionRate,
-                label: "Collections",
-                route: "/portal/super-admin/payments",
-                primaryColor: "#10b981",
-                secondaryColor: "#059669",
-                accentColor: "from-emerald-50 via-emerald-50/30 to-white",
-                borderHover: "hover:border-emerald-400 hover:shadow-emerald-500/20"
-              },
-              {
-                title: "System Health",
-                value: `${systemStatus.responseTime}ms`,
-                icon: <Activity className="w-8 h-8 text-[#F96302]" />,
-                metric: `${systemStatus.uptime} Uptime`,
-                progress: systemStatus.responseTime < 500 ? 95 : 70,
-                label: "Performance",
-                route: "/portal/super-admin/settings",
-                primaryColor: "#f59e0b",
-                secondaryColor: "#d97706",
-                accentColor: "from-amber-50 via-amber-50/30 to-white",
-                borderHover: "hover:border-amber-400 hover:shadow-amber-500/20"
-              }
-            ].map((metric, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                onClick={() => navigate(metric.route)}
-                className={`group relative border-2 rounded-2xl transition-all duration-300 flex flex-col h-full overflow-hidden cursor-pointer bg-gradient-to-br ${metric.accentColor} border-slate-300 ${metric.borderHover} hover:shadow-2xl hover:scale-[1.02] shadow-lg shadow-slate-300/30`}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {topMetrics.map((metric) => (
+            <div key={metric.title} className="border border-[#adb5bf] shadow-sm rounded-none flex flex-col justify-between">
+              <div className={`${metric.bg} h-[132px] w-full flex flex-col justify-center px-4`}>
+                <div className="text-[44px] font-bold leading-none text-[#111827]">{metric.value}</div>
+                <p className="text-[22px] font-semibold leading-none text-[#111827] mt-1">{metric.title}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(metric.href)}
+                className={`h-8 w-full ${metric.footer} flex items-center justify-center gap-1 text-[13px] font-semibold text-[#111827] transition-opacity hover:opacity-95`}
               >
-                {/* Decorative corner accent */}
-                <div className="absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 bg-gradient-to-br from-[#154279] transition-all duration-300" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
+                More info <span className="text-[14px]">➔</span>
+              </button>
+            </div>
+          ))}
+        </div>
 
-                {/* Main content */}
-                <div className="flex-grow relative p-8 flex flex-col items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#154279] to-transparent opacity-5 pointer-events-none transition-all duration-300" />
-                  
-                  <motion.div 
-                    whileHover={{ scale: 1.15, rotate: 5 }}
-                    className="relative z-10"
-                  >
-                    {metric.icon}
-                  </motion.div>
-                  
-                  <div className="relative z-10 mt-6 text-center w-full px-2">
-                    <h3 className="text-[13px] font-bold leading-tight group-hover:scale-105 transition-all uppercase tracking-tight text-[#154279]">
-                      {metric.title}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 font-medium mt-2">
-                      {metric.metric}
-                    </p>
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-8">
+            <div className="border-b border-[#bcc3cd] pb-3 mb-3">
+              <h2 className="text-[34px] font-bold leading-none text-[#263143]">Staff Activity Notes</h2>
+            </div>
+
+            <div className="max-h-[260px] space-y-3 overflow-y-auto pt-2 pb-4">
+              {systemAlerts.slice(0, 3).map((alert, idx) => (
+                <div
+                  key={alert.id}
+                  style={{ paddingLeft: idx > 0 ? idx * 24 : 0 }}
+                >
+                  <div className="flex items-center justify-between text-[11px] text-[#5f6b7c] mb-1">
+                    <span>{alert.id.split('-')[0] || "System"}</span>
+                    <span>{idx === 0 ? "Now" : `${idx * 2}m ago`}</span>
+                  </div>
+                  <div className={`px-3 py-2 text-[13px] border ${getStaffAlertTone(alert.type)}`}>
+                    {alert.title}: {alert.description}
                   </div>
                 </div>
+              ))}
 
-                {/* Bottom section with progress */}
-                <div className="relative z-30 p-6 border-t-2 transition-all bg-gradient-to-r from-slate-50 via-white to-slate-50 border-slate-200">
-                  <div className="absolute bottom-0 right-0 w-20 h-20 opacity-10 pointer-events-none transition-all duration-300">
-                    {metric.icon}
+              {filteredRecentItems.slice(0, 2).map((item) => (
+                <div
+                  key={item.id}
+                  className="pl-4"
+                >
+                  <div className="flex items-center justify-between text-[11px] text-[#5f6b7c] mb-1">
+                    <span>{item.type}</span>
+                    <span>{item.time}</span>
                   </div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#154279]">
-                        {metric.label}
-                      </span>
-                      <span className="text-xs font-bold text-[#154279]">
-                        {Math.min(metric.progress || 0, 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-slate-200 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(metric.progress || 0, 100)}%` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="h-full rounded-full"
-                        style={{ background: `linear-gradient(90deg, ${metric.primaryColor}, ${metric.secondaryColor})` }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-3">
-                      <span className="text-[9px] font-bold text-slate-600 uppercase tracking-wide">
-                        {metric.value}
-                      </span>
-                    </div>
+                  <div className={`px-3 py-2 text-[13px] border ${getRecentItemTone(item.type)}`}>
+                    {item.title}: {item.subtitle}
                   </div>
                 </div>
-              </motion.div>
+              ))}
+
+              {systemAlerts.length === 0 && filteredRecentItems.length === 0 && (
+                <div className="bg-[#eef1f4] border border-[#d2d8e0] px-3 py-8 text-center text-[13px] font-medium text-[#5f6b7c]">
+                  No notes available right now.
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 mt-3 border-t border-[#bcc3cd]">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder="Type Message ..."
+                  className="h-10 flex-1 border border-[#b6bec8] bg-[#eef1f4] px-3 text-[13px] text-[#1f2937] outline-none transition-colors placeholder:text-[#778396] focus:border-[#8e98a5]"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendNote}
+                  className="inline-flex h-10 items-center justify-center gap-2 bg-[#f0a500] px-5 text-[12px] font-semibold text-[#1f2937] transition-colors hover:bg-[#da9600]"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 xl:col-span-4">
+            {rightStats.map((card) => (
+              <div
+                key={card.title}
+                className={`${card.bg} flex items-center justify-between rounded-none border border-[#adb4be] px-4 py-3 text-[#111827]`}
+              >
+                <div className="flex items-center gap-2">
+                  {card.icon}
+                  <div>
+                    <p className="text-[20px] font-bold leading-none">{card.value}</p>
+                    <p className="mt-1 text-[20px] font-semibold leading-none">{card.title}</p>
+                  </div>
+                </div>
+              </div>
             ))}
+
+            <div className="rounded-none border border-[#adb4be] bg-[#eef1f4] px-4 py-3 mt-4">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-[#5f6b7c]">System</p>
+              <div className="mt-2 flex items-center gap-2 text-[12px] text-[#334155]">
+                {systemStatus.database ? (
+                  <CheckCircle className="h-4 w-4 text-[#2dae49]" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-[#dc3545]" />
+                )}
+                Database {systemStatus.database ? "Operational" : "Offline"}
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-[12px] text-[#334155]">
+                <Clock className="h-4 w-4 text-[#2fa7bf]" />
+                API latency {systemStatus.responseTime}ms
+              </div>
+            </div>
           </div>
         </div>
-      </section>
 
-      {/* MAIN CONTENT */}
-      <section className="py-12 bg-white">
-        <div className="max-w-[1400px] mx-auto px-6">
-          <div className="space-y-8">
-            {/* QUICK ACTIONS - HOWITWORKS STYLE */}
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px w-8 bg-[#F96302]"></div>
-                <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Quick Actions</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  {
-                    title: "Manage Users",
-                    icon: <Users className="w-6 h-6 text-white" />,
-                    description: "Add, edit, remove users",
-                    route: "/portal/super-admin/users",
-                    badge: stats.pendingApprovals > 0 ? stats.pendingApprovals : undefined,
-                    bgGradient: "from-blue-500 via-blue-600 to-blue-700",
-                    borderColor: "border-blue-300",
-                    iconBg: "bg-blue-400"
-                  },
-                  {
-                    title: "Properties",
-                    icon: <Building className="w-6 h-6 text-white" />,
-                    description: "View property listing",
-                    route: "/portal/super-admin/properties",
-                    bgGradient: "from-emerald-500 via-emerald-600 to-emerald-700",
-                    borderColor: "border-emerald-300",
-                    iconBg: "bg-emerald-400"
-                  },
-                  {
-                    title: "Approvals",
-                    icon: <FileCheck className="w-6 h-6 text-white" />,
-                    description: "Pending requests queue",
-                    route: "/portal/super-admin/approvals",
-                    badge: stats.pendingRequests > 0 ? stats.pendingRequests : undefined,
-                    bgGradient: "from-purple-500 via-purple-600 to-purple-700",
-                    borderColor: "border-purple-300",
-                    iconBg: "bg-purple-400"
-                  },
-                  {
-                    title: "Analytics",
-                    icon: <BarChart3 className="w-6 h-6 text-white" />,
-                    description: "Performance reports",
-                    route: "/portal/super-admin/analytics",
-                    bgGradient: "from-cyan-500 via-cyan-600 to-cyan-700",
-                    borderColor: "border-cyan-300",
-                    iconBg: "bg-cyan-400"
-                  },
-                  {
-                    title: "Reports",
-                    icon: <FileBarChart className="w-6 h-6 text-white" />,
-                    description: "Financial summaries",
-                    route: "/portal/super-admin/reports",
-                    bgGradient: "from-pink-500 via-pink-600 to-pink-700",
-                    borderColor: "border-pink-300",
-                    iconBg: "bg-pink-400"
-                  },
-                  {
-                    title: "Maintenance",
-                    icon: <Wrench className="w-6 h-6 text-white" />,
-                    description: "Service requests",
-                    route: "/portal/super-admin/maintenance",
-                    badge: stats.pendingMaintenance > 0 ? stats.pendingMaintenance : undefined,
-                    bgGradient: "from-orange-500 via-orange-600 to-orange-700",
-                    borderColor: "border-orange-300",
-                    iconBg: "bg-orange-400"
-                  }
-                ].map((action, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    onClick={() => navigate(action.route)}
-                    className={`group relative border-2 ${action.borderColor} rounded-2xl p-6 cursor-pointer transition-all duration-300 bg-gradient-to-br ${action.bgGradient} hover:border-white hover:shadow-2xl hover:shadow-black/20 hover:scale-[1.05] shadow-lg overflow-hidden text-white`}
-                  >
-                    {/* Decorative corner */}
-                    <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none opacity-20 bg-white group-hover:opacity-30 transition-all" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex justify-between items-start mb-4">
-                        <motion.div whileHover={{ scale: 1.1, rotate: -5 }} className={`p-3 ${action.iconBg} rounded-xl shadow-md group-hover:shadow-lg transition-all`}>
-                          {action.icon}
-                        </motion.div>
-                        {action.badge && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] font-bold text-slate-900 shadow-md ring-2 ring-white">
-                            {action.badge}
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-[15px] font-bold text-white mb-1">{action.title}</h4>
-                      <p className="text-[12px] text-white/90 font-medium">{action.description}</p>
-                    </div>
-                  </motion.div>
-                ))}
+        <div className="mt-8 grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-8">
+            <div className="flex flex-col gap-3 border-b border-[#bcc3cd] pb-3 mb-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-[34px] font-bold leading-none text-[#263143]">Recent Activities</h2>
+              <div className="relative w-full sm:w-[280px]">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8595]" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search activities..."
+                  className="h-9 w-full border border-[#b6bec8] bg-[#eef1f4] pl-9 pr-3 text-[13px] text-[#1f2937] outline-none transition-colors placeholder:text-[#778396] focus:border-[#8e98a5]"
+                />
               </div>
             </div>
 
-            {/* SYSTEM ALERTS */}
-            <div className="space-y-5">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px w-8 bg-[#F96302]"></div>
-                <h3 className="text-lg font-semibold text-[#154279] tracking-tight">System Alerts</h3>
-                {systemAlerts.length > 0 && <Badge className="border-red-300 text-red-700 bg-red-50 border-2 ml-auto">{systemAlerts.length} Active</Badge>}
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {systemAlerts.map((alert, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`p-5 rounded-2xl border-2 transition-all cursor-pointer group relative overflow-hidden ${
-                      alert.type === 'critical' ? 'bg-red-50 border-red-300 hover:bg-red-100 hover:shadow-lg hover:shadow-red-500/20' :
-                      alert.type === 'error' ? 'bg-red-50 border-red-200 hover:bg-red-100 hover:shadow-lg hover:shadow-red-500/20' :
-                      alert.type === 'warning' ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 hover:shadow-lg hover:shadow-amber-500/20' :
-                      'bg-emerald-50 border-emerald-300 hover:bg-emerald-100 hover:shadow-lg hover:shadow-emerald-500/20'
-                    }`}
-                    onClick={() => alert.action && navigate(alert.action)}
-                  >
-                    {/* Decorative accent */}
-                    <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none opacity-10 bg-gradient-to-br from-[#F96302] group-hover:opacity-20 transition-all" style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[660px] border-collapse text-left">
+                <thead>
+                  <tr className="bg-[#d7dee6] text-[11px] uppercase tracking-wide text-[#5f6b7c]">
+                    <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">ID</th>
+                    <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Activity</th>
+                    <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Status</th>
+                    <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Priority</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRecentItems.slice(0, 7).map((item, index) => {
+                    const status = resolveRequestStatus(item);
+                    const priority = resolveRequestPriority(item);
+                    const userRole = item.type === "user" ? item.subtitle.split("•")[0].trim() : "";
 
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                       alert.type === 'critical' || alert.type === 'error' ? 'bg-red-500' :
-                       alert.type === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
-                    }`}></div>
-
-                    <div className="flex items-start gap-4 pl-2 relative z-10">
-                      <div className={`p-3 rounded-xl mt-0.5 shrink-0 ${
-                        alert.type === 'critical' || alert.type === 'error' ? 'bg-red-200 text-red-700' :
-                        alert.type === 'warning' ? 'bg-amber-200 text-amber-700' :
-                        'bg-emerald-200 text-emerald-700'
-                      }`}>
-                        {alert.type === 'critical' || alert.type === 'error' ? 
-                          <AlertCircle className="w-5 h-5" /> :
-                          alert.type === 'warning' ? 
-                          <AlertTriangle className="w-5 h-5" /> :
-                          <CheckCircle className="w-5 h-5" />
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-[14px] text-slate-900">{alert.title}</h4>
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border-2 whitespace-nowrap ${
-                            alert.priority === 'critical' || alert.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300' : 
-                            'bg-slate-100 text-slate-700 border-slate-300'
-                          }`}>
-                            {alert.priority}
-                          </span>
-                        </div>
-                        <p className="text-[13px] text-slate-700 leading-relaxed font-medium">{alert.description}</p>
-                        
-                        {alert.action && (
-                          <div className="flex items-center gap-1 mt-3 text-[#154279] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <span className="text-[11px] font-bold uppercase tracking-wide">View Details</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* RECENT ACTIVITY & SHORTCUTS GRID */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* RECENT ACTIVITY - LEFT */}
-              {/* LOGIN ACTIVITY TRACKER - LEFT */}
-              <div className="lg:col-span-2">
-                <LoginActivityTracker />
-              </div>
-              {/* QUICK LINKS / SHORTCUTS - RIGHT */}
-              <div className="space-y-5">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px w-8 bg-[#F96302]"></div>
-                  <h3 className="text-lg font-semibold text-[#154279] tracking-tight">Shortcuts</h3>
-                </div>
-
-                <div className="bg-gradient-to-br from-[#154279] to-[#0f325e] rounded-2xl shadow-xl border-2 border-[#154279] overflow-hidden text-white relative hover:shadow-2xl hover:border-[#F96302] transition-all">
-                   <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                   <div className="absolute bottom-0 left-0 p-24 bg-[#F96302]/10 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none"></div>
-                   
-                    <div className="p-6 relative z-10">
-                      <div className="space-y-2">
-                        {[
-                          {
-                            title: "Add New User",
-                            icon: <UserPlus className="w-4 h-4" />,
-                            route: "/portal/super-admin/users"
-                          },
-                          {
-                            title: "My Profile",
-                            icon: <Shield className="w-4 h-4" />,
-                            action: () => setShowProfile(true)
-                          },
-                          {
-                            title: "Add Property",
-                            icon: <Home className="w-4 h-4" />,
-                            route: "/portal/super-admin/properties"
-                          },
-                          {
-                            title: "Rental Report",
-                            icon: <FileBarChart className="w-4 h-4" />,
-                            route: "/portal/super-admin/reports"
-                          },
-                          {
-                            title: "Analytics",
-                            icon: <BarChart3 className="w-4 h-4" />,
-                            route: "/portal/super-admin/analytics"
-                          },
-                          {
-                            title: "Settings",
-                            icon: <Settings className="w-4 h-4" />,
-                            route: "/portal/super-admin/settings"
-                          }
-                        ].map((link, index) => (
-                          <motion.button
-                            key={index}
-                            whileHover={{ x: 4 }}
-                            onClick={() => {
-                              if ('action' in link && link.action) {
-                                link.action();
-                              } else if ('route' in link) {
-                                navigate(link.route);
-                              }
-                            }}
-                            className="w-full flex items-center justify-between p-3 text-left bg-white/10 hover:bg-white/20 hover:bg-[#F96302]/20 rounded-xl transition-all duration-200 group border-2 border-white/10 hover:border-[#F96302]"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-white/10 group-hover:bg-[#F96302]/30 rounded-lg text-white group-hover:text-[#F96302] transition-all">
-                                  <motion.div whileHover={{ rotate: 10 }}>
-                                    {link.icon}
-                                  </motion.div>
-                              </div>
-                              <span className="text-[13px] font-bold text-white group-hover:text-[#F96302] transition-colors">
-                                {link.title}
+                    return (
+                      <tr key={item.id} className="hover:bg-[#e8edf3]">
+                        <td className="border-b border-[#cfd6df] px-4 py-3 text-[12px] font-semibold text-[#456b96]">
+                          {item.id.slice(0, 8).toUpperCase()}
+                        </td>
+                        <td className="border-b border-[#cfd6df] px-4 py-3 text-[12px] font-semibold text-[#2d3748]">
+                          <div>{item.title}</div>
+                          <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-[#6b7788]">
+                            <span>{item.subtitle}</span>
+                            {item.type === "user" && (
+                              <span className={`inline-flex px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getUserRoleTone(userRole)}`}>
+                                {userRole}
                               </span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-[#F96302] transition-colors" />
-                          </motion.button>
-                        ))}
-                      </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="border-b border-[#cfd6df] px-4 py-3 text-[11px] font-bold">
+                          <span
+                            className={`inline-flex px-2 py-1 ${
+                              status === "APPROVAL"
+                                ? "bg-[#156ad8] text-white"
+                                : status === "USER"
+                                  ? "bg-[#7b8895] text-white"
+                                  : status === "PAYMENT"
+                                    ? "bg-[#6a4acb] text-white"
+                                    : status === "MAINTENANCE"
+                                      ? "bg-[#f3bd11] text-[#1f2937]"
+                                      : status === "PROPERTY"
+                                        ? "bg-[#27a85b] text-white"
+                                        : "bg-[#2fa7bf] text-white"
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+                        <td className="border-b border-[#cfd6df] px-4 py-3 text-[11px] font-bold">
+                          <span
+                            className={`inline-flex px-2 py-1 ${
+                              priority === "HIGH"
+                                ? "bg-[#dc3545] text-white"
+                                : priority === "MEDIUM"
+                                  ? "bg-[#f3bd11] text-[#1f2937]"
+                                  : "bg-[#f7c949] text-[#1f2937]"
+                            }`}
+                          >
+                            {priority}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {filteredRecentItems.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-4 py-10 text-center text-[13px] font-medium text-[#5f6b7c]"
+                      >
+                        No activity rows match this search.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="xl:col-span-4">
+            <div className="border-b border-[#bcc3cd] pb-3 mb-3">
+              <h3 className="text-[32px] font-bold leading-none text-[#263143]">Pipeline Mix</h3>
+            </div>
+
+            <div className="mt-5 flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="relative flex h-44 w-44 items-center justify-center rounded-full" style={{ background: donutGradient }}>
+                <div className="h-24 w-24 rounded-full bg-[#d7dce1]" />
+              </div>
+
+              <div className="w-full space-y-2 sm:w-auto">
+                {pipelineLegend.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between gap-3 text-[12px]">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="font-medium text-[#334155]">{item.label}</span>
                     </div>
-                </div>
+                    <span className="font-semibold text-[#5f6b7c]">({item.percent}%)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-none border border-[#c2c9d2] bg-[#edf1f5] px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5f6b7c]">Revenue This Month</p>
+              <p className="mt-1 text-[20px] font-bold text-[#1f2937]">
+                {formatForDisplay(stats.totalRevenue || 0, "KSH", true)}
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-[11px] text-[#5f6b7c]">
+                <Building2 className="h-3.5 w-3.5 text-[#2fa7bf]" />
+                {stats.totalProperties} properties
+                <Users className="ml-2 h-3.5 w-3.5 text-[#2dae49]" />
+                {stats.totalLeases} active leases
+                <Wrench className="ml-2 h-3.5 w-3.5 text-[#dc3545]" />
+                {stats.pendingMaintenance} maintenance
               </div>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Profile Modal */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Badge className="bg-[#2f3d51] text-white">Occupancy {stats.occupancyRate}%</Badge>
+          <Badge className="bg-[#2dae49] text-white">Collection {Math.round(stats.collectionRate)}%</Badge>
+          <Badge className="bg-[#dc3545] text-white">Overdue {stats.overduePayments}</Badge>
+          <Badge className="bg-[#2fa7bf] text-white">Units {stats.occupiedUnits}/{stats.totalUnits}</Badge>
+        </div>
+      </div>
+
       <AnimatePresence>
         {showProfile && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center overflow-y-auto backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
             onClick={() => setShowProfile(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              initial={{ y: 16, scale: 0.98, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 16, scale: 0.98, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full m-4"
+              className="relative w-full max-w-4xl"
             >
-              <div className="bg-white rounded-2xl shadow-2xl max-w-4xl mx-auto relative">
-                <button
-                  onClick={() => setShowProfile(false)}
-                  className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-lg transition-colors z-10"
-                >
-                  <X className="w-5 h-5 text-slate-600" />
-                </button>
+              <button
+                type="button"
+                onClick={() => setShowProfile(false)}
+                className="absolute right-3 top-3 z-10 rounded-md bg-[#2f3d51] p-2 text-white hover:bg-[#243041]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="max-h-[85vh] overflow-y-auto rounded-2xl border border-[#b7bec8] bg-[#eef1f4] shadow-2xl">
                 <SuperAdminProfile />
               </div>
             </motion.div>

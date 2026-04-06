@@ -8,7 +8,7 @@ export interface UserProfile {
   last_name?: string;
   full_name?: string;
   phone?: string | null;
-  role: 'tenant' | 'property_manager' | 'super_admin' | 'technician' | 'proprietor' | 'caretaker' | 'accountant';
+  role: 'tenant' | 'property_manager' | 'super_admin' | 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'supplier';
   user_type?: string;
   status: 'active' | 'inactive' | 'suspended' | 'pending';
   is_active: boolean;
@@ -20,7 +20,7 @@ export interface UserProfile {
   last_login_at?: string | null;
 }
 
-export type UserRole = 'tenant' | 'property_manager' | 'super_admin' | 'technician' | 'proprietor' | 'caretaker' | 'accountant';
+export type UserRole = 'tenant' | 'property_manager' | 'super_admin' | 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'supplier';
 
 export interface CreateUserInput {
   email: string;

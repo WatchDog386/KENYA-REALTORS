@@ -1,11 +1,11 @@
 // src/services/technicianService.ts
-import { supabase } from '../../integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Technician, 
   TechnicianCategory, 
   TechnicianPropertyAssignment,
   TechnicianJobUpdate 
-} from '../../types/newRoles';
+} from '@/types/newRoles';
 
 // ============================================================================
 // TECHNICIAN CATEGORIES
@@ -394,50 +394,60 @@ export const technicianService = {
             .in('property_id', assignedPropertyIds);
     }
 
-    // Query C: Category Pool (Unassigned + Matching Category + No property assignment requirement)
-    // This ensures technicians see jobs in their category even if they have no properties assigned
-    let queryCategoryPool = supabase
+    // Query C: Category Pool in assigned properties only.
+    // This prevents technicians from seeing jobs for unrelated properties.
+    let queryCategoryPool = null;
+    if (assignedPropertyIds.length > 0) {
+      queryCategoryPool = supabase
         .from('maintenance_requests')
         .select(`
-            *,
-            property:properties(id, name, location),
-            tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-            category:technician_categories:category_id(name)
+          *,
+          property:properties(id, name, location),
+          tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
+          category:technician_categories:category_id(name)
         `)
         .is('assigned_to_technician_id', null)
-        .eq('category_id', tech.category_id);
+        .eq('category_id', tech.category_id)
+        .in('property_id', assignedPropertyIds);
+    }
 
-    // Query D: Fallback - All unassigned requests without category_id (legacy requests)
-    // Some requests might not have category_id set - show them as available
-    let queryFallback = supabase
+    // Query D: Fallback legacy un-categorized requests in assigned properties only.
+    let queryFallback = null;
+    if (assignedPropertyIds.length > 0) {
+      queryFallback = supabase
         .from('maintenance_requests')
         .select(`
-            *,
-            property:properties(id, name, location),
-            tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-            category:technician_categories:category_id(name)
+          *,
+          property:properties(id, name, location),
+          tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
+          category:technician_categories:category_id(name)
         `)
         .is('assigned_to_technician_id', null)
-        .is('category_id', null);
+        .is('category_id', null)
+        .in('property_id', assignedPropertyIds);
+    }
 
     // Apply status filter if present
     if (status) {
         queryDirectAssigned = queryDirectAssigned.eq('status', status);
         if (queryPropertyPool) queryPropertyPool = queryPropertyPool.eq('status', status);
-        queryCategoryPool = queryCategoryPool.eq('status', status);
-        queryFallback = queryFallback.eq('status', status);
+      if (queryCategoryPool) queryCategoryPool = queryCategoryPool.eq('status', status);
+      if (queryFallback) queryFallback = queryFallback.eq('status', status);
     }
 
-    // Execute in parallel
-    const queries = [queryDirectAssigned, queryCategoryPool, queryFallback];
-    if (queryPropertyPool) queries.splice(1, 0, queryPropertyPool);
+    // Execute in parallel.
+    const queries = [queryDirectAssigned];
+    if (queryPropertyPool) queries.push(queryPropertyPool);
+    if (queryCategoryPool) queries.push(queryCategoryPool);
+    if (queryFallback) queries.push(queryFallback);
     
     const results = await Promise.all(queries);
     
     const directRes = results[0];
-    const propertyRes = queryPropertyPool ? results[1] : { data: [], error: null };
-    const categoryRes = results[queryPropertyPool ? 2 : 1];
-    const fallbackRes = results[queryPropertyPool ? 3 : 2];
+    let resultIndex = 1;
+    const propertyRes = queryPropertyPool ? results[resultIndex++] : { data: [], error: null };
+    const categoryRes = queryCategoryPool ? results[resultIndex++] : { data: [], error: null };
+    const fallbackRes = queryFallback ? results[resultIndex++] : { data: [], error: null };
 
     if (directRes.error) console.error("Error fetching directly assigned jobs:", directRes.error);
     if (propertyRes.error) console.error("Error fetching property pool jobs:", propertyRes.error);

@@ -4,9 +4,11 @@ import { Property } from '@/hooks/useProperties';
 interface PropertyGridProps {
   properties: Property[];
   onPropertyClick?: (id: string) => void;
+  onRequestVisit?: (property: Property) => void;
+  onBookUnit?: (property: Property) => void;
 }
 
-const PropertyGrid = ({ properties, onPropertyClick }: PropertyGridProps) => {
+const PropertyGrid = ({ properties, onPropertyClick, onRequestVisit, onBookUnit }: PropertyGridProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {properties.map((property) => (
@@ -49,12 +51,27 @@ const PropertyGrid = ({ properties, onPropertyClick }: PropertyGridProps) => {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                onClick={() => onPropertyClick?.(property.id)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors duration-300"
+              >
+                View Listing
+                <ArrowRight size={16} />
+              </button>
+              <button
+                onClick={() => onRequestVisit?.(property)}
+                className="w-full bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 font-semibold py-2 px-3 rounded-lg transition-colors duration-300"
+              >
+                Request Visit
+              </button>
+            </div>
+
             <button
-              onClick={() => onPropertyClick?.(property.id)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-300"
+              onClick={() => onBookUnit?.(property)}
+              className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-300"
             >
-              View This Listing
-              <ArrowRight size={16} />
+              Book This Unit
             </button>
           </div>
         </div>

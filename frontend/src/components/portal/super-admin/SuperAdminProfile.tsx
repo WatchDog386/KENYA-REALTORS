@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, Upload, Check, X, Edit2, Shield } from "lucide-react";
-import { HeroBackground } from "@/components/ui/HeroBackground";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Camera,
+  Check,
+  CheckCircle2,
+  Key,
+  Loader2,
+  Mail,
+  Phone,
+  Shield,
+  User,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useRoles } from "@/hooks/useRoles";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface ProfileData {
   id: string;
@@ -17,7 +26,7 @@ interface ProfileData {
   phone?: string;
   avatar_url?: string;
   role: string;
-  status: 'active' | 'inactive' | 'suspended' | 'pending';
+  status: "active" | "inactive" | "suspended" | "pending";
   created_at: string;
   updated_at: string;
   last_login_at?: string;
@@ -36,25 +45,38 @@ interface UserRoleData {
   };
 }
 
+const PANEL_HEADER_CLASS =
+  "bg-[#154279] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white";
+
+const inputClassName =
+  "h-10 rounded-none border border-[#b6bec8] bg-white px-3 text-[13px] text-[#1f2937] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#F96302]";
+
+const SUPER_ADMIN_FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=1000&q=80";
+
 const SuperAdminProfile: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { fetchUserRoles } = useRoles();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [userRoles, setUserRoles] = useState<UserRoleData[]>([]);
   const [allPermissions, setAllPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  
+
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     phone: "",
     avatar_url: "",
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    newPassword: "",
+    confirmPassword: "",
   });
 
   useEffect(() => {
@@ -74,7 +96,7 @@ const SuperAdminProfile: React.FC = () => {
         .single();
 
       if (error) throw error;
-      
+
       setProfile(data);
       setFormData({
         first_name: data?.first_name || "",
@@ -82,6 +104,7 @@ const SuperAdminProfile: React.FC = () => {
         phone: data?.phone || "",
         avatar_url: data?.avatar_url || "",
       });
+
       if (data?.avatar_url) {
         setPreviewImage(data.avatar_url);
       }
@@ -98,16 +121,16 @@ const SuperAdminProfile: React.FC = () => {
 
     try {
       const roles = await fetchUserRoles(user.id);
-      setUserRoles(roles as unknown as UserRoleData[]);
-      
-      // Extract all unique permissions from roles
+      const normalizedRoles = (roles || []) as UserRoleData[];
+      setUserRoles(normalizedRoles);
+
       const permissionsSet = new Set<string>();
-      roles.forEach((userRole: any) => {
-        userRole.role?.permissions?.forEach((perm: string) => {
-          permissionsSet.add(perm);
+      normalizedRoles.forEach((entry) => {
+        entry.role?.permissions?.forEach((permission) => {
+          permissionsSet.add(permission);
         });
       });
-      
+
       setAllPermissions(Array.from(permissionsSet).sort());
     } catch (err) {
       console.error("Error fetching roles:", err);
@@ -126,13 +149,11 @@ const SuperAdminProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
 
-    // Validate file size (max 2MB for base64)
     if (file.size > 2 * 1024 * 1024) {
       toast.error("Image size must be less than 2MB");
       return;
@@ -140,42 +161,29 @@ const SuperAdminProfile: React.FC = () => {
 
     try {
       setImageUploading(true);
-      
-      if (!user?.id) {
-        toast.error("User not authenticated");
-        return;
-      }
 
-      // Read file as base64 data URL
       const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const base64String = event.target?.result as string;
-          
-          setFormData((prev) => ({
-            ...prev,
-            avatar_url: base64String,
-          }));
-          setPreviewImage(base64String);
-          toast.success("Image selected successfully");
-        } catch (err) {
-          console.error("Error processing image:", err);
-          toast.error("Failed to process image");
-        } finally {
-          setImageUploading(false);
-        }
-      };
-      
-      reader.onerror = () => {
-        toast.error("Failed to read image file");
+      reader.onload = (event) => {
+        const base64String = event.target?.result as string;
+        setFormData((prev) => ({
+          ...prev,
+          avatar_url: base64String,
+        }));
+        setPreviewImage(base64String);
         setImageUploading(false);
+        toast.success("Image selected. Click Save Profile to apply.");
       };
-      
+
+      reader.onerror = () => {
+        setImageUploading(false);
+        toast.error("Failed to read image file");
+      };
+
       reader.readAsDataURL(file);
-    } catch (err: any) {
-      console.error("Error uploading image:", err);
-      toast.error("Failed to process image");
+    } catch (err) {
+      console.error("Error processing image:", err);
       setImageUploading(false);
+      toast.error("Failed to process image");
     }
   };
 
@@ -200,11 +208,15 @@ const SuperAdminProfile: React.FC = () => {
 
       if (error) throw error;
 
-      setProfile({
-        ...profile!,
-        ...formData,
-      });
-      setIsEditing(false);
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...formData,
+            }
+          : prev,
+      );
+
       toast.success("Profile updated successfully");
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -214,7 +226,7 @@ const SuperAdminProfile: React.FC = () => {
     }
   };
 
-  const handleCancel = () => {
+  const handleResetForm = () => {
     setFormData({
       first_name: profile?.first_name || "",
       last_name: profile?.last_name || "",
@@ -222,106 +234,151 @@ const SuperAdminProfile: React.FC = () => {
       avatar_url: profile?.avatar_url || "",
     });
     setPreviewImage(profile?.avatar_url || null);
-    setIsEditing(false);
   };
+
+  const handleChangePassword = async () => {
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      toast.error("Fill in new password and confirmation");
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (error) throw error;
+
+      setPasswordData({ newPassword: "", confirmPassword: "" });
+      toast.success("Password updated successfully");
+    } catch (err) {
+      console.error("Error changing password:", err);
+      toast.error("Failed to update password");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const fullName = `${formData.first_name || "Super"} ${formData.last_name || "Admin"}`.trim();
+  const imageSrc = previewImage || formData.avatar_url || SUPER_ADMIN_FALLBACK_IMAGE;
+
+  const roleLabels = useMemo(() => {
+    const labels = new Set<string>();
+
+    userRoles.forEach((entry) => {
+      if (entry.role?.name) {
+        labels.add(entry.role.name);
+      }
+    });
+
+    if (profile?.role === "super_admin") {
+      labels.add("Super Administrator");
+    }
+
+    if (labels.size === 0 && profile?.role) {
+      labels.add(profile.role.replace(/_/g, " "));
+    }
+
+    return Array.from(labels);
+  }, [profile?.role, userRoles]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
+      <div className="flex min-h-[55vh] items-center justify-center bg-[#d7dce1]">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#154279]" />
+          <p className="text-[13px] font-medium text-[#5f6b7c]">Loading profile data...</p>
+        </div>
       </div>
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "inactive":
-        return "bg-gray-100 text-gray-800";
-      case "suspended":
-        return "bg-red-100 text-red-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="min-h-screen bg-[#d7dce1] p-4 md:p-6 font-['Poppins','Segoe_UI',sans-serif] text-[#243041]">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');`}</style>
 
-      {/* Header */}
-      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
-        <HeroBackground />
-        <div className="relative z-10 flex items-center gap-4 max-w-7xl mx-auto">
-          <button
-             onClick={() => navigate("/portal/super-admin")}
-             className="p-2 mb-auto bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
-           >
-             <ArrowLeft size={20} />
-           </button>
-           <div>
-             <div className="flex items-center gap-3 mb-2">
-                 <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
-                    <Shield className="w-5 h-5 text-white" />
-                 </div>
-                 <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Account Settings</span>
-             </div>
-             <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
-               My Profile
-             </h1>
-             <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
-               {isEditing ? "Edit your personal information" : "Manage your personal information, security settings, and role permissions."}
-             </p>
-           </div>
-        </div>
-      </section>
+      <div className="mx-auto max-w-[1500px] space-y-3">
+        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
+          <div className={PANEL_HEADER_CLASS}>Super Admin Profile</div>
+          <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-12">
+            <div className="xl:col-span-8">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="min-w-[240px] flex-1">
+                  <h1 className="text-[34px] font-bold leading-none text-[#1f2937]">{fullName}</h1>
+                  <div className="mt-1 flex items-center gap-2 text-[14px] font-medium text-[#5f6b7c]">
+                    <Mail className="h-4 w-4 text-[#154279]" />
+                    <span>{user?.email || "No email"}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-[#7b8895]">
+                    ID #{(profile?.id || user?.id || "unknown").slice(0, 8).toUpperCase()}
+                  </p>
+                </div>
 
-      <div className="max-w-4xl mx-auto px-6 space-y-6">
-
-      {/* Personal Information Card */}
-      <Card className="border-2 border-slate-200 bg-white shadow-lg">
-        <CardHeader className="border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white flex flex-row items-center justify-between">
-          <CardTitle className="text-[#154279] font-black text-xl">Personal Information</CardTitle>
-          {!isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#154279] hover:bg-[#0f325e] text-white rounded-xl transition-colors font-bold shadow-lg hover:shadow-xl text-sm"
-            >
-              <Edit2 size={16} />
-              Edit Profile
-            </button>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Avatar Section */}
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <div className="w-32 h-32 bg-gradient-to-br from-[#154279] to-blue-700 rounded-full flex items-center justify-center overflow-hidden shadow-lg border-4 border-white">
-                {previewImage ? (
-                  <img
-                    src={previewImage}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-4xl font-bold text-white">
-                    {formData.first_name?.[0]?.toUpperCase() || "S"}
+                <div className="flex flex-wrap gap-2">
+                  <span className="bg-[#154279] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Super Admin</span>
+                  <span className="bg-[#F96302] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                    {(profile?.status || "active").replace("_", " ")}
                   </span>
-                )}
+                </div>
               </div>
-              {isEditing && (
-                <label className="absolute bottom-0 right-0 bg-[#154279] hover:bg-[#0f325e] text-white p-3 rounded-full cursor-pointer transition-colors shadow-md hover:shadow-lg">
-                  <Upload size={20} />
+
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Role</p>
+                  <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{roleLabels[0] || "Super Administrator"}</p>
+                </div>
+                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Phone</p>
+                  <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{formData.phone || "Not set"}</p>
+                </div>
+                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Created</p>
+                  <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">
+                    {new Date(profile?.created_at || Date.now()).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Updated</p>
+                  <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">
+                    {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="xl:col-span-4">
+              <div className="border border-[#c7cdd6] bg-white p-3">
+                <div className="relative h-[290px] overflow-hidden border border-[#c7cdd6] bg-[#eef1f4]">
+                  <img
+                    src={imageSrc}
+                    alt="Super admin"
+                    className="h-full w-full object-cover object-center"
+                  />
+                </div>
+
+                <label className="mt-3 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 border border-[#d96d26] bg-[#F96302] px-3 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#e15802]">
+                  {imageUploading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Uploading
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-3.5 w-3.5" />
+                      Change Photo
+                    </>
+                  )}
                   <input
                     type="file"
                     accept="image/*"
@@ -330,214 +387,211 @@ const SuperAdminProfile: React.FC = () => {
                     className="hidden"
                   />
                 </label>
-              )}
+              </div>
             </div>
-            {imageUploading && (
-              <p className="text-sm text-gray-500">Uploading image...</p>
-            )}
-            <p className="text-xs text-gray-500">
-              {isEditing ? "Click camera icon to upload" : "Profile Picture"}
-            </p>
           </div>
+        </section>
 
-          {isEditing ? (
-            <div className="space-y-4">
-              {/* Edit Mode */}
-              <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-8">
+            <div className={PANEL_HEADER_CLASS}>Profile Information</div>
+            <div className="space-y-4 p-3">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">First Name</label>
+                  <Input
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00356B]"
                     placeholder="First name"
+                    className={inputClassName}
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Last Name</label>
+                  <Input
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00356B]"
                     placeholder="Last name"
+                    className={inputClassName}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Email Address</label>
+                  <Input
+                    value={user?.email || ""}
+                    readOnly
+                    className={`${inputClassName} bg-[#e8ecf1] text-[#59687d]`}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Phone Number</label>
+                  <Input
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="+254..."
+                    className={inputClassName}
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Email</label>
-                <input
-                  type="email"
-                  disabled
-                  value={user?.email || ""}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Email cannot be changed
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00356B]"
-                  placeholder="Phone number"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <button
+              <div className="flex flex-wrap gap-2 border-t border-[#c4cad3] pt-3">
+                <Button
+                  type="button"
                   onClick={handleSaveProfile}
                   disabled={isSaving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  className="h-10 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]"
                 >
                   {isSaving ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Saving...
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      Saving
                     </>
                   ) : (
                     <>
-                      <Check size={16} />
-                      Save Changes
+                      <Check className="mr-2 h-3.5 w-3.5" />
+                      Save Profile
                     </>
                   )}
-                </button>
-                <button
-                  onClick={handleCancel}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetForm}
                   disabled={isSaving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors disabled:opacity-50"
+                  className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
                 >
-                  <X size={16} />
-                  Cancel
-                </button>
+                  <X className="mr-2 h-3.5 w-3.5" />
+                  Reset
+                </Button>
               </div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {/* View Mode */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">First Name</p>
-                  <p className="font-semibold text-gray-900">
-                    {profile?.first_name || "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Last Name</p>
-                  <p className="font-semibold text-gray-900">
-                    {profile?.last_name || "N/A"}
-                  </p>
-                </div>
+          </section>
+
+          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-4">
+            <div className={PANEL_HEADER_CLASS}>Security</div>
+            <div className="space-y-4 p-3">
+              <div className="flex items-start gap-2 border border-[#bfd3ea] bg-[#e9f2fd] px-3 py-2 text-[12px] text-[#154279]">
+                <Shield className="mt-0.5 h-4 w-4" />
+                <p className="font-medium">Keep your account secure by updating your password regularly.</p>
               </div>
 
               <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-semibold text-gray-900">{user?.email}</p>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">New Password</label>
+                <Input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      newPassword: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter new password"
+                  className={inputClassName}
+                />
               </div>
 
               <div>
-                <p className="text-sm text-gray-600">Phone</p>
-                <p className="font-semibold text-gray-900">
-                  {profile?.phone || "Not provided"}
-                </p>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Confirm Password</label>
+                <Input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordData((prev) => ({
+                      ...prev,
+                      confirmPassword: e.target.value,
+                    }))
+                  }
+                  placeholder="Confirm password"
+                  className={inputClassName}
+                />
               </div>
 
-              <div>
-                <p className="text-sm text-gray-600">Status</p>
-                <Badge className={getStatusColor(profile?.status || "active")}>
-                  {profile?.status || "N/A"}
-                </Badge>
-              </div>
+              <Button
+                type="button"
+                onClick={handleChangePassword}
+                disabled={isChangingPassword}
+                className="h-10 w-full rounded-none border border-[#d96d26] bg-[#F96302] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
+              >
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    Updating Password
+                  </>
+                ) : (
+                  <>
+                    <Key className="mr-2 h-3.5 w-3.5" />
+                    Update Password
+                  </>
+                )}
+              </Button>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Member Since</p>
-                  <p className="font-semibold text-gray-900">
-                    {profile?.created_at ? formatDate(profile.created_at) : "N/A"}
-                  </p>
+              <div className="space-y-2 border-t border-[#c4cad3] pt-3">
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
+                  <CheckCircle2 className="h-4 w-4 text-[#2dae49]" />
+                  Account status: {(profile?.status || "active").replace("_", " ")}
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Last Login</p>
-                  <p className="font-semibold text-gray-900">
-                    {profile?.last_login_at ? formatDate(profile.last_login_at) : "Never"}
-                  </p>
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
+                  <User className="h-4 w-4 text-[#154279]" />
+                  Role: {roleLabels[0] || "Super Administrator"}
+                </div>
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
+                  <Phone className="h-4 w-4 text-[#154279]" />
+                  Contact: {formData.phone || "Not set"}
                 </div>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </section>
+        </div>
 
-      {/* Roles & Permissions Card */}
-      {!isEditing && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield size={20} className="text-[#00356B]" />
-              Roles & Permissions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Assigned Roles */}
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Assigned Roles</h3>
-              {userRoles.length > 0 ? (
-                <div className="space-y-3">
-                  {userRoles.map((userRole) => (
-                    <div
-                      key={userRole.id}
-                      className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-5">
+            <div className={PANEL_HEADER_CLASS}>Assigned Roles</div>
+            <div className="space-y-2 p-3">
+              {roleLabels.length > 0 ? (
+                roleLabels.map((label) => (
+                  <div key={label} className="flex items-center gap-2 border border-[#c7cdd6] bg-white px-3 py-2 text-[13px] font-semibold text-[#1f2937]">
+                    <Shield className="h-4 w-4 text-[#154279]" />
+                    <span>{label}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="border border-[#c7cdd6] bg-white px-3 py-3 text-[13px] font-medium text-[#5f6b7c]">
+                  No role information available.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-7">
+            <div className={PANEL_HEADER_CLASS}>Permissions</div>
+            <div className="p-3">
+              {allPermissions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {allPermissions.map((permission) => (
+                    <span
+                      key={permission}
+                      className="border border-[#bed3ea] bg-[#e9f2fd] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#154279]"
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">
-                            {userRole.role?.name || "Unknown Role"}
-                          </h4>
-                          <p className="text-sm text-gray-600">
-                            {userRole.role?.description || "No description"}
-                          </p>
-                        </div>
-                        <Badge className="bg-blue-100 text-blue-800">
-                          Assigned {formatDate(userRole.assigned_at)}
-                        </Badge>
-                      </div>
-                    </div>
+                      {permission.replace(/_/g, " ")}
+                    </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No roles assigned</p>
+                <div className="border border-[#c7cdd6] bg-white px-3 py-3 text-[13px] font-medium text-[#5f6b7c]">
+                  No permissions found for this account.
+                </div>
               )}
             </div>
-
-            {/* Permissions */}
-            {allPermissions.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-3">Active Permissions</h3>
-                <div className="flex flex-wrap gap-2">
-                  {allPermissions.map((permission) => (
-                    <Badge key={permission} className="bg-green-100 text-green-800">
-                      {permission}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+          </section>
+        </div>
       </div>
     </div>
   );

@@ -225,6 +225,12 @@ const AccountantLayout = ({ children }: { children?: ReactNode }) => {
       description: 'Payment Management'
     },
     {
+      title: 'Supplier Queue',
+      href: '/portal/accountant/payments',
+      icon: <FileText size={20} />,
+      description: 'LPO and supplier invoice workflow'
+    },
+    {
       title: 'Invoices',
       href: '/portal/accountant/invoices',
       icon: <FileText size={20} />,
@@ -241,6 +247,18 @@ const AccountantLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/accountant/tenants',
       icon: <Users size={20} />,
       description: 'Tenant Information'
+    },
+    {
+      title: 'Messages',
+      href: '/portal/accountant/messages',
+      icon: <Mail size={20} />,
+      description: 'Internal Mail Center'
+    },
+    {
+      title: 'Leave Requests',
+      href: '/portal/accountant/leave-requests',
+      icon: <Settings size={20} />,
+      description: 'Submit Leave & Follow-up'
     },
   ];
 

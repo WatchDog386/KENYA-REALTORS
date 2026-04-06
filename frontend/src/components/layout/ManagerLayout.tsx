@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 
 interface NavItem {
   title: string;
@@ -177,6 +178,8 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
     if (!user?.id) return;
 
     try {
+      const propertyIds = await getManagerAssignedPropertyIds(user.id);
+
       const tasks = {
         maintenance: 0,
         approvals: 0,
@@ -184,25 +187,43 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         payments: 0
       };
 
-      // Get pending maintenance requests
-      const { data: maintenance, error: maintenanceError } = await supabase
-        .from('maintenance_requests')
-        .select('id', { count: 'exact' })
-        .eq('assigned_to', user.id)
-        .in('status', ['pending', 'assigned']);
-
-      if (!maintenanceError && maintenance) {
-        tasks.maintenance = maintenance.length;
+      if (propertyIds.length === 0) {
+        setPendingTasks(tasks);
+        return;
       }
 
-      // Get pending approvals
-      // approvals table doesn't exist - skip
-      
-      // Get pending applications (assuming this is in approvals table)
-      // approvals table doesn't exist - skip
-      
-      // Get pending payments
-      // Skip for now - requires complex querying
+      // Get pending maintenance requests for manager properties
+      const { count: maintenanceCount, error: maintenanceError } = await supabase
+        .from('maintenance_requests')
+        .select('id', { count: 'exact', head: true })
+        .in('property_id', propertyIds)
+        .in('status', ['pending', 'assigned', 'in_progress']);
+
+      if (!maintenanceError) {
+        tasks.maintenance = maintenanceCount || 0;
+      }
+
+      // Get pending lease applications for manager properties only.
+      const { count: applicationCount, error: applicationError } = await supabase
+        .from('lease_applications')
+        .select('id', { count: 'exact', head: true })
+        .in('property_id', propertyIds)
+        .in('status', ['pending', 'under_review']);
+
+      if (!applicationError) {
+        tasks.applications = applicationCount || 0;
+      }
+
+      // Pending payments represented by unpaid invoices in manager properties.
+      const { count: paymentCount, error: paymentError } = await supabase
+        .from('invoices')
+        .select('id', { count: 'exact', head: true })
+        .in('property_id', propertyIds)
+        .in('status', ['unpaid', 'overdue']);
+
+      if (!paymentError) {
+        tasks.payments = paymentCount || 0;
+      }
 
       setPendingTasks(tasks);
     } catch (err) {
@@ -364,15 +385,15 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
     },
     {
       title: 'Technicians',
-      href: '/portal/manager/technicians',
+      href: '/portal/manager/maintenance',
       icon: <Briefcase size={20} />,
-      description: 'Manage Service Providers'
+      description: 'Track Technician Work Orders'
     },
     {
       title: 'Caretakers',
       href: '/portal/manager/caretakers',
       icon: <UserCheck size={20} />,
-      description: 'Property Staff'
+      description: 'Caretaker Duties & Follow-up'
     },
     {
       title: 'Approval Requests',

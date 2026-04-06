@@ -32,6 +32,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'view_analytics',
     'export_data'
   ],
+  supplier: [
+    'view_reports'
+  ],
   technician: [
     'view_reports'
   ],
@@ -49,6 +52,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   property_manager: 'Manage properties and tenant applications',
   proprietor: 'Property owner with analytics and reporting view',
   accountant: 'Manage financial records and payments',
+  supplier: 'View LPOs, submit supply invoices, and track supplier payments',
   technician: 'Maintenance and repair task management',
   caretaker: 'On-site property supervision',
   tenant: 'Tenant access for viewing their information'
@@ -124,6 +128,7 @@ export const getRoleLevel = (role: UserRole): number => {
     property_manager: 5,
     proprietor: 4,
     accountant: 4,
+    supplier: 3,
     caretaker: 3,
     technician: 2,
     tenant: 1
@@ -178,7 +183,7 @@ export const validateRoleAssignment = (
 export const getAssignableRoles = (assignerRole: UserRole): UserRole[] => {
   const allRoles: UserRole[] = [
     'super_admin', 'property_manager', 
-    'proprietor', 'accountant', 'caretaker', 'technician', 
+    'proprietor', 'accountant', 'supplier', 'caretaker', 'technician', 
     'tenant'
   ];
   

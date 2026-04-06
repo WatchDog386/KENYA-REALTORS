@@ -1,91 +1,86 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
-import { User, Phone, Mail, Lock, Loader2, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Loader2, X } from "lucide-react";
+
+const GlobalStyles = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+    .font-auth { font-family: 'Poppins', 'Segoe UI', sans-serif; }
+  `}</style>
+);
+
+type RegisterFormState = {
+  fullName: string;
+  email: string;
+  password: string;
+  acceptPolicy: boolean;
+};
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+  const [serverError, setServerError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<RegisterFormState>({
+    fullName: "",
     email: "",
-    phone: "",
     password: "",
-    confirmPassword: "",
-    accountType: "tenant", 
+    acceptPolicy: false,
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const mode = new URLSearchParams(location.search).get("mode");
+    if (mode === "signin") {
+      navigate("/login", { replace: true });
+    }
+  }, [location.search, navigate]);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }));
+
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
         [name]: "",
       }));
     }
-  };
 
-  const handleRoleChange = (value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      accountType: value,
-    }));
-    if (errors.accountType) {
-      setErrors((prev) => ({
-        ...prev,
-        accountType: "",
-      }));
+    if (serverError) {
+      setServerError("");
     }
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required";
-    }
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required";
-    }
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Invalid email format";
-    }
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm password";
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
+    if (!formData.fullName.trim()) {
+      newErrors.fullName = "Full name is required.";
     }
 
-    if (!formData.accountType) {
-      newErrors.accountType = "Please select an account type";
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required.";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required.";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters.";
+    }
+
+    if (!formData.acceptPolicy) {
+      newErrors.acceptPolicy = "You must agree to continue.";
     }
 
     setErrors(newErrors);
@@ -100,42 +95,43 @@ export default function RegisterPage() {
     }
 
     setLoading(true);
+    setServerError("");
+
     try {
-      console.log("📝 Attempting registration for:", formData.email, "Account Type:", formData.accountType);
-
       const redirectTo =
-        ((import.meta as any).env.VITE_AUTH_REDIRECT_URL as string) || ((import.meta as any).env.VITE_APP_URL as string);
+        ((import.meta as any).env.VITE_AUTH_REDIRECT_URL as string) ||
+        ((import.meta as any).env.VITE_APP_URL as string);
 
-      // IMPORTANT: Use 'role' as the key for the trigger to work
+      const [firstName, ...lastNameParts] = formData.fullName.trim().split(/\s+/);
+      const lastName = lastNameParts.join(" ");
+
       const { data, error: signupError } = await supabase.auth.signUp({
-        email: formData.email,
+        email: formData.email.trim(),
         password: formData.password,
         options: {
           emailRedirectTo: redirectTo,
           data: {
-            first_name: formData.firstName.trim(),
-            last_name: formData.lastName.trim(),
-            phone: formData.phone,
-            role: formData.accountType, // <-- must be 'role' for the trigger
+            first_name: firstName || "User",
+            last_name: lastName,
+            role: "tenant",
+            phone: "",
           },
         },
       });
 
-      if (signupError) throw signupError;
+      if (signupError) {
+        throw signupError;
+      }
 
       if (data.user) {
-        console.log("✅ Auth user created successfully:", data.user.id);
-
         if (!data.session) {
-          toast.info("📧 Check your email to confirm your account before approval.", { duration: 5000 });
-          setTimeout(() => navigate("/login"), 2000);
+          toast.info("Check your email to confirm your account.", { duration: 5000 });
+          setTimeout(() => navigate("/login"), 1600);
           return;
         }
 
-        // Wait for the trigger to create the profile
         await new Promise((resolve) => setTimeout(resolve, 1200));
 
-        // Check if profile exists
         const { data: profileData, error: profileFetchError } = await supabase
           .from("profiles")
           .select("id")
@@ -146,14 +142,6 @@ export default function RegisterPage() {
           throw new Error("Profile creation failed. Please contact support.");
         }
 
-        const profileId = profileData.id;
-        console.log("✅ Profile confirmed:", profileId);
-
-        // The profile is already created and approved by the trigger
-        // Just log confirmation
-        console.log("✅ User account is now active and ready to use");
-
-        // Notify super admins about new registration
         try {
           const { data: superAdmins } = await supabase
             .from("profiles")
@@ -163,48 +151,46 @@ export default function RegisterPage() {
 
           if (superAdmins && superAdmins.length > 0) {
             for (const admin of superAdmins) {
-              await supabase
-                .from("notifications")
-                .insert({
-                  recipient_id: admin.id,
-                  sender_id: data.user.id,
-                  type: "new_user_registration",
-                  related_entity_type: "user",
-                  related_entity_id: data.user.id,
-                  title: `New ${formData.accountType.charAt(0).toUpperCase() + formData.accountType.slice(1).replace('_', ' ')} Registration`,
-                  message: `${formData.firstName} ${formData.lastName} has registered as a ${formData.accountType.replace('_', ' ')}. Review and assign in User Management.`,
-                });
+              await supabase.from("notifications").insert({
+                recipient_id: admin.id,
+                sender_id: data.user.id,
+                type: "new_user_registration",
+                related_entity_type: "user",
+                related_entity_id: data.user.id,
+                title: "New Tenant Registration",
+                message: `${formData.fullName} has created a new account.`,
+              });
             }
-            console.log("✅ Notifications sent to super admins");
           }
-        } catch (error) {
-          console.warn("⚠️ Notification error:", error);
+        } catch (notifyError) {
+          console.warn("Notification warning:", notifyError);
         }
 
-        toast.success("✅ Registration successful!");
-        toast.info("🎉 Your account is active! You can now log in and start using the platform.", { duration: 5000 });
-        setTimeout(() => navigate("/login"), 2000);
+        toast.success("Registration successful!");
+        toast.info("Your account is active. Continue to sign in.", { duration: 3500 });
+        setTimeout(() => navigate("/login"), 1600);
       }
-    } catch (error: any) {
-      console.error("❌ Registration error:", error);
-      const errorMessage = error.message || "Registration failed";
-      const errorCode = error.code || "UNKNOWN";
-      
-      // Provide helpful error messages
+    } catch (registerError: any) {
+      const errorMessage = registerError.message || "Registration failed";
+      const errorCode = registerError.code || "UNKNOWN";
+
+      setServerError(errorMessage);
+
       if (errorMessage.includes("already exists")) {
-        toast.error("An account with this email already exists. Please sign in instead.");
+        toast.error("An account with this email already exists.");
       } else if (errorMessage.includes("invalid email")) {
         toast.error("Please enter a valid email address.");
       } else if (errorMessage.includes("password")) {
-        toast.error("Password requirements: At least 6 characters recommended.");
-      } else if (errorCode === "422" || errorMessage.includes("Unprocessable Entity")) {
-        toast.error("Registration data invalid. Please check all fields and try again.");
-      } else if (errorCode === "429" || errorMessage.includes("Too many")) {
-        toast.error("Too many registration attempts. Please try again in a few minutes.");
-      } else if (errorCode === "500" || errorMessage.includes("Internal Server") || errorMessage.includes("Database error")) {
-        console.error("🔥 CRITICAL REGISTRATION ERROR: The database trigger likely failed or RLS policies are blocking creation.");
-        toast.error("Database error. PLEASE RUN 'URGENT_FIX_REGISTRATION_v2.sql' in your Supabase SQL Editor. See console for link.", { duration: 15000 });
-        console.info("🔗 OPEN THIS IN BROWSER TO FIX DATABASE: https://supabase.com/dashboard/project/rcxmrtqgppayncelonls/sql/new");
+        toast.error("Password must be at least 6 characters.");
+      } else if (
+        errorCode === "500" ||
+        errorMessage.includes("Internal Server") ||
+        errorMessage.includes("Database error")
+      ) {
+        toast.error(
+          "Database error. Please run URGENT_FIX_REGISTRATION_v2.sql in Supabase SQL editor.",
+          { duration: 12000 },
+        );
       } else {
         toast.error(errorMessage || "Registration failed. Please try again.");
       }
@@ -214,241 +200,209 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8" style={{ fontFamily: "'Montserrat', sans-serif", backgroundColor: "#1a232e" }}>
-      <div className="w-full max-w-3xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="bg-white rounded-none shadow-xl shadow-slate-200/50 border border-slate-200"
-        >
-          {/* Header - Matching HowItWorks style */}
-          <div className="bg-[#154279] px-8 py-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-full bg-white/5 skew-x-12 pointer-events-none" />
-            
-            <div className="flex items-center justify-between relative z-10">
-              <div className="flex items-start gap-4">
-                <div className="bg-white/10 p-3 rounded-none backdrop-blur-sm border border-white/10">
-                  <img src="/realtor.jpg" alt="REALTORS" className="w-6 h-6 object-cover rounded-sm" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold tracking-[0.2em] text-[#D35400] uppercase bg-[#D35400]/10 px-2 py-0.5 rounded-none border border-[#D35400]/20 inline-block mb-2">
-                    Create Account
-                  </span>
-                  <h2 className="text-2xl font-bold text-white leading-none">Join REALTORS</h2>
-                  <p className="text-sm text-slate-300 mt-2 font-medium">Complete registration to access all features.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+    <>
+      <GlobalStyles />
 
-          {/* Form Container */}
-          <div className="p-8 md:p-10 relative z-0 overflow-visible">
-            <form onSubmit={handleRegister} className="space-y-5">
-              {/* Two Column Layout: Names */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* First Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-xs font-bold text-slate-700 uppercase tracking-widest">First Name</Label>
-                  <div className="relative group">
-                    <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                    <Input
-                      id="firstName"
-                      name="firstName"
-                      type="text"
-                      placeholder="John"
-                      value={formData.firstName}
-                      onChange={handleChange}
-                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.firstName ? 'border-red-500' : 'border-slate-200'}`}
-                    />
-                  </div>
-                  {errors.firstName && <p className="text-xs text-red-500 font-bold">{errors.firstName}</p>}
-                </div>
+      <div className="relative min-h-screen overflow-hidden bg-[#d7dce1] font-auth subpixel-antialiased text-[#243041]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-12 top-16 h-52 w-52 rotate-45 rounded-[36px] bg-white/25 shadow-[0_12px_24px_rgba(94,105,122,0.15)]" />
+          <div className="absolute left-1/4 top-6 h-36 w-36 rotate-12 rounded-[30px] bg-[#d9eef7]/45" />
+          <div className="absolute right-8 top-20 h-60 w-60 -rotate-12 rounded-[46px] bg-[#d8e7ef]/55" />
+          <div className="absolute bottom-16 left-16 h-44 w-44 rotate-[28deg] rounded-[32px] bg-white/20" />
+          <div className="absolute bottom-20 right-20 h-52 w-52 rotate-[38deg] rounded-[36px] bg-white/25" />
+          <div className="absolute right-1/3 top-1/3 h-6 w-6 rounded-full bg-[#c7d1dc]/70" />
+          <div className="absolute left-1/3 bottom-1/3 h-8 w-8 rounded-full bg-[#c5cfdb]/60" />
+        </div>
 
-                {/* Last Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Last Name</Label>
-                  <div className="relative group">
-                    <User className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                    <Input
-                      id="lastName"
-                      name="lastName"
-                      type="text"
-                      placeholder="Kamau"
-                      value={formData.lastName}
-                      onChange={handleChange}
-                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.lastName ? 'border-red-500' : 'border-slate-200'}`}
-                    />
-                  </div>
-                  {errors.lastName && <p className="text-xs text-red-500 font-bold">{errors.lastName}</p>}
-                </div>
-              </div>
-
-              {/* Phone and Email */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Phone */}
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Phone Number</Label>
-                  <div className="relative group">
-                    <Phone className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                    <Input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      placeholder="+254 712 345 678"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.phone ? 'border-red-500' : 'border-slate-200'}`}
-                    />
-                  </div>
-                  {errors.phone && <p className="text-xs text-red-500 font-bold">{errors.phone}</p>}
-                </div>
-
-                {/* Email */}
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Email Address</Label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.email ? 'border-red-500' : 'border-slate-200'}`}
-                    />
-                  </div>
-                  {errors.email && <p className="text-xs text-red-500 font-bold">{errors.email}</p>}
-                </div>
-              </div>
-
-              {/* Two Column: Role & Password */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Account Type Dropdown */}
-                <div className="space-y-2">
-                  <Label htmlFor="accountType" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Account Type</Label>
-                  <div className="bg-white border-2 border-slate-200 rounded-none p-3 relative z-50">
-                    <Select 
-                      value={formData.accountType} 
-                      onValueChange={handleRoleChange}
-                    >
-                      <SelectTrigger className={`h-10 bg-white dark:bg-white border-0 rounded-none focus:border-0 focus:ring-0 text-sm relative z-50 text-slate-800 dark:text-slate-800 ${errors.accountType ? 'border-red-500' : ''}`}>
-                        <SelectValue placeholder="Select your account type" />
-                      </SelectTrigger>
-                      <SelectContent className="z-[9999] bg-white dark:bg-white text-slate-800 dark:text-slate-800 border border-slate-200 shadow-lg">
-                        <SelectItem value="tenant">👤 Tenant / Renter</SelectItem>
-                        <SelectItem value="property_manager">🏢 Property Manager</SelectItem>
-                        <SelectItem value="owner">🏠 Property Owner / Landlord</SelectItem>
-                        <SelectItem value="proprietor">💼 Proprietor</SelectItem>
-                        <SelectItem value="caretaker">🔑 Caretaker</SelectItem>
-                        <SelectItem value="technician">🔧 Technician</SelectItem>
-                        <SelectItem value="accountant">💰 Accountant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {errors.accountType && <p className="text-xs text-red-500 font-bold">{errors.accountType}</p>}
-                </div>
-
-                {/* Password */}
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Password</Label>
-                  <div className="relative group">
-                    <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                    <Input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={formData.password}
-                      onChange={handleChange}
-                      className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.password ? 'border-red-500' : 'border-slate-200'}`}
-                    />
-                  </div>
-                  {errors.password && <p className="text-xs text-red-500 font-bold">{errors.password}</p>}
-                </div>
-              </div>
-
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-xs font-bold text-slate-700 uppercase tracking-widest">Confirm Password</Label>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-[#D35400] w-4 h-4 transition-colors" />
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirm ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className={`pl-10 bg-slate-50 border rounded-none h-10 focus:ring-[#D35400] focus:border-[#D35400] transition-all text-sm ${errors.confirmPassword ? 'border-red-500' : 'border-slate-200'}`}
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6">
+          <div className="w-full max-w-[860px] overflow-hidden border border-[#b7bcc3] bg-[#c8cbd1] shadow-[0_18px_55px_rgba(71,80,94,0.24)]">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-[#bfc4cb] px-5 py-4 sm:px-7">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded bg-white p-1 shadow-inner">
+                  <img
+                    src="/realtor.jpg"
+                    alt="REALTORS"
+                    className="h-full w-full rounded-sm object-cover"
                   />
                 </div>
-                {errors.confirmPassword && <p className="text-xs text-red-500 font-bold">{errors.confirmPassword}</p>}
-              </div>
-
-              {/* Info Box for signup message */}
-              <div className="p-4 border rounded-none bg-emerald-50 border-emerald-200">
-                <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                  ✨ Register instantly and start using the platform! Super admins can later assign additional properties and permissions as needed.
+                <p className="text-[26px] font-bold leading-none text-[#111827] sm:text-[34px]">
+                  Sign Up
+                  <span className="block text-[15px] font-normal text-[#4b5563] sm:ml-2 sm:inline sm:text-[20px]">
+                    create your account
+                  </span>
                 </p>
               </div>
 
-              {/* Show Passwords Toggle */}
-              <div className="flex items-center gap-3 py-2">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600 hover:text-slate-900 transition-colors font-bold">
-                  <input 
-                    type="checkbox" 
-                    checked={showPassword}
-                    onChange={() => {
-                      setShowPassword(!showPassword);
-                      setShowConfirm(!showPassword);
-                    }}
-                    className="w-4 h-4 rounded-none accent-[#D35400] cursor-pointer"
-                  />
-                  Show passwords
-                </label>
-              </div>
-
-              {/* Submit Button - Matching HowItWorks style */}
-              <Button 
-                type="submit"
-                disabled={loading}
-                className="w-full h-11 bg-[#D35400] hover:bg-[#A04000] text-white font-bold rounded-none mt-6 shadow-md uppercase tracking-widest text-xs transition-all active:scale-95"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  "Create Account"
-                )}
-              </Button>
-
-              {/* Already have account */}
-              <div className="flex items-start gap-2.5 p-3 rounded-none bg-blue-50 border border-blue-100 text-slate-600 text-xs font-bold mt-6">
-                Already have an account?{" "}
-                <Link to="/login" className="text-[#D35400] hover:underline font-bold">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/login")}
+                  className="h-8 min-w-[92px] rounded-xl bg-white px-5 text-[11px] font-bold uppercase tracking-[0.04em] text-[#4b5563] shadow-sm transition-colors hover:text-[#24b86e]"
+                >
                   Sign In
-                </Link>
+                </button>
+                <button
+                  type="button"
+                  className="h-8 min-w-[92px] rounded-xl bg-[#7a3ef2] px-5 text-[11px] font-bold uppercase tracking-[0.04em] text-white shadow-sm"
+                >
+                  Sign Up
+                </button>
               </div>
+            </div>
 
-              {/* Terms */}
-              <p className="text-center text-[10px] text-slate-500 leading-relaxed">
-                By creating an account, you agree to our{" "}
-                <Link to="/terms" className="text-slate-700 hover:underline font-bold">
-                  Terms of Service
-                </Link>
-                {" "}and{" "}
-                <Link to="/privacy" className="text-slate-700 hover:underline font-bold">
-                  Privacy Policy
-                </Link>
-              </p>
+            <form onSubmit={handleRegister} className="px-4 py-9 sm:px-10 md:px-14">
+              <div className="mx-auto w-full max-w-[680px] space-y-5">
+                <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[130px_1fr] sm:gap-5">
+                  <label
+                    htmlFor="signup-name"
+                    className="text-[20px] font-semibold text-[#243041]"
+                  >
+                    Full Name:
+                  </label>
+                  <input
+                    id="signup-name"
+                    name="fullName"
+                    type="text"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    className="h-11 w-full border border-[#b2b9c2] bg-[#eef1f4] px-4 text-[16px] text-[#1f2937] outline-none transition-colors focus:border-[#8e98a5]"
+                    autoComplete="name"
+                    required
+                  />
+                </div>
+
+                {errors.fullName && (
+                  <p className="-mt-1 text-right text-[13px] font-semibold text-red-600">
+                    {errors.fullName}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[130px_1fr] sm:gap-5">
+                  <label
+                    htmlFor="signup-email"
+                    className="text-[20px] font-semibold text-[#243041]"
+                  >
+                    Email:
+                  </label>
+                  <input
+                    id="signup-email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="h-11 w-full border border-[#b2b9c2] bg-[#eef1f4] px-4 text-[16px] text-[#1f2937] outline-none transition-colors focus:border-[#8e98a5]"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+
+                {errors.email && (
+                  <p className="-mt-1 text-right text-[13px] font-semibold text-red-600">
+                    {errors.email}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[130px_1fr] sm:gap-5">
+                  <label
+                    htmlFor="signup-password"
+                    className="text-[20px] font-semibold text-[#243041]"
+                  >
+                    Password:
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="signup-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="h-11 w-full border border-[#b2b9c2] bg-[#eef1f4] px-4 pr-11 text-[16px] text-[#1f2937] outline-none transition-colors focus:border-[#8e98a5]"
+                      autoComplete="new-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#748092] transition-colors hover:text-[#425166]"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
+                  </div>
+                </div>
+
+                {errors.password && (
+                  <p className="-mt-1 text-right text-[13px] font-semibold text-red-600">
+                    {errors.password}
+                  </p>
+                )}
+
+                <div className="flex justify-center pt-1">
+                  <label className="inline-flex items-center gap-2 rounded border border-[#bfc6cf] bg-[#e9edf2] px-3 py-1.5 text-[13px] font-semibold text-[#506076]">
+                    <input
+                      type="checkbox"
+                      checked={showPassword}
+                      onChange={() => setShowPassword((prev) => !prev)}
+                      className="h-4 w-4 accent-[#8d98a7]"
+                    />
+                    Show password
+                  </label>
+                </div>
+
+                <div className="mt-2 border border-[#c2c8d0] bg-[#edf1f5] px-3 py-2 text-[14px] text-[#3b4c62]">
+                  <label className="inline-flex items-center gap-2 font-semibold">
+                    <input
+                      type="checkbox"
+                      name="acceptPolicy"
+                      checked={formData.acceptPolicy}
+                      onChange={handleChange}
+                      className="h-4 w-4 accent-[#7a3ef2]"
+                    />
+                    I agree to the access policy and delivery terms.
+                  </label>
+                </div>
+
+                {errors.acceptPolicy && (
+                  <p className="-mt-1 text-right text-[13px] font-semibold text-red-600">
+                    {errors.acceptPolicy}
+                  </p>
+                )}
+
+                <div className="pt-3 text-center">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="mx-auto inline-flex h-11 min-w-[190px] items-center justify-center bg-[#7a3ef2] px-8 text-[16px] font-semibold leading-none text-white transition-colors hover:bg-[#6630d9] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Create Account"}
+                  </button>
+                </div>
+
+                <div
+                  className={`mt-4 flex items-center justify-center gap-2 border px-4 py-2 text-center text-[18px] ${
+                    serverError
+                      ? "border-red-200 bg-red-50 text-red-600"
+                      : "border-[#c2c8d0] bg-[#edf1f5] text-[#4b5f79]"
+                  }`}
+                >
+                  <span>{serverError || "Create your account to continue."}</span>
+                  {!serverError && <X className="h-3 w-3 text-[#6f8096]" />}
+                </div>
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/")}
+                    className="rounded-lg border border-[#bcc3cc] bg-white/85 px-5 py-2 text-[18px] font-semibold text-[#5f6c7b] transition-colors hover:text-[#243041]"
+                  >
+                    Back to Home
+                  </button>
+                </div>
+              </div>
             </form>
           </div>
-        </motion.div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -158,6 +158,8 @@ const AuthCallback = () => {
             finalRedirectPath = "/portal/proprietor";
           } else if (profile.role === 'caretaker') {
             finalRedirectPath = "/portal/caretaker";
+          } else if (profile.role === 'supplier') {
+            finalRedirectPath = "/portal/supplier";
           } else {
             finalRedirectPath = "/portal/tenant";
           }

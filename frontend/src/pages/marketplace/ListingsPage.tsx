@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PropertyGrid from '@/components/marketplace/PropertyGrid';
 import PropertyFilters, { FilterOptions } from '@/components/marketplace/PropertyFilters';
 import { useProperties } from '@/hooks/useProperties';
 import { Search, Filter } from 'lucide-react';
 
 const ListingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<FilterOptions>({
     search: '',
     minPrice: 0,
@@ -25,8 +27,24 @@ const ListingsPage: React.FC = () => {
     setFilters(newFilters);
   };
 
-  const handlePropertyClick = (property: any) => {
-    window.location.href = `/marketplace/${property.id}`;
+  const handlePropertyClick = (propertyId: string) => {
+    navigate(`/marketplace/${propertyId}`);
+  };
+
+  const handleRequestVisit = (property: any) => {
+    const propertyName = property?.title || property?.name || "Selected Property";
+    const location = property?.address || property?.city || "Kenya";
+    const subject = encodeURIComponent(`Unit Visit Request: ${propertyName}`);
+    const message = encodeURIComponent(
+      `Hello team,\n\nI would like to request a site visit for ${propertyName} located at ${location}.\nPlease share available viewing slots.\n\nThank you.`
+    );
+
+    navigate(`/contact?category=support&subject=${subject}&message=${message}`);
+  };
+
+  const handleBookUnit = (property: any) => {
+    const propertyName = encodeURIComponent(property?.title || property?.name || "Selected Unit");
+    navigate(`/applications?propertyId=${property?.id || ""}&propertyName=${propertyName}`);
   };
 
   if (isLoading) {
@@ -97,7 +115,12 @@ const ListingsPage: React.FC = () => {
 
         {/* Property Grid */}
         {properties.length > 0 ? (
-          <PropertyGrid properties={properties} onPropertyClick={handlePropertyClick} />
+          <PropertyGrid
+            properties={properties}
+            onPropertyClick={handlePropertyClick}
+            onRequestVisit={handleRequestVisit}
+            onBookUnit={handleBookUnit}
+          />
         ) : (
           <div className="bg-white rounded-xl shadow-md p-16 text-center">
             <Search size={64} className="mx-auto text-gray-300 mb-4" />

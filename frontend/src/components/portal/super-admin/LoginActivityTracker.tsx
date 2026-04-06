@@ -48,8 +48,8 @@ const LoginActivityTracker: React.FC<LoginActivityTrackerProps> = ({
     setLoading(true);
     try {
       const [activities, stats] = await Promise.all([
-        loginActivityService.getLoginActivities(30),
-        loginActivityService.getLoginStatistics(7),
+        loginActivityService.getLoginActivities(200),
+        loginActivityService.getLoginStatistics(0),
       ]);
       setActivities(activities);
       setStats(stats);
@@ -195,10 +195,10 @@ const LoginActivityTracker: React.FC<LoginActivityTrackerProps> = ({
         <div className="p-6 border-b border-slate-100 bg-white flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2 text-[#154279] uppercase tracking-tight">
-              <Globe className="w-5 h-5 text-[#F96302]" /> Login Activity Stream
+              <Globe className="w-5 h-5 text-[#F96302]" /> Login History
             </h2>
             <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase tracking-widest">
-              Real-time user authentication tracking
+              Event Details Tracking
             </p>
           </div>
 
@@ -269,6 +269,14 @@ const LoginActivityTracker: React.FC<LoginActivityTrackerProps> = ({
               <p className="text-sm font-medium">No login activities found</p>
             </div>
           ) : (
+            filteredActivities.map((activity, index) => (
+              <motion.div
+                key={activity.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="p-4 hover:bg-slate-50 transition-colors group"
+              >
                 <div className="flex items-start justify-between gap-4 flex-wrap sm:flex-nowrap">
                   <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="flex flex-col">

@@ -244,6 +244,12 @@ const CaretakerLayout = ({ children }: { children?: ReactNode }) => {
       icon: <MessageSquare size={20} />,
       description: 'Tenant communication',
       badge: 0 
+    },
+    {
+      title: 'Leave Requests',
+      href: '/portal/caretaker/leave-requests',
+      icon: <FileText size={20} />,
+      description: 'Submit Leave Request'
     }
   ];
 

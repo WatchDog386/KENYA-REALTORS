@@ -90,7 +90,7 @@ export const ProprietorAssignmentDialog: React.FC<ProprietorAssignmentDialogProp
           user_id,
           business_name,
           status,
-          profiles:user_id(first_name, last_name, email)
+          profiles!proprietors_user_id_fkey(first_name, last_name, email)
         `)
         .eq('status', 'active')
         .order('business_name', { ascending: true });
@@ -118,7 +118,7 @@ export const ProprietorAssignmentDialog: React.FC<ProprietorAssignmentDialogProp
           is_active,
           proprietors(
             business_name,
-            profiles:user_id(first_name, last_name, email)
+            profiles!proprietors_user_id_fkey(first_name, last_name, email)
           )
         `)
         .eq('property_id', propertyId)

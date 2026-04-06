@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { initializePaystackPayment, verifyPaystackTransaction } from "@/services/paystackService";
+import { initializePaystackPayment, verifyPaystackTransaction, getPaystackPublicKey } from "@/services/paystackService";
 import { toast } from "sonner";
 
 export interface PaystackPaymentDialogProps {
@@ -19,8 +19,6 @@ export interface PaystackPaymentDialogProps {
   onPaymentSuccess: (transactionRef: string, details: any) => void;
   onPaymentError?: (error: string) => void;
 }
-
-const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
 const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   open,
@@ -39,16 +37,34 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   >("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transactionReference, setTransactionReference] = useState<string | null>(null);
+  const [paystackPublicKey, setPaystackPublicKey] = useState<string | null>(null);
+  const [keyLoadingError, setKeyLoadingError] = useState<string | null>(null);
 
-  // Initialize Paystack script
+  // Load Paystack public key
+  useEffect(() => {
+    const loadPaystackKey = async () => {
+      try {
+        const key = await getPaystackPublicKey();
+        setPaystackPublicKey(key);
+        setKeyLoadingError(null);
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Failed to load Paystack configuration";
+        setKeyLoadingError(errorMsg);
+        console.error("Failed to load Paystack public key:", errorMsg);
+      }
+    };
+
+    if (open) {
+      loadPaystackKey();
+    }
+  }, [open]);
+
   // Initialize Paystack script
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "https://js.paystack.co/v1/inline.js";
     script.async = true;
-    script.onload = () => {
-      console.log("Paystack SDK loaded successfully");
-    };
+    script.onload = () => {};
     script.onerror = () => {
       console.error("Failed to load Paystack SDK");
     };
@@ -79,8 +95,8 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   };
 
   const handlePayment = async () => {
-    if (!PAYSTACK_PUBLIC_KEY) {
-      const error = "Paystack public key is not configured";
+    if (!paystackPublicKey) {
+      const error = keyLoadingError || "Paystack public key is not configured";
       setErrorMessage(error);
       setTransactionStatus("error");
       onPaymentError?.(error);
@@ -91,8 +107,8 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
     setTransactionStatus("initializing");
     setErrorMessage(null);
 
-    // Generate reference needed for manual verification fallback
-    const ref = referenceId || `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Always use a unique transaction reference for Paystack
+    const ref = `ref_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setTransactionReference(ref);
 
     try {
@@ -104,7 +120,7 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
       }
 
       const handler = PaystackPop.setup({
-        key: PAYSTACK_PUBLIC_KEY,
+        key: paystackPublicKey,
         email: email,
         amount: Math.round(amount * 100), // Convert to kobo/cents
         currency: 'KES',
@@ -113,6 +129,7 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
         metadata: {
             paymentType,
             description,
+          referenceId,
              custom_fields: [
                 {
                     display_name: "Payment Type",
@@ -122,19 +139,16 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
             ]
         },
         callback: (transaction: any) => {
-          console.log("Payment successful:", transaction);
           // transaction.reference should match our ref
           verifyTransaction(transaction.reference);
         },
         onClose: () => {
-          console.log("Paystack dialog closed by user");
           setLoading(false);
           setTransactionStatus("idle"); // User closed popup
           setErrorMessage("Payment canceled");
         }
       });
-      
-      console.log("Opening Paystack payment dialog...");
+
       handler.openIframe();
       
     } catch (error: any) {
@@ -159,16 +173,22 @@ const PaystackPaymentDialog: React.FC<PaystackPaymentDialogProps> = ({
   const verifyTransaction = async (reference: string) => {
     setTransactionStatus("verifying");
     try {
-      // Attempt verification
-      try {
-        const verifyResponse = await verifyPaystackTransaction(reference);
-        if (!verifyResponse.status) {
-           throw new Error(verifyResponse.message || "Payment verification failed");
-        }
+      const verifyResponse = await verifyPaystackTransaction(reference);
+      if (!verifyResponse.status) {
+        throw new Error(verifyResponse.message || "Payment verification failed");
+      }
+
+      if (verifyResponse.verification_unavailable) {
+        console.info("Server verification unavailable; using callback fallback.");
+        onPaymentSuccess(reference, {
+          status: "success",
+          reference,
+          amount,
+          verification_unavailable: true,
+          fallback_reason: verifyResponse.fallback_reason,
+        });
+      } else {
         onPaymentSuccess(reference, verifyResponse.data);
-      } catch (verifyError) {
-        console.warn("Server verification failed (likely CORS), falling back to client success:", verifyError);
-        onPaymentSuccess(reference, { status: "success", reference, amount });
       }
 
       setTransactionStatus("success");

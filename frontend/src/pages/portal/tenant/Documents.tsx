@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getTenantLeaseAgreementState } from "@/services/tenantLeaseAgreementService";
+import { downloadTenantLeaseAgreementPdf } from "@/utils/leaseAgreementPdf";
+import { TenantLeaseAgreementForm } from "@/constants/tenantLeaseAgreement";
 
 interface Document {
   id: string;
@@ -15,12 +18,14 @@ interface Document {
   document_type: "lease" | "receipt" | "notice" | "other";
   uploaded_at: string;
   created_at: string;
+  isGeneratedLease?: boolean;
 }
 
 const DocumentsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [signedLeaseForm, setSignedLeaseForm] = useState<TenantLeaseAgreementForm | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,16 +39,26 @@ const DocumentsPage: React.FC = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
+      const leaseState = await getTenantLeaseAgreementState(user.id).catch((error) => {
+        console.warn("Could not load tenant lease metadata for documents:", error);
+        return null;
+      });
+
+      const leaseForm = leaseState?.record?.form || leaseState?.form || null;
+      setSignedLeaseForm(leaseState?.isSigned ? leaseForm : null);
+
       const { data, error } = await supabase
         .from("documents")
         .select("*")
         .eq("user_id", user.id)
         .order("uploaded_at", { ascending: false });
 
+      let nextDocuments: Document[] = data || [];
+
       if (error) {
         console.warn("Could not fetch documents:", error);
         // Use mock data
-        setDocuments([
+        nextDocuments = [
           {
             id: "1",
             user_id: user.id,
@@ -64,10 +79,35 @@ const DocumentsPage: React.FC = () => {
             uploaded_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
             created_at: new Date().toISOString(),
           },
-        ]);
-      } else if (data) {
-        setDocuments(data);
+        ];
       }
+
+      if (leaseState?.isSigned && leaseForm) {
+        const hasLeaseDocument = (nextDocuments || []).some(
+          (doc) =>
+            doc.document_type === "lease" &&
+            (doc.isGeneratedLease || (Boolean(doc.file_url) && doc.file_url !== "#"))
+        );
+
+        if (!hasLeaseDocument) {
+          nextDocuments = [
+            {
+              id: `lease-profile-${user.id}`,
+              user_id: user.id,
+              title: "Signed Lease Agreement - AYDEN PLAZA",
+              file_type: "PDF",
+              file_url: "generated:lease-agreement",
+              document_type: "lease",
+              uploaded_at: leaseState.record?.signedAt || new Date().toISOString(),
+              created_at: leaseState.record?.signedAt || new Date().toISOString(),
+              isGeneratedLease: true,
+            },
+            ...nextDocuments,
+          ];
+        }
+      }
+
+      setDocuments(nextDocuments);
     } catch (err) {
       console.error("Error fetching documents:", err);
       toast.error("Failed to load documents");
@@ -162,19 +202,33 @@ const DocumentsPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => window.open(doc.file_url, "_blank")}
+                      onClick={() => {
+                        if (doc.isGeneratedLease && signedLeaseForm) {
+                          downloadTenantLeaseAgreementPdf(signedLeaseForm);
+                          return;
+                        }
+
+                        if (!doc.file_url || doc.file_url === "#" || doc.file_url.startsWith("generated:")) {
+                          toast.info("This document can be downloaded after it is fully generated.");
+                          return;
+                        }
+
+                        window.open(doc.file_url, "_blank");
+                      }}
                       className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Download"
                     >
                       <Download size={18} />
                     </button>
-                    <button
-                      onClick={() => deleteDocument(doc.id)}
-                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    {!doc.isGeneratedLease && (
+                      <button
+                        onClick={() => deleteDocument(doc.id)}
+                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </CardContent>

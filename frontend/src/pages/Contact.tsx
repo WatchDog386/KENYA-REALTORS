@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail,
@@ -48,6 +49,7 @@ const GlobalStyles = () => (
 );
 
 export default function Contact() {
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -60,6 +62,21 @@ export default function Contact() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  React.useEffect(() => {
+    const category = searchParams.get("category");
+    const subject = searchParams.get("subject");
+    const message = searchParams.get("message");
+
+    if (!category && !subject && !message) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      category: category || prev.category,
+      subject: subject || prev.subject,
+      message: message || prev.message,
+    }));
+  }, [searchParams]);
 
   const contactChannels = [
     {
@@ -328,7 +345,7 @@ export default function Contact() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        placeholder="+254 700 000 000"
+                        placeholder="0711493222"
                         className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-[#F96302] focus:ring-4 focus:ring-[#F96302]/10 text-gray-900 transition-all placeholder:text-gray-400"
                       />
                     </div>

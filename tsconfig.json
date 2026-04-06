@@ -1,3 +1,17 @@
 {
-  "extends": "./config/tsconfig.json"
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["frontend/src/*"]
+    },
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["frontend/src/**/*"],
+  "exclude": ["node_modules", "backend", "frontend/dist", "frontend/node_modules"]
 }

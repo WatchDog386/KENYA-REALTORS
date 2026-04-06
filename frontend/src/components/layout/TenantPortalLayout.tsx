@@ -191,6 +191,12 @@ const TenantPortalLayout = ({ children }: { children?: ReactNode }) => {
       description: 'Overview & Updates'
     },
     {
+      title: 'Lease Agreement',
+      href: '/portal/tenant/lease-agreement',
+      icon: <FileText size={20} />,
+      description: 'Read, Sign & Download'
+    },
+    {
       title: 'My Property',
       href: '/portal/tenant/property',
       icon: <Home size={20} />,

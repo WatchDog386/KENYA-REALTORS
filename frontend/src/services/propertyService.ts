@@ -23,6 +23,14 @@ export interface Property {
   // Computed on frontend
   total_units?: number;
   expected_income?: number;
+  unit_price_breakdown?: Array<{
+    name: string;
+    total_units: number;
+    tiers: Array<{
+      price_per_unit: number;
+      units_count: number;
+    }>;
+  }>;
   created_at?: string;
 }
 

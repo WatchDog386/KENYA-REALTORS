@@ -5,6 +5,7 @@
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "baseUrl": "..",
     "paths": {
       "@/*": ["./src/*"]
@@ -21,7 +22,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "rootDir": "../src",
     "jsx": "react-jsx"
   },

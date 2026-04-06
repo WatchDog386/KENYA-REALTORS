@@ -157,7 +157,7 @@ const Footer = () => {
               </span>
             </div>
             <a 
-              href="tel:+254706927062" 
+              href="tel:+254711493222" 
               className="p-4 bg-slate-50 rounded-none flex items-center gap-3 group transition-all duration-300"
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = COLORS.primary;
@@ -170,7 +170,7 @@ const Footer = () => {
             >
               <Phone className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-slate-700 group-hover:text-white transition-colors">
-                +254 706 927 062
+                0711493222
               </span>
             </a>
             <a 
@@ -193,7 +193,7 @@ const Footer = () => {
                 <MapPin className="w-4 h-4 text-[#F96302]" />
                 <span className="text-[9px] font-bold uppercase text-slate-700 whitespace-nowrap">Pangani</span>
              </div>
-             <a href="tel:+254706927062" className="flex items-center gap-2 px-4 border-r border-gray-300">
+             <a href="tel:+254711493222" className="flex items-center gap-2 px-4 border-r border-gray-300">
                 <Phone className="w-4 h-4 text-[#154279]" />
                 <span className="text-[9px] font-bold uppercase text-slate-700 whitespace-nowrap">Call Us</span>
              </a>

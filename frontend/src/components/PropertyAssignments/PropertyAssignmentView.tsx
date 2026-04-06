@@ -73,7 +73,7 @@ export const PropertyAssignmentView: React.FC<PropertyAssignmentViewProps> = ({
           ownership_percentage,
           proprietors(
             business_name,
-            profiles:user_id(first_name, last_name, email)
+            profiles!proprietors_user_id_fkey(first_name, last_name, email)
           )
         `)
         .eq('property_id', propertyId)

@@ -541,7 +541,7 @@ const Reports = () => {
 
       // Fetch assigned manager for this property
       let managerName = "No Manager Assigned";
-      let managerContact = "+254 700 000 000";
+      let managerContact = "0711493222";
       let managerEmail = "manager@aydenhomes.co.ke";
 
       try {
@@ -558,7 +558,7 @@ const Reports = () => {
         if (assignmentData?.profiles) {
           const profile = assignmentData.profiles;
           managerName = `${profile.first_name} ${profile.last_name}`;
-          managerContact = profile.phone || "+254 700 000 000";
+          managerContact = profile.phone || "0711493222";
           managerEmail = profile.email || "manager@aydenhomes.co.ke";
         }
       } catch (err) {

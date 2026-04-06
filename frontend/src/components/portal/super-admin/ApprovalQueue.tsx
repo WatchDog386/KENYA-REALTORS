@@ -159,6 +159,9 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
       setIsViewDialogOpen(false);
       setAdminReply("");
 
+      fetchApprovalRequests();
+      fetchApprovalStats();
+
       if (onApprovalUpdate) {
         onApprovalUpdate(targetId, "approved");
       }
@@ -180,6 +183,9 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
       setIsRejectDialogOpen(false);
       setRejectionReason("");
       setSelectedApprovalData(null);
+
+      fetchApprovalRequests();
+      fetchApprovalStats();
 
       if (onApprovalUpdate) {
         onApprovalUpdate(selectedApprovalData.id, "rejected");
@@ -298,10 +304,70 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
   // Stats are already available from the hook
   const approvalStats = stats;
 
+  const handlePrintSummary = () => {
+    // Generate an HTML string for the entire approval history (or current filtered list)
+    const printableContent = (approvals || [])
+      .map(
+        (app: any) => {
+          const type = (app.approval_type || app.request_type || "N/A").replace(/_/g, " ").toUpperCase();
+          const requester = app.requested_by_user ? `${app.requested_by_user.first_name} ${app.requested_by_user.last_name}` : "Unknown";
+          const status = app.status.toUpperCase();
+          const date = new Date(app.created_at).toLocaleString();
+          return `
+            <div style="border-bottom: 1px solid #ccc; padding: 12px 0;">
+              <div><strong>ID:</strong> ${app.id}</div>
+              <div><strong>Type:</strong> ${type}</div>
+              <div><strong>Requester:</strong> ${requester}</div>
+              <div><strong>Status:</strong> <span style="font-weight:bold; color: ${status === 'APPROVED' ? 'green' : status === 'REJECTED' ? 'red' : 'orange'};">${status}</span></div>
+              <div><strong>Submitted:</strong> ${date}</div>
+            </div>
+          `;
+        }
+      )
+      .join("");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Approval Summary Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+            h1 { color: #154279; border-bottom: 2px solid #154279; padding-bottom: 10px; margin-bottom: 5px; }
+            .meta { color: #666; font-size: 12px; margin-bottom: 20px; }
+            .content { margin-top: 20px; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Approval Queue Summary</h1>
+          <div class="meta">Generated on ${new Date().toLocaleString()}</div>
+          <button onclick="window.print()" style="padding: 10px 20px; background-color: #154279; color: white; border: none; cursor: pointer; margin-bottom: 20px;">Print Now</button>
+          <div class="content">
+            ${printableContent || "<p>No records found.</p>"}
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Automatically trigger print dialog
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
   return (
-    <div className="bg-slate-50 min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="superadmin-flat-page bg-[#d7dce1] min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Header */}
-      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+      <section className="superadmin-flat-hero relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
         <HeroBackground />
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
           <div className="space-y-1">
@@ -320,11 +386,12 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
           </div>
 
           <div className="flex items-center gap-3">
-             <button
+            <button
+              onClick={handlePrintSummary}
               className="group flex items-center gap-2 bg-white/10 text-white px-5 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all duration-300 rounded-xl border border-white/20 hover:border-white/40 shadow-sm backdrop-blur-sm"
             >
-              <Download className="h-3.5 w-3.5" />
-              Export Queue
+              <FileText className="h-3.5 w-3.5" />
+              Print Summary
             </button>
             
             <button

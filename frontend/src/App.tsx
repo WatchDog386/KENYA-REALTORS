@@ -2,9 +2,9 @@
 // © 2025 Jeff. All rights reserved.
 // Unauthorized copying, distribution, or modification of this file is strictly prohibited.
 
-import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -52,6 +52,9 @@ import PropertyDetailsPage from "@/pages/marketplace/PropertyDetailsPage";
    PORTAL PAGES
 ====================== */
 import SuperAdminDashboard from "@/pages/portal/SuperAdminDashboard";
+import SuperAdminReceiptsManagement from "@/pages/portal/super-admin/ReceiptsManagement";
+import SuperAdminUtilities from "@/pages/portal/SuperAdminUtilities";
+import SuperAdminUtilitiesManager from "@/pages/portal/SuperAdminUtilitiesManager";
 import SuperAdminProfilePage from "@/pages/portal/SuperAdminProfilePage";
 import ManagerPortal from "@/pages/portal/ManagerPortal";
 import PortalTenantDashboard from "@/pages/portal/TenantDashboard";
@@ -63,6 +66,7 @@ import ProfileManagement from "@/pages/portal/ProfileManagement";
 import RefundStatusPage from "@/pages/portal/RefundStatusPage";
 import Applications from "@/pages/portal/Applications";
 import RentalApplications from "@/components/portal/RentalApplications";
+import TenantDetails from "@/pages/portal/TenantDetails";
 
 // Tenant portal pages
 import TenantPaymentsPageComponent from "@/pages/portal/tenant/Payments";
@@ -81,6 +85,8 @@ import TenantSafetyPageComponent from "@/pages/portal/tenant/Safety";
 import TenantHelpPageComponent from "@/pages/portal/tenant/Help";
 import TenantRefundStatusPageComponent from "@/pages/portal/tenant/RefundStatus";
 import TenantVacancyNoticePageComponent from "@/pages/portal/tenant/VacancyNotice";
+import TenantBillHistoryPageComponent from "@/pages/portal/tenant/BillHistory";
+import TenantLeaseAgreementPageComponent from "@/pages/portal/tenant/LeaseAgreement";
 
 // Import Super Admin Context
 import { SuperAdminProvider } from "@/contexts/SuperAdminContext";
@@ -98,10 +104,16 @@ import ManagerRentCollection from "@/components/portal/manager/ManagerRentCollec
 import ManagerApplications from "@/components/portal/manager/ManagerApplications";
 import ManagerDeposits from "@/components/portal/manager/ManagerDeposits";
 import ManagerLeases from "@/components/portal/manager/ManagerLeases";
+import ManagerCaretakerDuties from "@/components/portal/manager/ManagerCaretakerDuties";
 import ManagerProfile from "@/components/portal/manager/ManagerProfile";
 import ManagerApprovalRequests from "@/pages/portal/manager/ApprovalRequests";
-import ManagerTechnicians from "@/components/portal/manager/ManagerTechnicians";
-import ManagerCaretakers from "@/components/portal/manager/ManagerCaretakers";
+import ManagerUtilityReadings from "@/pages/portal/manager/UtilityReadings";
+import BillingAndInvoicing from "@/pages/portal/manager/BillingAndInvoicing";
+import ManagerReceipts from "@/pages/portal/manager/Receipts";
+import ManagerLeaveRequestsPage from "@/pages/portal/manager/LeaveRequests";
+import LeaveRequestsPage from "@/pages/portal/staff/LeaveRequests";
+import SuperAdminLeaveRequestsDashboard from "@/pages/portal/super-admin/SuperAdminLeaveRequestsDashboard";
+import { managerRoutes } from "@/pages/portal/manager/routes";
 
 // Create a fallback component in case of import issues
 const GlobalLoader = () => (
@@ -159,6 +171,7 @@ import AccountantLayout from "@/components/layout/AccountantLayout";
 import ProprietorLayout from "@/components/layout/ProprietorLayout";
 import CaretakerLayout from "@/components/layout/CaretakerLayout";
 import TechnicianLayout from "@/components/layout/TechnicianLayout";
+import SupplierLayout from "@/components/layout/SupplierLayout";
 
 /* ======================
    SUPER ADMIN PAGES
@@ -169,6 +182,7 @@ import PropertyManager from "@/components/portal/super-admin/PropertyManager";
 import UserManagementNew from "@/components/portal/super-admin/UserManagementNew";
 import SystemSettings from "@/components/portal/super-admin/SystemSettings";
 import Reports from "@/components/portal/super-admin/Reports"; // Fixed import name
+import SuperAdminApplications from "@/components/portal/super-admin/SuperAdminApplications";
 
 /* ======================
    NEW ROLE DASHBOARDS
@@ -190,6 +204,8 @@ import CaretakerMaintenance from "@/components/portal/caretaker/CaretakerMainten
 import CaretakerProperty from "@/components/portal/caretaker/CaretakerProperty";
 import CaretakerReports from "@/components/portal/caretaker/CaretakerReports";
 import CaretakerMessages from "@/components/portal/caretaker/CaretakerMessages";
+import CaretakerDuties from "@/components/portal/caretaker/CaretakerDuties";
+import SupplierDashboard from "@/pages/portal/supplier/SupplierDashboard";
 
 import ProprietorProperties from "@/pages/portal/proprietor/ProprietorProperties";
 import ProprietorReports from "@/pages/portal/proprietor/ProprietorReports";
@@ -201,6 +217,8 @@ import ProprietorDocuments from "@/pages/portal/proprietor/ProprietorDocuments";
 ====================== */
 import NotFound from "@/pages/NotFound";
 import Profile from "./pages/Profile";
+import { getTenantPortalAccessState } from "@/services/tenantOnboardingService";
+import { getTenantLeaseAgreementState } from "@/services/tenantLeaseAgreementService";
 
 /* ======================
    REACT QUERY
@@ -306,6 +324,9 @@ const PortalRedirect = () => {
     case "caretaker":
       console.log("Redirecting to caretaker portal");
       return <Navigate to="/portal/caretaker" replace />;
+    case "supplier":
+      console.log("Redirecting to supplier portal");
+      return <Navigate to="/portal/supplier" replace />;
     default:
       console.log("No role match, redirecting to role selection");
       return <Navigate to="/auth/role-selection" replace />;
@@ -358,6 +379,8 @@ const RoleBasedRoute = ({
         return <Navigate to="/portal/proprietor" replace />;
       case "caretaker":
         return <Navigate to="/portal/caretaker" replace />;
+      case "supplier":
+        return <Navigate to="/portal/supplier" replace />;
       default:
         return <Navigate to="/auth/role-selection" replace />;
     }
@@ -378,6 +401,7 @@ const RoleBasedRoute = ({
       case "proprietor":
       case "technician":
       case "caretaker":
+      case "supplier":
         return <>{children}</>;
       default:
         return <MainLayout>{children}</MainLayout>;
@@ -391,7 +415,16 @@ const RoleBasedRoute = ({
    SUPER ADMIN PORTAL WRAPPER
 ====================== */
 const SuperAdminPortalWrapper = () => {
-  const { getUserRole, isAdmin, user } = useAuth();
+  const { getUserRole, isAdmin, user, supabaseUser, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+
+  // Keep current interface stable while profile hydration catches up.
+  if (!user && supabaseUser) {
+    return <GlobalLoader />;
+  }
 
   // Get user role
   const userRole = getUserRole();
@@ -422,7 +455,16 @@ const SuperAdminPortalWrapper = () => {
    MANAGER PORTAL WRAPPER
 ====================== */
 const ManagerPortalWrapper = () => {
-  const { getUserRole } = useAuth();
+  const { getUserRole, user, supabaseUser, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+
+  // Keep current interface stable while profile hydration catches up.
+  if (!user && supabaseUser) {
+    return <GlobalLoader />;
+  }
 
   const userRole = getUserRole();
 
@@ -452,9 +494,66 @@ const ManagerPortalWrapper = () => {
    TENANT PORTAL WRAPPER
 ====================== */
 const TenantPortalWrapper = () => {
-  const { getUserRole } = useAuth();
-
+  const { getUserRole, user, supabaseUser, isLoading } = useAuth();
+  const location = useLocation();
+  const [leaseGateLoading, setLeaseGateLoading] = useState(true);
+  const [requiresLeaseAgreement, setRequiresLeaseAgreement] = useState(false);
   const userRole = getUserRole();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkLeaseGate = async () => {
+      if (!user?.id || userRole !== "tenant") {
+        if (!cancelled) {
+          setRequiresLeaseAgreement(false);
+          setLeaseGateLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setLeaseGateLoading(true);
+
+        const accessState = await getTenantPortalAccessState(user.id);
+        if (accessState.isLocked || !accessState.hasPaidOnboardingInvoice) {
+          if (!cancelled) {
+            setRequiresLeaseAgreement(false);
+          }
+          return;
+        }
+
+        const leaseState = await getTenantLeaseAgreementState(user.id);
+        if (!cancelled) {
+          setRequiresLeaseAgreement(!leaseState.isSigned);
+        }
+      } catch (error) {
+        console.warn("Tenant lease-gate check failed, allowing normal access:", error);
+        if (!cancelled) {
+          setRequiresLeaseAgreement(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setLeaseGateLoading(false);
+        }
+      }
+    };
+
+    checkLeaseGate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, userRole, location.pathname]);
+
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+
+  // Keep current interface stable while profile hydration catches up.
+  if (!user && supabaseUser) {
+    return <GlobalLoader />;
+  }
 
   console.log("TenantPortalWrapper - userRole:", userRole);
 
@@ -467,6 +566,24 @@ const TenantPortalWrapper = () => {
     } else {
       return <Navigate to="/login" replace />;
     }
+  }
+
+  const leaseAllowedPaths = [
+    "/portal/tenant/lease-agreement",
+    "/portal/tenant/payments",
+    "/portal/tenant/payments/make",
+  ];
+
+  const isLeaseExemptPath = leaseAllowedPaths.some(
+    (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
+
+  if (leaseGateLoading) {
+    return <GlobalLoader />;
+  }
+
+  if (requiresLeaseAgreement && !isLeaseExemptPath) {
+    return <Navigate to="/portal/tenant/lease-agreement" replace />;
   }
 
   return (
@@ -734,14 +851,22 @@ const App = () => {
                   <Route path="properties" element={<PropertyManager />} />
                   <Route path="users" element={<UserManagementNew />} />
                   <Route path="approvals" element={<ApprovalQueue />} />
+                  <Route path="leave-requests" element={<SuperAdminLeaveRequestsDashboard />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />
+                  <Route path="billing" element={<Navigate to="/portal/super-admin/utilities" replace />} />
+                  <Route path="billing-and-invoicing" element={<Navigate to="/portal/super-admin/utilities" replace />} />
+                  <Route path="invoicing" element={<Navigate to="/portal/super-admin/utilities" replace />} />
+                  <Route path="utilities" element={<SuperAdminUtilitiesManager />} />
+                  <Route path="utilities/settings" element={<Navigate to="/portal/super-admin/utilities" replace />} />
                   <Route path="settings" element={<SystemSettings />} />
                   <Route path="reports" element={<Reports />} /> {/* ADDED THIS LINE */}
                   <Route path="leases" element={<LeasesManagement />} />
+                  <Route path="leases/:id" element={<TenantDetails />} />
                   <Route path="payments" element={<PaymentsManagement />} />
+                  <Route path="receipts" element={<SuperAdminReceiptsManagement />} />
                   <Route path="profile" element={<SuperAdminProfilePage />} />
                   <Route path="refunds" element={<RefundStatusPage />} />
-                  <Route path="applications" element={<Applications />} />
+                  <Route path="applications" element={<SuperAdminApplications />} />
                   <Route path="rental-applications" element={<RentalApplications />} />
                   <Route
                     path="create-users"
@@ -784,6 +909,14 @@ const App = () => {
                 >
                   <Route index element={<ManagerPortal />} />
                   <Route
+                    path="technicians"
+                    element={<ManagerMaintenancePage />}
+                  />
+                  <Route
+                    path="caretakers"
+                    element={<ManagerCaretakerDuties />}
+                  />
+                  <Route
                     path="properties"
                     element={<ManagerUnits />}
                   />
@@ -807,17 +940,21 @@ const App = () => {
                     path="approval-requests"
                     element={<ManagerApprovalRequests />}
                   />
+                  <Route path="leave-requests" element={<ManagerLeaveRequestsPage />} />
                   <Route
                     path="vacation-notices"
                     element={<ManagerVacancyNotices />}
                   />
-                  <Route path="technicians" element={<ManagerTechnicians />} />
-                  <Route path="caretakers" element={<ManagerCaretakers />} />
+                  <Route path="caretaker-duties" element={<ManagerCaretakerDuties />} />
+                  <Route path="utilities" element={<ManagerUtilityReadings />} />
+                  <Route path="billing" element={<BillingAndInvoicing />} />
+                  <Route path="receipts" element={<ManagerReceipts />} />
                 </Route>
 
                 {/* TENANT PORTAL ROUTES */}
                 <Route path="/portal/tenant" element={<TenantPortalWrapper />}>
                   <Route index element={<PortalTenantDashboard />} />
+                  <Route path="lease-agreement" element={<TenantLeaseAgreementPageComponent />} />
                   <Route path="payments" element={<TenantPaymentsPageComponent />} />
                   <Route path="payments/make" element={<TenantMakePaymentPageComponent />} />
                   <Route
@@ -853,6 +990,10 @@ const App = () => {
                     path="vacation-notice"
                     element={<TenantVacancyNoticePageComponent />}
                   />
+                  <Route
+                    path="bills"
+                    element={<TenantBillHistoryPageComponent />}
+                  />
                 </Route>
 
                 {/* NEW ROLE PORTALS */}
@@ -869,6 +1010,8 @@ const App = () => {
                   <Route path="invoices" element={<AccountantInvoices />} />
                   <Route path="receipts" element={<AccountantReceipts />} />
                   <Route path="payments" element={<AccountantPayments />} />
+                  <Route path="messages" element={<ManagerMessages />} />
+                  <Route path="leave-requests" element={<LeaveRequestsPage />} />
                 </Route>
                 <Route
                   path="/portal/technician"
@@ -883,6 +1026,8 @@ const App = () => {
                   <Route path="schedule" element={<TechnicianSchedule />} />
                   <Route path="earnings" element={<TechnicianEarnings />} />
                   <Route path="profile" element={<TechnicianProfile />} />
+                  <Route path="messages" element={<ManagerMessages />} />
+                  <Route path="leave-requests" element={<LeaveRequestsPage />} />
                 </Route>
                 <Route
                   path="/portal/proprietor"
@@ -909,8 +1054,22 @@ const App = () => {
                   <Route index element={<CaretakerDashboard />} />
                   <Route path="maintenance" element={<CaretakerMaintenance />} />
                   <Route path="property" element={<CaretakerProperty />} />
+                  <Route path="duties" element={<CaretakerDuties />} />
                   <Route path="reports" element={<CaretakerReports />} />
                   <Route path="messages" element={<CaretakerMessages />} />
+                  <Route path="leave-requests" element={<LeaveRequestsPage />} />
+                </Route>
+
+                <Route
+                  path="/portal/supplier"
+                  element={
+                    <RoleBasedRoute allowedRoles={["supplier", "super_admin"]}>
+                       <SupplierLayout />
+                    </RoleBasedRoute>
+                  }
+                >
+                  <Route index element={<SupplierDashboard />} />
+                  <Route path="messages" element={<ManagerMessages />} />
                 </Route>
 
                 {/* SHARED PORTAL PAGES */}

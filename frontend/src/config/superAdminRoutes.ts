@@ -75,6 +75,22 @@ export const SUPER_ADMIN_ROUTES: SuperAdminRoute[] = [
     showInNavigation: true
   },
   {
+    title: 'Receipts',
+    path: '/portal/super-admin/receipts',
+    icon: 'file-text',
+    description: 'View and manage receipts',
+    permission: 'manage_payments',
+    showInNavigation: true
+  },
+  {
+    title: 'Billing and Invoicing',
+    path: '/portal/super-admin/utilities',
+    icon: 'zap',
+    description: 'Manage billing and invoicing',
+    permission: 'manage_utilities',
+    showInNavigation: true
+  },
+  {
     title: 'Manager Portal',
     path: '/portal/super-admin/manager',
     icon: 'shield',

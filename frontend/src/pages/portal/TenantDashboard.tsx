@@ -159,6 +159,15 @@ const TenantDashboard: React.FC = () => {
     upcomingEvents: 0,
   });
 
+  const [billingSnapshot, setBillingSnapshot] = useState({
+    onboardingTotal: 0,
+    invoicedRent: 0,
+    paidRent: 0,
+    rentBalance: 0,
+    transferCharges: 0,
+    receiptCount: 0,
+  });
+
   // Calculate lease months remaining
   const calculateLeaseMonthsLeft = (endDate: string): number => {
     const today = new Date();
@@ -401,17 +410,59 @@ const TenantDashboard: React.FC = () => {
       if (payments) {
         setRecentPayments(payments);
 
+        const normalize = (value: any) => String(value || "").toLowerCase();
+        const classifyPayment = (payment: any) => {
+          const summary = [
+            normalize(payment.description),
+            normalize(payment.notes),
+            normalize(payment.payment_type),
+          ].join(" ");
+
+          if (/(deposit|onboarding|initial|lease fee|agreement|water deposit)/.test(summary)) {
+            return "onboarding";
+          }
+
+          if (/(swap|shift|upgrade|downgrade|transfer|migration)/.test(summary)) {
+            return "transfer";
+          }
+
+          return "regular";
+        };
+
         // Calculate stats
         const currentBalance = calculateCurrentBalance(payments);
         const totalPaid = payments
           .filter((p) => p.status === "completed")
           .reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
+        const invoicedRent = payments
+          .filter((payment) => ["completed", "pending", "overdue"].includes(payment.status))
+          .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+
+        const onboardingTotal = payments
+          .filter((payment: any) => classifyPayment(payment) === "onboarding")
+          .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+
+        const transferCharges = payments
+          .filter((payment: any) => classifyPayment(payment) === "transfer")
+          .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+
+        const receiptCount = payments.filter((payment) => payment.status === "completed").length;
+
         setStats((prev) => ({
           ...prev,
           currentBalance,
           totalPaid,
         }));
+
+        setBillingSnapshot({
+          onboardingTotal,
+          invoicedRent,
+          paidRent: totalPaid,
+          rentBalance: currentBalance,
+          transferCharges,
+          receiptCount,
+        });
       }
     } catch (err) {
       console.warn("Could not fetch payments:", err);
@@ -882,6 +933,55 @@ const TenantDashboard: React.FC = () => {
                </CardContent>
              </Card>
            </motion.div>
+        </div>
+
+        {/* BILLING SNAPSHOT */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-black uppercase tracking-wider text-[#154279]">Billing Snapshot</h2>
+            <Button variant="ghost" className="text-[#F96302] hover:bg-orange-50" onClick={() => navigate('/portal/tenant/bills')}>
+              Payment History
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Initial Onboarding Total</p>
+              <p className="text-lg font-black text-slate-900 mt-1">{formatCurrency(billingSnapshot.onboardingTotal)}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Deposits, lease fee, and setup charges</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Invoiced Rent</p>
+              <p className="text-lg font-black text-slate-900 mt-1">{formatCurrency(billingSnapshot.invoicedRent)}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Completed, pending, and overdue charges</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Paid Rent</p>
+              <p className="text-lg font-black text-emerald-700 mt-1">{formatCurrency(billingSnapshot.paidRent)}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Total confirmed payments</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Rent Balance</p>
+              <p className={cn("text-lg font-black mt-1", billingSnapshot.rentBalance > 0 ? "text-red-700" : "text-emerald-700")}>{formatCurrency(billingSnapshot.rentBalance)}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Outstanding amount to settle</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Swap/Upgrade Charges</p>
+              <p className="text-lg font-black text-slate-900 mt-1">{formatCurrency(billingSnapshot.transferCharges)}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Shifting, upgrading, or downgrading invoices</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Receipts Issued</p>
+              <p className="text-lg font-black text-[#154279] mt-1">{billingSnapshot.receiptCount}</p>
+              <p className="text-[11px] text-slate-500 mt-1">Payments with available receipts</p>
+            </div>
+          </div>
         </div>
 
         {/* MAIN LAYOUT GRID */}

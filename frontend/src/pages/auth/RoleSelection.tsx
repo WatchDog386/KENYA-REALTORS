@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
   Home, 
+  Handshake,
   CheckCircle,
   ArrowLeft
 } from 'lucide-react';
@@ -46,6 +47,20 @@ const RoleSelection = () => {
         'Track deposit refund status'
       ],
       color: 'border-purple-200 hover:border-purple-400 bg-purple-50'
+    },
+    {
+      id: 'supplier',
+      title: 'Supplier',
+      icon: Handshake,
+      description: 'Receive LPO requests, submit supplier invoices, and track accountant payment processing.',
+      features: [
+        'View assigned LPO requests',
+        'Submit supplier invoice details',
+        'Upload supply evidence images',
+        'Track approval and payment status',
+        'Receive payment updates'
+      ],
+      color: 'border-emerald-200 hover:border-emerald-400 bg-emerald-50'
     }
   ];
 
@@ -77,6 +92,9 @@ const RoleSelection = () => {
             break;
           case 'super_admin':
             navigate('/portal/super-admin/dashboard');
+            break;
+          case 'supplier':
+            navigate('/portal/supplier');
             break;
           default:
             navigate('/portal');

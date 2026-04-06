@@ -87,7 +87,7 @@ export const PropertyAssignmentAdmin: React.FC = () => {
           assigned_at,
           proprietors(
             business_name,
-            profiles:user_id(first_name, last_name)
+            profiles!proprietors_user_id_fkey(first_name, last_name)
           ),
           properties(name)
         `)

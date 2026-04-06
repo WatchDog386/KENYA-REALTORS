@@ -7,8 +7,9 @@ import ManagerMaintenance from './Maintenance';
 import ManagerApprovalRequests from './ApprovalRequests';
 import ManagerVacationNotices from './VacationNotices';
 import ManagerReports from './Reports';
-import ManagerTechnicians from './Technicians';
-import ManagerCaretakers from './Caretakers';
+import ManagerUtilityReadings from './UtilityReadings';
+import ManagerReceipts from './Receipts';
+import BillingAndInvoicing from './BillingAndInvoicing';
 
 export const managerRoutes: RouteObject[] = [
   {
@@ -22,14 +23,6 @@ export const managerRoutes: RouteObject[] = [
       {
         path: 'tenants',
         element: <ManagerTenants />,
-      },
-      {
-        path: 'technicians',
-        element: <ManagerTechnicians />,
-      },
-      {
-        path: 'caretakers',
-        element: <ManagerCaretakers />,
       },
       {
         path: 'payments',
@@ -50,6 +43,18 @@ export const managerRoutes: RouteObject[] = [
       {
         path: 'reports',
         element: <ManagerReports />,
+      },
+      {
+        path: 'utilities',
+        element: <ManagerUtilityReadings />,
+      },
+      {
+        path: 'billing',
+        element: <BillingAndInvoicing />,
+      },
+      {
+        path: 'receipts',
+        element: <ManagerReceipts />,
       },
     ],
   },

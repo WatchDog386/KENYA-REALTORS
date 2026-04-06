@@ -239,6 +239,18 @@ const TechnicianLayout = ({ children }: { children?: ReactNode }) => {
       href: '/portal/technician/profile',
       icon: <User size={20} />,
       description: 'Manage profile & skills'
+    },
+    {
+      title: 'Messages',
+      href: '/portal/technician/messages',
+      icon: <MessageSquare size={20} />,
+      description: 'Internal Email & Alerts'
+    },
+    {
+      title: 'Leave Requests',
+      href: '/portal/technician/leave-requests',
+      icon: <FileText size={20} />,
+      description: 'Submit Leave Request'
     }
   ];
 

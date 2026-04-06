@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Globe } from "lucide-react";
 import {
   FaBars,
   FaUser,
+  FaSearch,
   FaChevronDown,
   FaShoppingCart,
   FaSignOutAlt,
@@ -31,14 +32,70 @@ import {
   LOGOUT_BUTTON,
 } from "@/config/navbarConfig";
 
+// Unified Data for Search
+const SEARCH_DATA = [
+  // --- HERO LISTINGS ---
+  { id: 101, title: "Modern Downtown Loft", area: "CBD", price: "85,000", type: "Loft", img: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=200" },
+  { id: 102, title: "Suburban Family Home", area: "Karen", price: "150,000", type: "House", img: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=200" },
+  { id: 103, title: "Cozy Studio Apartment", area: "Roysambu", price: "25,000", type: "Studio", img: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=200" },
+  { id: 104, title: "Luxury Condo w/ View", area: "Westlands", price: "210,000", type: "Condo", img: "https://images.unsplash.com/photo-1515263487990-61b07816b324?q=80&w=200" }
+];
 
+// Extract unique locations with vacancy info
+const LOCATION_AREAS = [
+  { name: "CBD", vacancies: 7, rentals: 15 },
+  { name: "Karen", vacancies: 4, rentals: 10 },
+  { name: "Roysambu", vacancies: 6, rentals: 14 },
+  { name: "Westlands", vacancies: 3, rentals: 9 }
+];
+
+const PUBLIC_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "sw", label: "Swahili" },
+  { code: "ar", label: "Arabic" },
+  { code: "so", label: "Somali" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+];
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const [showLocations, setShowLocations] = useState(false);
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
+  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [filteredResults, setFilteredResults] = useState<typeof SEARCH_DATA>([]);
+  const [publicLanguage, setPublicLanguage] = useState(() => localStorage.getItem("public_language") || "en");
+
+  const resolveRoute = (action?: string) => {
+    const normalized = (action || "").trim();
+    if (!normalized) return "/";
+    return normalized.startsWith("/") ? normalized : `/${normalized}`;
+  };
+
+  const goToRoute = (action?: string) => {
+    setMenuOpen(false);
+    setShowTenantDropdown(false);
+    setShowAccountDropdown(false);
+    navigate(resolveRoute(action));
+  };
+
+  const handleLanguageChange = (languageCode: string) => {
+    setPublicLanguage(languageCode);
+    localStorage.setItem("public_language", languageCode);
+
+    if (languageCode === "en") {
+      return;
+    }
+
+    const sourceUrl = window.location.href;
+    const translateUrl = `https://translate.google.com/translate?sl=auto&tl=${languageCode}&u=${encodeURIComponent(sourceUrl)}`;
+    window.open(translateUrl, "_blank", "noopener,noreferrer");
+  };
 
   // Cart logic
   const [cart, setCart] = useState(() => {
@@ -46,7 +103,32 @@ const Navbar = () => {
     return saved ? JSON.parse(saved) : { count: 0, total: 0 };
   });
 
+  // Search Logic
+  useEffect(() => {
+    const lowerQuery = searchQuery.toLowerCase().trim();
+    if (lowerQuery === "") {
+      // Show all results if search is empty (or limit to top 5-10 if list is huge)
+      setFilteredResults(SEARCH_DATA);
+      return;
+    }
+    const results = SEARCH_DATA.filter(item => 
+      item.title.toLowerCase().includes(lowerQuery) || 
+      item.area.toLowerCase().includes(lowerQuery) ||
+      item.type.toLowerCase().includes(lowerQuery)
+    );
+    setFilteredResults(results);
+  }, [searchQuery]);
 
+  const addToCart = (item: typeof SEARCH_DATA[0]) => {
+    const newCart = {
+      count: cart.count + 1,
+      total: cart.total + (typeof item.price === 'string' ? parseFloat(item.price.replace(/,/g, '')) : item.price)
+    };
+    setCart(newCart);
+    setSearchQuery("");
+    setShowResults(false);
+    // Optional: Flash a toast or something
+  };
 
   // Fonts
   useEffect(() => {
@@ -65,36 +147,12 @@ const Navbar = () => {
         --navbar-height-desktop: ${NAVBAR_HEIGHTS.desktop};
       }
 
-      /* Sleek & Polished 3D Effect */
-      @keyframes polishedLift {
-        0%, 100% {
-          filter: drop-shadow(-6px 10px 18px rgba(0, 0, 0, 0.15));
-          transform: translateY(0px);
-        }
-        50% {
-          filter: drop-shadow(-8px 14px 24px rgba(0, 0, 0, 0.22));
-          transform: translateY(-3px);
-        }
-      }
-
-      .brand-animate {
-        animation: polishedLift 4s ease-in-out infinite;
-      }
-
       .logo-svg {
-        filter: drop-shadow(-5px 8px 16px rgba(0, 0, 0, 0.12));
-        transition: all 0.3s ease;
-        will-change: filter, transform;
+        transition: transform 0.3s ease;
       }
 
       .logo-svg:hover {
-        filter: drop-shadow(-7px 12px 22px rgba(0, 0, 0, 0.2));
         transform: translateY(-3px);
-      }
-
-      .brand-text-3d {
-        filter: drop-shadow(-5px 8px 16px rgba(0, 0, 0, 0.12));
-        animation: polishedLift 4s ease-in-out infinite;
       }
     `;
     document.head.appendChild(style);
@@ -128,7 +186,7 @@ const Navbar = () => {
 
   return (
     <div 
-      className={`fixed top-0 w-full z-50 transition-all duration-300 bg-[#efeeee] ${isScrolled ? "shadow-md border-b border-[#d9d9d9]" : ""}`}
+      className={`fixed top-0 w-full z-50 transition-all duration-300 bg-[#efeeee] ${isScrolled ? "shadow-sm border-b border-[#d9d9d9]" : ""}`}
       style={{
         '--navbar-height-mobile': NAVBAR_HEIGHTS.mobile,
         '--navbar-height-desktop': NAVBAR_HEIGHTS.desktop
@@ -139,8 +197,7 @@ const Navbar = () => {
       <div
         className="text-white text-xs hidden lg:block border-b border-slate-200"
         style={{
-          background: `linear-gradient(180deg, ${COLORS.primary} 0%, #0f335e 100%)`,
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -1px 0 rgba(0,0,0,0.24)",
+          background: COLORS.primary,
         }}
       >
         <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-between h-10">
@@ -162,18 +219,27 @@ const Navbar = () => {
             )}
           </div>
           <div className="flex items-center gap-6 font-bold tracking-wide">
+            <div className="flex items-center gap-2">
+              <Globe size={11} className="text-[#F96302]" />
+              <select
+                value={publicLanguage}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="bg-transparent text-white text-[10px] font-bold uppercase tracking-wider border border-white/30 rounded px-2 py-1 focus:outline-none focus:border-[#F96302]"
+                aria-label="Select site language"
+              >
+                {PUBLIC_LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code} className="text-slate-900">
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {UTILITY_BAR.buttons.map((btn, idx) => (
               <button 
                 key={idx} 
-                onClick={() => {
-                  if (btn.action.startsWith('applications')) {
-                    navigate(`/${btn.action}`);
-                  } else if (btn.action === 'login') {
-                    navigate('/login');
-                  } else {
-                    navigate('/');
-                  }
-                }} 
+                type="button"
+                onClick={() => goToRoute(btn.action)} 
                 className={`text-white hover:text-[#F96302] transition-colors uppercase ${btn.size}`}
               >
                 {btn.label}
@@ -188,7 +254,7 @@ const Navbar = () => {
         className={`relative z-20 transition-all duration-300 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"} py-2 md:py-4 md:rounded-none rounded-b-[2rem] md:shadow-none`}
         style={{
           background: "#efeeee",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.75), 0 8px 16px rgba(0,0,0,0.08)",
+          boxShadow: "0 4px 12px rgba(15, 23, 42, 0.06)",
         }}
       >
         <div className="max-w-[1440px] mx-auto px-4 lg:px-6">
@@ -199,7 +265,7 @@ const Navbar = () => {
                {/* 1. Left: Hamburger */}
                <button 
                   onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 rounded-xl text-[#154279] bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all"
+                className="p-2 rounded-xl text-[#154279] bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors"
                >
                  <FaBars size={24} />
                </button>
@@ -207,7 +273,7 @@ const Navbar = () => {
                {/* 2. Center: Logo Icon Only (App Style) */}
                <div onClick={handleHomeClick} className="flex items-center justify-center gap-2">
                   {/* SVG Logo */}
-                  <svg viewBox="0 0 200 200" className="h-10 w-auto drop-shadow-md" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox="0 0 200 200" className="h-10 w-auto" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <linearGradient id="mobile-grad-front" x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor="#F9F1DC" />
@@ -270,14 +336,14 @@ const Navbar = () => {
                <div className="relative">
                  <button 
                     onClick={() => setShowTenantDropdown(!showTenantDropdown)}
-                    className="p-2 rounded-xl text-[#154279] relative z-20 bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all"
+                    className="p-2 rounded-xl text-[#154279] relative z-20 bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors"
                  >
                    <FaUser size={22} />
                  </button>
                  
                  {/* Mobile Account Dropdown */}
                  {showTenantDropdown && (
-                   <div className="absolute top-full right-0 mt-2 w-48 border border-[#d9d9d9] overflow-hidden z-30 rounded-2xl bg-[#efeeee] shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff]">
+                   <div className="absolute top-full right-0 mt-2 w-48 border border-[#d9d9d9] overflow-hidden z-30 rounded-2xl bg-[#efeeee] shadow-lg">
                       {ACCOUNT_DROPDOWN.items.map((item) => (
                         <button 
                           key={item.id}
@@ -413,7 +479,8 @@ const Navbar = () => {
                         {/* Footer Actions */}
                         <div className="p-6 bg-white border-t border-slate-200">
                            <button 
-                             onClick={() => navigate('/login')}
+                             type="button"
+                             onClick={() => goToRoute('/login')}
                              className="w-full bg-[#154279] text-white py-3 font-bold shadow-lg shadow-blue-900/20 active:scale-95 transition-transform flex items-center justify-center gap-2 rounded-none"
                            >
                              <FaSignInAlt /> Portal Login
@@ -425,27 +492,94 @@ const Navbar = () => {
 
             </div>
 
-            {/* Spacer to push Account & Cart to the right */}
-            <div className="hidden lg:flex flex-1"></div>
+            {/* NAVIGATION LIST (Moved from Sub-Nav) */}
+            <div className="hidden lg:flex flex-1 w-full justify-center items-center gap-10 relative z-30 ml-4 lg:ml-8">
+              {NAVIGATION_SECTIONS.map((item) => {
+                const IconComponent = item.icon;
+                const isTenantSupport = item.id === "faq";
+                
+                return (
+                  <div key={item.id} className="relative group">
+                    <button
+                      onClick={() => {
+                        if (isTenantSupport) {
+                          setShowTenantDropdown(!showTenantDropdown);
+                        } else {
+                          handleNavClick(item.id);
+                        }
+                      }}
+                      className={`flex items-center gap-2 px-2 py-2.5 rounded-none transition-all duration-200 ${
+                        isTenantSupport ? "group-hover:text-[#F96302]" : ""
+                      } hover:text-[#F96302]`}
+                    >
+                      <span className={`text-[${COLORS.secondary}]`}>
+                        <IconComponent size={item.iconSize} />
+                      </span>
+                      <span className={`font-semibold text-[15px] text-[${COLORS.primary}] hover:text-[${COLORS.secondary}] transition-colors`}>
+                        {item.name}
+                      </span>
+                      {isTenantSupport && (
+                        <FaChevronDown size={12} className="text-slate-600 group-hover:text-[#F96302] transition-colors" />
+                      )}
+                    </button>
+
+                    {/* Tenant Support Dropdown */}
+                    {isTenantSupport && (
+                      <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                        <div className="bg-[#efeeee] border border-[#d9d9d9] rounded-xl shadow-lg overflow-hidden min-w-[220px]">
+                          <button
+                            onClick={() => {
+                              handleNavClick("faq");
+                              setShowTenantDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-200"
+                          >
+                            <span>❓</span>
+                            FAQ Section
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigate("/contact");
+                              setShowTenantDropdown(false);
+                            }}
+                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] hover:bg-slate-50 transition-colors flex items-center gap-3"
+                          >
+                            <span>📧</span>
+                            Contact Us
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             {/* Desktop Account & Cart Area */}
             <div className="hidden lg:flex items-center gap-8 shrink-0">
               
               {/* Account Dropdown - Blue/Orange */}
-              <div className="relative group h-full py-2">
-                <button className="flex flex-col items-start outline-none px-3 py-2 rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] group-hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all">
+              <div className="relative h-full py-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAccountDropdown((prev) => !prev)}
+                  className="flex flex-col items-start outline-none px-3 py-2 rounded-xl bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors"
+                >
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] text-black font-bold uppercase tracking-wider">Account</span>
-                    <FaChevronDown size={8} className={`text-[${COLORS.secondary}] group-hover:rotate-180 transition-transform duration-300`} />
+                    <FaChevronDown
+                      size={8}
+                      className={`text-[${COLORS.secondary}] transition-transform duration-300 ${showAccountDropdown ? "rotate-180" : ""}`}
+                    />
                   </div>
-                  <span className={`text-[14px] text-[${COLORS.primary}] font-bold group-hover:text-[${COLORS.secondary}] transition-colors`}>
+                  <span className={`text-[14px] text-[${COLORS.primary}] font-bold hover:text-[${COLORS.secondary}] transition-colors`}>
                     Hello, Guest
                   </span>
                 </button>
 
                 {/* Dropdown Menu - Rounded & Smooth */}
-                  <div className="absolute top-full right-0 pt-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 w-64 z-50">
-                  <div className="rounded-2xl border border-[#d9d9d9] overflow-hidden p-2 bg-[#efeeee] shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff]">
+                <div className={`absolute top-full right-0 pt-3 transition-all duration-300 transform w-64 z-50 ${showAccountDropdown ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-2"}`}>
+                  <div className="rounded-2xl border border-[#d9d9d9] overflow-hidden p-2 bg-[#efeeee] shadow-lg">
                     <div className="px-4 py-3 border-b border-slate-100 mb-1">
                         <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">{ACCOUNT_DROPDOWN.title}</p>
                     </div>
@@ -453,7 +587,8 @@ const Navbar = () => {
                     {ACCOUNT_DROPDOWN.items.map((item) => (
                       <button 
                         key={item.id}
-                        onClick={() => navigate(`/${item.action}`)}
+                        type="button"
+                        onClick={() => goToRoute(item.action)}
                         className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl transition-all group/item mt-1"
                       >
                         <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-full group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
@@ -467,10 +602,17 @@ const Navbar = () => {
                     ))}
                   </div>
                 </div>
+
+                {showAccountDropdown && (
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowAccountDropdown(false)}
+                  />
+                )}
               </div>
 
               {/* Cart Button */}
-              <button className={`flex items-center gap-3 group relative pl-6 border-l border-slate-300 pr-3 py-2 rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff] transition-all`}>
+              <button className={`flex items-center gap-3 group relative pl-6 border-l border-slate-300 pr-3 py-2 rounded-xl bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors`}>
                 <div className="relative">
                   <FaShoppingCart size={24} className={`text-[${COLORS.secondary}] group-hover:text-[${COLORS.primary}] transition-colors duration-300`} />
                   {cart.count > 0 && (
@@ -491,72 +633,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Sub-Nav (Desktop) */}
-      <div className="hidden lg:block h-14 transition-all duration-300 bg-[#efeeee] border-b border-[#d9d9d9]">
-        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-center h-full">
-          <div className="flex items-center gap-10">
-            {NAVIGATION_SECTIONS.map((item) => {
-              const IconComponent = item.icon;
-              const isTenantSupport = item.id === "faq";
-              
-              return (
-                <div key={item.id} className="relative group">
-                  <button
-                    onClick={() => {
-                      if (isTenantSupport) {
-                        setShowTenantDropdown(!showTenantDropdown);
-                      } else {
-                        handleNavClick(item.id);
-                      }
-                    }}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-none transition-all duration-200 ${
-                      isTenantSupport ? "group-hover:text-[#F96302]" : ""
-                    } rounded-xl bg-[#efeeee] shadow-[6px_6px_12px_#d1d1d1,-6px_-6px_12px_#ffffff] hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]`}
-                  >
-                    <span className={`text-[${COLORS.secondary}]`}>
-                      <IconComponent size={item.iconSize} />
-                    </span>
-                    <span className={`font-semibold text-sm text-[${COLORS.primary}]`}>
-                      {item.name}
-                    </span>
-                    {isTenantSupport && (
-                      <FaChevronDown size={12} className="text-slate-600 group-hover:text-[#F96302] transition-colors" />
-                    )}
-                  </button>
-
-                  {/* Tenant Support Dropdown */}
-                  {isTenantSupport && (
-                    <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
-                      <div className="bg-[#efeeee] border border-[#d9d9d9] rounded-xl shadow-[8px_8px_16px_#d1d1d1,-8px_-8px_16px_#ffffff] overflow-hidden min-w-[220px]">
-                        <button
-                          onClick={() => {
-                            handleNavClick("faq");
-                            setShowTenantDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] transition-colors flex items-center gap-3 border-b border-slate-200 hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
-                        >
-                          <span>❓</span>
-                          FAQ Section
-                        </button>
-                        <button
-                          onClick={() => {
-                            navigate("/contact");
-                            setShowTenantDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] transition-colors flex items-center gap-3 hover:shadow-[inset_2px_2px_4px_#d1d1d1,inset_-2px_-2px_4px_#ffffff]"
-                        >
-                          <span>📧</span>
-                          Contact Us
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Sub-Nav (Desktop) Removed and moved into Main Nav Bar */}
 
       {/* Mobile Menu Drawer */}
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -582,14 +659,14 @@ const Navbar = () => {
               {NAVIGATION_SECTIONS.map((item) => {
                 const IconComponent = item.icon;
                 const isTenantSupport = item.id === "faq";
-                const [mobileDropdownOpen, setMobileDropdownOpen] = React.useState(false);
+                
                 
                 return (
                   <div key={item.id}>
                     <button 
                       onClick={() => {
                         if (isTenantSupport) {
-                          setMobileDropdownOpen(!mobileDropdownOpen);
+                          // setMobileDropdownOpen(!mobileDropdownOpen);
                         } else {
                           handleNavClick(item.id);
                           setMenuOpen(false);
@@ -604,18 +681,18 @@ const Navbar = () => {
                         <span className="font-semibold text-sm">{item.name}</span>
                       </div>
                       {isTenantSupport && (
-                        <FaChevronDown size={12} className={`text-slate-500 transition-transform ${mobileDropdownOpen ? "rotate-180" : ""}`} />
+                        <FaChevronDown size={12} className={`text-slate-500 transition-transform ${false ? "rotate-180" : ""}`} />
                       )}
                     </button>
 
                     {/* Mobile Tenant Support Dropdown */}
-                    {isTenantSupport && mobileDropdownOpen && (
+                    {isTenantSupport  && (
                       <div className="bg-slate-50 border-l-[3px] border-[#F96302]">
                         <button
                           onClick={() => {
                             navigate("/faq");
                             setMenuOpen(false);
-                            setMobileDropdownOpen(false);
+                            
                           }}
                           className="w-full px-12 py-3 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
                         >
@@ -626,7 +703,7 @@ const Navbar = () => {
                           onClick={() => {
                             navigate("/contact");
                             setMenuOpen(false);
-                            setMobileDropdownOpen(false);
+                            
                           }}
                           className="w-full px-12 py-3 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
                         >
@@ -656,7 +733,7 @@ const Navbar = () => {
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-200 hidden">
-            <button onClick={() => { setMenuOpen(false); navigate('/login'); }} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-xl transition-all px-4 justify-center`}>
+            <button type="button" onClick={() => goToRoute('/login')} className={`flex items-center gap-3 ${LOGOUT_BUTTON.textColor} font-bold text-sm ${LOGOUT_BUTTON.hoverColor} w-full py-3 ${LOGOUT_BUTTON.hoverBgColor} rounded-xl transition-all px-4 justify-center`}>
               <FaSignOutAlt /> {LOGOUT_BUTTON.label}
             </button>
           </div>

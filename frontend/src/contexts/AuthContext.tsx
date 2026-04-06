@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User as SupabaseUser, Provider } from "@supabase/supabase-js";
 import { useNavigate, useLocation } from "react-router-dom";
+import { loginActivityService } from "@/services/loginActivityService";
 
 // Available roles
 const AVAILABLE_ROLES = [
@@ -14,6 +15,7 @@ const AVAILABLE_ROLES = [
   { name: "proprietor", description: "Proprietor" },
   { name: "caretaker", description: "Caretaker" },
   { name: "accountant", description: "Accountant" },
+  { name: "supplier", description: "Supplier" },
 ] as const;
 
 // Permissions by role
@@ -26,6 +28,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   super_admin: ["*"],
   owner: ["manage_properties", "view_tenants", "manage_managers"],
+  supplier: ["view_reports"],
 };
 
 // Interface for user profile
@@ -34,7 +37,7 @@ interface UserProfile {
   email: string;
   first_name?: string;
   last_name?: string;
-  role: "super_admin" | "property_manager" | "tenant" | "owner" | "technician" | "proprietor" | "caretaker" | "accountant" | null;
+  role: "super_admin" | "property_manager" | "tenant" | "owner" | "technician" | "proprietor" | "caretaker" | "accountant" | "supplier" | null;
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
@@ -224,7 +227,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Default approval status is false for sensitive roles
       // For development/demo purposes, we are auto-approving these roles
-      const isAutoApproved = ['super_admin', 'accountant', 'technician', 'proprietor', 'caretaker', 'tenant', 'manager', 'property_manager', 'owner'].includes(role);
+      const isAutoApproved = ['super_admin', 'accountant', 'technician', 'proprietor', 'caretaker', 'supplier', 'tenant', 'manager', 'property_manager', 'owner'].includes(role);
       
       const { error } = await supabase
         .from("profiles")
@@ -344,6 +347,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Check if we are already on the correct path to avoid loops
     const currentPath = location.pathname;
+
+    // Keep users on their current work page inside the portal on session refresh/tab return.
+    if (currentPath.startsWith("/portal/")) {
+      return;
+    }
     
     // Helper to check if we should redirect
     const shouldRedirect = (targetPath: string) => {
@@ -394,6 +402,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         break;
       case "caretaker":
         targetDash = "/portal/caretaker";
+        break;
+      case "supplier":
+        targetDash = "/portal/supplier";
         break;
     }
 
@@ -448,32 +459,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
       console.log("🔄 Auth state changed:", event);
 
-      setIsLoading(true);
+      const isInteractiveAuthEvent = event === "SIGNED_IN" || event === "SIGNED_OUT";
+
+      if (isInteractiveAuthEvent) {
+        setIsLoading(true);
+      }
+
       setSession(session);
       setSupabaseUser(session?.user || null);
 
-      if (session?.user) {
-        setTimeout(async () => {
-          try {
-            const profile = await fetchUserProfileFromDB(session.user.id);
-            setUser(profile);
+      if (!session?.user) {
+        setUser(null);
+        if (isInteractiveAuthEvent) {
+          setIsLoading(false);
+        }
+        return;
+      }
 
-            // Redirect on both SIGNED_IN (fresh login) and INITIAL_SESSION (page refresh)
-            if (profile && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
-              handlePostLoginRedirect(profile);
-            } else if (!profile && event === "SIGNED_IN") {
-              await createProfileIfMissing();
-            }
-          } catch (err) {
-            console.error("Error during auth state change:", err);
-          } finally {
+      setTimeout(async () => {
+        try {
+          const profile = await fetchUserProfileFromDB(session.user.id);
+          setUser(profile);
+
+          // Only explicit sign-in should trigger role-based redirect.
+          if (profile && event === "SIGNED_IN") {
+            handlePostLoginRedirect(profile);
+          } else if (!profile && event === "SIGNED_IN") {
+            await createProfileIfMissing();
+          }
+        } catch (err) {
+          console.error("Error during auth state change:", err);
+        } finally {
+          if (isInteractiveAuthEvent) {
             setIsLoading(false);
           }
-        }, 500);
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
+        }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
@@ -501,6 +522,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (error) {
         console.error("❌ Auth error:", error.message);
+        // Record failed login attempt
+        console.log("📝 [AuthContext] About to call recordFailedLogin with:", {
+          email: trimmedEmail,
+          reason: error.message
+        });
+        const result = await loginActivityService.recordFailedLogin(trimmedEmail, error.message);
+        console.log("📝 [AuthContext] recordFailedLogin returned:", result);
         return {
           success: false,
           error:
@@ -511,10 +539,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       if (data.user) {
-        console.log("✅ Sign in successful");
+        console.log("✅ Sign in successful for user:", data.user.id, "Email:", data.user.email);
 
         const profile = await fetchUserProfileFromDB(data.user.id);
         setUser(profile);
+
+        // Record successful login
+        if (profile) {
+          console.log("📝 [AuthContext] About to call recordLogin with:", {
+            userId: data.user.id,
+            email: trimmedEmail,
+            role: profile.role,
+          });
+          const result = await loginActivityService.recordLogin(
+            data.user.id,
+            trimmedEmail,
+            profile.role || "user"
+          );
+          console.log("📝 [AuthContext] recordLogin returned:", result);
+        } else {
+          console.warn("⚠️ No profile found for user, skipping login record");
+        }
 
         if (profile) {
           handlePostLoginRedirect(profile);
@@ -523,9 +568,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return { success: true };
       }
 
+      // Record authentication failure
+      console.log("📝 Recording authentication failure...");
+      await loginActivityService.recordFailedLogin(trimmedEmail, "Authentication failed");
       return { success: false, error: "Authentication failed" };
     } catch (err: any) {
       console.error("❌ Sign in error:", err);
+      // Record login error
+      await loginActivityService.recordFailedLogin(
+        email.trim().toLowerCase(),
+        err.message || "Sign in failed"
+      );
       return { success: false, error: err.message || "Sign in failed" };
     } finally {
       setIsLoading(false);
@@ -656,6 +709,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const signOut = async () => {
     try {
       setIsLoading(true);
+      
+      // Record logout if user exists
+      if (supabaseUser) {
+        console.log("📝 [AuthContext] About to call recordLogout for user:", supabaseUser.id);
+        const result = await loginActivityService.recordLogout(supabaseUser.id);
+        console.log("📝 [AuthContext] recordLogout returned:", result);
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 

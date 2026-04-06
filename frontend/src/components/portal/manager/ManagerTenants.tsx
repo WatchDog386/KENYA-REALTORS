@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 import {
   Card,
   CardContent,
@@ -67,6 +68,9 @@ interface TenantDetails {
   lease_created_at?: string;
   profile_created_at?: string;
   account_status?: string;
+  next_of_kin?: string;
+  next_of_kin_email?: string;
+  nationality?: string;
 }
 
 const ManagerTenants: React.FC = () => {
@@ -93,30 +97,26 @@ const ManagerTenants: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get property assigned to manager
-      const { data: assignment, error: assignmentError } = await supabase
-        .from('property_manager_assignments')
-        .select(`
-            property_id,
-            properties (
-               name
-            )
-        `)
-        .eq('property_manager_id', user.id)
-        .single();
+      const propertyIds = await getManagerAssignedPropertyIds(user.id);
 
-      if (assignmentError && assignmentError.code !== 'PGRST116') {
-        throw assignmentError;
-      }
-
-      if (!assignment) {
+      if (propertyIds.length === 0) {
         setTenants([]);
         return;
       }
 
-      if (assignment.properties) {
-          // @ts-ignore
-          setPropertyName(assignment.properties.name);
+      const { data: managerProperties, error: managerPropertiesError } = await supabase
+        .from('properties')
+        .select('id, name')
+        .in('id', propertyIds);
+
+      if (managerPropertiesError) {
+        throw managerPropertiesError;
+      }
+
+      if ((managerProperties || []).length === 1) {
+        setPropertyName(String((managerProperties as any[])[0]?.name || ''));
+      } else {
+        setPropertyName(`${propertyIds.length} properties`);
       }
 
       // Get tenants via leases (Source of Truth for Occupancy)
@@ -134,8 +134,8 @@ const ManagerTenants: React.FC = () => {
             property_id
           )
         `)
-        .or('status.eq.active,status.eq.pending_renewal')
-        .eq('units.property_id', assignment.property_id);
+        .in('status', ['active', 'pending', 'approved', 'manager_approved', 'pending_renewal'])
+        .in('units.property_id', propertyIds);
 
       if (leasesError) throw leasesError;
 
@@ -218,6 +218,20 @@ const ManagerTenants: React.FC = () => {
   const loadTenantDetails = async (tenant: Tenant) => {
     setIsDetailsLoading(true);
     try {
+      const fetchLatestApplication = async (includeNextOfKinEmail: boolean) => {
+        const selectCols = includeNextOfKinEmail
+          ? 'next_of_kin, next_of_kin_email, nationality'
+          : 'next_of_kin, nationality';
+
+        return supabase
+          .from('lease_applications')
+          .select(selectCols)
+          .eq('applicant_id', tenant.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+      };
+
       const [leaseRes, profileRes] = await Promise.all([
         supabase
           .from('tenant_leases')
@@ -247,11 +261,21 @@ const ManagerTenants: React.FC = () => {
           .maybeSingle(),
       ]);
 
+      let latestApplicationRes = await fetchLatestApplication(true);
+      if (
+        latestApplicationRes.error &&
+        String(latestApplicationRes.error.message || '').toLowerCase().includes('next_of_kin_email')
+      ) {
+        latestApplicationRes = await fetchLatestApplication(false);
+      }
+
       if (leaseRes.error) throw leaseRes.error;
       if (profileRes.error) throw profileRes.error;
+      if (latestApplicationRes.error) throw latestApplicationRes.error;
 
       const lease = leaseRes.data as any;
       const profile = profileRes.data as any;
+      const latestApplication = latestApplicationRes.data as any;
       const leaseUnit = lease?.units || {};
       const leaseProperty = leaseUnit?.properties as any;
 
@@ -275,6 +299,9 @@ const ManagerTenants: React.FC = () => {
         lease_created_at: lease?.created_at,
         profile_created_at: profile?.created_at,
         account_status: profile?.status || undefined,
+        next_of_kin: latestApplication?.next_of_kin || undefined,
+        next_of_kin_email: latestApplication?.next_of_kin_email || undefined,
+        nationality: latestApplication?.nationality || undefined,
       });
     } catch (error) {
       console.error('Error loading tenant details:', error);
@@ -664,6 +691,18 @@ const ManagerTenants: React.FC = () => {
                     <div className="rounded-xl border border-slate-200 p-3">
                       <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><FileText className="h-3.5 w-3.5 inline-block mr-1" /> Lease End</p>
                       <p className="font-semibold text-slate-800">{formatDate(tenantDetails?.tenant.lease_end_date || selectedTenant.lease_end_date, 'Month-to-Month')}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><User className="h-3.5 w-3.5 inline-block mr-1" /> Next of Kin</p>
+                      <p className="font-semibold text-slate-800 break-words">{tenantDetails?.next_of_kin || 'Not provided'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><Mail className="h-3.5 w-3.5 inline-block mr-1" /> Next of Kin Email</p>
+                      <p className="font-semibold text-slate-800 break-all">{tenantDetails?.next_of_kin_email || 'Not provided'}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><User className="h-3.5 w-3.5 inline-block mr-1" /> Nationality</p>
+                      <p className="font-semibold text-slate-800">{tenantDetails?.nationality || 'Not provided'}</p>
                     </div>
                   </div>
 

@@ -1,29 +1,9 @@
 // src/services/supabase.ts
-import { createClient } from '@supabase/supabase-js';
+import { supabase as sharedSupabase } from '@/integrations/supabase/client';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables');
-}
-
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-  },
-  db: {
-    schema: 'public',
-  },
-  global: {
-    headers: {
-      'Accept': 'application/json',
-    }
-  }
-});
+// Reuse the singleton integrations client to avoid multiple GoTrue auth clients
+// competing for the same browser storage key.
+export const supabase = sharedSupabase;
 
 export type UserRole = 'admin' | 'tenant' | 'landlord';
 

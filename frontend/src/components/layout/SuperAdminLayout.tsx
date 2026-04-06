@@ -40,6 +40,7 @@ import {
   Filter,
   MoreVertical,
   AlertCircle,
+  Zap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -52,6 +53,7 @@ interface User {
   first_name?: string;
   last_name?: string;
   role?: string;
+  avatar_url?: string | null;
 }
 
 interface NavItem {
@@ -125,6 +127,28 @@ const getNavigationItems = (permissions: string[], stats?: DashboardStats) => {
       description: "View analytics",
       permission: "view_analytics",
     },
+    {
+      title: "Applications",
+      path: "/portal/super-admin/applications",
+      icon: "clipboard-list",
+      description: "Review tenant applications",
+      permission: "manage_approvals",
+      badge: stats?.pendingApplications?.toString(),
+    },
+    {
+      title: "Billing and Invoicing",
+      path: "/portal/super-admin/utilities",
+      icon: "zap",
+      description: "Manage billing and invoicing",
+      permission: "manage_finances",
+    },
+    {
+      title: "Leave Requests",
+      path: "/portal/super-admin/leave-requests",
+      icon: "calendar",
+      description: "Review and approve staff leave requests",
+      permission: "manage_users",
+    },
   ];
 };
 
@@ -165,6 +189,8 @@ const getIconComponent = (iconName?: string) => {
       return <ClipboardList size={20} />;
     case "calendar":
       return <Calendar size={20} />;
+    case "zap":
+      return <Zap size={20} />;
     case "wrench":
       return <Wrench size={20} />;
     case "message-square":
@@ -222,18 +248,18 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
 
   // Inject Fonts and Styles
   React.useEffect(() => {
-    // Add Nunito font
+    // Add Poppins font
     const link = document.createElement("link");
     link.href =
-      "https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap";
+      "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
     const style = document.createElement("style");
     style.textContent = `
-      * { font-family: 'Nunito', sans-serif; }
-      body { font-family: 'Nunito', sans-serif; }
-      h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
+      * { font-family: 'Poppins', sans-serif; }
+      body { font-family: 'Poppins', sans-serif; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', sans-serif; }
       
       .custom-scroll::-webkit-scrollbar { width: 6px; }
       .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -241,9 +267,9 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
       .custom-scroll::-webkit-scrollbar-thumb:hover { background: #154279; }
       
       .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(21, 66, 121, 0.05); }
-      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(21, 66, 121, 0.3); border-radius: 4px; }
-      .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(21, 66, 121, 0.5); }
+      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(10, 31, 56, 0.5); }
+      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(67, 153, 220, 0.45); border-radius: 4px; }
+      .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(67, 153, 220, 0.7); }
     `;
     document.head.appendChild(style);
 
@@ -282,7 +308,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
         title: "Dashboard",
         href: "/portal/super-admin/dashboard",
         icon: <LayoutDashboard size={20} />,
-        description: "System Overview & Metrics",
+        description: "",
         permission: "view_analytics",
       },
       {
@@ -378,6 +404,12 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const allItems = flattenItems(navItems);
   const currentPage =
     allItems.find((item) => isActive(item.href)) || navItems[0];
+  const isDashboardHome = location.pathname === "/portal/super-admin/dashboard";
+  const fullName =
+    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+    ((user as any)?.user_metadata?.full_name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    "Admin";
 
   // Get unread notifications count from system alerts
   const unreadNotifications = safeSystemAlerts.filter(
@@ -443,10 +475,10 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             }
           }}
           className={cn(
-            "flex items-center justify-between px-4 py-3 mx-2 rounded-xl transition-all duration-200 group relative mb-1 font-nunito",
+            "group relative mb-1 flex items-center justify-between border-l-4 px-4 py-3 transition-all duration-150",
             isItemActive
-              ? "bg-[#154279] text-white shadow-lg"
-              : "text-slate-700 hover:bg-slate-100 hover:text-[#154279]",
+              ? "border-l-[#35d0ff] bg-[#1f7fb1] text-white"
+              : "border-l-transparent text-[#d4e4f5] hover:border-l-[#2ea3da] hover:bg-[#123b63] hover:text-white",
             depth > 0 && "pl-8"
           )}
         >
@@ -454,18 +486,18 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div
               className={`${
                 isItemActive
-                  ? "text-[#F96302]"
-                  : "text-slate-500 group-hover:text-[#F96302]"
+                  ? "text-[#c6eeff]"
+                  : "text-[#88abcf] group-hover:text-[#d9f0ff]"
               } relative transition-colors`}
             >
               {item.icon}
               {typeof item.badge === "number" && item.badge > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#0c2c4e] bg-[#f28f1a] text-[9px] font-bold text-white shadow-sm">
                   {item.badge}
                 </span>
               )}
               {typeof item.badge === "string" && parseInt(item.badge) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#0c2c4e] bg-[#f28f1a] text-[9px] font-bold text-white shadow-sm">
                   {item.badge}
                 </span>
               )}
@@ -473,7 +505,7 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div className="flex-1">
               <span
                 className={cn(
-                  "text-[14px] tracking-wide font-nunito",
+                  "text-[13px] tracking-wide",
                   isItemActive
                     ? "font-bold"
                     : "font-medium"
@@ -481,9 +513,6 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
               >
                 {item.title}
               </span>
-              <div className={cn("text-[10px] mt-0.5 hidden xl:block transition-opacity font-nunito", isItemActive ? "text-white/70 font-medium" : "text-slate-500 opacity-0 group-hover:opacity-100 font-medium")}>
-                {item.description}
-              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -492,19 +521,19 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                 className={cn(
                   "w-4 h-4 transition-transform",
                   isExpanded && "rotate-180",
-                  isItemActive ? "text-white" : "text-slate-500 group-hover:text-[#154279]"
+                  isItemActive ? "text-white" : "text-[#9ab9d8] group-hover:text-white"
                 )}
               />
             ) : (
               isItemActive && (
-                <ChevronRight size={14} className="text-[#F96302]" />
+                <ChevronRight size={14} className="text-[#d7efff]" />
               )
             )}
           </div>
         </Link> 
 
         {hasChildren && isExpanded && (
-          <div className="ml-4 mt-1 space-y-1 border-l-2 border-[#154279]/20 pl-2 mb-2">
+          <div className="mb-2 ml-4 mt-1 space-y-1 border-l border-[#2c5c88] pl-2">
             {item.children!.map((child) => renderNavItem(child, depth + 1))}
           </div>
         )}
@@ -513,195 +542,57 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#154279] font-nunito selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Nunito', sans-serif" }}>
-      {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 w-full bg-gradient-to-r from-[#154279] via-blue-700 to-[#154279] z-50 px-4 py-3 flex items-center justify-between shadow-lg">
+    <div className="min-h-screen bg-[#d7dce1] text-[#e8f2ff] selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Poppins', sans-serif" }}>
+      <div className="fixed left-0 top-0 z-50 flex w-full items-center justify-between bg-[#0a1f38] px-4 py-3 shadow-lg lg:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-white p-2 bg-white/10 hover:bg-white/20 transition-all rounded-lg border border-white/10"
+            className="rounded-md border border-[#1d3e62] bg-[#0f2b4a] p-2 text-white transition-all hover:bg-[#16436f]"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-white font-bold tracking-tight text-sm">
-              KENYA REALTORS
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative p-2 bg-white/10 hover:bg-white/20 text-white transition-all rounded-lg border border-white/10"
-          >
-            <Bell size={20} />
-            {unreadNotifications > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#F96302] text-[9px] font-bold text-white rounded-full flex items-center justify-center border border-white/20">
-                {unreadNotifications}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-9 h-9 rounded-lg bg-[#F96302] flex items-center justify-center text-white font-bold text-sm shadow-md border-2 border-white"
-          >
-            {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
-          </button>
+          <span className="text-sm font-bold tracking-tight text-[#dcecff]">KENYA REALTORS</span>
         </div>
       </div>
 
-      {/* Sidebar - Sleek White Background */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-full bg-white text-[#154279] z-40 transition-all duration-300 ease-in-out shadow-xl flex flex-col border-r-2 border-slate-200",
-          sidebarOpen ? "translate-x-0 w-72" : "-translate-x-full",
-          "lg:translate-x-0 lg:w-72"
+          "fixed left-0 top-0 z-40 flex h-full w-80 flex-col border-r border-[#12314f] bg-[#0a1f38] text-[#e8f2ff] shadow-xl transition-all duration-300 ease-in-out",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          "lg:translate-x-0"
         )}
       >
-        {/* Logo Section */}
-        <div className="h-20 flex items-center px-6 border-b-2 border-slate-200 bg-white">
-          <div className="shrink-0 cursor-pointer flex items-center gap-2 md:gap-3 w-full">
-            <svg
-              viewBox="0 0 200 200"
-              className="h-12 w-auto drop-shadow-sm"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <defs>
-                <linearGradient
-                  id="grad-front-nav"
-                  x1="0%"
-                  y1="0%"
-                  x2="0%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor="#F9F1DC" />
-                  <stop offset="100%" stopColor="#D4AF37" />
-                </linearGradient>
-                <linearGradient
-                  id="grad-side-nav"
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor="#D4AF37" />
-                  <stop offset="100%" stopColor="#AA8C2C" />
-                </linearGradient>
-                <linearGradient
-                  id="grad-dark-nav"
-                  x1="0%"
-                  y1="0%"
-                  x2="100%"
-                  y2="100%"
-                >
-                  <stop offset="0%" stopColor="#998A5E" />
-                  <stop offset="100%" stopColor="#5C5035" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M110 90 V170 L160 150 V70 L110 90 Z"
-                fill="url(#grad-front-nav)"
-                stroke="#8A7D55"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M160 70 L180 80 V160 L160 150 Z"
-                fill="url(#grad-dark-nav)"
-                stroke="#8A7D55"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M30 150 V50 L80 20 V120 L30 150 Z"
-                fill="url(#grad-front-nav)"
-                stroke="#8A7D55"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M80 20 L130 40 V140 L80 120 Z"
-                fill="url(#grad-side-nav)"
-                stroke="#8A7D55"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <g fill="#154279">
-                <path d="M85 50 L100 56 V86 L85 80 Z" />
-                <path d="M85 90 L100 96 V126 L85 120 Z" />
-                <path d="M45 60 L55 54 V124 L45 130 Z" />
-                <path d="M120 130 L140 122 V152 L120 160 Z" />
-              </g>
-            </svg>
-
-            <div className="flex flex-col justify-center select-none ml-1">
-              <span className="text-[9px] font-bold uppercase tracking-[0.35em] text-[#154279] leading-none ml-0.5">
-                Kenya
-              </span>
-              <div className="flex items-baseline -mt-1 relative">
-                <span className="text-[20px] font-black tracking-tighter text-[#154279]">
-                  REALTOR
-                </span>
-                <span className="text-[20px] font-black tracking-tighter text-[#F96302]">
-                  S
-                </span>
-                <div className="h-1.5 w-1.5 bg-[#F96302] rounded-full ml-1 mb-1.5 shadow-lg shadow-orange-500/50"></div>
-              </div>
+        <div className="flex h-20 items-center border-b border-[#12314f] bg-[#0a1f38] px-6">
+          <div className="flex w-full items-center gap-2">
+            <div className="h-8 w-1.5 bg-[#35d0ff]" />
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#8fb4d7]">Super Admin</div>
+              <div className="text-[20px] font-bold leading-none text-[#e8f2ff]">Command</div>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-4 overflow-y-auto sidebar-scroll pb-4 mt-4">
+        <nav className="sidebar-scroll mt-4 flex-1 overflow-y-auto px-4 pb-4">
           <div className="mb-2">
-            <div className="px-4 mb-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+            <div className="mb-3 flex items-center gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb4d7]">
               <span>Main Menu</span>
-              <div className="flex-1 h-px bg-gradient-to-r from-slate-300 to-transparent"></div>
+              <div className="h-px flex-1 bg-gradient-to-r from-[#2a5279] to-transparent" />
             </div>
-            <div className="space-y-0.5">
-              {navItems.map((item) => renderNavItem(item))}
-            </div>
-          </div>
-
-          {/* Report Quick Links */}
-          <div className="px-2 mt-8">
-            <div className="px-4 mb-3 text-[10px] font-bold text-[#154279] uppercase tracking-widest flex items-center gap-2">
-              <span>Quick Reports</span>
-            </div>
-            <div className="space-y-2 mx-2">
-              <Link
-                to="/portal/super-admin/reports?type=rental&month=current"
-                className="block p-3 bg-slate-50 rounded-xl hover:bg-[#154279] hover:text-white transition-all duration-200 group border border-slate-200 hover:border-[#154279] shadow-sm hover:shadow-md"
-              >
-                <div className="text-xs font-bold text-[#154279] group-hover:text-white transition-colors">Monthly Rental</div>
-                <div className="text-[10px] text-slate-600 group-hover:text-white/80 font-medium mt-0.5">Current month collection</div>
-              </Link>
-              <Link
-                to="/portal/super-admin/reports?type=arrears"
-                className="block p-3 bg-slate-50 rounded-xl hover:bg-[#F96302] hover:text-white transition-all duration-200 group border border-slate-200 hover:border-[#F96302] shadow-sm hover:shadow-md"
-              >
-                <div className="text-xs font-bold text-[#154279] group-hover:text-white transition-colors">Arrears Report</div>
-                <div className="text-[10px] text-slate-600 group-hover:text-white/80 font-medium mt-0.5">Outstanding payments</div>
-              </Link>
-            </div>
+            <div className="space-y-0.5">{navItems.map((item) => renderNavItem(item))}</div>
           </div>
         </nav>
 
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t-2 border-slate-200 bg-slate-50">
-          <div className="flex items-center justify-between mb-4">
+        <div className="border-t border-[#12314f] bg-[#0d2744] p-4">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse ring-2 ring-emerald-500/20"></div>
-              <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
-                System Online
-              </span>
+              <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#9ddab8]">System Online</span>
             </div>
-            <span className="text-[10px] text-slate-600 font-bold">v2.4.0</span>
+            <span className="text-[10px] font-semibold text-[#8fb4d7]">v2.4.0</span>
           </div>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 text-xs text-white transition-all py-3 bg-gradient-to-r from-[#154279] to-[#0f325e] hover:from-[#F96302] hover:to-[#ff8c42] rounded-xl font-bold uppercase tracking-wider shadow-md hover:shadow-lg"
+            className="flex w-full items-center justify-center gap-2 border border-[#2c5c88] bg-[#16436f] py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white transition-all hover:bg-[#1f7fb1]"
           >
             <LogOut size={14} className="stroke-[2.5]" />
             <span>Sign Out</span>
@@ -709,50 +600,47 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main
-        className={cn(
-          "transition-all duration-300 min-h-screen flex flex-col bg-white",
-          sidebarOpen ? "lg:ml-72" : "lg:ml-0"
-        )}
-      >
-        {/* Desktop Header */}
-        <header className="hidden lg:flex items-center justify-between h-20 px-8 bg-white border-b-2 border-slate-200 sticky top-0 z-30 transition-all duration-300 shadow-sm">
+      <main className={cn("min-h-screen flex flex-col bg-[#d7dce1] transition-all duration-300", sidebarOpen ? "lg:ml-80" : "lg:ml-0")}>
+        <header className="sticky top-0 z-30 hidden h-20 items-center justify-between border-b border-[#12314f] bg-[#0a1f38] px-8 shadow-sm lg:flex">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-lg font-black text-[#154279] tracking-tight uppercase">
-                {currentPage.title}
+              <h2 className="text-lg font-semibold tracking-tight uppercase text-[#e8f2ff]">
+                {isDashboardHome ? (
+                  <>
+                    Welcome Back, <span className="text-[#35d0ff]">{fullName}</span>
+                  </>
+                ) : (
+                  currentPage.title
+                )}
               </h2>
-              <div className="text-[11px] text-slate-600 font-semibold uppercase tracking-wide">
-                {currentPage.description}
-              </div>
+              {(currentPage.description || isDashboardHome) && (
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[#8fb4d7]">
+                  {isDashboardHome ? "Super Admin Command Center" : currentPage.description}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-6">
             <form onSubmit={handleSearch} className="relative group">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#F96302] transition-colors"
-                size={16}
-              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#82a8ca] transition-colors group-focus-within:text-[#d6ecff]" size={16} />
               <input
                 type="text"
-                placeholder="Search database..."
+                placeholder="Search workspace..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-11 pr-4 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-[#F96302] focus:shadow-sm w-72 outline-none placeholder:text-slate-400 transition-all duration-200 font-medium font-nunito"
+                className="w-72 border border-[#1f466b] bg-[#0f2b4a] py-2.5 pl-11 pr-4 text-sm font-medium text-[#e8f2ff] outline-none transition-all duration-200 placeholder:text-[#7ea5c7] focus:border-[#2ea3da] focus:bg-[#12355a]"
               />
             </form>
 
-            {/* Notifications */}
             <div className="relative z-50">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative p-2.5 text-slate-600 hover:text-[#154279] hover:bg-slate-100 bg-white border-2 border-slate-200 hover:border-[#F96302] hover:shadow-sm rounded-lg transition-all"
+                className="relative border border-[#1f466b] bg-[#0f2b4a] p-2.5 text-[#d6e9fb] transition-all hover:border-[#2ea3da] hover:bg-[#123b63]"
               >
                 <Bell size={20} />
                 {unreadNotifications > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-[#F96302] text-[10px] font-bold text-white rounded-full flex items-center justify-center shadow-sm">
+                  <span className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#f28f1a] text-[10px] font-bold text-white shadow-sm">
                     {unreadNotifications}
                   </span>
                 )}
@@ -760,37 +648,28 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
 
               {notificationsOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setNotificationsOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-4 w-96 bg-white rounded-xl shadow-[0_15px_50px_-10px_rgba(0,0,0,0.2)] border-2 border-slate-200 z-50 overflow-hidden">
-                    <div className="px-4 py-3 bg-[#154279] text-white font-bold text-sm">
-                      Notifications ({unreadNotifications})
-                    </div>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-4 w-96 overflow-hidden border border-[#1f466b] bg-[#0f2b4a] shadow-[0_15px_50px_-10px_rgba(0,0,0,0.35)]">
+                    <div className="bg-[#194b79] px-4 py-3 text-sm font-semibold text-[#e8f2ff]">Notifications ({unreadNotifications})</div>
                     <div className="max-h-96 overflow-y-auto">
                       {safeSystemAlerts.length > 0 ? (
                         safeSystemAlerts.slice(0, 5).map((alert) => (
                           <div
                             key={alert.id}
-                            className={`px-4 py-3 border-b border-slate-100 last:border-0 ${getAlertColor(alert.type)} cursor-pointer hover:bg-opacity-80 transition-all`}
+                            className={`cursor-pointer border-b border-[#1e476e] px-4 py-3 last:border-0 ${getAlertColor(alert.type)} transition-all hover:bg-opacity-80`}
                           >
                             <div className="flex items-start gap-3">
-                              <div className="mt-1">
-                                {getNotificationIcon(alert.type)}
-                              </div>
+                              <div className="mt-1">{getNotificationIcon(alert.type)}</div>
                               <div className="flex-1">
-                                <h3 className="text-sm font-bold text-[#154279]">{alert.title}</h3>
-                                <p className="text-xs text-slate-600 mt-1">{alert.description}</p>
-                                <span className="text-[10px] text-slate-500 font-medium mt-1 block">{alert.timestamp}</span>
+                                <h3 className="text-sm font-semibold text-[#0d243f]">{alert.title}</h3>
+                                <p className="mt-1 text-xs text-[#243041]">{alert.description}</p>
+                                <span className="mt-1 block text-[10px] font-medium text-[#40536b]">{alert.timestamp}</span>
                               </div>
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="px-4 py-8 text-center text-slate-500 text-sm">
-                          No notifications
-                        </div>
+                        <div className="px-4 py-8 text-center text-sm text-[#9dbedf]">No notifications</div>
                       )}
                     </div>
                   </div>
@@ -798,51 +677,45 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
               )}
             </div>
 
-            {/* User Menu */}
             <div className="relative z-50">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 pl-1 pr-3 py-1.5 hover:bg-slate-100 rounded-lg border-2 border-slate-200 hover:border-[#F96302] hover:shadow-sm transition-all"
+                className="flex items-center gap-3 border border-[#1f466b] bg-[#0f2b4a] py-1.5 pl-1 pr-3 transition-all hover:border-[#2ea3da] hover:bg-[#123b63]"
               >
-                <div className="w-9 h-9 rounded-lg bg-[#154279] flex items-center justify-center text-white font-bold border-2 border-[#F96302]">
-                  {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
+                <div className="flex h-9 w-9 items-center justify-center overflow-hidden border border-[#2ea3da] bg-[#1f7fb1] font-bold text-white">
+                  {user?.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={fullName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"
+                  )}
                 </div>
-                <div className="text-left hidden xl:block">
-                  <div className="text-xs font-bold text-[#154279]">
-                    {user?.first_name || user?.email?.split("@")[0] || "Admin"}
-                  </div>
-                  <div className="text-[10px] text-slate-600 font-medium">
-                    {user?.role || "Super Admin"}
-                  </div>
+                <div className="hidden text-left xl:block">
+                  <div className="text-xs font-semibold text-[#e8f2ff]">{fullName}</div>
+                  <div className="text-[10px] font-medium text-[#9dc0df]">{user?.role || "Super Admin"}</div>
                 </div>
-                <ChevronDown size={14} className="text-slate-400" />
+                <ChevronDown size={14} className="text-[#8fb4d7]" />
               </button>
 
               {userMenuOpen && (
                 <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setUserMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-[0_15px_50px_-10px_rgba(0,0,0,0.2)] border-2 border-slate-200 z-50 overflow-hidden">
-                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Account</p>
+                  <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden border border-[#1f466b] bg-[#0f2b4a] shadow-[0_15px_50px_-10px_rgba(0,0,0,0.35)]">
+                    <div className="border-b border-[#1e476e] bg-[#123b63] px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b9d7f2]">Account</p>
                     </div>
-                    <Link
-                      to="/portal/super-admin/profile"
-                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#154279] transition-all font-medium border-b border-slate-100"
-                    >
+                    <Link to="/portal/super-admin/profile" className="block border-b border-[#1e476e] px-4 py-3 text-sm font-medium text-[#d4e4f5] transition-all hover:bg-[#194b79] hover:text-white">
                       View Profile
                     </Link>
-                    <Link
-                      to="/portal/super-admin/settings"
-                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#154279] transition-all font-medium border-b border-slate-100"
-                    >
+                    <Link to="/portal/super-admin/settings" className="block border-b border-[#1e476e] px-4 py-3 text-sm font-medium text-[#d4e4f5] transition-all hover:bg-[#194b79] hover:text-white">
                       Settings
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="w-full text-left px-4 py-3 text-sm text-white bg-[#F96302] hover:bg-[#ff8c42] transition-all font-bold"
+                      className="w-full border-t border-[#1e476e] bg-[#f28f1a] px-4 py-3 text-left text-sm font-semibold text-white transition-all hover:bg-[#d6780c]"
                     >
                       Sign Out
                     </button>
@@ -853,48 +726,30 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
           </div>
         </header>
 
-        {/* Content Area - WHITE BACKGROUND */}
-        <div className="flex-1 overflow-visible bg-white relative z-10">
-          <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto overflow-y-auto custom-scroll max-h-[calc(100vh-120px)]">
-            <Outlet />
-          </div>
+        <div className="relative z-10 flex-1 overflow-hidden bg-[#d7dce1]">
+          <div className="h-full w-full overflow-y-auto custom-scroll">{children || <Outlet />}</div>
         </div>
 
-        {/* Footer */}
-        <footer className="px-8 py-5 border-t-2 border-slate-200 bg-white hidden lg:block shadow-sm">
-          <div className="flex justify-between items-center">
-            <div className="text-xs text-slate-700 font-medium font-nunito">
-              <span className="font-bold text-[#154279] tracking-tight">KENYA REALTORS</span> © {new Date().getFullYear()}. All rights reserved.
+        <footer className="hidden border-t border-[#12314f] bg-[#0a1f38] px-8 py-5 shadow-sm lg:block">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium text-[#9dc0df]">
+              <span className="font-semibold tracking-tight text-[#e8f2ff]">KENYA REALTORS</span> © {new Date().getFullYear()}. All rights reserved.
             </div>
-            <div className="flex gap-6 text-xs text-slate-600 font-semibold font-nunito">
-              <span className="text-[10px] text-slate-500">
-                {safeRecentActivities.length > 0
-                  ? `Last activity: ${safeRecentActivities[0]?.time}`
-                  : "No recent activity"}
+            <div className="flex gap-6 text-xs font-semibold text-[#9dc0df]">
+              <span className="text-[10px] text-[#8fb4d7]">
+                {safeRecentActivities.length > 0 ? `Last activity: ${safeRecentActivities[0]?.time}` : "No recent activity"}
               </span>
-              <Link
-                to="/portal/super-admin/reports"
-                className="hover:text-[#F96302] transition-colors duration-200 flex items-center gap-1 hover:font-bold"
-              >
+              <Link to="/portal/super-admin/reports" className="flex items-center gap-1 transition-colors duration-200 hover:text-[#35d0ff]">
                 <FileBarChart size={12} />
                 Reports
               </Link>
-              <Link
-                to="/portal/super-admin/settings"
-                className="hover:text-[#F96302] transition-colors duration-200 hover:font-bold"
-              >
+              <Link to="/portal/super-admin/settings" className="transition-colors duration-200 hover:text-[#35d0ff]">
                 Privacy Policy
               </Link>
-              <Link
-                to="/portal/super-admin/settings"
-                className="hover:text-[#F96302] transition-colors duration-200 hover:font-bold"
-              >
+              <Link to="/portal/super-admin/settings" className="transition-colors duration-200 hover:text-[#35d0ff]">
                 Terms of Service
               </Link>
-              <Link
-                to="/portal/help"
-                className="hover:text-[#F96302] transition-colors duration-200 hover:font-bold"
-              >
+              <Link to="/portal/help" className="transition-colors duration-200 hover:text-[#35d0ff]">
                 Help Center
               </Link>
             </div>
@@ -902,12 +757,8 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
         </footer>
       </main>
 
-      {/* Mobile Backdrop */}
       {sidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/40 z-30 backdrop-blur-sm"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
     </div>
   );

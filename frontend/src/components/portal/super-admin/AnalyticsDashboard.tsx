@@ -194,9 +194,9 @@ const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="superadmin-flat-page bg-[#d7dce1] min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       {/* Header */}
-      <section className="relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
+      <section className="superadmin-flat-hero relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
         <HeroBackground />
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
           <div className="space-y-1">

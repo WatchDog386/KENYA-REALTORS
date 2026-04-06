@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
@@ -5,16 +6,26 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize Supabase client with service role key
-const supabase = createClient(
-  "https://rcxmrtqgppayncelonls.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjeG1ydHFncHBheW5jZWxvbmxzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODAzMzc1NCwiZXhwIjoyMDgzNjA5NzU0fQ.k_auqkmx43e40iVZ1mq3kjfWXjAcwU9v4LvMdsZ1FUw"
-);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. Set these in your environment before running this migration script."
+  );
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function applyMigration() {
   try {
     console.log("📦 Reading migration file...");
-    const migrationPath = path.join(__dirname, "../supabase/migrations/20260205_enhance_user_sync.sql");
+    const migrationPath = path.join(__dirname, "../backend/supabase/migrations/20260205_enhance_user_sync.sql");
+
+    if (!fs.existsSync(migrationPath)) {
+      throw new Error(`Migration file not found at: ${migrationPath}`);
+    }
+
     const migrationSQL = fs.readFileSync(migrationPath, "utf-8");
 
     console.log("🚀 Executing migration...\n");
@@ -27,9 +38,9 @@ async function applyMigration() {
     if (error) {
       console.error("❌ Migration execution failed:", error);
       console.log("\n📋 Manual Steps:");
-      console.log("1. Visit: https://rcxmrtqgppayncelonls.supabase.co");
+      console.log(`1. Visit: ${SUPABASE_URL}`);
       console.log("2. Go to SQL Editor");
-      console.log("3. Copy and paste the migration from: supabase/migrations/20260205_enhance_user_sync.sql");
+      console.log("3. Copy and paste the migration from: backend/supabase/migrations/20260205_enhance_user_sync.sql");
       console.log("4. Click 'Execute' to run the migration");
       process.exit(1);
     }

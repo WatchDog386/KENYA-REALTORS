@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getTenantPortalAccessState } from "@/services/tenantOnboardingService";
 
 interface MaintenanceRequest {
   id: string;
@@ -28,10 +29,6 @@ interface MaintenanceRequest {
   priority: string;
   created_at: string;
   updated_at: string;
-  category?: {
-    name: string;
-  };
-  image_url?: string;
 }
 
 const MaintenancePage: React.FC = () => {
@@ -39,6 +36,7 @@ const MaintenancePage: React.FC = () => {
   const navigate = useNavigate();
   const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onboardingLocked, setOnboardingLocked] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -48,9 +46,20 @@ const MaintenancePage: React.FC = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
+
+      const accessState = await getTenantPortalAccessState(user.id);
+      if (accessState.isLocked) {
+        setOnboardingLocked(true);
+        setRequests([]);
+        return;
+      }
+
+      setOnboardingLocked(false);
+
       const { data, error } = await supabase
         .from("maintenance_requests")
-        .select("*, category:technician_categories:category_id(name)")
+        .select("*")
+        .or(`tenant_id.eq.${user.id},reported_by.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -106,6 +115,26 @@ const MaintenancePage: React.FC = () => {
           alt="Loading..."
           className="w-16 h-16 animate-spin opacity-20"
         />
+      </div>
+    );
+  }
+
+  if (onboardingLocked) {
+    return (
+      <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50">
+        <Card className="border border-amber-300 bg-amber-50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-amber-900">Maintenance Unlocks After Initial Payment</CardTitle>
+            <CardDescription className="text-amber-800">
+              Complete your initial move-in invoice from the Payments page first. Once confirmed, maintenance requests will be available.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate("/portal/tenant/payments")} className="bg-[#154279] hover:bg-[#0f305a]">
+              Go to Payments
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -287,12 +316,6 @@ const MaintenancePage: React.FC = () => {
                          <p className="text-sm text-gray-500 mt-1 line-clamp-1 max-w-md">{request.description}</p>
                         <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
                           <span>ID: #{request.id.slice(0, 8)}</span>
-                          {request.category && (
-                            <>
-                              <span>•</span>
-                              <span className="font-medium text-slate-600">{request.category.name}</span>
-                            </>
-                          )}
                           <span>•</span>
                           <span>{formatDate(request.created_at)}</span>
                         </div>

@@ -235,6 +235,12 @@ const ProprietorLayout = ({ children }: { children?: ReactNode }) => {
       icon: <MessageSquare size={20} />,
       description: 'Communication center',
       badge: 2 // Example badge, could be dynamic
+    },
+    {
+      title: 'Documents',
+      href: '/portal/proprietor/documents',
+      icon: <FileText size={20} />,
+      description: 'Contracts & Compliance Files'
     }
   ];
 

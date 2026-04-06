@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -88,6 +89,7 @@ const ManagerUnits = () => {
   const [filterProperty, setFilterProperty] = useState<string>('all');
   const [filterUnitType, setFilterUnitType] = useState<string>('all');
   const [filterPriceRange, setFilterPriceRange] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [propertyId, setPropertyId] = useState<string>('');
   const [propertyName, setPropertyName] = useState<string>('');
   const [properties, setProperties] = useState<{id: string, name: string}[]>([]);
@@ -276,6 +278,20 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     email: '',
     phone: '',
     password: '',
+    physical_address: '',
+    po_box: '',
+    employer_details: '',
+    marital_status: '',
+    children_count: '',
+    age_bracket: '',
+    occupants_count: '1',
+    next_of_kin: '',
+    next_of_kin_email: '',
+    nationality: '',
+    house_staff: false,
+    home_address: '',
+    location: '',
+    sub_location: '',
   });
   const [newUnit, setNewUnit] = useState({
     unit_number: '',
@@ -407,18 +423,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       if (id) {
         targetPropertyIds = [id];
       } else {
-        const { data: assignments, error: assignError } = await supabase
-          .from('property_manager_assignments')
-          .select('property_id')
-          .eq('property_manager_id', user.id);
-
-        if (assignError && assignError.code !== 'PGRST116') {
-          console.error("Assignment error:", assignError);
-        }
-        
-        if (assignments && assignments.length > 0) {
-          targetPropertyIds = assignments.map(a => a.property_id);
-        }
+        targetPropertyIds = await getManagerAssignedPropertyIds(user.id);
       }
 
       if (targetPropertyIds.length === 0) {
@@ -547,163 +552,210 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     }
   };
 
-  const handleAssignTenant = async () => {
-      if(!selectedUnit || !selectedTenant) return;
-      
-      try {
-          setSavingUnit(true);
-          const now = new Date().toISOString();
-          const targetPropertyId = selectedUnit.property_id;
+  const createMoveInAllocationInvoice = async (tenantProfileId: string, leaseApplicationId?: string) => {
+    if (!selectedUnit) return null;
 
-          const { data: selectedTenantProfile, error: selectedTenantProfileError } = await supabase
-            .from('profiles')
-            .select('id, status, role')
-            .eq('id', selectedTenant)
-            .maybeSingle();
+    const applicationTag = leaseApplicationId ? `LEASE_APPLICATION_ID:${leaseApplicationId}` : null;
+    const onboardingFilter = 'notes.ilike.%BILLING_EVENT:first_payment%,notes.ilike.%BILLING_EVENT:unit_allocation%';
+    const notesFilter = applicationTag ? `${onboardingFilter},notes.ilike.%${applicationTag}%` : onboardingFilter;
 
-          if (selectedTenantProfileError) throw selectedTenantProfileError;
+    const { data: existingInvoice, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('id, notes')
+      .eq('tenant_id', tenantProfileId)
+      .eq('property_id', selectedUnit.property_id)
+      .in('status', ['unpaid', 'overdue'])
+      .or(notesFilter)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-          if (!selectedTenantProfile) {
-            toast.error('Selected tenant profile not found');
-            return;
-          }
+    if (invoiceError && invoiceError.code !== 'PGRST116') {
+      throw invoiceError;
+    }
 
-          const tenantStatus = String(selectedTenantProfile.status || '').toLowerCase();
-          if (tenantStatus !== 'active') {
-            toast.error('This tenant is pending superadmin approval and cannot be assigned yet.');
-            return;
-          }
+    if (!existingInvoice?.id) {
+      return null;
+    }
 
-          const activeStatuses = ['active', 'approved', 'manager_approved', 'ongoing', 'current'];
-          let conflictQuery = supabase
-            .from('tenant_leases')
-            .select('id, unit_id, status, units(unit_number)')
-            .eq('tenant_id', selectedTenant)
-            .in('status', activeStatuses);
+    const existingNotes = String(existingInvoice.notes || '');
+    const metadataLines = [
+      `LEASE_APPLICATION_ID:${leaseApplicationId || ''}`,
+      `APPLICANT_ID:${tenantProfileId}`,
+      `UNIT_ID:${selectedUnit.id}`,
+      `PROPERTY_ID:${selectedUnit.property_id}`,
+      `UNIT_NUMBER:${selectedUnit.unit_number || ''}`,
+      `UNIT_TYPE_ID:${selectedUnit.unit_type_id || ''}`,
+      `UNIT_TYPE_NAME:${selectedUnit.property_unit_types?.name || ''}`,
+    ].filter((line) => !line.endsWith(':'));
 
-          if (selectedUnit.active_lease?.id) {
-            conflictQuery = conflictQuery.neq('id', selectedUnit.active_lease.id);
-          }
+    const missingLines = metadataLines.filter((line) => !existingNotes.includes(line));
+    if (missingLines.length > 0) {
+      const mergedNotes = existingNotes ? `${existingNotes}\n${missingLines.join('\n')}` : missingLines.join('\n');
+      const { error: updateNotesError } = await supabase
+        .from('invoices')
+        .update({ notes: mergedNotes })
+        .eq('id', existingInvoice.id);
 
-          const { data: conflictingLeases, error: conflictError } = await conflictQuery.limit(1);
-          if (conflictError) throw conflictError;
+      if (updateNotesError) throw updateNotesError;
+    }
 
-          if (conflictingLeases && conflictingLeases.length > 0) {
-            const conflict: any = conflictingLeases[0];
-            const conflictUnit = conflict?.units?.unit_number || 'another unit';
-            toast.error(`This tenant is already assigned to unit ${conflictUnit}. Unassign first.`);
-            return;
-          }
-          
-          console.log("🔹 Starting tenant assignment...", { selectedTenant, propertyId: targetPropertyId, unitId: selectedUnit.id });
-          
-          if (selectedUnit.active_lease) {
-               // Update existing assignment
-               console.log("📝 Updating existing lease...");
-               const { error } = await supabase
-                  .from('tenant_leases')
-                  .update({ 
-                      tenant_id: selectedTenant 
-                  })
-                  .eq('id', selectedUnit.active_lease.id);
-               
-               if(error) throw error;
+    return existingInvoice.id;
+  };
 
-               // Also update the tenants table to keep them in sync
-               const { error: tenantsError } = await supabase
-                  .from('tenants')
-                  .update({
-                    property_id: targetPropertyId,
-                      unit_id: selectedUnit.id,
-                      move_in_date: now,
-                      status: 'active'
-                  })
-                  .eq('user_id', selectedTenant);
+  const assignTenantToUnit = async (
+    tenantUserId: string,
+    options: { allowPendingTenant?: boolean; createInitialInvoice?: boolean } = {}
+  ) => {
+    if (!selectedUnit || !tenantUserId) return;
 
-               if(tenantsError) throw new Error(`Failed to update tenant record: ${tenantsError.message}`);
-               console.log("✅ Tenant record updated");
-               
-               toast.success("Assignment updated successfully");
-          } else {
-              // First, create the tenants table record so tenant can see assignment immediately
-              console.log("🔍 Checking for existing tenant record...");
-              const { data: existingTenant, error: checkError } = await supabase
-                  .from('tenants')
-                  .select('id')
-                  .eq('user_id', selectedTenant)
-                  .limit(1)
-                  .maybeSingle();
+    try {
+      setSavingUnit(true);
+      const now = new Date().toISOString();
 
-              if (checkError && checkError.code !== 'PGRST116') {
-                  throw new Error(`Database check failed: ${checkError.message}`);
-              }
+      const { data: selectedTenantProfile, error: selectedTenantProfileError } = await supabase
+        .from('profiles')
+        .select('id, status, role')
+        .eq('id', tenantUserId)
+        .maybeSingle();
 
-              if (existingTenant) {
-                  console.log("📝 Updating existing tenant record...");
-                  // Update existing tenant record
-                  const { error: updateError } = await supabase
-                      .from('tenants')
-                      .update({
-                        property_id: targetPropertyId,
-                          unit_id: selectedUnit.id,
-                          move_in_date: now,
-                          status: 'active'
-                      })
-                      .eq('user_id', selectedTenant);
-
-                  if (updateError) throw updateError;
-                  console.log("✅ Tenant record updated successfully");
-              } else {
-                  console.log("➕ Creating new tenant record...");
-                  // Create new tenant record
-                  const { error: insertError } = await supabase
-                      .from('tenants')
-                      .insert({
-                          user_id: selectedTenant,
-                        property_id: targetPropertyId,
-                          unit_id: selectedUnit.id,
-                          move_in_date: now,
-                          status: 'active'
-                      });
-
-                  if (insertError) throw insertError;
-                  console.log("✅ Tenant record created successfully");
-              }
-
-              // Create lease
-              console.log("➕ Creating lease record...");
-              const { error: leaseError } = await supabase.from('tenant_leases').insert({
-                  unit_id: selectedUnit.id,
-                  tenant_id: selectedTenant,
-                  start_date: now,
-                  rent_amount: selectedUnit.property_unit_types?.price_per_unit || 0,
-                  status: 'active'
-              });
-
-              if(leaseError) throw leaseError;
-              console.log("✅ Lease record created");
-              
-              // Update unit status to 'occupied' as requested
-              console.log("🔄 Updating unit status to occupied...");
-              const { error: unitError } = await supabase.from('units').update({ status: 'occupied' }).eq('id', selectedUnit.id);
-              if(unitError) throw unitError;
-              console.log("✅ Unit status updated");
-              
-              toast.success("Tenant assigned successfully");
-          }
-
-          setIsAssignOpen(false);
-          loadUnits();
-      } catch(e: any) {
-          console.error("❌ Assignment error:", e);
-          if (e.message?.includes("409") || e.code === "409" || (typeof e === 'object' && JSON.stringify(e).includes("409"))) {
-            toast.error("User is already a tenant elsewhere. You do not have permission to move them. Ask an admin to enable full tenant access.");
-          } else {
-            toast.error("Failed to save assignment: " + (e.message || JSON.stringify(e)));
-          }
-      } finally {
-          setSavingUnit(false);
+      if (selectedTenantProfileError) throw selectedTenantProfileError;
+      if (!selectedTenantProfile) {
+        toast.error('Selected tenant profile not found');
+        return;
       }
+
+      const tenantStatus = String(selectedTenantProfile.status || '').toLowerCase();
+      if (!options.allowPendingTenant && tenantStatus !== 'active') {
+        toast.error('This tenant is pending approval and cannot be assigned yet.');
+        return;
+      }
+
+      const activeStatuses = ['active', 'approved', 'manager_approved', 'ongoing', 'current'];
+      let conflictQuery = supabase
+        .from('tenant_leases')
+        .select('id, unit_id, status, units(unit_number)')
+        .eq('tenant_id', tenantUserId)
+        .in('status', activeStatuses);
+
+      if (selectedUnit.active_lease?.id) {
+        conflictQuery = conflictQuery.neq('id', selectedUnit.active_lease.id);
+      }
+
+      const { data: conflictingLeases, error: conflictError } = await conflictQuery.limit(1);
+      if (conflictError) throw conflictError;
+
+      if (conflictingLeases && conflictingLeases.length > 0) {
+        const conflict: any = conflictingLeases[0];
+        const conflictUnit = conflict?.units?.unit_number || 'another unit';
+        toast.error(`This tenant is already assigned to unit ${conflictUnit}. Unassign first.`);
+        return;
+      }
+
+      const { data: existingTenant, error: checkError } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('user_id', tenantUserId)
+        .limit(1)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw new Error(`Database check failed: ${checkError.message}`);
+      }
+
+      let tenantRecordId = existingTenant?.id as string | undefined;
+      if (existingTenant) {
+        const { error: updateError } = await supabase
+          .from('tenants')
+          .update({
+            property_id: selectedUnit.property_id,
+            unit_id: selectedUnit.id,
+            move_in_date: now,
+            status: 'active'
+          })
+          .eq('id', existingTenant.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { data: insertedTenant, error: insertError } = await supabase
+          .from('tenants')
+          .insert({
+            user_id: tenantUserId,
+            property_id: selectedUnit.property_id,
+            unit_id: selectedUnit.id,
+            move_in_date: now,
+            status: 'active'
+          })
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        tenantRecordId = insertedTenant?.id;
+      }
+
+      if (selectedUnit.active_lease) {
+        const { error } = await supabase
+          .from('tenant_leases')
+          .update({ tenant_id: tenantUserId })
+          .eq('id', selectedUnit.active_lease.id);
+
+        if (error) throw error;
+        toast.success('Assignment updated successfully');
+      } else {
+        const { data: insertedLease, error: leaseError } = await supabase
+          .from('tenant_leases')
+          .insert({
+            unit_id: selectedUnit.id,
+            tenant_id: tenantUserId,
+            start_date: now,
+            rent_amount: selectedUnit.property_unit_types?.price_per_unit || 0,
+            status: 'active'
+          })
+          .select('id')
+          .single();
+
+        if (leaseError) throw leaseError;
+
+        const { error: unitError } = await supabase
+          .from('units')
+          .update({ status: 'occupied' })
+          .eq('id', selectedUnit.id);
+        if (unitError) throw unitError;
+
+        if (options.createInitialInvoice && insertedLease?.id) {
+          try {
+            const linkedInvoiceId = await createMoveInAllocationInvoice(tenantUserId, insertedLease.id);
+            if (linkedInvoiceId) {
+              toast.success('Tenant linked to existing Super Admin billing invoice.');
+            } else {
+              toast.info('Tenant assigned. First-time invoice will auto-generate when the application is approved.');
+            }
+          } catch (invoiceError: any) {
+            console.error('Failed to create initial invoice:', invoiceError);
+            toast.warning('Tenant assigned, but linking to Billing invoice failed.');
+          }
+        }
+
+        toast.success('Tenant assigned successfully');
+      }
+
+      setIsAssignOpen(false);
+      loadUnits();
+    } catch (e: any) {
+      console.error('❌ Assignment error:', e);
+      if (e.message?.includes('409') || e.code === '409' || (typeof e === 'object' && JSON.stringify(e).includes('409'))) {
+        toast.error('User is already a tenant elsewhere. Ask admin to resolve previous assignment first.');
+      } else {
+        toast.error('Failed to save assignment: ' + (e.message || JSON.stringify(e)));
+      }
+    } finally {
+      setSavingUnit(false);
+    }
+  };
+
+  const handleAssignTenant = async () => {
+    if (!selectedTenant) return;
+    await assignTenantToUnit(selectedTenant, { allowPendingTenant: false, createInitialInvoice: false });
   };
 
   const loadApplicantCandidates = async () => {
@@ -714,17 +766,24 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         return;
       }
 
-      const { data, error } = await supabase
+      let applicationsQuery = supabase
         .from('lease_applications')
         .select(`
           id,
           applicant_id,
-          status,
-          profiles:applicant_id (first_name, last_name, email)
+          applicant_name,
+          applicant_email,
+          status
         `)
         .eq('property_id', targetPropertyId)
-        .in('status', ['pending', 'manager_approved', 'approved'])
+        .in('status', ['pending', 'under_review', 'approved'])
         .order('created_at', { ascending: false });
+
+      if (selectedUnit?.id) {
+        applicationsQuery = applicationsQuery.eq('unit_id', selectedUnit.id);
+      }
+
+      const { data, error } = await applicationsQuery;
 
       if (error) throw error;
 
@@ -739,13 +798,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         if (!row?.applicant_id) return;
         if (assignedTenantIds.has(row.applicant_id)) return;
 
-        const profile = row.profiles || {};
         if (!uniqueByApplicant.has(row.applicant_id)) {
           uniqueByApplicant.set(row.applicant_id, {
             application_id: row.id,
             applicant_id: row.applicant_id,
-            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown Applicant',
-            email: profile.email || 'No email',
+            name: row.applicant_name || 'Unknown Applicant',
+            email: row.applicant_email || 'No email',
             status: row.status || 'pending',
           });
         }
@@ -756,41 +814,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       console.error('Error loading applicant candidates:', error);
       toast.error('Failed to load applicants');
       setApplicantCandidates([]);
-    }
-  };
-
-  const createTenantApprovalRequest = async (tenantUserId: string, source: 'create_user' | 'from_applicants') => {
-    const targetPropertyId = selectedUnit?.property_id || propertyId;
-    if (!selectedUnit || !targetPropertyId) {
-      throw new Error('Please choose a target unit before creating tenant request');
-    }
-
-    const metadata: Record<string, any> = {
-      user_id: tenantUserId,
-      property_id: targetPropertyId,
-      unit_id: selectedUnit.id,
-      move_in_date: new Date().toISOString(),
-      source,
-      requested_role: 'tenant',
-    };
-
-    if (source === 'from_applicants' && selectedApplicantId) {
-      const selectedApplicant = applicantCandidates.find((a) => a.applicant_id === selectedApplicantId);
-      metadata.application_id = selectedApplicant?.application_id;
-    }
-
-    const { error: approvalError } = await supabase
-      .from('approvals')
-      .insert({
-        approval_type: 'tenant_addition',
-        user_id: user?.id,
-        status: 'in_progress',
-        metadata,
-        notes: `Tenant addition request from manager for unit ${selectedUnit.unit_number}`,
-      });
-
-    if (approvalError) {
-      throw new Error(`Failed to create approval request: ${approvalError.message}`);
     }
   };
 
@@ -815,8 +838,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           user_type: 'tenant',
           status: 'pending',
           is_active: false,
-          property_id: selectedUnit?.property_id || propertyId,
-          unit_id: selectedUnit?.id || null,
+          assigned_property_id: selectedUnit?.property_id || propertyId || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', candidate.applicant_id);
@@ -825,12 +847,16 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to update applicant profile: ${profileUpdateError.message}`);
       }
 
-      await createTenantApprovalRequest(candidate.applicant_id, 'from_applicants');
+      const { error: appStatusError } = await supabase
+        .from('lease_applications')
+        .update({ status: 'under_review' })
+        .eq('id', candidate.application_id);
+
+      if (appStatusError) throw appStatusError;
 
       setSelectedTenant(candidate.applicant_id);
       setIsAddTenantOpen(false);
-      setIsAssignOpen(true);
-      toast.success('Applicant submitted for superadmin approval and ready for assignment');
+      toast.success('Applicant moved to under review. First-time invoice will auto-send once approved.');
     } catch (error: any) {
       console.error('Error adding tenant from applicants:', error);
       toast.error(error.message || 'Failed to add tenant from applicants');
@@ -843,10 +869,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     const email = newTenantForm.email.trim().toLowerCase();
     const firstName = newTenantForm.first_name.trim();
     const lastName = newTenantForm.last_name.trim();
+    const phone = newTenantForm.phone.trim();
     const password = newTenantForm.password;
 
-    if (!email || !firstName || !lastName || !password) {
-      toast.error('Please complete first name, last name, email and password');
+    if (!email || !firstName || !lastName || !phone || !password) {
+      toast.error('Please complete first name, last name, email, phone and password');
       return;
     }
 
@@ -864,6 +891,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     try {
       setIsCreatingTenantUser(true);
 
+      const occupantsCountRaw = parseInt(newTenantForm.occupants_count, 10);
+      const occupantsCount = Number.isFinite(occupantsCountRaw) && occupantsCountRaw > 0 ? occupantsCountRaw : 1;
+      const childrenCountRaw = parseInt(newTenantForm.children_count, 10);
+      const childrenCount = Number.isFinite(childrenCountRaw) && childrenCountRaw >= 0 ? childrenCountRaw : 0;
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -871,7 +903,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           data: {
             first_name: firstName,
             last_name: lastName,
-            phone: newTenantForm.phone?.trim() || null,
+            phone,
             role: 'tenant',
             status: 'pending',
           },
@@ -891,13 +923,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           email,
           first_name: firstName,
           last_name: lastName,
-          phone: newTenantForm.phone?.trim() || null,
+          phone,
           role: 'tenant',
           user_type: 'tenant',
           status: 'pending',
           is_active: false,
-          property_id: selectedUnit?.property_id || propertyId,
-          unit_id: selectedUnit?.id || null,
+          assigned_property_id: selectedUnit?.property_id || propertyId || null,
           updated_at: new Date().toISOString(),
         });
 
@@ -905,13 +936,73 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         throw new Error(`Failed to save tenant profile: ${profileUpsertError.message}`);
       }
 
-      await createTenantApprovalRequest(tenantUserId, 'create_user');
+      const applicationInsertPayload = {
+        applicant_id: tenantUserId,
+        property_id: selectedUnit?.property_id || propertyId,
+        unit_id: selectedUnit?.id,
+        status: 'under_review',
+        applicant_name: `${firstName} ${lastName}`,
+        applicant_email: email,
+        telephone_numbers: phone,
+        physical_address: newTenantForm.physical_address.trim() || null,
+        po_box: newTenantForm.po_box.trim() || null,
+        employer_details: newTenantForm.employer_details.trim() || null,
+        marital_status: newTenantForm.marital_status || null,
+        children_count: childrenCount,
+        age_bracket: newTenantForm.age_bracket || null,
+        occupants_count: occupantsCount,
+        next_of_kin: newTenantForm.next_of_kin.trim() || null,
+        next_of_kin_email: newTenantForm.next_of_kin_email.trim() || null,
+        nationality: newTenantForm.nationality.trim() || null,
+        house_staff: Boolean(newTenantForm.house_staff),
+        home_address: newTenantForm.home_address.trim() || null,
+        location: newTenantForm.location.trim() || null,
+        sub_location: newTenantForm.sub_location.trim() || null,
+      };
+
+      let { error: newApplicationError } = await supabase
+        .from('lease_applications')
+        .insert(applicationInsertPayload)
+        .select('id')
+        .single();
+
+      if (newApplicationError && String(newApplicationError.message || '').toLowerCase().includes('next_of_kin_email')) {
+        const { next_of_kin_email, ...fallbackPayload } = applicationInsertPayload as any;
+        ({ error: newApplicationError } = await supabase
+          .from('lease_applications')
+          .insert(fallbackPayload)
+          .select('id')
+          .single());
+      }
+
+      if (newApplicationError) {
+        throw new Error(`Failed to create lease application: ${newApplicationError.message}`);
+      }
 
       setSelectedTenant(tenantUserId);
-      setNewTenantForm({ first_name: '', last_name: '', email: '', phone: '', password: '' });
+      setNewTenantForm({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        password: '',
+        physical_address: '',
+        po_box: '',
+        employer_details: '',
+        marital_status: '',
+        children_count: '',
+        age_bracket: '',
+        occupants_count: '1',
+        next_of_kin: '',
+        next_of_kin_email: '',
+        nationality: '',
+        house_staff: false,
+        home_address: '',
+        location: '',
+        sub_location: '',
+      });
       setIsAddTenantOpen(false);
-      setIsAssignOpen(true);
-      toast.success('Tenant created and sent to superadmin for approval. Continue assignment when approved.');
+      toast.success('Tenant created and moved to under review. First-time invoice will auto-send once approved.');
     } catch (error: any) {
       console.error('Error creating tenant user:', error);
       toast.error(error.message || 'Failed to create tenant user');
@@ -993,6 +1084,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     const matchesSearch = unit.unit_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesProperty = filterProperty === 'all' || unit.property_id === filterProperty;
     const matchesUnitType = filterUnitType === 'all' || unit.unit_type_id === filterUnitType;
+    const displayStatus = (unit.active_lease ? 'occupied' : unit.status)?.toLowerCase() || 'vacant';
+    const normalizedStatus = displayStatus === 'available' ? 'vacant' : displayStatus;
+    const matchesStatus = filterStatus === 'all' || normalizedStatus === filterStatus;
     
     let matchesPrice = true;
     if (filterPriceRange !== 'all') {
@@ -1003,7 +1097,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
       else if (filterPriceRange === '50000+') matchesPrice = price > 50000;
     }
 
-    return matchesSearch && matchesProperty && matchesUnitType && matchesPrice;
+    return matchesSearch && matchesProperty && matchesUnitType && matchesStatus && matchesPrice;
   });
 
   const assignedTenantIds = new Set(
@@ -1043,7 +1137,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               <div className="p-2 bg-blue-100 rounded-lg">
                   <Building className="w-8 h-8 text-blue-600" />
               </div>
-              <h1 className="text-4xl font-bold text-slate-800">Properties & Units</h1>
+              <h1 className="text-4xl font-bold text-slate-800">Units</h1>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center bg-white border border-slate-200 rounded-lg p-1">
@@ -1062,16 +1156,6 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   <List size={18} />
                 </button>
               </div>
-              <Button
-                onClick={() => {
-                  setAddTenantMode('from_applicants');
-                  setSelectedApplicantId('');
-                  setIsAddTenantOpen(true);
-                }}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-              >
-                <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
-              </Button>
             </div>
           </div>
           <p className="text-slate-500 ml-1">Manage all units across your properties</p>
@@ -1314,12 +1398,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         </Dialog>
 
         {/* Assign Tenant Dialog */}
-        <Dialog open={isAddTenantOpen} onOpenChange={setIsAddTenantOpen}>
-           <DialogContent className="bg-white border-slate-100 shadow-xl">
+          <Dialog open={isAddTenantOpen} onOpenChange={setIsAddTenantOpen}>
+            <DialogContent className="bg-white border-slate-100 shadow-xl max-w-3xl max-h-[90vh] overflow-y-auto">
                <DialogHeader>
                    <DialogTitle className="text-slate-800">Add Tenant</DialogTitle>
                    <DialogDescription className="text-slate-500">
-                       Choose how you want to add tenant access before assignment.
+                     Add from applicants by default, or create a new tenant profile. First-time invoice auto-generates after manager approval.
                    </DialogDescription>
                </DialogHeader>
 
@@ -1381,6 +1465,152 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                           placeholder="At least 6 characters"
                         />
                       </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Physical Address</Label>
+                        <Input
+                          value={newTenantForm.physical_address}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, physical_address: e.target.value }))}
+                          placeholder="Apartment/House, Street"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">P.O. Box</Label>
+                        <Input
+                          value={newTenantForm.po_box}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, po_box: e.target.value }))}
+                          placeholder="P.O. Box"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Marital Status</Label>
+                        <Select
+                          value={newTenantForm.marital_status || 'none'}
+                          onValueChange={(val) => setNewTenantForm((prev) => ({ ...prev, marital_status: val === 'none' ? '' : val }))}
+                        >
+                          <SelectTrigger className="bg-white border-slate-200">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not set</SelectItem>
+                            <SelectItem value="Single">Single</SelectItem>
+                            <SelectItem value="Married">Married</SelectItem>
+                            <SelectItem value="Divorced">Divorced</SelectItem>
+                            <SelectItem value="Widowed">Widowed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Age Bracket</Label>
+                        <Select
+                          value={newTenantForm.age_bracket || 'none'}
+                          onValueChange={(val) => setNewTenantForm((prev) => ({ ...prev, age_bracket: val === 'none' ? '' : val }))}
+                        >
+                          <SelectTrigger className="bg-white border-slate-200">
+                            <SelectValue placeholder="Select bracket" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not set</SelectItem>
+                            <SelectItem value="18-25">18-25</SelectItem>
+                            <SelectItem value="26-35">26-35</SelectItem>
+                            <SelectItem value="36-45">36-45</SelectItem>
+                            <SelectItem value="46-55">46-55</SelectItem>
+                            <SelectItem value="55+">55+</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Occupants Count</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={newTenantForm.occupants_count}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, occupants_count: e.target.value }))}
+                          placeholder="1"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Children Count</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={newTenantForm.children_count}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, children_count: e.target.value }))}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Nationality</Label>
+                        <Input
+                          value={newTenantForm.nationality}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, nationality: e.target.value }))}
+                          placeholder="e.g. Kenyan"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Live-in House Staff</Label>
+                        <Select
+                          value={newTenantForm.house_staff ? 'yes' : 'no'}
+                          onValueChange={(val) => setNewTenantForm((prev) => ({ ...prev, house_staff: val === 'yes' }))}
+                        >
+                          <SelectTrigger className="bg-white border-slate-200">
+                            <SelectValue placeholder="Select option" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no">No</SelectItem>
+                            <SelectItem value="yes">Yes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Next of Kin</Label>
+                        <Input
+                          value={newTenantForm.next_of_kin}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, next_of_kin: e.target.value }))}
+                          placeholder="Name and contact"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Next of Kin Email</Label>
+                        <Input
+                          type="email"
+                          value={newTenantForm.next_of_kin_email}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, next_of_kin_email: e.target.value }))}
+                          placeholder="kin@example.com"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Employer Details</Label>
+                        <Textarea
+                          className="bg-white border-slate-200 text-slate-900 placeholder:text-slate-400"
+                          value={newTenantForm.employer_details}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, employer_details: e.target.value }))}
+                          placeholder="Employer name and address"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Home Address</Label>
+                        <Input
+                          value={newTenantForm.home_address}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, home_address: e.target.value }))}
+                          placeholder="Village / Estate"
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Label className="text-slate-700 mb-1 block">Location</Label>
+                        <Input
+                          value={newTenantForm.location}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, location: e.target.value }))}
+                          placeholder="County / City"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="text-slate-700 mb-1 block">Sub-Location</Label>
+                        <Input
+                          value={newTenantForm.sub_location}
+                          onChange={(e) => setNewTenantForm((prev) => ({ ...prev, sub_location: e.target.value }))}
+                          placeholder="Ward / Area"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -1404,7 +1634,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   )}
 
                   <div className="rounded-lg bg-amber-50 border border-amber-100 text-amber-800 text-xs p-3">
-                    New tenants are created with pending approval so they appear in superadmin user management before activation.
+                    On manager approval, the first-time invoice is sent automatically to the tenant dashboard.
                   </div>
                </div>
 
@@ -1415,7 +1645,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                      disabled={isCreatingTenantUser}
                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-semibold"
                    >
-                     {isCreatingTenantUser ? 'Processing...' : 'Submit For Approval'}
+                     {isCreatingTenantUser ? 'Processing...' : 'Submit Tenant'}
                    </Button>
                </DialogFooter>
            </DialogContent>
@@ -1455,35 +1685,35 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
 
         {/* View Details Dialog - Full View (Form Layout) */}
         <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-            <DialogContent className="max-w-6xl h-[90vh] p-0 bg-white flex flex-col gap-0 overflow-hidden outline-none border-0 shadow-lg">
+          <DialogContent className="max-w-6xl h-[90vh] p-0 bg-slate-100 flex flex-col gap-0 overflow-hidden outline-none border border-slate-200 shadow-2xl">
                 
                 {/* Fixed Header */}
-                <div className="bg-white px-8 py-5 border-b border-gray-100 flex justify-between items-center shrink-0 z-10">
+            <div className="bg-gradient-to-r from-[#015B97] to-[#014a7a] px-8 py-5 flex justify-between items-center shrink-0 z-10">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-3">
+                <h2 className="text-xl font-bold text-white flex items-center gap-3">
                             Unit {selectedUnit?.unit_number} Details
                             <span className={`text-xs px-2.5 py-0.5 rounded-full border uppercase tracking-wider font-bold ${
                                 selectedUnit?.active_lease 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                : 'bg-blue-50 text-blue-700 border-blue-100'
+                    ? 'bg-white/15 text-white border-white/25' 
+                    : 'bg-white text-[#015B97] border-white/70'
                             }`}>
                                 {selectedUnit?.active_lease ? 'Occupied' : selectedUnit?.status || 'Vacant'}
                             </span>
                         </h2>
-                        <p className="text-sm text-slate-500 mt-1">View and manage unit specifications</p>
+                <p className="text-sm text-blue-100 mt-1">View and manage unit specifications</p>
                     </div>
                     <div className="flex gap-3">
                          <Button 
                             variant="outline" 
                             onClick={() => setIsDetailsOpen(false)} 
-                            className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium"
+                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white font-medium"
                          >
                             Cancel
                          </Button>
                          <Button 
                             onClick={handleSaveUnitChanges} 
                             disabled={savingUnit} 
-                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-semibold px-6 border-transparent"
+                  className="bg-[#D85C2C] hover:bg-[#b94c20] text-white shadow-sm font-semibold px-6 border-transparent"
                          >
                             {savingUnit ? (
                                 <>
@@ -1495,15 +1725,15 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+                <div className="flex-1 overflow-y-auto p-8 bg-slate-100">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
                         
                         {/* LEFT COLUMN - MAIN INFO form */}
                         <div className="lg:col-span-2 space-y-6">
                             
                             {/* Property Information Card */}
-                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-800 mb-6 pb-4 border-b border-slate-50">Property Information</h3>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 className="text-base font-bold text-[#015B97] mb-6 pb-4 border-b border-slate-200">Property Information</h3>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
@@ -1521,7 +1751,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             id="info-floor" 
                                             value={editConfig.floor_number}
                                             onChange={(e) => setEditConfig({...editConfig, floor_number: e.target.value})}
-                                            className="bg-white border-slate-200 focus:ring-blue-500 focus:border-blue-500"
+                                          className="bg-white border-slate-200 focus:ring-[#015B97] focus:border-[#015B97]"
                                             placeholder="Ex. 1"
                                         />
                                     </div>
@@ -1532,7 +1762,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             value={editConfig.unit_type_id} 
                                             onValueChange={(val) => setEditConfig({...editConfig, unit_type_id: val})}
                                         >
-                                          <SelectTrigger id="info-type" className="bg-white border-slate-200 focus:ring-blue-500">
+                                          <SelectTrigger id="info-type" className="bg-white border-slate-200 focus:ring-[#015B97] focus:border-[#015B97]">
                                             <SelectValue placeholder="Select type" />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -1551,7 +1781,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             value={editConfig.status} 
                                             onValueChange={(val) => setEditConfig({...editConfig, status: val})}
                                         >
-                                          <SelectTrigger id="info-status" className="bg-white border-slate-200 focus:ring-blue-500">
+                                          <SelectTrigger id="info-status" className="bg-white border-slate-200 focus:ring-[#015B97] focus:border-[#015B97]">
                                             <SelectValue placeholder="Select status" />
                                           </SelectTrigger>
                                           <SelectContent>
@@ -1566,8 +1796,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                             </div>
                             
                             {/* Specifications Card */}
-                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-800 mb-6 pb-4 border-b border-slate-50">Property Details</h3>
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                              <h3 className="text-base font-bold text-[#015B97] mb-6 pb-4 border-b border-slate-200">Property Details</h3>
                                 
                                 <div className="space-y-6">
                                      <div className="space-y-2">
@@ -1576,12 +1806,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             id="info-features" 
                                             value={editConfig.features}
                                             onChange={(e) => setEditConfig({...editConfig, features: e.target.value})}
-                                            className="bg-white border-slate-200 focus:ring-blue-500 rounded-lg"
+                                          className="bg-white border-slate-200 focus:ring-[#015B97] focus:border-[#015B97] rounded-lg"
                                             placeholder="Ex. Balcony, AC, Parking, Wifi"
                                         />
                                         <div className="flex flex-wrap gap-2 mt-3">
                                             {editConfig.features.split(',').filter(f => f.trim()).map((f, i) => (
-                                                <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium border border-blue-100">{f.trim()}</span>
+                                            <span key={i} className="bg-[#eaf3fb] text-[#015B97] px-3 py-1 rounded-full text-xs font-medium border border-[#c8def3]">{f.trim()}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -1593,7 +1823,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             rows={5}
                                             value={editConfig.description}
                                             onChange={(e) => setEditConfig({...editConfig, description: e.target.value})}
-                                            className="bg-white border-slate-200 focus:ring-blue-500 resize-none leading-relaxed rounded-lg"
+                                          className="bg-white border-slate-200 focus:ring-[#015B97] focus:border-[#015B97] resize-none leading-relaxed rounded-lg"
                                             placeholder="Describe the unit layout, view, and key selling points..."
                                         />
                                     </div>
@@ -1606,11 +1836,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                         <div className="space-y-6">
                             
                             {/* Image Upload Card */}
-                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-800 mb-4">Property Image</h3>
+                          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h3 className="text-base font-bold text-[#015B97] mb-4">Property Image</h3>
                                 
                                 <div className="space-y-4">
-                                     <div className="relative aspect-[4/3] bg-slate-50 rounded-xl overflow-hidden border-2 border-dashed border-slate-200 hover:border-blue-400 transition-all group cursor-pointer shadow-inner">
+                                     <div className="relative aspect-[4/3] bg-slate-50 rounded-xl overflow-hidden border-2 border-dashed border-slate-200 hover:border-[#015B97] transition-all group cursor-pointer shadow-inner">
                                         {selectedUnit?.image_url ? (
                                             <>
                                                 <img src={selectedUnit.image_url} alt="Unit" className="w-full h-full object-cover" />
@@ -1641,7 +1871,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                         </label>
                                         {uploadingImage && (
                                             <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-20">
-                                                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                                              <Loader2 className="w-8 h-8 text-[#015B97] animate-spin" />
                                             </div>
                                         )}
                                     </div>
@@ -1652,25 +1882,25 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                             </div>
 
                             {/* Price Card */}
-                            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-800 mb-4">Pricing</h3>
-                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-xl p-5 border border-blue-100">
-                                    <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-2">Monthly Rent</p>
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                              <h3 className="text-base font-bold text-[#015B97] mb-4">Pricing</h3>
+                              <div className="bg-gradient-to-br from-[#eaf3fb] to-[#f4f8fc] rounded-xl p-5 border border-[#c8def3]">
+                                <p className="text-xs text-[#015B97] font-bold uppercase tracking-wider mb-2">Monthly Rent</p>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-lg font-semibold text-blue-700">KES</span>
+                                  <span className="text-lg font-semibold text-[#015B97]">KES</span>
                                         <span className="text-3xl font-bold text-slate-900">
                                             {(editConfig.price || 0).toLocaleString()} 
                                         </span>
                                     </div>
-                                    <p className="text-xs text-blue-400 mt-2 font-medium">
+                                <p className="text-xs text-slate-500 mt-2 font-medium">
                                         Base price derived from Unit Type.
                                     </p>
                                 </div>
                             </div>
 
                             {/* Lease / Tenant Actions */}
-                             <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
-                                <h3 className="text-base font-bold text-slate-800 mb-4">Lease Management</h3>
+                             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                              <h3 className="text-base font-bold text-[#015B97] mb-4">Lease Management</h3>
                                 
                                 {selectedUnit?.active_lease ? ( // Occupied State
                                     <div className="space-y-4">
@@ -1690,7 +1920,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                                 setSelectedTenant(selectedUnit.active_lease!.tenant_id);
                                                 setIsAssignOpen(true);
                                             }}
-                                            className="w-full bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 font-semibold"
+                                          className="w-full bg-white text-[#015B97] border-[#9ec4e5] hover:bg-[#eaf3fb] hover:text-[#014a7a] hover:border-[#8ab8df] font-semibold"
                                         >
                                             Reassign Tenant
                                         </Button>
@@ -1699,7 +1929,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                             variant="outline" 
                                             onClick={handleUnassignTenant}
                                             disabled={savingUnit}
-                                            className="w-full bg-white text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 font-semibold"
+                                          className="w-full bg-white text-[#D85C2C] border-[#f1c2ad] hover:bg-[#fdf2ed] hover:text-[#b94c20] hover:border-[#e7ab93] font-semibold"
                                         >
                                             {savingUnit ? 'Unassigning...' : 'Unassign Tenant'}
                                         </Button>
@@ -1707,16 +1937,16 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                 ) : ( // Vacant State
                                     <div className="space-y-4">
                                         <div className="p-5 bg-slate-50 rounded-xl border border-slate-100 text-center">
-                                            <p className="text-slate-500 text-sm mb-4 font-medium">Unit is currently vacant.</p>
-                                            <Button 
-                                                onClick={() => {
+                                      <p className="text-slate-500 text-sm mb-4 font-medium">Unit is currently vacant.</p>
+                                      <Button 
+                                        onClick={() => {
                                           if (!selectedUnit) return;
                                           openAddTenantDialog(selectedUnit);
-                                                }}
-                                                className="w-full bg-orange-500 hover:bg-orange-600 text-white shadow-sm font-bold border-orange-600 border-b-2 active:translate-y-[1px] active:border-b-0 transition-all"
-                                            >
+                                        }}
+                                        className="w-full bg-[#D85C2C] hover:bg-[#b94c20] text-white shadow-sm font-bold border-[#aa431c] border-b-2 active:translate-y-[1px] active:border-b-0 transition-all"
+                                      >
                                         <UserPlus className="w-4 h-4 mr-2" /> Add Tenant
-                                            </Button>
+                                      </Button>
                                         </div>
                                     </div>
                                 )}
@@ -1774,6 +2004,19 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                   <SelectItem value="10000-20000">10,000 - 20,000</SelectItem>
                   <SelectItem value="20000-50000">20,000 - 50,000</SelectItem>
                   <SelectItem value="50000+">50,000+</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="occupied">Occupied</SelectItem>
+                  <SelectItem value="vacant">Vacant</SelectItem>
+                  <SelectItem value="booked">Booked</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
           </div>
@@ -1858,58 +2101,58 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                 <>
                                     <Button 
                                         variant="outline" size="sm"
-                                        className="h-8 text-xs bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                      className="h-8 text-xs bg-white text-[#015B97] border-[#9ec4e5] hover:bg-[#eaf3fb]"
                                         onClick={() => openDetails(unit)}
                                     >
-                                        View
+                                      View Details
                                     </Button>
                                     <Button 
                                         size="sm"
-                                        className="h-8 text-xs bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm border-b-2 border-emerald-700 active:translate-y-[1px] active:border-b-0"
+                                      className="h-8 text-xs bg-[#D85C2C] hover:bg-[#b94c20] text-white shadow-sm border-b-2 border-[#aa431c] active:translate-y-[1px] active:border-b-0"
                                         onClick={() => { 
                                             setSelectedUnit(unit);
                                             setSelectedTenant(unit.active_lease!.tenant_id);
                                             setIsAssignOpen(true);
                                         }}
                                     >
-                                        Manage
+                                      Manage It
                                     </Button>
                                 </>
                             ) : displayStatus === 'maintenance' ? (
                                 <>
                                     <Button 
                                         variant="outline" size="sm"
-                                        className="h-8 text-xs bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
+                                      className="h-8 text-xs bg-white text-[#015B97] border-[#9ec4e5] hover:bg-[#eaf3fb]"
                                         onClick={() => openDetails(unit)}
                                     >
-                                        Details
+                                      View Details
                                     </Button>
                                     <Button 
                                         size="sm"
-                                        className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
+                                      className="h-8 text-xs bg-[#D85C2C] hover:bg-[#b94c20] text-white shadow-sm border-b-2 border-[#aa431c] active:translate-y-[1px] active:border-b-0"
                                         onClick={() => openDetails(unit)}
                                     >
-                                        Resolve
+                                      Resolve Issue
                                     </Button>
                                 </>
                             ) : (
                                 <>
                                     <Button 
                                         variant="outline" size="sm"
-                                        className="h-8 text-xs bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
+                                      className="h-8 text-xs bg-white text-[#015B97] border-[#9ec4e5] hover:bg-[#eaf3fb]"
                                         onClick={() => openDetails(unit)}
                                     >
-                                        Details
+                                      View Details
                                     </Button>
-                                    <Button 
-                                        size="sm"
-                                        className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white shadow-sm border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0"
-                                        onClick={() => { 
-                                            openAddTenantDialog(unit);
-                                        }}
-                                    >
+                                <Button 
+                                  size="sm"
+                                    className="h-8 text-xs bg-[#D85C2C] hover:bg-[#b94c20] text-white shadow-sm border-b-2 border-[#aa431c] active:translate-y-[1px] active:border-b-0"
+                                  onClick={() => { 
+                                    openAddTenantDialog(unit);
+                                  }}
+                                >
                                   <UserPlus className="w-3.5 h-3.5 mr-1" /> Add Tenant
-                                    </Button>
+                                </Button>
                                 </>
                              )}
                           </div>
@@ -2066,13 +2309,13 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                          {isOccupied && unit.active_lease ? ( // Occupied
                             <>
                                 <Button 
-                                    className="w-full bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50 font-bold text-xs shadow-sm h-9" 
+                                  className="w-full bg-white text-[#015B97] border border-[#9ec4e5] hover:bg-[#eaf3fb] font-bold text-xs shadow-sm h-9" 
                                     onClick={(e) => { e.stopPropagation(); openDetails(unit); }}
                                 >
-                                    View
+                                  View Details
                                 </Button>
                                 <Button 
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md border-b-2 border-emerald-700 active:translate-y-[1px] active:border-b-0 h-9"
+                                  className="w-full bg-[#D85C2C] hover:bg-[#b94c20] text-white font-bold text-xs shadow-md border-b-2 border-[#aa431c] active:translate-y-[1px] active:border-b-0 h-9"
                                     onClick={(e) => { 
                                         e.stopPropagation(); 
                                         setSelectedUnit(unit);
@@ -2080,34 +2323,34 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                         setIsAssignOpen(true);
                                     }}
                                 >
-                                    Manage
+                                  Manage It
                                 </Button>
                             </>
                          ) : displayStatus === 'maintenance' ? ( // Maintenance
                             <>
                                 <Button 
-                                    className="w-full bg-white text-orange-600 border border-orange-200 hover:bg-orange-50 font-bold text-xs shadow-sm h-9"
+                                  className="w-full bg-white text-[#015B97] border border-[#9ec4e5] hover:bg-[#eaf3fb] font-bold text-xs shadow-sm h-9"
                                     onClick={(e) => { e.stopPropagation(); openDetails(unit); }}
                                 >
-                                    Details
+                                  View Details
                                 </Button>
                                 <Button 
-                                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0 h-9"
+                                  className="w-full bg-[#D85C2C] hover:bg-[#b94c20] text-white font-bold text-xs shadow-md border-b-2 border-[#aa431c] active:translate-y-[1px] active:border-b-0 h-9"
                                     onClick={(e) => { e.stopPropagation(); openDetails(unit); }}
                                 >
-                                    Resolve
+                                  Resolve Issue
                                 </Button>
                             </>
                          ) : ( // Vacant
                             <>
                                 <Button 
-                                    className="w-full bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 font-bold text-xs shadow-sm h-9"
+                                  className="w-full bg-white text-[#015B97] border border-[#9ec4e5] hover:bg-[#eaf3fb] font-bold text-xs shadow-sm h-9"
                                     onClick={(e) => { e.stopPropagation(); openDetails(unit); }}
                                 >
-                                    Details
+                                  View Details
                                 </Button>
                                 <Button 
-                                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md border-b-2 border-orange-700 active:translate-y-[1px] active:border-b-0 h-9"
+                                  className="w-full bg-[#D85C2C] hover:bg-[#b94c20] text-white font-bold text-xs shadow-md border-b-2 border-[#aa431c] active:translate-y-[1px] active:border-b-0 h-9"
                                     onClick={(e) => { 
                                         e.stopPropagation(); 
                                         openAddTenantDialog(unit);

@@ -1,343 +1,296 @@
 // src/utils/receiptGenerator.ts
-// Receipt generation utility for payment transactions
+// Utility for generating PDF receipts for successful payments
+
+import jsPDF from 'jspdf';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface ReceiptItem {
+  description: string;
+  amount: number;
+  type: 'rent' | 'water' | 'electricity' | 'garbage' | 'other' | string;
+}
 
 export interface ReceiptData {
   receiptNumber: string;
   tenantName: string;
-  tenantEmail: string;
   propertyName: string;
   unitNumber: string;
+  houseNumber?: string;
+  houseType?: string;
   amount: number;
-  currency: string;
-  paymentDate: Date;
   paymentMethod: string;
   transactionReference: string;
-  invoiceNumber: string;
-  invoiceDueDate: Date;
+  paidDate: string;
+  invoiceDate?: string;
+  dueDate?: string;
   companyName?: string;
-  companyPhone?: string;
-  companyEmail?: string;
+  companyLogo?: string;
   companyAddress?: string;
+  companyPhone?: string;
+  items?: ReceiptItem[];
 }
 
 /**
- * Generate a simple HTML receipt that can be converted to PDF
+ * Generate a PDF receipt for a payment
+ * @param data - Receipt data
+ * @returns PDF blob
  */
-export const generateReceiptHTML = (data: ReceiptData): string => {
-  const formattedDate = data.paymentDate.toLocaleDateString("en-KE", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+export const generateReceiptPDF = (data: ReceiptData): Blob => {
+  const doc = new jsPDF();
+  const receiptNumber = data.receiptNumber || "RCP-" + new Date().getFullYear();
+  const paidDate = new Date(data.paidDate || new Date()).toLocaleDateString();
+  const primaryColor = [21, 66, 121];
 
-  const formattedAmount = data.amount.toLocaleString("en-KE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(0, 0, 210, 50, "F");
 
-  return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Payment Receipt - ${data.receiptNumber}</title>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        
-        body {
-          font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-          color: #333;
-          background-color: #f5f5f5;
-        }
-        
-        .receipt-container {
-          max-width: 800px;
-          margin: 20px auto;
-          background: white;
-          padding: 40px;
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .receipt-header {
-          border-bottom: 3px solid #154279;
-          padding-bottom: 20px;
-          margin-bottom: 30px;
-        }
-        
-        .company-info {
-          margin-bottom: 20px;
-        }
-        
-        .company-name {
-          font-size: 24px;
-          font-weight: bold;
-          color: #154279;
-          margin-bottom: 8px;
-        }
-        
-        .company-details {
-          font-size: 12px;
-          color: #666;
-          line-height: 1.6;
-        }
-        
-        .receipt-title {
-          text-align: right;
-          font-size: 32px;
-          font-weight: bold;
-          color: #154279;
-          margin-bottom: 10px;
-        }
-        
-        .receipt-number {
-          text-align: right;
-          font-size: 14px;
-          color: #666;
-          margin-bottom: 30px;
-        }
-        
-        .section {
-          margin-bottom: 30px;
-        }
-        
-        .section-title {
-          font-size: 14px;
-          font-weight: bold;
-          color: #154279;
-          border-bottom: 1px solid #ddd;
-          padding-bottom: 10px;
-          margin-bottom: 15px;
-        }
-        
-        .two-column {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 30px;
-        }
-        
-        .property-info,
-        .tenant-info {
-          font-size: 13px;
-          line-height: 1.8;
-        }
-        
-        .info-label {
-          color: #888;
-          font-weight: 500;
-        }
-        
-        .info-value {
-          color: #333;
-          font-weight: 600;
-        }
-        
-        .payment-details {
-          background-color: #f9f9f9;
-          padding: 20px;
-          border-radius: 4px;
-          margin-bottom: 30px;
-        }
-        
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 15px;
-          font-size: 14px;
-        }
-        
-        .detail-row.total {
-          border-top: 2px solid #ddd;
-          padding-top: 15px;
-          font-weight: bold;
-          font-size: 16px;
-          color: #154279;
-        }
-        
-        .detail-label {
-          color: #666;
-        }
-        
-        .detail-value {
-          text-align: right;
-          color: #333;
-          font-weight: 500;
-        }
-        
-        .amount-highlight {
-          color: #F96302;
-          font-size: 24px;
-          font-weight: bold;
-        }
-        
-        .footer {
-          border-top: 1px solid #ddd;
-          padding-top: 20px;
-          margin-top: 40px;
-          font-size: 12px;
-          color: #666;
-          text-align: center;
-          line-height: 1.8;
-        }
-        
-        .thank-you {
-          text-align: center;
-          font-size: 14px;
-          color: #154279;
-          font-weight: bold;
-          margin-bottom: 20px;
-        }
-        
-        .status-badge {
-          display: inline-block;
-          background-color: #4CAF50;
-          color: white;
-          padding: 8px 16px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: bold;
-          margin-bottom: 20px;
-        }
-        
-        @media print {
-          body {
-            background-color: white;
-          }
-          
-          .receipt-container {
-            box-shadow: none;
-            margin: 0;
-            padding: 0;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="receipt-container">
-        <div class="receipt-header">
-          <div class="company-info">
-            <div class="company-name">${data.companyName || "Realtor Kenya"}</div>
-            <div class="company-details">
-              ${data.companyAddress ? `<div>${data.companyAddress}</div>` : ""}
-              ${data.companyPhone ? `<div>Phone: ${data.companyPhone}</div>` : ""}
-              ${data.companyEmail ? `<div>Email: ${data.companyEmail}</div>` : ""}
-            </div>
-          </div>
-          <div class="receipt-title">RECEIPT</div>
-          <div class="receipt-number">#${data.receiptNumber}</div>
-        </div>
-        
-        <div class="status-badge">✓ PAID</div>
-        
-        <div class="section">
-          <div class="two-column">
-            <div class="tenant-info">
-              <div class="section-title">TENANT INFORMATION</div>
-              <div><span class="info-label">Name:</span> <span class="info-value">${data.tenantName}</span></div>
-              <div><span class="info-label">Email:</span> <span class="info-value">${data.tenantEmail}</span></div>
-            </div>
-            <div class="property-info">
-              <div class="section-title">PROPERTY INFORMATION</div>
-              <div><span class="info-label">Property:</span> <span class="info-value">${data.propertyName}</span></div>
-              <div><span class="info-label">Unit:</span> <span class="info-value">${data.unitNumber}</span></div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="section">
-          <div class="section-title">PAYMENT DETAILS</div>
-          <div class="payment-details">
-            <div class="detail-row">
-              <span class="detail-label">Invoice Number:</span>
-              <span class="detail-value">${data.invoiceNumber}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Invoice Due Date:</span>
-              <span class="detail-value">${data.invoiceDueDate.toLocaleDateString("en-KE")}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Payment Date:</span>
-              <span class="detail-value">${formattedDate}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Payment Method:</span>
-              <span class="detail-value">${data.paymentMethod}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Transaction Reference:</span>
-              <span class="detail-value" style="font-family: monospace; font-size: 12px;">${data.transactionReference}</span>
-            </div>
-            <div class="detail-row total">
-              <span>Amount Paid:</span>
-              <span><span class="amount-highlight">${data.currency} ${formattedAmount}</span></span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="thank-you">
-          Thank you for your payment
-        </div>
-        
-        <div class="footer">
-          <p>This is an automated receipt generated by our payment system.</p>
-          <p>For any inquiries, please contact us at the above details.</p>
-          <p style="margin-top: 20px; color: #999; font-size: 11px;">
-            Generated on ${new Date().toLocaleString("en-KE")}
-          </p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  doc.setDrawColor(255, 255, 255);
+  doc.setLineWidth(0.8);
+  doc.rect(12, 10, 30, 30);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(17);
+  doc.setFont(undefined, "bold");
+  doc.text(data.companyName || "KENYA REALTORS", 48, 18);
+  doc.setFontSize(10);
+  doc.setFont(undefined, "normal");
+  doc.text("Billing and Invoicing Department", 48, 25);
+  doc.text(data.companyAddress || "Nairobi, Kenya", 48, 31);
+
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(22);
+  doc.text("RECEIPT", 154, 20);
+  doc.setFontSize(9.5);
+  doc.setFont(undefined, "normal");
+  doc.text("Receipt #: " + receiptNumber, 144, 29);
+  doc.text("Payment Date: " + paidDate, 144, 34.5);
+  doc.text("Ref: " + (data.transactionReference || "N/A"), 144, 40);
+
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(9.5);
+  doc.text("Received From", 16, 66);
+  doc.text("Payment Details", 112, 66);
+
+  doc.setTextColor(51, 65, 85);
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(8.5);
+  doc.text(data.tenantName || "N/A", 16, 73);
+  doc.text("Unit " + (data.unitNumber || "N/A") + " • " + (data.propertyName || "N/A"), 16, 78);
+  doc.text("Method: " + (data.paymentMethod || "N/A"), 112, 73);
+  doc.text("Currency: KES", 112, 78);
+
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.rect(12, 90, 186, 10, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, "bold");
+  doc.text("Description", 16, 97);
+  doc.text("Amount", 180, 97, { align: "right" });
+
+  let y = 108;
+  doc.setTextColor(30, 41, 59);
+  doc.setFont(undefined, "normal");
+  
+  const formatAmount = (amt: number) => new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES" }).format(amt || 0);
+  const amountStr = formatAmount(Number(data.amount || 0));
+
+  if (data.items && data.items.length > 0) {
+    data.items.forEach((item: any) => {
+      doc.text(item.description, 16, y);
+      doc.text(formatAmount(item.amount), 180, y, { align: "right" });
+      doc.setDrawColor(226, 232, 240);
+      doc.line(12, y + 4, 198, y + 4);
+      y += 10;
+    });
+    // add small padding buffer
+    y += 5;
+  } else {
+    doc.text("Payment Received", 16, y);
+    doc.text(formatAmount(Number(data.amount)), 180, y, { align: "right" });
+    doc.setDrawColor(226, 232, 240);
+    doc.line(12, y + 4, 198, y + 4);
+    y += 15;
+  }
+
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(120, y + 6, 78, 22, 2, 2, "F");
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setFontSize(11);
+  doc.setFont(undefined, "bold");
+  doc.text("TOTAL PAID:", 124, y + 20);
+  doc.text(amountStr, 194, y + 20, { align: "right" });
+
+  const footerY = 270;
+  doc.setDrawColor(226, 232, 240);
+  doc.line(12, footerY - 5, 198, footerY - 5);
+  doc.setFont(undefined, "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("KENYA REALTORS", 105, footerY, { align: "center" });
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text("Thank you for your payment!", 105, footerY + 6, { align: "center" });
+  doc.text("Generated: " + new Date().toLocaleDateString(), 105, footerY + 12, { align: "center" });
+
+  return doc.output("blob");
 };
 
 /**
- * Create a receipt object with HTML content
- * In production, this would be converted to PDF and stored in Supabase Storage
+ * Download receipt PDF to user's device
+ * @param data - Receipt data
+ * @param filename - Optional filename for the download
  */
-export const createReceipt = async (data: ReceiptData): Promise<{ html: string; receiptNumber: string }> => {
-  try {
-    const html = generateReceiptHTML(data);
+export const downloadReceiptPDF = (
+  data: ReceiptData,
+  filename?: string
+): void => {
+  const blob = generateReceiptPDF(data);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || `receipt-${data.receiptNumber}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
-    return {
-      html,
-      receiptNumber: data.receiptNumber,
-    };
-  } catch (error) {
-    console.error("Error creating receipt:", error);
+/**
+ * Get receipt data from payment and invoice records
+ * @param payment - Payment record with relations
+ * @param receipt - Receipt record
+ * @returns Formatted receipt data
+ */
+export const formatReceiptData = (
+  receipt: any,
+  companyInfo?: {
+    name?: string;
+    address?: string;
+    phone?: string;
+    logo?: string;
+  }
+): ReceiptData => {
+  const metadata = receipt.metadata || {};
+  return {
+    receiptNumber: receipt.receipt_number,
+    tenantName: metadata.tenant_name || receipt.tenant_name || 'N/A',
+    propertyName: metadata.property_name || receipt.property_name || 'N/A',
+    unitNumber: metadata.unit_number || receipt.unit_number || 'N/A',
+    houseNumber: metadata.house_number || metadata.unit_number || receipt.unit_number,
+    houseType: metadata.unit_type || 'N/A',
+    amount: receipt.amount_paid || receipt.amount || 0,
+    paymentMethod: receipt.payment_method || 'Paystack',
+    transactionReference: receipt.transaction_reference || metadata.transaction_reference || 'N/A',
+    paidDate: receipt.payment_date || receipt.generated_at || new Date().toISOString(),
+    items: metadata.items || [],
+    companyName: companyInfo?.name || 'Property Management System',
+    companyAddress: companyInfo?.address,
+    companyPhone: companyInfo?.phone,
+    companyLogo: companyInfo?.logo,
+  };
+};
+
+/**
+ * Create receipt record after payment succeeds
+ */
+export const processPaymentWithReceipt = async (
+  userId: string,
+  propertyId: string,
+  unitId: string,
+  paymentAmount: number,
+  paymentMethod: string,
+  transactionReference: string,
+  items: ReceiptItem[],
+  rentPaymentId?: string,
+  billPaymentId?: string
+): Promise<any> => {
+  // receipts.tenant_id references auth.users(id), so use the authenticated user ID
+  const tenantId = userId;
+
+  const [tenantProfileResult, propertyResult, unitResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('first_name, last_name')
+      .eq('id', userId)
+      .maybeSingle(),
+    supabase
+      .from('properties')
+      .select('name')
+      .eq('id', propertyId)
+      .maybeSingle(),
+    supabase
+      .from('units')
+      .select('unit_number, property_unit_types(unit_type_name)')
+      .eq('id', unitId)
+      .maybeSingle(),
+  ]);
+
+  const tenantName = [tenantProfileResult.data?.first_name, tenantProfileResult.data?.last_name]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const propertyName = propertyResult.data?.name || null;
+  // @ts-ignore
+  const unitType = unitResult.data?.property_unit_types?.unit_type_name || null;
+  const unitNumber = unitResult.data?.unit_number || null;
+
+  // Generate a unique receipt number using timestamp + random component to avoid collisions
+  const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const receiptNumber = `RCP-${timestamp}-${randomPart}`;
+
+  console.log('💾 Inserting receipt into database:', {
+    receiptNumber,
+    tenantId,
+    userId,
+    propertyId,
+    unitId,
+    amount: paymentAmount,
+    method: paymentMethod
+  });
+
+  const { data, error } = await supabase
+    .from('receipts')
+    .insert([
+      {
+        receipt_number: receiptNumber,
+        tenant_id: tenantId,
+        generated_by: userId,
+        property_id: propertyId,
+        unit_id: unitId,
+        amount_paid: paymentAmount,
+        payment_method: paymentMethod,
+        payment_date: new Date().toISOString(),
+        transaction_reference: transactionReference,
+        status: 'generated',
+        metadata: {
+          items,
+          tenant_name: tenantName || null,
+          property_name: propertyName,
+          unit_number: unitNumber,
+          house_number: unitNumber,
+          unit_type: unitType,
+          transaction_reference: transactionReference,
+          rent_payment_id: rentPaymentId,
+          bill_payment_id: billPaymentId,
+        },
+      },
+    ])
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('❌ Receipt insert failed:', {
+      code: (error as any)?.code,
+      message: (error as any)?.message,
+      details: (error as any)?.details,
+      hint: (error as any)?.hint,
+      status: (error as any)?.status
+    });
     throw error;
   }
-};
 
-/**
- * Download receipt as HTML file
- */
-export const downloadReceiptHTML = (html: string, receiptNumber: string): void => {
-  const element = document.createElement("a");
-  element.setAttribute(
-    "href",
-    "data:text/html;charset=utf-8," + encodeURIComponent(html)
-  );
-  element.setAttribute("download", `receipt-${receiptNumber}.html`);
-  element.style.display = "none";
-  document.body.appendChild(element);
-  element.click();
-  document.body.removeChild(element);
-};
-
-/**
- * Open receipt in new window for printing/PDF save
- */
-export const openReceiptForPrint = (html: string): void => {
-  const printWindow = window.open("", "_blank");
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-  }
+  console.log('✅ Receipt inserted successfully:', data);
+  return data;
 };

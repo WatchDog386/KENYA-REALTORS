@@ -10,7 +10,7 @@ export interface UserManagementData {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'property_manager' | 'tenant';
+  role: 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'supplier' | 'property_manager' | 'tenant';
   roleSpecificData?: any; // Additional data based on role
 }
 
@@ -302,7 +302,7 @@ export const reactivateUser = async (userId: string): Promise<boolean> => {
  * Get all users with a specific role
  */
 export const getUsersByRole = async (
-  role: 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'property_manager' | 'tenant'
+  role: 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'supplier' | 'property_manager' | 'tenant'
 ) => {
   try {
     const { data, error } = await supabase

@@ -1,351 +1,495 @@
+// src/components/portal/manager/ManagerMaintenance.tsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  Wrench, 
-  AlertTriangle, 
-  Clock, 
-  CheckCircle,
-  Plus,
-  Search,
-  Filter,
-  User,
-  DollarSign,
-  Calendar,
-  Loader2,
-  FileText,
-  Activity
-} from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { useManager } from '@/hooks/useManager';
-import { formatCurrency } from '@/utils/formatCurrency';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Wrench, AlertCircle, Clock, CheckCircle, MessageCircle, Send, User, Home, Calendar, Filter } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
 
-const ManagerMaintenance = () => {
-  const [requests, setRequests] = useState<any[]>([]);
+const ManagerMaintenance: React.FC = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    pending: 0,
-    inProgress: 0,
-    completed: 0,
-    totalCost: 0
-  });
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedReport, setSelectedReport] = useState<any>(null);
-  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Chat State
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [messagesLoading, setMessagesLoading] = useState(false);
+
+  // Update State
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    loadMaintenanceRequests();
+  }, [user?.id]);
+  
+  useEffect(() => {
+     if (selectedRequest) {
+         fetchMessages(selectedRequest.id);
+         
+         // Realtime Chat
+         const channel = supabase
+            .channel(`manager_maintenance_chat_${selectedRequest.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'maintenance_request_messages',
+                    filter: `maintenance_request_id=eq.${selectedRequest.id}`
+                },
+                (payload) => {
+                    fetchMessages(selectedRequest.id);
+                }
+            )
+            .subscribe();
+            
+         return () => { supabase.removeChannel(channel); };
+     } else {
+         setMessages([]);
+     }
+  }, [selectedRequest]);
 
-  const fetchRequests = async () => {
+  const loadMaintenanceRequests = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       
-      // We need more complex join than useManager provides, so querying supabase directly
-      // But filtering by properties managed by this user.
-      
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-
-      // Get properties this manager manages
-      const { data: assignments } = await supabase
-        .from('property_manager_assignments')
-        .select('property_id')
-        .eq('property_manager_id', userData.user.id);
-        
-      const propertyIds = assignments?.map(a => a.property_id) || [];
-
-      if (propertyIds.length === 0) {
-        setRequests([]);
-        setLoading(false);
-        return;
-      }
-
+      // Get all requests for properties managed by this user
       const { data, error } = await supabase
         .from('maintenance_requests')
-        .select(`
-            *,
-            property:properties(id, name, address),
-            unit:units(unit_number),
-            tenant:profiles!maintenance_requests_tenant_id_fkey(first_name, last_name, phone, avatar_url),
-            technician:technicians(
-              id,
-              user:profiles!technicians_user_id_fkey(first_name, last_name, phone, avatar_url)
-            ),
-            completion_report:maintenance_completion_reports(*)
-        `)
-        .in('property_id', propertyIds)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setRequests(data || []);
+      if (error) {
+          console.warn("Error loading requests:", error);
+          setRequests([]);
+          return;
+      }
 
-      // Calculate stats
-      const pending = data?.filter(r => r.status === 'pending').length || 0;
-      const inProgress = data?.filter(r => r.status === 'in_progress' || r.status === 'scheduled' || r.status === 'assigned').length || 0;
-      const completed = data?.filter(r => r.status === 'completed').length || 0;
-      const totalCost = data?.filter(r => r.status === 'completed').reduce((sum, r) => sum + (r.actual_cost || 0), 0) || 0;
+      if (data) {
+          // Manually enrich data to avoid 400 errors from missing relationships
+          const propertyIds = [...new Set(data.map(r => r.property_id).filter(Boolean))];
+          const unitIds = [...new Set(data.map(r => r.unit_id).filter(Boolean))];
+          const userIds = [...new Set(data.map(r => r.user_id).filter(Boolean))];
 
-      setStats({ pending, inProgress, completed, totalCost });
-    } catch (err) {
-      console.error('Error fetching maintenance requests:', err);
-      toast.error('Failed to load maintenance requests');
+          const { data: properties } = await supabase.from('properties').select('id, name').in('id', propertyIds);
+          const { data: units } = await supabase.from('units').select('id, unit_number').in('id', unitIds);
+          const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds);
+
+          const enrichedData = data.map(r => ({
+              ...r,
+              properties: properties?.find(p => p.id === r.property_id) || { name: 'Unknown' },
+              units: units?.find(u => u.id === r.unit_id) || { unit_number: 'N/A' },
+              profiles: profiles?.find(p => p.id === r.user_id) || { first_name: 'Unknown', last_name: '', email: '' }
+          }));
+          
+          setRequests(enrichedData);
+      } else {
+          setRequests([]);
+      }
+    } catch (error) {
+      console.error('Error loading maintenance requests:', error);
     } finally {
       setLoading(false);
     }
   };
+  
+  const fetchMessages = async (requestId: string) => {
+      try {
+          setMessagesLoading(true);
+          const { data, error } = await supabase
+            .from('maintenance_request_messages')
+            .select('*')
+            .eq('maintenance_request_id', requestId)
+            .order('created_at', { ascending: true });
+            
+          if (error) throw error;
+          
+          const rawMsgs = data || [];
+          
+          if (rawMsgs.length > 0) {
+              const senderIds = [...new Set(rawMsgs.map(m => m.sender_id))];
+              const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name').in('id', senderIds);
+              
+              const merged = rawMsgs.map(m => ({
+                  ...m,
+                  sender: profiles?.find(p => p.id === m.sender_id) || { first_name: 'Unknown', last_name: '' }
+              }));
+              setMessages(merged);
+          } else {
+              setMessages([]);
+          }
+      } catch (e) {
+          console.error("Fetch msg error", e);
+      } finally {
+          setMessagesLoading(false);
+      }
+  };
+
+  const handleSendMessage = async () => {
+      if (!newMessage.trim() || !selectedRequest) return;
+      
+      const content = newMessage.trim();
+      
+      // Optimistic
+      const tempMsg = {
+          id: 'temp-' + Date.now(),
+          maintenance_request_id: selectedRequest.id,
+          sender_id: user!.id,
+          message: content,
+          created_at: new Date().toISOString(),
+          sender: { first_name: 'Me', last_name: '' }
+      };
+      setMessages(prev => [...prev, tempMsg]);
+      setNewMessage("");
+      
+      try {
+          const { error } = await supabase.from('maintenance_request_messages').insert({
+              maintenance_request_id: selectedRequest.id,
+              sender_id: user!.id,
+              message: content
+          });
+          
+          if (error) throw error;
+          
+          // Notify Tenant
+          await supabase.from('notifications').insert({
+              recipient_id: selectedRequest.tenant_id,
+              sender_id: user!.id,
+              type: 'maintenance',
+              title: 'Maintenance Update',
+              message: `New message regarding your maintenance request: ${selectedRequest.title}`,
+              related_entity_id: selectedRequest.id,
+              read: false
+          });
+          
+      } catch (e) {
+          console.error("Send error", e);
+          toast.error("Failed to send message");
+          setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
+      }
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+      if (!selectedRequest) return;
+      setUpdating(true);
+      try {
+          const updates: any = { status, updated_at: new Date().toISOString() };
+          if (status === 'in_progress' && scheduleDate) {
+              updates.scheduled_date = scheduleDate;
+          }
+          
+          const { error } = await supabase
+            .from('maintenance_requests')
+            .update(updates)
+            .eq('id', selectedRequest.id);
+            
+          if (error) throw error;
+          
+          toast.success(`Request marked as ${status.replace('_', ' ')}`);
+          
+          // Notify Tenant
+          await supabase.from('notifications').insert({
+              recipient_id: selectedRequest.tenant_id,
+              sender_id: user!.id,
+              type: 'maintenance',
+              title: `Maintenance Request ${status === 'in_progress' ? 'Scheduled' : 'Updated'}`,
+              message: `Your request "${selectedRequest.title}" is now ${status.replace('_', ' ')}. ${status === 'in_progress' && scheduleDate ? `Scheduled for ${new Date(scheduleDate).toLocaleString()}` : ''}`,
+              related_entity_id: selectedRequest.id,
+              read: false
+          });
+          
+          // Update local state
+          setRequests(prev => prev.map(r => r.id === selectedRequest.id ? { ...r, ...updates } : r));
+          setSelectedRequest(prev => ({ ...prev, ...updates }));
+          
+          if (status === 'completed' || status === 'cancelled') {
+              setIsDialogOpen(false);
+          }
+          
+      } catch (e: any) {
+          toast.error("Failed to update: " + e.message);
+      } finally {
+          setUpdating(false);
+      }
+  };
 
   const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'urgent': return <Badge className="bg-red-100 text-red-800 hover:bg-red-200 border-none">Urgent</Badge>;
-      case 'high': return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-200 border-none">High</Badge>;
-      case 'medium': return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-none">Medium</Badge>;
-      case 'low': return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-none">Low</Badge>;
-      default: return <Badge variant="outline">{priority}</Badge>;
-    }
+      const colors = {
+          emergency: 'bg-red-100 text-red-800',
+          high: 'bg-orange-100 text-orange-800',
+          medium: 'bg-yellow-100 text-yellow-800',
+          low: 'bg-blue-100 text-blue-800'
+      };
+      return <Badge variant="outline" className={colors[priority as keyof typeof colors]}>{priority}</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-none"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
-      case 'assigned': return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-none"><User className="w-3 h-3 mr-1" /> Assigned</Badge>;
-      case 'scheduled': return <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200 border-none"><Calendar className="w-3 h-3 mr-1" /> Scheduled</Badge>;
-      case 'in_progress': return <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-none"><Activity className="w-3 h-3 mr-1" /> In Progress</Badge>;
-      case 'completed': return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-none"><CheckCircle className="w-3 h-3 mr-1" /> Completed</Badge>;
-      case 'cancelled': return <Badge variant="secondary">Cancelled</Badge>;
-      default: return <Badge variant="outline">{status}</Badge>;
-    }
+      const colors = {
+          completed: 'bg-green-100 text-green-800',
+          in_progress: 'bg-blue-100 text-blue-800',
+          pending: 'bg-yellow-100 text-yellow-800',
+          cancelled: 'bg-gray-100 text-gray-800'
+      };
+      return <Badge variant="outline" className={colors[status as keyof typeof colors]}>{status.replace('_', ' ')}</Badge>;
   };
-
-  const handleOpenReport = (report: any) => {
-      setSelectedReport(report);
-      setIsReportOpen(true);
-  };
-
-  const filteredRequests = requests.filter(r => 
-      r.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      r.property.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (r.tenant?.first_name + ' ' + r.tenant?.last_name).toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-gray-600">Loading maintenance requests...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-primary to-primary/80 rounded-xl shadow-lg p-6 flex items-center justify-between text-white">
-        <div className="flex items-center gap-4">
-          <div className="bg-white/20 p-3 rounded-lg">
-            <Wrench className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">Maintenance</h1>
-            <p className="text-blue-100 text-sm mt-1">Track repairs and technician reports</p>
-          </div>
+    <div className="p-8 space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+           <h1 className="text-4xl font-light text-[#00356B] tracking-tight flex items-center gap-2">
+             <Wrench className="h-8 w-8" /> Maintenance
+           </h1>
+           <p className="text-gray-600">Manage repair requests and work orders</p>
         </div>
-        <Button className="bg-white text-primary hover:bg-gray-100 shadow-sm" asChild>
-          <Link to="/portal/manager/maintenance/new">
-            <Plus className="w-4 h-4 mr-2" />
-            New Request
-          </Link>
+        <Button onClick={loadMaintenanceRequests} variant="outline" size="sm">
+            <Clock className="w-4 h-4 mr-2" /> Refresh
         </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
-            <p className="text-xs text-gray-500">Awaiting action</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-            <Activity className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.inProgress}</div>
-            <p className="text-xs text-gray-500">Active jobs</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.completed}</div>
-            <p className="text-xs text-gray-500">This month</p>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-            <DollarSign className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalCost)}</div>
-            <p className="text-xs text-gray-500">Completed work</p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle>Maintenance Requests</CardTitle>
-              <CardDescription>
-                {requests.length} total requests found
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input 
-                   placeholder="Search requests..." 
-                   className="pl-9 w-full sm:w-64" 
-                   value={searchTerm}
-                   onChange={e => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-            </div>
-          </div>
+          <CardTitle>Active Requests</CardTitle>
+          <CardDescription>Overview of all maintenance tickets</CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="space-y-4">
-                {filteredRequests.map(req => (
-                    <div key={req.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div className="space-y-1 flex-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-lg">{req.title}</span>
-                                    {getPriorityBadge(req.priority)}
-                                    {getStatusBadge(req.status)}
-                                </div>
-                                <div className="flex items-center gap-4 text-sm text-gray-500">
-                                    <span className="flex items-center gap-1">
-                                        <Wrench className="w-3 h-3" />
-                                        Unit {req.unit?.unit_number || 'General'}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Calendar className="w-3 h-3" />
-                                        {new Date(req.created_at).toLocaleDateString()}
-                                    </span>
-                                    {req.technician && (
-                                        <span className="flex items-center gap-1 text-primary font-medium">
-                                            <User className="w-3 h-3" />
-                                            Start by: {req.technician.user.first_name} {req.technician.user.last_name}
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-sm text-gray-600 mt-2">{req.description}</p>
-                            </div>
-                            
-                            <div className="flex items-center gap-3 w-full md:w-auto">
-                                {req.status === 'completed' && req.completion_report && (
-                                    <Button variant="outline" size="sm" onClick={() => handleOpenReport(req.completion_report)}>
-                                        <FileText className="w-4 h-4 mr-2" /> View Report
-                                    </Button>
-                                )}
-                                <Button variant="ghost" size="sm">Details</Button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                
-                {filteredRequests.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                        No requests found matching your search.
-                    </div>
-                )}
+          {loading ? (
+             <div className="flex justify-center p-8"><Loader2 className="animate-spin text-blue-600" /></div>
+          ) : requests.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 bg-slate-50 rounded-lg border border-dashed border-gray-200">
+              <Wrench className="h-12 w-12 mx-auto mb-2 opacity-20" />
+              <p>No maintenance requests found.</p>
             </div>
+          ) : (
+             <Table>
+                 <TableHeader>
+                     <TableRow>
+                         <TableHead>Priority</TableHead>
+                         <TableHead>Issue / Property</TableHead>
+                         <TableHead>Tenant</TableHead>
+                         <TableHead>Status</TableHead>
+                         <TableHead>Requested</TableHead>
+                         <TableHead></TableHead>
+                     </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                     {requests.map(req => (
+                         <TableRow key={req.id} className="cursor-pointer hover:bg-slate-50" onClick={() => {
+                             setSelectedRequest(req);
+                             setScheduleDate(req.scheduled_date ? new Date(req.scheduled_date).toISOString().slice(0, 16) : "");
+                             setIsDialogOpen(true);
+                         }}>
+                             <TableCell>{getPriorityBadge(req.priority)}</TableCell>
+                             <TableCell>
+                                 <div className="font-medium text-gray-900">{req.title}</div>
+                                 <div className="text-xs text-gray-500">{req.properties?.name} {req.units?.unit_number ? ` • Unit ${req.units.unit_number}` : ''}</div>
+                             </TableCell>
+                             <TableCell>
+                                 <div className="text-sm">{req.profiles?.first_name} {req.profiles?.last_name}</div>
+                             </TableCell>
+                             <TableCell>{getStatusBadge(req.status)}</TableCell>
+                             <TableCell className="text-gray-500 text-xs">
+                                 {new Date(req.created_at).toLocaleDateString()}
+                             </TableCell>
+                             <TableCell>
+                                 <Button variant="ghost" size="sm">View</Button>
+                             </TableCell>
+                         </TableRow>
+                     ))}
+                 </TableBody>
+             </Table>
+          )}
         </CardContent>
       </Card>
 
-      {/* Completion Report Dialog */}
-      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
-          <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                  <DialogTitle>Completion Report</DialogTitle>
-                  <DialogDescription>Details submitted by the technician.</DialogDescription>
-              </DialogHeader>
-              {selectedReport && (
-                  <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                          <div>
-                              <p className="text-sm text-gray-500">Actual Cost</p>
-                              <p className="text-xl font-bold">{formatCurrency(selectedReport.actual_cost)}</p>
-                          </div>
-                          <div>
-                              <p className="text-sm text-gray-500">Hours Spent</p>
-                              <p className="text-xl font-bold">{selectedReport.hours_spent} hrs</p>
+      {/* Main Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 bg-gray-50">
+              {selectedRequest && (
+                  <div className="flex flex-col h-full max-h-[90vh]">
+                      <div className="p-6 border-b bg-white">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <h2 className="text-xl font-bold text-gray-900">{selectedRequest.title}</h2>
+                                  <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
+                                      <Home size={14} /> {selectedRequest.properties?.name} • Unit {selectedRequest.units?.unit_number}
+                                  </p>
+                              </div>
+                              {getStatusBadge(selectedRequest.status)}
                           </div>
                       </div>
                       
-                      <div>
-                          <p className="font-medium mb-1">Materials Used</p>
-                          <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">{selectedReport.materials_used || "None listed."}</p>
-                      </div>
+                      <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                          
+                          {/* Left Panel: Info & Actions */}
+                          <div className="w-full md:w-1/3 p-6 overflow-y-auto border-r border-gray-200 bg-white">
+                              <div className="space-y-6">
+                                  <div>
+                                      <label className="text-xs font-bold text-gray-400 uppercase">Tenant</label>
+                                      <div className="flex items-center gap-2 mt-2">
+                                          <div className="bg-gray-100 p-2 rounded-full"><User size={16} /></div>
+                                          <div>
+                                              <p className="text-sm font-medium">{selectedRequest.profiles?.first_name} {selectedRequest.profiles?.last_name}</p>
+                                              <p className="text-xs text-gray-500">{selectedRequest.profiles?.email}</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  <div>
+                                       <label className="text-xs font-bold text-gray-400 uppercase">Description</label>
+                                       <p className="text-sm text-gray-700 mt-2 p-3 bg-gray-50 rounded-lg border border-gray-100 leading-relaxed">
+                                           {selectedRequest.description}
+                                       </p>
+                                  </div>
 
-                      <div>
-                          <p className="font-medium mb-1">Technician Notes</p>
-                          <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded">{selectedReport.notes || "No notes."}</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                          {selectedReport.before_work_image_url && (
-                              <div>
-                                  <p className="font-medium mb-2 text-sm">Before</p>
-                                  <img 
-                                      src={selectedReport.before_work_image_url} 
-                                      alt="Before Work" 
-                                      className="w-full h-32 object-cover rounded-md border" 
-                                      onError={(e) => (e.currentTarget.src = 'https://placehold.co/400x300?text=No+Image')}
-                                  />
+                                  {selectedRequest.images && selectedRequest.images.length > 0 && (
+                                     <div>
+                                        <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Attachments</label>
+                                        <div className="flex gap-2 overflow-x-auto pb-2">
+                                            {selectedRequest.images.map((img: string, i: number) => (
+                                                <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="block w-16 h-16 rounded-lg bg-gray-100 border overflow-hidden flex-shrink-0">
+                                                    <img src={img} alt="Evidence" className="w-full h-full object-cover" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                     </div>
+                                  )}
+                                  
+                                  <div className="pt-6 border-t space-y-4">
+                                      <h4 className="font-semibold text-sm">Actions</h4>
+                                      
+                                      {selectedRequest.status !== 'completed' && selectedRequest.status !== 'cancelled' && (
+                                          <>
+                                              <div className="space-y-2">
+                                                  <label className="text-xs text-gray-500">Schedule Visit</label>
+                                                  <Input 
+                                                     type="datetime-local" 
+                                                     value={scheduleDate} 
+                                                     onChange={(e) => setScheduleDate(e.target.value)}
+                                                     className="text-xs"
+                                                  />
+                                              </div>
+                                              <Button 
+                                                 className="w-full bg-blue-600 hover:bg-blue-700" 
+                                                 size="sm"
+                                                 onClick={() => handleUpdateStatus('in_progress')}
+                                                 disabled={updating}
+                                              >
+                                                  {updating ? <Loader2 className="animate-spin w-4 h-4" /> : 'Schedule / Start Work'}
+                                              </Button>
+                                              <Button
+                                                  className="w-full bg-green-600 hover:bg-green-700"
+                                                  size="sm"
+                                                  onClick={() => handleUpdateStatus('completed')}
+                                                  disabled={updating}
+                                              >
+                                                   Mark Completed
+                                              </Button>
+                                          </>
+                                      )}
+                                      
+                                      {selectedRequest.status === 'completed' && (
+                                          <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm flex items-center gap-2">
+                                              <CheckCircle size={16} /> Work Completed
+                                          </div>
+                                      )}
+                                  </div>
                               </div>
-                          )}
-                          {selectedReport.after_repair_image_url && (
-                              <div>
-                                  <p className="font-medium mb-2 text-sm">After</p>
-                                  <img 
-                                      src={selectedReport.after_repair_image_url} 
-                                      alt="After Repair" 
-                                      className="w-full h-32 object-cover rounded-md border" 
-                                      onError={(e) => (e.currentTarget.src = 'https://placehold.co/400x300?text=No+Image')}
-                                  />
+                          </div>
+                          
+                          {/* Right Panel: Chat */}
+                          <div className="w-full md:w-2/3 flex flex-col bg-gray-50">
+                              <div className="p-3 border-b bg-white/50 backdrop-blur flex items-center gap-2">
+                                  <MessageCircle size={16} className="text-blue-600" />
+                                  <span className="text-sm font-medium text-gray-700">Message Thread</span>
                               </div>
-                          )}
+                              
+                              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                  {messages.length === 0 && (
+                                      <div className="text-center py-12 text-gray-400">
+                                          <p className="text-sm">No communication history</p>
+                                      </div>
+                                  )}
+                                  {messages.map((msg) => {
+                                      const isMe = user?.id && msg.sender_id === user.id;
+                                      return (
+                                          <div key={msg.id} className={`flex flex-col max-w-[85%] ${isMe ? 'items-end ml-auto' : 'items-start'}`}>
+                                              <div className={`rounded-2xl p-3 text-sm shadow-sm leading-relaxed ${
+                                                  isMe 
+                                                  ? 'bg-blue-600 text-white rounded-tr-none' 
+                                                  : 'bg-white border border-gray-200 text-gray-700 rounded-tl-none'
+                                              }`}>
+                                                  {!isMe && (
+                                                      <p className="font-bold text-[10px] mb-1 opacity-50 uppercase tracking-widest">
+                                                         {msg.sender?.first_name || 'Tenant'}
+                                                      </p>
+                                                  )}
+                                                  {msg.message}
+                                              </div>
+                                              <span className="text-[10px] text-gray-400 mt-1 px-1">
+                                                  {new Date(msg.created_at).toLocaleString()}
+                                              </span>
+                                          </div>
+                                      )
+                                  })}
+                              </div>
+                              
+                              <div className="p-3 bg-white border-t">
+                                  <form 
+                                    className="flex gap-2"
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleSendMessage();
+                                    }}
+                                  >
+                                      <Input 
+                                          placeholder="Type a message..." 
+                                          value={newMessage}
+                                          onChange={(e) => setNewMessage(e.target.value)}
+                                          disabled={updating}
+                                          className="bg-gray-50 border-gray-200"
+                                      />
+                                      <Button type="submit" size="icon" disabled={!newMessage.trim() || updating} className="bg-blue-600">
+                                          <Send size={16} />
+                                      </Button>
+                                  </form>
+                              </div>
+                          </div>
                       </div>
                   </div>
               )}
-              <DialogFooter>
-                  <Button onClick={() => setIsReportOpen(false)}>Close</Button>
-                  {/* Could add Approve/Invoice buttons here later */}
-              </DialogFooter>
           </DialogContent>
       </Dialog>
     </div>

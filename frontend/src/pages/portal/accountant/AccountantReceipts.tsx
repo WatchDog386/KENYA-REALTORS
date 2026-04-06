@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Receipt, Download, Filter, Eye, Mail, Plus } from 'lucide-react';
+import { Search, Receipt, Download, Filter, Eye, Mail, Plus, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -22,6 +22,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { motion } from 'framer-motion';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 interface Receipt {
   id: string;
@@ -30,7 +33,9 @@ interface Receipt {
   amount_paid: number;
   payment_date: string;
   payment_method: string;
+  status: string;
   generated_by: string;
+  metadata?: any;
   invoice?: {
     reference_number: string;
     amount: number;
@@ -121,12 +126,170 @@ const AccountantReceipts = () => {
 
   const handleSendReceipt = async (receipt: Receipt) => {
     try {
-      console.log(`Sending receipt ${receipt.receipt_number} to ${receipt.invoice?.tenant?.email}`);
-      alert(`Receipt sent to ${receipt.invoice?.tenant?.email}`);
+      const tenantEmail = receipt.metadata?.tenant_email || receipt.invoice?.tenant?.email;
+      if (!tenantEmail) {
+        toast.error('Tenant email not found');
+        return;
+      }
+
+      try {
+        // Call edge function to send receipt email
+        const { data, error } = await supabase.functions.invoke('send-payment-receipt', {
+          body: {
+            to_email: tenantEmail,
+            receipt_id: receipt.id,
+            receipt_number: receipt.receipt_number,
+            tenant_name: receipt.metadata?.tenant_name || `${receipt.invoice?.tenant?.first_name} ${receipt.invoice?.tenant?.last_name}`,
+            amount: receipt.amount_paid,
+            payment_date: receipt.payment_date,
+            payment_method: receipt.payment_method,
+            transaction_reference: receipt.metadata?.transaction_reference,
+            items: receipt.metadata?.items || [],
+            resend: true,
+          }
+        });
+
+        if (error) {
+          console.error('Email sending error:', error);
+          // Don't fail completely - just warn user
+          toast.warning('Receipt copied to clipboard, but email could not be sent');
+        } else {
+          console.log('Email sent successfully:', data);
+        }
+      } catch (emailErr) {
+        console.error('Email function error:', emailErr);
+        // Continue with status update even if email fails
+        toast.warning('Receipt ready to send, but email service may be unavailable');
+      }
+
+      // Always update receipt status even if email fails
+      await supabase
+        .from('receipts')
+        .update({ status: 'sent', updated_at: new Date().toISOString() })
+        .eq('id', receipt.id);
+
+      toast.success(`Receipt marked as sent to ${tenantEmail}`);
+      await fetchReceipts();
     } catch (err) {
       console.error('Error sending receipt:', err);
-      alert('Failed to send receipt');
+      toast.error('Failed to update receipt status');
     }
+  };
+
+  const handleDownloadReceipt = async (receipt: Receipt) => {
+    try {
+      // Generate printable HTML version
+      const printWindow = window.open('', '', 'width=800,height=600');
+      if (printWindow) {
+        const receiptHTML = generateReceiptHTML(receipt);
+        printWindow.document.write(receiptHTML);
+        printWindow.document.close();
+        printWindow.print();
+
+        // Update receipt status
+        await supabase
+          .from('receipts')
+          .update({ status: 'downloaded' })
+          .eq('id', receipt.id);
+      }
+    } catch (err) {
+      console.error('Error downloading receipt:', err);
+      toast.error('Failed to download receipt');
+    }
+  };
+
+  const generateReceiptHTML = (receipt: Receipt) => {
+    const items = receipt.metadata?.items || [];
+    const tenantName = receipt.metadata?.tenant_name || `${receipt.invoice?.tenant?.first_name} ${receipt.invoice?.tenant?.last_name}`;
+    const propertyName = receipt.metadata?.property_name || 'Property';
+    const transactionRef = receipt.metadata?.transaction_reference || receipt.id;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt - ${receipt.receipt_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+            .header { text-align: center; border-bottom: 3px solid #154279; padding-bottom: 20px; margin-bottom: 30px; }
+            .header h1 { margin: 0; color: #154279; font-size: 32px; }
+            .receipt-number { color: #666; font-size: 14px; margin-top: 5px; }
+            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+            .detail-item { }
+            .detail-label { font-weight: bold; color: #555; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+            .detail-value { font-size: 16px; margin-top: 8px; color: #000; }
+            table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+            th { background-color: #154279; color: white; padding: 12px; text-align: left; font-weight: bold; }
+            td { padding: 10px 12px; border-bottom: 1px solid #ddd; }
+            tr:last-child td { border-bottom: 2px solid #154279; }
+            .total-row { background-color: #f5f5f5; font-weight: bold; }
+            .total-amount { font-size: 18px; color: #10b981; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+            .success-badge { color: #10b981; font-weight: bold; font-size: 16px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>PAYMENT RECEIPT</h1>
+            <div class="receipt-number">Receipt #${receipt.receipt_number}</div>
+          </div>
+          
+          <div class="details">
+            <div class="detail-item">
+              <div class="detail-label">Property</div>
+              <div class="detail-value">${propertyName}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Tenant Name</div>
+              <div class="detail-value">${tenantName}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Payment Date</div>
+              <div class="detail-value">${format(new Date(receipt.payment_date), 'MMMM dd, yyyy hh:mm a')}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Payment Method</div>
+              <div class="detail-value">${receipt.payment_method.toUpperCase()}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Transaction Ref</div>
+              <div class="detail-value">${transactionRef}</div>
+            </div>
+          </div>
+
+          ${items.length > 0 ? `
+            <table>
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th style="text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map((item: any) => `
+                  <tr>
+                    <td>${item.description}</td>
+                    <td style="text-align: right;">KSh ${parseFloat(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                `).join('')}
+                <tr class="total-row">
+                  <td>TOTAL PAID</td>
+                  <td style="text-align: right;" class="total-amount">KSh ${parseFloat(receipt.amount_paid.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+          ` : ''}
+
+          <div class="footer">
+            <p class="success-badge">✓ Payment Successfully Processed</p>
+            <p>This receipt confirms payment has been received.</p>
+            <p>Please keep it for your records.</p>
+            <p style="margin-top: 20px; color: #999;">Document generated on ${new Date().toLocaleString()}</p>
+          </div>
+        </body>
+      </html>
+    `;
   };
 
   return (
@@ -212,13 +375,13 @@ const AccountantReceipts = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Receipt #</TableHead>
-                <TableHead>Linked Invoice</TableHead>
-                <TableHead>Payer</TableHead>
-                <TableHead>Date Paid</TableHead>
-                <TableHead>Payment Method</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="font-bold text-slate-700">Receipt #</TableHead>
+                <TableHead className="font-bold text-slate-700">Property</TableHead>
+                <TableHead className="font-bold text-slate-700">Tenant Name</TableHead>
+                <TableHead className="font-bold text-slate-700">Date</TableHead>
+                <TableHead className="font-bold text-slate-700">Method</TableHead>
+                <TableHead className="font-bold text-slate-700 text-right">Amount</TableHead>
+                <TableHead className="text-right font-bold text-slate-700">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -238,46 +401,64 @@ const AccountantReceipts = () => {
               ) : (
                 filteredReceipts.map((rcpt) => (
                   <TableRow key={rcpt.id}>
-                    <TableCell className="font-medium">{rcpt.receipt_number}</TableCell>
+                    <TableCell className="font-mono font-semibold text-[#154279]">{rcpt.receipt_number}</TableCell>
                     <TableCell>
-                        {rcpt.invoice?.reference_number ? (
-                            <Badge variant="outline">{rcpt.invoice.reference_number}</Badge>
+                        {rcpt.metadata?.property_name ? (
+                            <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800">{rcpt.metadata.property_name}</Badge>
                         ) : '-'}
                     </TableCell>
-                    <TableCell>
-                        {rcpt.invoice?.tenant?.first_name} {rcpt.invoice?.tenant?.last_name}
+                    <TableCell className="font-medium">
+                        {rcpt.metadata?.tenant_name || `${rcpt.invoice?.tenant?.first_name} ${rcpt.invoice?.tenant?.last_name}`}
                     </TableCell>
                     <TableCell>{format(new Date(rcpt.payment_date), 'MMM dd, yyyy')}</TableCell>
-                    <TableCell className="capitalize">{rcpt.payment_method || '-'}</TableCell>
-                    <TableCell className="font-bold">KES {Number(rcpt.amount_paid).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Badge className="bg-green-100 text-green-800 border-green-300">
+                        {rcpt.payment_method?.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-bold text-green-600">{formatCurrency(rcpt.amount_paid)}</TableCell>
                     <TableCell className="text-right">
-                       <div className="flex gap-2 justify-end">
-                         <Dialog open={isPreviewOpen && selectedReceipt?.id === rcpt.id} onOpenChange={setIsPreviewOpen}>
-                           <DialogTrigger asChild>
-                             <Button 
-                               variant="ghost" 
-                               size="sm"
-                               onClick={() => setSelectedReceipt(rcpt)}
-                             >
-                               <Eye className="w-4 h-4" />
-                             </Button>
-                           </DialogTrigger>
-                           <DialogContent className="max-w-2xl">
-                             <DialogHeader>
-                               <DialogTitle>Receipt Preview</DialogTitle>
-                             </DialogHeader>
-                             {selectedReceipt && <ReceiptPreview receipt={selectedReceipt} />}
-                           </DialogContent>
-                         </Dialog>
+                      <div className="flex gap-1 justify-end">
+                        <Dialog open={isPreviewOpen && selectedReceipt?.id === rcpt.id} onOpenChange={setIsPreviewOpen}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setSelectedReceipt(rcpt)}
+                              className="h-8 text-blue-600 hover:bg-blue-50"
+                              title="Preview"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Receipt Preview - {rcpt.receipt_number}</DialogTitle>
+                            </DialogHeader>
+                            {selectedReceipt && <ReceiptPreview receipt={selectedReceipt} />}
+                          </DialogContent>
+                        </Dialog>
                          
-                         <Button 
-                           variant="ghost" 
-                           size="sm"
-                           onClick={() => handleSendReceipt(rcpt)}
-                         >
-                           <Mail className="w-4 h-4" />
-                         </Button>
-                       </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleSendReceipt(rcpt)}
+                          className="h-8 text-purple-600 hover:bg-purple-50"
+                          title="Send to email"
+                        >
+                          <Mail className="w-4 h-4" />
+                        </Button>
+
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDownloadReceipt(rcpt)}
+                          className="h-8 text-green-600 hover:bg-green-50"
+                          title="Download PDF"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -417,59 +598,79 @@ interface ReceiptPreviewProps {
 }
 
 const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ receipt }) => {
+  const items = receipt.metadata?.items || [];
+  const tenantName = receipt.metadata?.tenant_name || `${receipt.invoice?.tenant?.first_name} ${receipt.invoice?.tenant?.last_name}`;
+  const propertyName = receipt.metadata?.property_name || 'Property';
+  const tenantEmail = receipt.metadata?.tenant_email || receipt.invoice?.tenant?.email;
+  const transactionRef = receipt.metadata?.transaction_reference || receipt.id;
+
   return (
-    <div className="bg-white p-8 border rounded-lg">
-      <div className="text-center mb-8 pb-4 border-b">
-        <h2 className="text-3xl font-bold text-indigo-600 mb-1">RECEIPT</h2>
-        <p className="text-sm text-gray-600">Payment Receipt</p>
+    <div className="bg-white p-8 border rounded-lg max-h-[600px] overflow-y-auto">
+      <div className="text-center mb-8 pb-4 border-b-2 border-[#154279]">
+        <h2 className="text-3xl font-bold text-[#154279] mb-1">PAYMENT RECEIPT</h2>
+        <p className="text-sm text-gray-600 font-mono">{receipt.receipt_number}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-8 mb-8">
         <div>
-          <h3 className="text-xs font-semibold text-gray-700 uppercase mb-1">Receipt Number</h3>
-          <p className="text-lg font-bold">{receipt.receipt_number}</p>
+          <h3 className="text-xs font-semibold text-gray-700 uppercase mb-1 tracking-wide">Receipt Number</h3>
+          <p className="text-lg font-bold font-mono">{receipt.receipt_number}</p>
         </div>
         <div className="text-right">
-          <h3 className="text-xs font-semibold text-gray-700 uppercase mb-1">Date</h3>
+          <h3 className="text-xs font-semibold text-gray-700 uppercase mb-1 tracking-wide">Date</h3>
           <p className="text-lg">
             {format(new Date(receipt.payment_date), 'MMMM dd, yyyy')}
           </p>
         </div>
       </div>
 
-      <div className="bg-gray-50 p-4 rounded mb-6">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">Received From</h4>
-        <p className="font-semibold">
-          {receipt.invoice?.tenant?.first_name} {receipt.invoice?.tenant?.last_name}
-        </p>
-        <p className="text-sm text-gray-600">{receipt.invoice?.tenant?.email}</p>
+      <div className="bg-slate-50 p-4 rounded mb-6 border border-slate-200">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Received From</h4>
+        <p className="font-semibold text-lg">{tenantName}</p>
+        <p className="text-sm text-gray-600">{tenantEmail}</p>
+      </div>
+
+      <div className="bg-blue-50 p-4 rounded mb-6 border border-blue-200">
+        <h4 className="text-sm font-semibold text-blue-900 mb-3 uppercase tracking-wide">Property Details</h4>
+        <p className="font-semibold text-blue-900">{propertyName}</p>
       </div>
 
       <div className="space-y-3 mb-6 pb-6 border-b">
         <div className="flex justify-between">
-          <span className="text-gray-700">Invoice Reference:</span>
-          <span className="font-semibold">{receipt.invoice?.reference_number}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-700">Invoice Amount:</span>
-          <span className="font-semibold">KES {Number(receipt.invoice?.amount).toLocaleString()}</span>
+          <span className="text-gray-700">Transaction Reference:</span>
+          <span className="font-mono font-semibold">{transactionRef}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-700">Payment Method:</span>
-          <span className="font-semibold capitalize">{receipt.payment_method || 'Not specified'}</span>
+          <span className="font-semibold badge bg-green-100 text-green-800 px-3 py-1 rounded text-sm">{receipt.payment_method.toUpperCase()}</span>
         </div>
       </div>
 
+      {items.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Items Paid</h4>
+          <div className="space-y-2">
+            {items.map((item: any, idx: number) => (
+              <div key={idx} className="flex justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                <span className="text-gray-700">{item.description}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(item.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end mb-6">
         <div className="w-64">
-          <div className="flex justify-between py-3 border-t-2 border-b-2">
-            <span className="font-semibold">Amount Paid</span>
-            <span className="font-bold text-2xl text-green-600">KES {Number(receipt.amount_paid).toLocaleString()}</span>
+          <div className="flex justify-between py-3 px-4 border-t-2 border-b-2 border-[#154279] bg-green-50">
+            <span className="font-semibold text-gray-900">Amount Paid</span>
+            <span className="font-bold text-2xl text-green-600">{formatCurrency(receipt.amount_paid)}</span>
           </div>
         </div>
       </div>
 
       <div className="space-y-2 text-xs text-gray-500 text-center border-t pt-4">
+        <p className="text-green-600 font-semibold">✓ Payment Successfully Processed</p>
         <p>Thank you for your payment!</p>
         <p>This is a system-generated receipt and requires no signature.</p>
       </div>

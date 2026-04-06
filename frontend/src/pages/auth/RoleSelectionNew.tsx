@@ -1,5 +1,5 @@
 // src/pages/auth/RoleSelection.tsx - Updated with new roles
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -13,13 +13,40 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import { technicianService } from '@/services/technicianService';
+import { TechnicianCategory } from '@/types/newRoles';
 
 const RoleSelection = () => {
   const navigate = useNavigate();
   const { user, updateUserRole } = useAuth();
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [selectedTechnicianCategory, setSelectedTechnicianCategory] = useState<string>('');
+  const [technicianCategories, setTechnicianCategories] = useState<TechnicianCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+
+  // Load technician categories when component mounts
+  useEffect(() => {
+    loadTechnicianCategories();
+  }, []);
+
+  const loadTechnicianCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const categories = await technicianService.getCategories();
+      setTechnicianCategories(categories);
+    } catch (error) {
+      console.error('Error loading technician categories:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load technician categories.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   const roles = [
     {
@@ -105,9 +132,26 @@ const RoleSelection = () => {
   const handleContinue = async () => {
     if (!selectedRole) return;
     
+    // Validate technician category selection
+    if (selectedRole === 'technician' && !selectedTechnicianCategory) {
+      toast({
+        title: "Category Required",
+        description: "Please select your technician specialty category.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
-      await updateUserRole(selectedRole);
+      // For technicians, pass category information
+      if (selectedRole === 'technician') {
+        await updateUserRole(selectedRole, {
+          category_id: selectedTechnicianCategory
+        });
+      } else {
+        await updateUserRole(selectedRole);
+      }
       
       toast({
         title: "Role Updated",
@@ -182,7 +226,13 @@ const RoleSelection = () => {
             return (
               <div
                 key={role.id}
-                onClick={() => handleRoleSelect(role.id)}
+                onClick={() => {
+                  handleRoleSelect(role.id);
+                  // Reset technician category when changing roles
+                  if (role.id !== 'technician') {
+                    setSelectedTechnicianCategory('');
+                  }
+                }}
                 className={`relative p-6 rounded-xl cursor-pointer transition-all transform hover:scale-105 border-2 ${
                   isSelected
                     ? 'border-white bg-white/10 ring-2 ring-white/30 shadow-xl'
@@ -227,7 +277,47 @@ const RoleSelection = () => {
           })}
         </div>
 
-        {/* Action Buttons */}
+        {/* Technician Category Selection - Shown when technician is selected */}
+        {selectedRole === 'technician' && (
+          <div className="mb-10 p-6 bg-slate-800 rounded-lg border border-orange-500/50">
+            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              <Wrench className="w-6 h-6 text-orange-400" />
+              Select Your Specialty Category
+            </h2>
+            <p className="text-slate-300 mb-6">
+              As a technician, you must specialize in one of the categories below. You'll receive maintenance requests in your specialty area.
+            </p>
+
+            {loadingCategories ? (
+              <div className="text-center text-slate-400">Loading categories...</div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {technicianCategories.map((category) => (
+                  <div
+                    key={category.id}
+                    onClick={() => setSelectedTechnicianCategory(category.id)}
+                    className={`p-4 rounded-lg cursor-pointer transition-all border-2 ${
+                      selectedTechnicianCategory === category.id
+                        ? 'bg-orange-500/20 border-orange-400 ring-2 ring-orange-400/50'
+                        : 'bg-slate-700 border-slate-600 hover:border-orange-400'
+                    }`}
+                  >
+                    <h3 className="font-semibold text-white mb-2 capitalize">{category.name}</h3>
+                    <p className="text-sm text-slate-300">{category.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selectedTechnicianCategory && (
+              <div className="mt-4 p-3 bg-green-500/20 border border-green-500 rounded-lg">
+                <p className="text-green-200 font-medium">
+                  ✓ Category selected: <span className="capitalize">{technicianCategories.find(c => c.id === selectedTechnicianCategory)?.name}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex justify-center gap-4">
           <Button
             onClick={handleGoBack}

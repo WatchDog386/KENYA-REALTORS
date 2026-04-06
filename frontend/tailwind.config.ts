@@ -1,11 +1,15 @@
 import type { Config } from "tailwindcss";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 export default {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
+    path.join(configDir, "pages/**/*.{ts,tsx}").replace(/\\/g, "/"),
+    path.join(configDir, "components/**/*.{ts,tsx}").replace(/\\/g, "/"),
+    path.join(configDir, "app/**/*.{ts,tsx}").replace(/\\/g, "/"),
+    path.join(configDir, "src/**/*.{ts,tsx}").replace(/\\/g, "/"),
   ],
   safelist: [
     "text-black",

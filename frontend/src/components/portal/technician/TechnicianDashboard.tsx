@@ -554,6 +554,12 @@ export const TechnicianDashboard: React.FC = () => {
                                 <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
                                    <span className="flex items-center gap-1"><MapPin size={12} /> {req.property.name}</span>
                                    {req.unit && <span>Unit {req.unit.unit_number}</span>}
+                                   {(req.tenant?.first_name || req.tenant?.phone) && (
+                                     <span>
+                                       Tenant: {`${req.tenant?.first_name || ''} ${req.tenant?.last_name || ''}`.trim() || 'N/A'}
+                                       {req.tenant?.phone ? ` (${req.tenant.phone})` : ''}
+                                     </span>
+                                   )}
                                    {req.scheduled_date && (
                                      <span className="text-[#F96302] flex items-center gap-1">
                                         <Calendar size={12} /> {new Date(req.scheduled_date).toLocaleDateString()}

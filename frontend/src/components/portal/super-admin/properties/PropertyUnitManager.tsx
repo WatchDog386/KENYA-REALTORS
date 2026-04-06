@@ -53,11 +53,11 @@ function cn(...inputs: any[]) {
 // --- GLOBAL STYLES ---
 const GlobalStyles = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
     
-    body { font-family: 'Nunito', sans-serif; }
-    .font-nunito { font-family: 'Nunito', sans-serif; }
-    h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
+        body { font-family: 'Poppins', sans-serif; }
+        .font-poppins { font-family: 'Poppins', sans-serif; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', sans-serif; }
     
     .custom-scroll::-webkit-scrollbar { width: 6px; }
     .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -70,6 +70,12 @@ const THEME = {
   primary: "#154279",
   secondary: "#F96302",
 };
+
+const PANEL_HEADER_CLASS =
+    "flex items-center justify-between bg-[#154279] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white";
+
+const INPUT_CLASS_NAME =
+    "h-9 rounded-none border border-[#b9c3cf] bg-white px-3 text-[12px] text-[#243041] focus-visible:ring-0";
 
 interface PropertyUnitManagerProps {
   property: Property;
@@ -668,18 +674,18 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
   return (
     <>
     <GlobalStyles />
-    <div className="min-h-screen pb-20 animate-in fade-in duration-500 bg-[#F5F8FA] font-nunito">
+        <div className="min-h-screen bg-[#d7dce1] pb-10 font-poppins text-[#243041]">
       
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#154279] rounded-b-[2.5rem] shadow-xl mb-12 min-h-[40vh] flex items-center -mx-6 -mt-6 lg:-mx-0 lg:-mt-0">
+            <section className="relative mb-3 overflow-hidden border border-[#bcc3cd] bg-[#eef1f4]">
         <HeroBackground />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#154279] via-[#154279]/95 to-blue-900/80" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#eef1f4]/95 to-[#e4e9ef]/95" />
         
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto px-6 w-full pt-16">
+                <div className="relative z-10 flex w-full max-w-[1500px] flex-col gap-4 px-4 py-4 md:mx-auto md:flex-row md:items-center md:justify-between md:px-6">
           <div className="flex items-center gap-6">
              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button variant="ghost" size="icon" onClick={onBack} className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl h-12 w-12 shadow-md backdrop-blur-sm">
-                    <ArrowLeft className="w-6 h-6" />
+                                <Button variant="outline" size="icon" onClick={onBack} className="h-9 w-9 rounded-none border border-[#b6bec8] bg-white text-[#465870] hover:bg-[#f5f7fa]">
+                                        <ArrowLeft className="h-4 w-4" />
                 </Button>
              </motion.div>
              
@@ -689,16 +695,16 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                     animate={{ opacity: 1, x: 0 }}
                     className="flex items-center gap-2 mb-2"
                 >
-                    <div className="h-[2px] w-8 bg-[#F96302]"></div>
-                    <span className="text-[11px] font-bold text-[#F96302] uppercase tracking-[0.2em]">{property.type || 'Property'} Management</span>
+                          <div className="h-[2px] w-8 bg-[#154279]"></div>
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#154279]">{property.type || 'Property'} Management</span>
                 </motion.div>
                 
-                <h1 className="text-3xl md:text-5xl font-black text-white leading-tight tracking-tight mb-2">
-                {property.name} <span className="text-[#F96302]">Units</span>
+                     <h1 className="mb-1 text-3xl font-bold leading-tight tracking-tight text-[#1f2937] md:text-4xl">
+                     {property.name} <span className="text-[#154279]">Units</span>
                 </h1>
                 
-                <p className="text-blue-100/80 text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                   <Building className="w-4 h-4 text-[#F96302]" />
+                     <p className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-[#5f6b7c]">
+                         <Building className="h-4 w-4 text-[#154279]" />
                    {property.location}
                 </p>
              </div>
@@ -709,7 +715,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setIsManageTypesOpen(true)}
-                className="px-5 py-3 rounded-lg font-bold text-[11px] uppercase tracking-[0.15em] transition-all flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/40 shadow-lg backdrop-blur-sm"
+                     className="flex h-9 items-center gap-2 border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#10335f]"
              >
                 <Settings2 className="w-4 h-4" />
                 Manage Types
@@ -718,7 +724,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         </div>
       </section>
 
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 space-y-12">
+        <div className="mx-auto max-w-[1500px] space-y-3 px-4 lg:px-6">
 
       {/* Summary Section - Product Card Style */}
       <motion.div 
@@ -729,98 +735,98 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       >
         <motion.div 
             whileHover={{ y: -5 }}
-            className="group relative rounded-2xl p-6 shadow-lg bg-gradient-to-br from-[#154279] to-[#205a9e] text-white overflow-hidden transition-all duration-300"
+            className="group relative overflow-hidden border border-[#bcc3cd] bg-[#eef1f4] p-4 shadow-none transition-all duration-300"
         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
+            <div className="absolute -mr-8 -mt-8 h-32 w-32 rounded-bl-full bg-[#edf2f8] pointer-events-none top-0 right-0" />
             <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3">
-                <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-2 group-hover:bg-white/30 transition-colors">
-                    <MdApartment size={32} className="text-white" />
+                <div className="mb-2 rounded-none bg-[#eef2f7] p-3 transition-colors group-hover:bg-[#e4ebf4]">
+                    <MdApartment size={28} className="text-[#154279]" />
                 </div>
-                <h3 className="text-xs font-bold text-blue-100 uppercase tracking-widest">Total Units</h3>
-                <div className="text-4xl font-black text-white">{units.length}</div>
-                <p className="text-[10px] text-blue-200 font-bold uppercase tracking-widest">Active Inventory</p>
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Total Units</h3>
+                <div className="text-3xl font-bold text-[#1f2937]">{units.length}</div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Active Inventory</p>
             </div>
         </motion.div>
 
         <motion.div 
             whileHover={{ y: -5 }}
-            className="group relative rounded-2xl p-6 shadow-lg bg-gradient-to-br from-emerald-600 to-emerald-500 text-white overflow-hidden transition-all duration-300"
+            className="group relative overflow-hidden border border-[#bcc3cd] bg-[#eef1f4] p-4 shadow-none transition-all duration-300"
         >
-             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
+             <div className="absolute -mr-8 -mt-8 h-32 w-32 rounded-bl-full bg-emerald-50 pointer-events-none top-0 right-0" />
             <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3">
-                 <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-2 group-hover:bg-white/30 transition-colors">
-                    <CheckCircle size={32} className="text-white" />
+                 <div className="mb-2 rounded-none bg-emerald-50 p-3 transition-colors group-hover:bg-emerald-100">
+                    <CheckCircle size={28} className="text-emerald-700" />
                 </div>
-                <h3 className="text-xs font-bold text-emerald-100 uppercase tracking-widest">Occupancy</h3>
-                <div className="text-4xl font-black text-white">
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Occupancy</h3>
+                <div className="text-3xl font-bold text-[#1f2937]">
                     {units.length > 0 ? Math.round((units.filter(u => u.status === 'occupied').length / units.length) * 100) : 0}%
                 </div>
-                <div className="w-full max-w-[120px] h-2 bg-black/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-white" style={{ width: `${units.length > 0 ? (units.filter(u => u.status === 'occupied').length / units.length) * 100 : 0}%` }} />
+                <div className="h-2 w-full max-w-[120px] overflow-hidden rounded-none bg-emerald-100">
+                    <div className="h-full bg-emerald-600" style={{ width: `${units.length > 0 ? (units.filter(u => u.status === 'occupied').length / units.length) * 100 : 0}%` }} />
                 </div>
             </div>
         </motion.div>
 
         <motion.div 
              whileHover={{ y: -5 }}
-             className="group relative rounded-2xl p-6 shadow-lg bg-gradient-to-br from-[#F96302] to-[#ff8c42] text-white overflow-hidden transition-all duration-300"
+               className="group relative overflow-hidden border border-[#bcc3cd] bg-[#eef1f4] p-4 shadow-none transition-all duration-300"
         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none -mr-8 -mt-8" />
+            <div className="absolute -mr-8 -mt-8 h-32 w-32 rounded-bl-full bg-orange-50 pointer-events-none top-0 right-0" />
             <div className="relative z-10 flex flex-col items-center justify-center text-center space-y-3">
-                 <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl mb-2 group-hover:bg-white/30 transition-colors">
-                    <MdStorefront size={32} className="text-white" />
+                 <div className="mb-2 rounded-none bg-orange-50 p-3 transition-colors group-hover:bg-orange-100">
+                    <MdStorefront size={28} className="text-orange-700" />
                 </div>
-                <h3 className="text-xs font-bold text-orange-100 uppercase tracking-widest">Revenue Potential</h3>
-                <div className="text-3xl font-black text-white flex items-baseline">
-                    <span className="text-sm font-bold text-orange-200 mr-1">KES</span>
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Revenue Potential</h3>
+                <div className="flex items-baseline text-2xl font-bold text-[#1f2937]">
+                    <span className="mr-1 text-[11px] font-semibold text-[#7b8895]">KES</span>
                     {units.reduce((sum, u) => sum + (Number(u.price) || 0), 0).toLocaleString()}
                 </div>
-                <p className="text-[10px] text-orange-100 font-bold uppercase tracking-widest flex items-center gap-1">
+                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">
                     <Zap size={10} /> Monthly Projected
                 </p>
             </div>
         </motion.div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
         
         {/* LEFT COLUMN: UNITS LIST - Styled as ComparisonMatrix */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-3 xl:col-span-8">
             <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-white border-none shadow-xl rounded-2xl overflow-hidden"
+                className="overflow-hidden border border-[#bcc3cd] bg-[#eef1f4] shadow-sm"
             >
-                <div className="p-6 border-b border-slate-100 bg-white flex items-center justify-between">
+                <div className={PANEL_HEADER_CLASS}>Unit Directory</div>
+                <div className="flex flex-col gap-2 bg-[#eef1f4] p-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                         <h2 className="text-lg font-bold flex items-center gap-2 text-[#154279] uppercase tracking-tight">
-                            <MdKingBed className="w-5 h-5 text-[#F96302]" /> Unit Directory
+                         <h2 className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-[#5b6778]">
+                            <MdKingBed className="h-4 w-4 text-[#154279]" /> Manage individual units
                         </h2>
-                        <p className="text-[10px] text-slate-500 mt-1 font-bold uppercase tracking-widest">Manage individual units</p>
                     </div>
                     
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input 
                             placeholder="Search..." 
-                            className="pl-9 h-9 text-xs border-slate-300 focus:border-[#F96302] focus:ring-0 rounded-lg w-40 md:w-60 bg-white"
+                            className={`${INPUT_CLASS_NAME} w-40 pl-9 md:w-60`}
                         />
                     </div>
-                    <Button onClick={handleAddUnit} className="ml-4 bg-[#F96302] hover:bg-[#e05802] text-white font-bold h-9 text-xs uppercase tracking-widest shadow-sm">
+                    <Button onClick={handleAddUnit} className="ml-0 h-9 rounded-none border border-[#154279] bg-[#154279] text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f] md:ml-2">
                         <Plus className="w-4 h-4 mr-2" /> Add Unit
                     </Button>
                 </div>
                 
-                <div className="overflow-x-auto bg-white">
+                <div className="overflow-x-auto border-t border-[#c7cdd6] bg-white">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-gradient-to-r from-[#e8ecf1] to-[#f0f4f8] border-b-2 border-[#154279]">
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em]">Unit #</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em]">Type</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-center">Floor</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Price</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-center">Status</TableHead>
-                                <TableHead className="py-4 text-[#154279] font-bold text-[10px] uppercase tracking-[0.2em] text-right">Actions</TableHead>
+                            <TableRow className="bg-[#f6f8fa] border-b border-[#d5dbe4]">
+                                <TableHead className="py-3 text-[#5b6778] font-semibold text-[10px] uppercase tracking-[0.16em]">Unit #</TableHead>
+                                <TableHead className="py-3 text-[#5b6778] font-semibold text-[10px] uppercase tracking-[0.16em]">Type</TableHead>
+                                <TableHead className="py-3 text-[#5b6778] font-semibold text-[10px] uppercase tracking-[0.16em] text-center">Floor</TableHead>
+                                <TableHead className="py-3 text-[#5b6778] font-semibold text-[10px] uppercase tracking-[0.16em] text-right">Price</TableHead>
+                                <TableHead className="py-3 text-[#5b6778] font-semibold text-[10px] uppercase tracking-[0.16em] text-center">Status</TableHead>
+                                <TableHead className="py-3 text-[#5b6778] font-semibold text-[10px] uppercase tracking-[0.16em] text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody className="divide-y divide-slate-100">
@@ -848,9 +854,9 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         whileHover={{ backgroundColor: "rgba(21, 66, 121, 0.02)" }}
-                                        className="hover:bg-slate-50 transition-colors group"
+                                        className="hover:bg-[#f8fafc] transition-colors group"
                                     >
-                                        <TableCell className="font-bold text-[#154279] border-l-4 border-transparent group-hover:border-[#F96302] transition-all">
+                                        <TableCell className="font-semibold text-[#243041] border-l-4 border-transparent group-hover:border-[#154279] transition-all">
                                             {unit.unit_number}
                                         </TableCell>
                                         <TableCell>
@@ -865,11 +871,11 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                         </TableCell>
                                         <TableCell className="text-center font-bold text-slate-500 text-xs">{unit.floor_number}</TableCell>
                                         <TableCell className="text-right">
-                                            <div className="font-bold text-[#154279] text-[12px]">KES {unit.price?.toLocaleString() || 0}</div>
+                                            <div className="font-semibold text-[#243041] text-[12px]">KES {unit.price?.toLocaleString() || 0}</div>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className={cn(
-                                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
+                                                "inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider border",
                                                 unit.status === 'occupied' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                                                 unit.status === 'booked' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                                                 unit.status === 'maintenance' ? 'bg-red-50 text-red-700 border-red-200' :
@@ -885,20 +891,20 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex justify-end gap-1 opacity-100 transition-opacity">
                                             <Button 
-                                                variant="ghost" 
+                                                variant="outline" 
                                                 size="sm" 
                                                 onClick={() => openEditDialog(unit)}
-                                                className="h-8 w-8 p-0 text-slate-400 hover:text-[#154279] hover:bg-transparent"
+                                                className="h-7 w-7 p-0 rounded-none border border-[#c2c9d2] text-[#4e5a6d] hover:bg-[#f5f7fa]"
                                             >
                                                 <Pencil className="w-4 h-4" />
                                             </Button>
                                             <Button 
-                                                variant="ghost" 
+                                                variant="outline" 
                                                 size="sm" 
                                                 onClick={() => handleDeleteUnit(unit.id, unit.unit_number)}
-                                                className="h-8 w-8 p-0 text-slate-400 hover:text-red-500 hover:bg-transparent"
+                                                className="h-7 w-7 p-0 rounded-none border border-[#c2c9d2] text-[#7a3131] hover:bg-[#fff1f1]"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
@@ -914,38 +920,27 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         </div>
 
         {/* RIGHT COLUMN: GENERATOR - Styled as Product Card but with Form */}
-        <div className="space-y-6">
+        <div className="space-y-3 xl:col-span-4">
             <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 className={cn(
-                    "relative border-2 rounded-2xl transition-all duration-300 overflow-hidden bg-white",
-                    "border-[#154279] shadow-2xl shadow-[#154279]/10"
+                    "relative border border-[#bcc3cd] transition-all duration-300 overflow-hidden bg-[#eef1f4]",
+                    "shadow-sm"
                 )}
             >
                 {/* Header Section */}
-                <div className="bg-gradient-to-br from-[#154279] via-[#154279] to-[#0f325e] p-6 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                <MdBusiness size={24} className="text-[#F96302]" />
-                             </div>
-                             <h2 className="text-lg font-bold uppercase tracking-wide">Bulk Generator</h2>
-                        </div>
-                        <p className="text-[11px] text-blue-100 font-bold uppercase tracking-widest pl-1">Rapidly create multiple units</p>
-                    </div>
-                </div>
+                <div className={PANEL_HEADER_CLASS}>Bulk Generator</div>
 
-                <div className="p-6 space-y-5 bg-gradient-to-b from-white to-slate-50">
+                <div className="p-4 space-y-3 bg-[#eef1f4]">
                     <div className="space-y-1.5">
                         <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Unit Type</Label>
                         <Input 
                             value={generateConfig.unitTypeName} 
                             onChange={(e) => setGenerateConfig({...generateConfig, unitTypeName: e.target.value})}
                             placeholder="e.g. 1 Bedroom"
-                            className="bg-white border-slate-200 focus:border-[#F96302] focus:ring-0 rounded-lg h-10 font-bold text-custom-primary text-sm"
+                            className={INPUT_CLASS_NAME}
                         />
                     </div>
                     
@@ -956,7 +951,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 type="number" 
                                 value={generateConfig.count} 
                                 onChange={(e) => setGenerateConfig({...generateConfig, count: Number(e.target.value)})}
-                                className="bg-white border-slate-200 focus:border-[#154279] rounded-lg"
+                                className={INPUT_CLASS_NAME}
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -965,7 +960,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 type="number" 
                                 value={generateConfig.floorNumber} 
                                 onChange={(e) => setGenerateConfig({...generateConfig, floorNumber: Number(e.target.value)})}
-                                className="bg-white border-slate-200 focus:border-[#154279] rounded-lg"
+                                className={INPUT_CLASS_NAME}
                             />
                         </div>
                     </div>
@@ -977,7 +972,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 value={generateConfig.prefix} 
                                 onChange={(e) => setGenerateConfig({...generateConfig, prefix: e.target.value})}
                                 placeholder="e.g. A-"
-                                className="bg-white border-slate-200 focus:border-[#154279] rounded-lg"
+                                className={INPUT_CLASS_NAME}
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -986,7 +981,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 type="number" 
                                 value={generateConfig.startNumber} 
                                 onChange={(e) => setGenerateConfig({...generateConfig, startNumber: Number(e.target.value)})}
-                                className="bg-white border-slate-200 focus:border-[#154279] rounded-lg"
+                                className={INPUT_CLASS_NAME}
                             />
                         </div>
                     </div>
@@ -1000,7 +995,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 placeholder="0.00"
                                 value={generateConfig.price} 
                                 onChange={(e) => setGenerateConfig({...generateConfig, price: e.target.value})}
-                                className="pl-10 bg-white border-slate-200 focus:border-[#F96302] rounded-lg font-bold text-[#154279]"
+                                className={`${INPUT_CLASS_NAME} pl-10`}
                             />
                         </div>
                     </div>
@@ -1011,7 +1006,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                             placeholder="Comma separated"
                             value={generateConfig.features} 
                             onChange={(e) => setGenerateConfig({...generateConfig, features: e.target.value})}
-                            className="bg-white border-slate-200 focus:border-[#154279] rounded-lg"
+                            className={INPUT_CLASS_NAME}
                         />
                     </div>
 
@@ -1020,7 +1015,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                         whileTap={{ scale: 0.98 }}
                         onClick={handleGenerateUnits}
                         disabled={isGenerating}
-                        className="w-full mt-4 bg-[#F96302] hover:bg-[#e05802] text-white px-4 py-3 rounded-lg font-bold text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2 transition-all"
+                        className="mt-2 flex h-10 w-full items-center justify-center gap-2 border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-[0.15em] text-white transition-colors hover:bg-[#10335f]"
                     >
                         {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MdApartment className="w-4 h-4" />}
                         Generate Units
@@ -1033,24 +1028,13 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 animate={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 className={cn(
-                    "relative border-2 rounded-2xl transition-all duration-300 overflow-hidden bg-white",
-                    "border-emerald-600 shadow-2xl shadow-emerald-600/10"
+                    "relative border border-[#bcc3cd] transition-all duration-300 overflow-hidden bg-[#eef1f4]",
+                    "shadow-sm"
                 )}
             >
-                 <div className="bg-gradient-to-br from-emerald-600 via-emerald-600 to-emerald-800 p-6 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full pointer-events-none" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-2">
-                             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                                <Upload size={24} className="text-emerald-300" />
-                             </div>
-                             <h2 className="text-lg font-bold uppercase tracking-wide">Import Details</h2>
-                        </div>
-                        <p className="text-[11px] text-emerald-100 font-bold uppercase tracking-widest pl-1">Upload Excel Sheet</p>
-                    </div>
-                </div>
+                 <div className={PANEL_HEADER_CLASS}>Import Details</div>
 
-                 <div className="p-6 space-y-5 bg-gradient-to-b from-white to-slate-50">
+                 <div className="p-4 space-y-3 bg-[#eef1f4]">
                     <div className="text-xs text-slate-500 mb-4">
                         Upload an Excel file (.xlsx, .xls) with columns: <br/>
                         <span className="font-mono bg-slate-100 px-1 rounded">Unit Number, Floor, Type, Rent, Status, Description, Features</span>
@@ -1068,8 +1052,8 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                         <label 
                             htmlFor="excel-upload"
                             className={cn(
-                                "w-full cursor-pointer flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all",
-                                "border-emerald-200 hover:border-emerald-400 hover:bg-emerald-50",
+                                "w-full cursor-pointer flex flex-col items-center justify-center border border-dashed p-6 transition-all bg-white",
+                                "border-[#b9c3cf] hover:border-[#8ea1b8] hover:bg-[#f7f9fc]",
                                 isImporting ? "opacity-50 pointer-events-none" : ""
                             )}
                         >
@@ -1099,34 +1083,34 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
 
       {/* Manage Unit Types Dialog */}
       <Dialog open={isManageTypesOpen} onOpenChange={setIsManageTypesOpen}>
-        <DialogContent className="max-w-3xl rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-6 py-4 flex items-center justify-between">
+        <DialogContent className="max-w-3xl overflow-hidden border border-[#bcc3cd] p-0 font-poppins">
+            <div className={PANEL_HEADER_CLASS}>
                 <div>
-                    <DialogTitle className="text-white font-bold text-xl uppercase tracking-wide">Manage Unit Types</DialogTitle>
-                    <DialogDescription className="text-blue-200 text-xs font-medium uppercase tracking-widest mt-1">Add, edit or remove unit types</DialogDescription>
+                    <DialogTitle className="text-white font-semibold text-[11px] uppercase tracking-[0.16em]">Manage Unit Types</DialogTitle>
+                    <DialogDescription className="text-blue-100 text-[10px] font-medium uppercase tracking-wide mt-1">Add, edit or remove unit types</DialogDescription>
                 </div>
-                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                <div className="p-1 bg-white/10">
                     <MdBusiness className="w-6 h-6 text-[#F96302]" />
                 </div>
             </div>
             
-            <div className="p-6 bg-white space-y-6">
+            <div className="p-4 bg-[#eef1f4] space-y-4">
                 <div className="flex justify-end">
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                        <Button onClick={() => openTypeDialog()} className="bg-[#F96302] hover:bg-[#e05802] text-white font-bold shadow-lg shadow-orange-500/20 rounded-xl px-6 h-11 text-xs uppercase tracking-widest">
+                    <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <Button onClick={() => openTypeDialog()} className="h-9 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]">
                             <Plus size={16} className="mr-2" />
                             Add New Type
                         </Button>
                     </motion.div>
                 </div>
                 
-                <div className="rounded-xl border-2 border-slate-100 overflow-hidden shadow-sm">
+                <div className="overflow-hidden border border-[#c7cdd6] bg-white">
                     <Table>
                         <TableHeader>
-                            <TableRow className="bg-slate-50 border-b-2 border-slate-200">
-                                <TableHead className="py-4 font-bold text-[#154279] text-[11px] uppercase tracking-wider">Type Name</TableHead>
-                                <TableHead className="py-4 font-bold text-[#154279] text-[11px] uppercase tracking-wider">Price</TableHead>
-                                <TableHead className="py-4 text-right font-bold text-[#154279] text-[11px] uppercase tracking-wider">Actions</TableHead>
+                            <TableRow className="bg-[#f6f8fa] border-b border-[#d5dbe4]">
+                                <TableHead className="py-3 font-semibold text-[#5b6778] text-[10px] uppercase tracking-[0.16em]">Type Name</TableHead>
+                                <TableHead className="py-3 font-semibold text-[#5b6778] text-[10px] uppercase tracking-[0.16em]">Price</TableHead>
+                                <TableHead className="py-3 text-right font-semibold text-[#5b6778] text-[10px] uppercase tracking-[0.16em]">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody className="divide-y divide-slate-50">
@@ -1138,14 +1122,14 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 </TableRow>
                             ) : (
                                 unitTypes.map(t => (
-                                    <TableRow key={t.id} className="hover:bg-blue-50/30 transition-colors group">
+                                    <TableRow key={t.id} className="hover:bg-[#f8fafc] transition-colors group">
                                         <TableCell className="font-bold text-slate-700">{t.unit_type_name || t.name}</TableCell>
                                         <TableCell className="font-bold text-[#154279] font-mono">KES {Number(t.price_per_unit || 0).toLocaleString()}</TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            <Button variant="ghost" size="sm" onClick={() => openTypeDialog(t)} className="h-8 w-8 p-0 text-slate-400 hover:text-[#154279] hover:bg-transparent">
+                                            <Button variant="outline" size="sm" onClick={() => openTypeDialog(t)} className="h-7 w-7 p-0 rounded-none border border-[#c2c9d2] text-[#4e5a6d] hover:bg-[#f5f7fa]">
                                                 <Pencil size={14} />
                                             </Button>
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-red-500 hover:bg-transparent" onClick={() => handleDeleteType(t.id!)}>
+                                            <Button variant="outline" size="sm" className="h-7 w-7 p-0 rounded-none border border-[#c2c9d2] text-[#7a3131] hover:bg-[#fff1f1]" onClick={() => handleDeleteType(t.id!)}>
                                                 <Trash2 size={14} />
                                             </Button>
                                         </TableCell>
@@ -1161,38 +1145,35 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
 
       {/* Add/Edit Unit Type Dialog */}
       <Dialog open={isTypeDialogOpen} onOpenChange={setIsTypeDialogOpen}>
-        <DialogContent className="rounded-2xl border-none shadow-2xl overflow-hidden p-0 max-w-md">
-            <div className="bg-[#154279] px-6 py-4">
+        <DialogContent className="max-w-md overflow-hidden border border-[#bcc3cd] p-0 font-poppins">
+            <div className={PANEL_HEADER_CLASS}>
                 <DialogTitle className="text-white font-bold text-lg">{editingType?.id ? 'Edit Unit Type' : 'Add Unit Type'}</DialogTitle>
                 <DialogDescription className="text-blue-200 text-xs">Define the details for this unit type.</DialogDescription>
             </div>
             
-            <div className="p-6 space-y-5 bg-white">
+            <div className="p-4 space-y-4 bg-[#eef1f4]">
                 <div className="space-y-2">
                     <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Type Name</Label>
                     <Input 
                         value={editingType?.name || ''} 
                         onChange={(e) => setEditingType(prev => ({ ...prev!, name: e.target.value }))}
                         placeholder="e.g. 1 Bedroom Luxury"
-                        className="bg-slate-50 border-slate-200 focus:bg-white focus:border-[#F96302] focus:ring-0 rounded-lg h-10 font-bold text-[#154279]"
+                        className={INPUT_CLASS_NAME}
                     />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Price per Unit</Label>
-                    <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">KES</span>
-                        <Input 
-                            type="number"
-                            value={editingType?.price_per_unit || ''} 
-                            onChange={(e) => setEditingType(prev => ({ ...prev!, price_per_unit: Number(e.target.value) }))}
-                            className="pl-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-[#F96302] focus:ring-0 rounded-lg h-10 font-bold text-[#154279]"
-                        />
-                    </div>
+                    <Input 
+                        type="number"
+                        value={editingType?.price_per_unit || ''} 
+                        onChange={(e) => setEditingType(prev => ({ ...prev!, price_per_unit: Number(e.target.value) }))}
+                        className={INPUT_CLASS_NAME}
+                    />
                 </div>
                 
                 <div className="flex items-center gap-3 pt-2">
-                    <Button variant="ghost" onClick={() => setIsTypeDialogOpen(false)} className="flex-1 rounded-xl h-12 font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-100">Cancel</Button>
-                    <Button onClick={() => handleSaveType(editingType!)} disabled={isSavingType} className="flex-1 bg-[#154279] hover:bg-[#0f325e] text-white font-bold rounded-xl h-12 shadow-lg shadow-blue-900/20">
+                    <Button variant="outline" onClick={() => setIsTypeDialogOpen(false)} className="flex-1 h-9 rounded-none border border-[#b9c3cf] bg-white text-[11px] font-semibold uppercase tracking-wide text-[#4f5b6f] hover:bg-[#f6f8fa]">Cancel</Button>
+                    <Button onClick={() => handleSaveType(editingType!)} disabled={isSavingType} className="flex-1 h-9 rounded-none border border-[#154279] bg-[#154279] text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]">
                         {isSavingType ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Type'}
                     </Button>
                 </div>
@@ -1202,28 +1183,30 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
       
       {/* Unit Edit Dialog with Images and Features */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-0 border-none shadow-2xl bg-white">
-            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] text-white p-6 sticky top-0 z-20">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border border-[#bcc3cd] p-0 font-poppins bg-[#eef1f4]">
+            <div className="sticky top-0 z-20 border-b border-[#0f325e]">
+                <div className={PANEL_HEADER_CLASS}>
                 <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-white/10 rounded-lg">
+                    <div className="p-1 bg-white/10">
                         {editingUnit?.id ? <Pencil className="w-5 h-5 text-[#F96302]" /> : <Plus className="w-5 h-5 text-[#F96302]" />}
                     </div>
                     <div>
-                        <DialogTitle className="font-bold text-xl">{editingUnit?.id ? `Edit Unit ${editingUnit.unit_number}` : 'Add New Unit'}</DialogTitle>
-                        <DialogDescription className="text-blue-200 text-xs font-medium uppercase tracking-widest mt-1">
+                        <DialogTitle className="font-semibold text-[11px] uppercase tracking-[0.16em]">{editingUnit?.id ? `Edit Unit ${editingUnit.unit_number}` : 'Add New Unit'}</DialogTitle>
+                        <DialogDescription className="text-blue-100 text-[10px] font-medium uppercase tracking-wide mt-1">
                             {editingUnit?.id ? 'Update unit details and status' : 'Enter details for the new unit'}
                         </DialogDescription>
                     </div>
                 </div>
+                </div>
             </div>
             
             {isEditLoading ? (
-                <div className="flex flex-col items-center justify-center p-16 bg-white">
+                <div className="flex flex-col items-center justify-center p-16 bg-[#eef1f4]">
                     <Loader2 className="w-12 h-12 animate-spin text-[#154279] mb-4" />
                     <p className="text-slate-500 font-bold text-sm uppercase tracking-widest">Loading unit details...</p>
                 </div>
             ) : (
-            <div className="p-8 space-y-6 bg-white">
+            <div className="p-4 space-y-4 bg-[#eef1f4]">
                 {/* Top Grid: Number, Floor, Type */}
                 <div className="grid grid-cols-3 gap-6">
                      <div className="space-y-2">
@@ -1231,7 +1214,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                             <Input 
                                 value={editingUnit?.unit_number || ''} 
                                 onChange={(e) => setEditingUnit(prev => ({...prev!, unit_number: e.target.value}))} 
-                                className="font-black text-[#154279] bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg h-10"
+                                className={INPUT_CLASS_NAME}
                             />
                      </div>
                      <div className="space-y-2">
@@ -1240,7 +1223,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                 type="number" 
                                 value={editingUnit?.floor_number ?? ''} 
                                 onChange={(e) => setEditingUnit(prev => ({...prev!, floor_number: Number(e.target.value)}))} 
-                                className="font-bold bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg h-10"
+                                className={INPUT_CLASS_NAME}
                             />
                      </div>
                      <div className="space-y-2">
@@ -1260,7 +1243,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                             })} 
                             placeholder="e.g. 1 Bedroom"
                             list="unit-type-suggestions"
-                            className="font-bold bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg h-10"
+                            className={INPUT_CLASS_NAME}
                         />
                         <datalist id="unit-type-suggestions">
                             {unitTypes.map(t => (
@@ -1277,7 +1260,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                             value={editingUnit?.status} 
                             onValueChange={(val) => setEditingUnit(prev => ({...prev!, status: val}))}
                         >
-                            <SelectTrigger className="font-bold bg-slate-50 border-slate-200 focus:ring-[#154279] rounded-lg h-10">
+                            <SelectTrigger className={INPUT_CLASS_NAME}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1291,12 +1274,12 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                     <div className="space-y-2">
                         <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Price (KES)</Label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">KES</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-xs">KES</span>
                             <Input 
                                 type="number"
                                 value={editingUnit?.price ?? ''}
                                 onChange={(e) => setEditingUnit(prev => ({...prev!, price: Number(e.target.value)}))}
-                                className="pl-10 font-bold bg-slate-50 border-slate-200 focus:border-[#F96302] rounded-lg h-10 text-[#154279]"
+                                className={`${INPUT_CLASS_NAME} pl-10`}
                             />
                         </div>
                     </div>
@@ -1307,7 +1290,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                     <Textarea 
                         value={editingUnit?.description || ''}
                         onChange={(e) => setEditingUnit(prev => ({...prev!, description: e.target.value}))}
-                        className="bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg min-h-[80px]"
+                        className="min-h-[80px] rounded-none border border-[#b9c3cf] bg-white text-[12px] text-[#243041] focus-visible:ring-0"
                     />
                 </div>
 
@@ -1320,7 +1303,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                              setEditingUnit(prev => ({...prev!, features}));
                         }}
                         placeholder="Balcony, AC, Wifi"
-                        className="bg-slate-50 border-slate-200 focus:border-[#154279] rounded-lg h-10"
+                        className={INPUT_CLASS_NAME}
                     />
                 </div>
 
@@ -1329,19 +1312,19 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                     <Label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Images</Label>
                     <div className="grid grid-cols-4 gap-3 mb-3">
                         {editingUnit?.images?.map(img => (
-                            <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm group">
+                            <div key={img.id} className="relative aspect-square overflow-hidden border border-[#c2c9d2] bg-white group">
                                 <img src={img.image_url} alt="Unit" className="object-cover w-full h-full" />
                                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full">
+                                    <Button variant="destructive" size="icon" className="h-7 w-7 rounded-none">
                                         <X size={14} />
                                     </Button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-8 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-[#F96302] transition-all relative group">
+                    <div className="border border-dashed border-[#b9c3cf] flex flex-col items-center justify-center p-8 bg-white cursor-pointer hover:bg-[#f7f9fc] hover:border-[#8ea1b8] transition-all relative group">
                            <div className="text-center group-hover:-translate-y-1 transition-transform">
-                               <div className="w-12 h-12 rounded-full bg-blue-50 text-[#154279] flex items-center justify-center mx-auto mb-3 group-hover:bg-[#154279] group-hover:text-white transition-colors">
+                               <div className="w-12 h-12 bg-blue-50 text-[#154279] flex items-center justify-center mx-auto mb-3 group-hover:bg-[#154279] group-hover:text-white transition-colors">
                                    <Upload className="w-5 h-5" />
                                </div>
                                <span className="text-xs font-bold text-slate-500 group-hover:text-slate-700 uppercase tracking-wide">Upload Images</span>
@@ -1358,14 +1341,20 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
 
             </div>
             )}
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 sticky bottom-0 z-20">
-                <Button variant="ghost" onClick={() => setIsEditOpen(false)} className="font-bold text-slate-500 hover:text-slate-700 hover:bg-white rounded-xl h-11 px-6">Cancel</Button>
-                <Button onClick={handleSaveUnit} className="bg-[#154279] hover:bg-[#0f325e] text-white font-bold shadow-lg shadow-blue-900/20 rounded-xl h-11 px-8 uppercase tracking-widest text-xs">
+            <div className="p-4 border-t border-[#c7cdd6] bg-[#eef1f4] flex justify-end gap-2 sticky bottom-0 z-20">
+                <Button variant="outline" onClick={() => setIsEditOpen(false)} className="h-9 rounded-none border border-[#b9c3cf] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#4f5b6f] hover:bg-[#f6f8fa]">Cancel</Button>
+                <Button onClick={handleSaveUnit} className="h-9 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]">
                     Save Unit
                 </Button>
             </div>
         </DialogContent>
       </Dialog>
+
+        </div>
+        </>
+    );
 };
+
+export default PropertyUnitManager;
 
 

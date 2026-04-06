@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { getTenantPortalAccessState } from "@/services/tenantOnboardingService";
 
 const MaintenanceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -84,6 +85,15 @@ const MaintenanceDetailPage: React.FC = () => {
 
   const fetchRequestDetails = async () => {
     try {
+      if (!user?.id || !id) return;
+
+      const accessState = await getTenantPortalAccessState(user.id);
+      if (accessState.isLocked) {
+        toast.info("Complete your initial payment to unlock maintenance features.");
+        navigate("/portal/tenant/payments");
+        return;
+      }
+
       const { data, error } = await supabase
         .from("maintenance_requests")
         .select(`
@@ -92,6 +102,7 @@ const MaintenanceDetailPage: React.FC = () => {
             properties:properties!fk_maintenance_properties (name)
         `)
         .eq("id", id)
+        .or(`tenant_id.eq.${user.id},reported_by.eq.${user.id}`)
         .single();
 
       if (error) throw error;
