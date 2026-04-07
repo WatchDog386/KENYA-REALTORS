@@ -104,6 +104,27 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [unitTypes, setUnitTypes] = useState<PropertyUnitType[]>([]);
+
+    const getEffectiveUnitPrice = (unit: Unit) => {
+        if (unit.price !== null && unit.price !== undefined) {
+            const directPrice = Number(unit.price);
+            if (!Number.isNaN(directPrice)) {
+                return directPrice;
+            }
+        }
+
+        if (unit.property_unit_types?.price_per_unit !== null && unit.property_unit_types?.price_per_unit !== undefined) {
+            const joinedTypePrice = Number(unit.property_unit_types.price_per_unit);
+            if (!Number.isNaN(joinedTypePrice)) {
+                return joinedTypePrice;
+            }
+        }
+
+        const localTypePrice = Number(
+            unitTypes.find((type) => type.id === unit.unit_type_id)?.price_per_unit ?? 0
+        );
+        return Number.isNaN(localTypePrice) ? 0 : localTypePrice;
+    };
   
   // Edit State
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
@@ -524,11 +545,17 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
   };
 
   // Unit Type CRUD
-  const handleSaveType = async (type: Partial<PropertyUnitType>) => {
-    if (!type.name || !type.price_per_unit) {
-        toast.error("Name and Price are required");
-        return;
-    }
+    const handleSaveType = async (type: Partial<PropertyUnitType>) => {
+        const normalizedPrice = Number(type.price_per_unit);
+        if (!type.name || type.price_per_unit === null || type.price_per_unit === undefined || Number.isNaN(normalizedPrice)) {
+                toast.error("Name and Price are required");
+                return;
+        }
+
+        if (normalizedPrice < 0) {
+                toast.error("Price must be zero or more");
+                return;
+        }
     
     setIsSavingType(true);
     try {
@@ -536,7 +563,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             // Update
             const { error } = await supabase.from('property_unit_types').update({
                 name: type.name,
-                price_per_unit: type.price_per_unit
+                price_per_unit: normalizedPrice
             }).eq('id', type.id);
             if (error) throw error;
             toast.success("Unit Type updated");
@@ -545,7 +572,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
             const { error } = await supabase.from('property_unit_types').insert({
                 property_id: property.id,
                 name: type.name,
-                price_per_unit: type.price_per_unit
+                price_per_unit: normalizedPrice
             });
             if (error) throw error;
             toast.success("Unit Type created");
@@ -779,7 +806,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                 <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Revenue Potential</h3>
                 <div className="flex items-baseline text-2xl font-bold text-[#1f2937]">
                     <span className="mr-1 text-[11px] font-semibold text-[#7b8895]">KES</span>
-                    {units.reduce((sum, u) => sum + (Number(u.price) || 0), 0).toLocaleString()}
+                    {units.reduce((sum, unit) => sum + getEffectiveUnitPrice(unit), 0).toLocaleString()}
                 </div>
                 <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">
                     <Zap size={10} /> Monthly Projected
@@ -871,7 +898,7 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
                                         </TableCell>
                                         <TableCell className="text-center font-bold text-slate-500 text-xs">{unit.floor_number}</TableCell>
                                         <TableCell className="text-right">
-                                            <div className="font-semibold text-[#243041] text-[12px]">KES {unit.price?.toLocaleString() || 0}</div>
+                                            <div className="font-semibold text-[#243041] text-[12px]">KES {getEffectiveUnitPrice(unit).toLocaleString()}</div>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <div className={cn(

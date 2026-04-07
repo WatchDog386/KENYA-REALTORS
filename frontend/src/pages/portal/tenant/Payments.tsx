@@ -1,5 +1,5 @@
 // src/pages/portal/tenant/Payments.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -111,8 +111,47 @@ const PaymentsPage: React.FC = () => {
   const [initialInvoiceTotal, setInitialInvoiceTotal] = useState(0);
   const [hasPaidOnboardingInvoice, setHasPaidOnboardingInvoice] = useState(false);
   const [selectedInitialInvoice, setSelectedInitialInvoice] = useState<PendingInitialInvoice | null>(null);
+  const fetchInFlightRef = useRef(false);
+  const queuedFetchRef = useRef(false);
+  const lastNetworkToastAtRef = useRef(0);
+
+  const isLikelyNetworkError = (error: unknown): boolean => {
+    const errorText = JSON.stringify(error ?? "").toLowerCase();
+    return (
+      errorText.includes("failed to fetch") ||
+      errorText.includes("network") ||
+      errorText.includes("proxy") ||
+      errorText.includes("err_proxy_connection_failed")
+    );
+  };
+
+  const shouldShowNetworkToast = (): boolean => {
+    const now = Date.now();
+    if (now - lastNetworkToastAtRef.current < 15000) {
+      return false;
+    }
+    lastNetworkToastAtRef.current = now;
+    return true;
+  };
+
+  const fetchData = useCallback(async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    if (fetchInFlightRef.current) {
+      queuedFetchRef.current = true;
+      return;
+    }
+
+    fetchInFlightRef.current = true;
+    await fetchDataCore(user.id);
+  }, [user?.id]);
 
   useEffect(() => {
+    if (!user?.id) return;
+
     fetchData();
 
     // Setup real-time subscriptions for utility readings
@@ -188,12 +227,12 @@ const PaymentsPage: React.FC = () => {
       .subscribe();
 
     return () => {
-      readingsChannel.unsubscribe();
-      paymentsChannel.unsubscribe();
-      billsChannel.unsubscribe();
-      receiptsChannel.unsubscribe();
+      void supabase.removeChannel(readingsChannel);
+      void supabase.removeChannel(paymentsChannel);
+      void supabase.removeChannel(billsChannel);
+      void supabase.removeChannel(receiptsChannel);
     };
-  }, [user?.id]);
+  }, [fetchData, user?.id]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -205,14 +244,14 @@ const PaymentsPage: React.FC = () => {
   // Refetch data when user returns from payment page
   useEffect(() => {
     const hasTabParam = searchParams.has('tab');
-    if (hasTabParam) {
+    if (hasTabParam && user?.id) {
       // User returned from payment, refetch data with a small delay
       const timer = setTimeout(() => {
         fetchData();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, [fetchData, searchParams, user?.id]);
 
   // Build a payment-style bill entry from raw utility readings when invoices are missing
   function buildBillsFromReadings(readings: UtilityReading[]): Payment[] {
@@ -251,12 +290,11 @@ const PaymentsPage: React.FC = () => {
     });
   }
 
-  const fetchData = async () => {
-    if (!user?.id) return;
+  const fetchDataCore = async (userId: string) => {
     try {
       setLoading(true);
 
-      const accessState = await getTenantPortalAccessState(user.id);
+      const accessState = await getTenantPortalAccessState(userId);
       setOnboardingLocked(accessState.isLocked);
       setPendingInitialInvoices(accessState.pendingInitialInvoices);
       setInitialInvoiceTotal(accessState.initialInvoiceTotal);
@@ -276,7 +314,7 @@ const PaymentsPage: React.FC = () => {
       const { data: tenantData } = await supabase
         .from('tenants')
         .select('id, unit_id, property_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('status', 'active')
         .maybeSingle();
       
@@ -291,7 +329,7 @@ const PaymentsPage: React.FC = () => {
         const { data: latestApplications, error: latestApplicationError } = await supabase
           .from('lease_applications')
           .select('property_id, status')
-          .eq('applicant_id', user.id)
+          .eq('applicant_id', userId)
           .in('status', ['pending', 'under_review', 'approved', 'manager_approved', 'invoice_sent'])
           .order('created_at', { ascending: false })
           .limit(1);
@@ -363,8 +401,8 @@ const PaymentsPage: React.FC = () => {
 
       let paidOnboardingByProfileQuery = supabase
         .from('invoices')
-        .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes')
-        .eq('tenant_id', user.id)
+        .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes, items')
+        .eq('tenant_id', userId)
         .eq('status', 'paid')
         .or(ONBOARDING_INVOICE_NOTES_FILTER);
 
@@ -381,10 +419,10 @@ const PaymentsPage: React.FC = () => {
 
       let paidOnboardingInvoices = paidOnboardingInvoicesByProfile || [];
 
-      if ((paidOnboardingInvoices.length === 0) && tenantId && tenantId !== user.id) {
+      if ((paidOnboardingInvoices.length === 0) && tenantId && tenantId !== userId) {
         let paidOnboardingByTenantIdQuery = supabase
           .from('invoices')
-          .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes')
+          .select('id, amount, due_date, status, created_at, updated_at, reference_number, notes, items')
           .eq('tenant_id', tenantId)
           .eq('status', 'paid')
           .or(ONBOARDING_INVOICE_NOTES_FILTER);
@@ -403,8 +441,13 @@ const PaymentsPage: React.FC = () => {
         }
       }
 
+      const preferredPaidOnboardingInvoices = selectPreferredOnboardingInvoices(paidOnboardingInvoices);
+      const onboardingInvoiceAlreadyCoveredRent = preferredPaidOnboardingInvoices.some((invoice: any) =>
+        Number((invoice?.items as any)?.monthly_rent || 0) > 0
+      );
+
       setPaidInitialInvoices(
-        mapPaidInvoicesToPayments(selectPreferredOnboardingInvoices(paidOnboardingInvoices))
+        mapPaidInvoicesToPayments(preferredPaidOnboardingInvoices)
       );
 
       // 2. Fetch Rent Payments
@@ -414,9 +457,9 @@ const PaymentsPage: React.FC = () => {
         .order("due_date", { ascending: false });
 
       if (tenantId) {
-        rentQuery = rentQuery.or(`tenant_id.eq.${user.id},tenant_id.eq.${tenantId}`);
+        rentQuery = rentQuery.or(`tenant_id.eq.${userId},tenant_id.eq.${tenantId}`);
       } else {
-        rentQuery = rentQuery.eq("tenant_id", user.id);
+        rentQuery = rentQuery.eq("tenant_id", userId);
       }
 
       const { data: rentData, error: rentError } = await rentQuery;
@@ -509,11 +552,12 @@ const PaymentsPage: React.FC = () => {
             leaseMonthlyRent > 0 &&
             !hasPendingRentRecords &&
             !hasRentInUtilityBills &&
-            latestReadingRent <= 0
+            latestReadingRent <= 0 &&
+            !onboardingInvoiceAlreadyCoveredRent
           ) {
             finalUtilityBills = [
               {
-                id: `lease-rent-${tenantId || user.id}`,
+                id: `lease-rent-${tenantId || userId}`,
                 amount: leaseMonthlyRent,
                 amount_paid: 0,
                 due_date: new Date().toISOString(),
@@ -541,10 +585,22 @@ const PaymentsPage: React.FC = () => {
       }
 
     } catch (err) {
-      console.error("Error fetching payments:", err);
-      toast.error("Failed to load payments");
+      if (isLikelyNetworkError(err)) {
+        console.warn("Payments fetch failed due to network/proxy connectivity:", err);
+        if (shouldShowNetworkToast()) {
+          toast.error("Network/proxy issue while loading payments. Retrying...");
+        }
+      } else {
+        console.error("Error fetching payments:", err);
+        toast.error("Failed to load payments");
+      }
     } finally {
       setLoading(false);
+      fetchInFlightRef.current = false;
+      if (queuedFetchRef.current) {
+        queuedFetchRef.current = false;
+        void fetchData();
+      }
     }
   };
 
@@ -801,7 +857,7 @@ const PaymentsPage: React.FC = () => {
 
   if (onboardingLocked) {
     return (
-      <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50 pb-20">
+      <div className="space-y-6 font-nunito pb-20">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1012,7 +1068,7 @@ const PaymentsPage: React.FC = () => {
   if (selectedPaymentType) {
     // Show payment form for selected type
     return (
-      <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50 pb-20">
+      <div className="space-y-6 font-nunito pb-20">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -1051,7 +1107,7 @@ const PaymentsPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50 pb-20">
+    <div className="space-y-6 font-nunito pb-20">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}

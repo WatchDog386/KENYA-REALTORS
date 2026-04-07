@@ -121,7 +121,7 @@ const MaintenancePage: React.FC = () => {
 
   if (onboardingLocked) {
     return (
-      <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50">
+      <div className="space-y-6 font-nunito">
         <Card className="border border-amber-300 bg-amber-50 shadow-sm">
           <CardHeader>
             <CardTitle className="text-amber-900">Maintenance Unlocks After Initial Payment</CardTitle>
@@ -140,7 +140,7 @@ const MaintenancePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 font-nunito min-h-screen bg-slate-50/50">
+    <div className="space-y-6 font-nunito">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -44,6 +44,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { createOrEnsureMoveInInvoiceForApplication } from "@/services/tenantOnboardingService";
 
 // Add missing type definitions
 interface User {
@@ -228,6 +230,8 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { stats, systemAlerts, recentActivities } = useSuperAdmin();
+  const invoiceSweepRunningRef = React.useRef(false);
+  const autoInvoicedApplicationIdsRef = React.useRef<Set<string>>(new Set());
 
   // Default stats if undefined
   const safeStats: DashboardStats = stats || {
@@ -276,6 +280,85 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
       if (document.head.contains(style)) document.head.removeChild(style);
     };
   }, []);
+
+  const runSuperAdminInvoiceSweep = React.useCallback(async () => {
+    if (user?.role !== "super_admin" || invoiceSweepRunningRef.current) {
+      return;
+    }
+
+    invoiceSweepRunningRef.current = true;
+    try {
+      const { data: applications, error } = await supabase
+        .from("lease_applications")
+        .select(
+          `
+          id,
+          applicant_id,
+          applicant_name,
+          applicant_email,
+          property_id,
+          unit_id,
+          status
+        `
+        )
+        .in("status", ["pending", "under_review", "approved"])
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.warn("Super admin invoice sweep failed to fetch applications:", error);
+        return;
+      }
+
+      for (const app of applications || []) {
+        const appId = String((app as any)?.id || "");
+        if (!appId || autoInvoicedApplicationIdsRef.current.has(appId)) {
+          continue;
+        }
+
+        const applicantId = (app as any)?.applicant_id ? String((app as any).applicant_id) : "";
+        const propertyId = (app as any)?.property_id ? String((app as any).property_id) : "";
+        const unitId = (app as any)?.unit_id ? String((app as any).unit_id) : "";
+        if (!applicantId || !propertyId || !unitId) {
+          continue;
+        }
+
+        try {
+          const result = await createOrEnsureMoveInInvoiceForApplication({
+            id: appId,
+            applicant_id: applicantId,
+            property_id: propertyId,
+            unit_id: unitId,
+            applicant_name: (app as any)?.applicant_name || undefined,
+            applicant_email: (app as any)?.applicant_email || undefined,
+          });
+
+          if (result?.linkedInvoiceId) {
+            autoInvoicedApplicationIdsRef.current.add(appId);
+          }
+        } catch (invoiceError) {
+          console.warn("Super admin invoice sweep failed for application:", appId, invoiceError);
+        }
+      }
+    } finally {
+      invoiceSweepRunningRef.current = false;
+    }
+  }, [user?.role]);
+
+  React.useEffect(() => {
+    if (user?.role !== "super_admin") {
+      return;
+    }
+
+    void runSuperAdminInvoiceSweep();
+    const intervalId = window.setInterval(() => {
+      void runSuperAdminInvoiceSweep();
+    }, 20000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [runSuperAdminInvoiceSweep, user?.role]);
 
   const toggleItem = (title: string) => {
     setExpandedItems((prev) =>

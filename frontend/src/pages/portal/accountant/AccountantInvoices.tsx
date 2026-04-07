@@ -42,6 +42,8 @@ interface Invoice {
   property?: {
     name: string;
   };
+  tenant_name?: string;
+  tenant_email?: string;
 }
 
 const AccountantInvoices = () => {
@@ -83,7 +85,85 @@ const AccountantInvoices = () => {
         console.warn("Could not fetch invoices:", error);
         setInvoices([]);
       } else {
-        setInvoices(data || []);
+        const parseApplicantIdFromNotes = (notes?: string | null) => {
+          const match = String(notes || "").match(/APPLICANT_ID:([a-f0-9-]+)/i);
+          return match?.[1] || null;
+        };
+
+        const baseInvoices = (data || []) as Invoice[];
+
+        const invoiceTenantIds = Array.from(
+          new Set(baseInvoices.map((invoice) => invoice.tenant_id).filter(Boolean))
+        );
+
+        const applicantIdsFromNotes = Array.from(
+          new Set(baseInvoices.map((invoice) => parseApplicantIdFromNotes(invoice.notes)).filter(Boolean))
+        ) as string[];
+
+        const { data: tenantRows, error: tenantRowsError } = invoiceTenantIds.length
+          ? await supabase
+              .from('tenants')
+              .select('id, user_id')
+              .in('id', invoiceTenantIds)
+          : { data: [], error: null as any };
+
+        if (tenantRowsError && tenantRowsError.code !== 'PGRST116') {
+          throw tenantRowsError;
+        }
+
+        const tenantMap = new Map((tenantRows || []).map((row: any) => [row.id, row.user_id]));
+
+        const profileIds = Array.from(
+          new Set([
+            ...invoiceTenantIds,
+            ...applicantIdsFromNotes,
+            ...(tenantRows || []).map((row: any) => row?.user_id).filter(Boolean),
+          ])
+        );
+
+        const { data: profileRows, error: profileRowsError } = profileIds.length
+          ? await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email')
+              .in('id', profileIds)
+          : { data: [], error: null as any };
+
+        if (profileRowsError) {
+          throw profileRowsError;
+        }
+
+        const profileMap = new Map((profileRows || []).map((row: any) => [row.id, row]));
+
+        const normalizedInvoices = baseInvoices.map((invoice) => {
+          const metadataApplicantId = parseApplicantIdFromNotes(invoice.notes);
+          const profileIdCandidates = [
+            metadataApplicantId,
+            tenantMap.get(invoice.tenant_id),
+            invoice.tenant_id,
+          ].filter(Boolean) as string[];
+
+          const resolvedProfile = profileIdCandidates
+            .map((profileId) => profileMap.get(profileId))
+            .find(Boolean);
+
+          const firstName = resolvedProfile?.first_name || invoice.tenant?.first_name || '';
+          const lastName = resolvedProfile?.last_name || invoice.tenant?.last_name || '';
+          const tenantName = `${firstName} ${lastName}`.trim() || 'Unknown Tenant';
+          const tenantEmail = resolvedProfile?.email || invoice.tenant?.email || 'N/A';
+
+          return {
+            ...invoice,
+            tenant_name: tenantName,
+            tenant_email: tenantEmail,
+            tenant: {
+              first_name: firstName,
+              last_name: lastName,
+              email: tenantEmail,
+            },
+          };
+        });
+
+        setInvoices(normalizedInvoices);
       }
     } catch (err) {
       console.error('Error fetching invoices:', err);
@@ -97,6 +177,8 @@ const AccountantInvoices = () => {
       inv.reference_number?.toLowerCase().includes(search.toLowerCase()) ||
       inv.tenant?.first_name?.toLowerCase().includes(search.toLowerCase()) ||
       inv.tenant?.last_name?.toLowerCase().includes(search.toLowerCase()) ||
+      inv.tenant_name?.toLowerCase().includes(search.toLowerCase()) ||
+      inv.tenant_email?.toLowerCase().includes(search.toLowerCase()) ||
       inv.property?.name?.toLowerCase().includes(search.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || inv.status === statusFilter;
@@ -120,8 +202,8 @@ const AccountantInvoices = () => {
     try {
       // Here you would send email notification
       // For now, just log and show alert
-      console.log(`Sending invoice ${invoice.reference_number} to ${invoice.tenant?.email}`);
-      alert(`Invoice sent to ${invoice.tenant?.email}`);
+      console.log(`Sending invoice ${invoice.reference_number} to ${invoice.tenant_email || invoice.tenant?.email}`);
+      alert(`Invoice sent to ${invoice.tenant_email || invoice.tenant?.email}`);
     } catch (err) {
       console.error('Error sending invoice:', err);
       alert('Failed to send invoice');

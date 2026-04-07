@@ -67,6 +67,60 @@ const ManagerApplications = () => {
     loadApplications();
   }, [user?.id]);
 
+  const autoApproveIncomingApplications = async (items: LeaseApplication[]) => {
+    const appsToApprove = items.filter((app) =>
+      ['pending', 'under_review'].includes(String(app.status || '').toLowerCase())
+    );
+    const idsToApprove = appsToApprove.map((app) => app.id);
+
+    if (idsToApprove.length === 0) {
+      return items;
+    }
+
+    const { error } = await supabase
+      .from('lease_applications')
+      .update({ status: 'approved' })
+      .in('id', idsToApprove);
+
+    if (error) {
+      console.error('Failed to auto-approve incoming applications:', error);
+      return items;
+    }
+
+    const approvedSet = new Set(idsToApprove);
+    const updatedItems = items.map((app) =>
+      approvedSet.has(app.id) ? { ...app, status: 'approved' } : app
+    );
+
+    for (const app of updatedItems) {
+      if (String(app.status || '').toLowerCase() !== 'approved') continue;
+      if (!app.property_id || !app.unit_id) continue;
+
+      try {
+        await createOrEnsureMoveInInvoiceForApplication({
+          id: app.id,
+          applicant_id: app.applicant_id || undefined,
+          property_id: app.property_id,
+          unit_id: app.unit_id,
+          applicant_name: app.applicant_name,
+          applicant_email: app.applicant_email,
+          telephone_numbers: app.telephone_numbers,
+          unit_number: app.units?.unit_number,
+          unit_type_id: app.units?.unit_type_id,
+          unit_type_name:
+            app.units?.property_unit_types?.name ||
+            app.units?.property_unit_types?.unit_type_name ||
+            null,
+          property_name: app.properties?.name,
+        });
+      } catch (invoiceError) {
+        console.warn('Manager auto-approve invoice fallback failed for application:', app.id, invoiceError);
+      }
+    }
+
+    return updatedItems;
+  };
+
   const loadApplications = async () => {
     if (!user?.id) return;
     try {
@@ -108,7 +162,8 @@ const ManagerApplications = () => {
         };
       });
 
-      setApplications(sortByNewest(applicationsWithUnits));
+      const autoApprovedApplications = await autoApproveIncomingApplications(applicationsWithUnits);
+      setApplications(sortByNewest(autoApprovedApplications));
     } catch (err) {
       console.error('Error loading applications:', err);
       toast.error('Failed to load applications');
@@ -120,43 +175,7 @@ const ManagerApplications = () => {
   const handleStatusChange = async (applicationId: string, newStatus: string) => {
     setUpdatingId(applicationId);
     try {
-      const currentApplication = applications.find((application) => application.id === applicationId);
-      if (!currentApplication) {
-        toast.error('Application not found');
-        return;
-      }
-
       let finalStatus = newStatus;
-      const shouldGenerateInvoice = newStatus === 'approved';
-
-      let linkedToBillingInvoice = false;
-
-      if (shouldGenerateInvoice) {
-        if (!currentApplication.applicant_id) {
-          toast.error('Applicant account is missing. Ask tenant to submit with registration email and password.');
-          return;
-        }
-
-        const invoiceResult = await createOrEnsureMoveInInvoiceForApplication({
-          id: currentApplication.id,
-          applicant_id: currentApplication.applicant_id,
-          property_id: currentApplication.property_id,
-          unit_id: currentApplication.unit_id,
-          applicant_name: currentApplication.applicant_name,
-          applicant_email: currentApplication.applicant_email,
-          telephone_numbers: currentApplication.telephone_numbers,
-          unit_number: currentApplication.units?.unit_number,
-          unit_type_id: currentApplication.units?.unit_type_id,
-          unit_type_name:
-            currentApplication.units?.property_unit_types?.name ||
-            currentApplication.units?.property_unit_types?.unit_type_name ||
-            null,
-          property_name: currentApplication.properties?.name,
-        });
-        linkedToBillingInvoice = Boolean(invoiceResult?.linkedInvoiceId);
-
-        finalStatus = newStatus;
-      }
 
       const { error } = await supabase
         .from('lease_applications')
@@ -165,14 +184,10 @@ const ManagerApplications = () => {
 
       if (error) throw error;
       
-      if (shouldGenerateInvoice) {
-        if (linkedToBillingInvoice) {
-          toast.success('Application approved. First-time invoice has been sent to the tenant dashboard.');
-        } else {
-          toast.warning('Application approved, but invoice generation is pending. Please retry approval.');
-        }
+      if (finalStatus === 'approved') {
+        toast.success('Application approved. First-time invoice is generated from the Super Admin workflow.');
       } else if (finalStatus === 'under_review') {
-        toast.success('Application moved to under review. Invoice will auto-send after manager approval.');
+        toast.success('Application moved to under review.');
       } else {
         toast.success(`Application marked as ${finalStatus}`);
       }
@@ -189,7 +204,7 @@ const ManagerApplications = () => {
       if (err.message?.includes("409") || err.code === "409" || (typeof err === 'object' && JSON.stringify(err).includes("409"))) {
         toast.error("User is already a tenant elsewhere. Cannot assign.");
       } else if (err?.code === '42501' || String(err?.message || '').toLowerCase().includes('permission') || String(err?.message || '').includes('403')) {
-        toast.error('Permission denied while creating invoice. Apply the latest invoice RLS migration and retry.');
+        toast.error('Permission denied while updating application status.');
       } else {
         toast.error(`Failed to update status: ${err?.message || 'Unknown error'}`);
       }

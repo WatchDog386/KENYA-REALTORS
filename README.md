@@ -1,35 +1,32 @@
 # KENYA-REALTORS Architecture
 
-This repository is organized into two primary application layers:
+This repository runs as a root-managed frontend app backed directly by Supabase.
 
 ## Frontend
 
 - Path: `frontend/`
 - Stack: React + Vite + TypeScript
-- Purpose: UI, routing, user interactions, and calling backend APIs
+- Purpose: UI, routing, business logic, and direct Supabase integration
 
-## Backend
+## Backend Folder
 
 - Path: `backend/`
-- Stack: Node.js + Express
-- Purpose: API/business logic, auth checks, and Supabase access/proxying
+- Purpose: reserved for reference artifacts and future backend work
+- Runtime status: no active Node/Express server is required for app execution
 
 ## Runtime Commands (from repository root)
 
-- `npm run dev:frontend` -> starts frontend from `frontend/`
-- `npm run dev:backend` -> starts backend from `backend/`
-- `npm run dev` -> alias of frontend dev
-- `npm run dev:full` -> starts frontend and backend together
-- `npm run build` -> builds frontend from `frontend/`
+- `npm run dev` -> starts the app (frontend) from root
+- `npm run dev:frontend` -> starts frontend explicitly
+- `npm run build` -> builds frontend using `frontend/vite.config.ts`
+- `npm run preview` -> previews the built frontend
 
-## Deployment Split
+## Data/Auth/Storage
 
-- Frontend deploy target: Vercel (`frontend/`)
-- Backend deploy target: Render (`backend/`)
-- Database/Auth/Storage: Supabase
+- Supabase is the active source for database, auth, and storage.
 
 ## Notes
 
-- Root contains workspace-level config/scripts only.
-- Frontend app source should live under `frontend/`.
-- Backend app source should live under `backend/`.
+- Run the project from repository root only.
+- Frontend app source lives under `frontend/`.
+- Backend folder remains in place for clean project organization.

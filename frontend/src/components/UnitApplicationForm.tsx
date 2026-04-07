@@ -238,6 +238,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
     }
 
     setIsSubmitting(true);
+    let shouldSignOutAfterSubmit = false;
     try {
       let applicantId = user?.id || null;
       let accountAction: "existing" | "created" = "existing";
@@ -246,7 +247,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
       if (!applicantId) {
         const [firstName, ...lastNameParts] = form.applicant_name.trim().split(/\s+/);
         const lastName = lastNameParts.join(" ").trim();
-        let existingAccountByEmail: boolean | null = null;
+        let existingAccountIdByEmail: string | null = null;
 
         // If policy allows, this avoids auth probe errors by selecting the correct path first.
         const { data: profileByEmail, error: profileLookupError } = await supabase
@@ -256,20 +257,11 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
           .maybeSingle();
 
         if (!profileLookupError) {
-          existingAccountByEmail = !!profileByEmail;
+          existingAccountIdByEmail = profileByEmail?.id || null;
         }
 
-        if (existingAccountByEmail === true) {
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: applicantEmail,
-            password: form.password,
-          });
-
-          if (signInError || !signInData.user?.id) {
-            throw new Error("This email is already registered, but the password is incorrect. Use the correct password or reset it, then apply again.");
-          }
-
-          applicantId = signInData.user.id;
+        if (existingAccountIdByEmail) {
+          applicantId = existingAccountIdByEmail;
         } else {
           const { data: authData, error: authError } = await supabase.auth.signUp({
             email: applicantEmail,
@@ -288,18 +280,7 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
           if (authError) {
             const authMessage = String(authError.message || "").toLowerCase();
             if (authMessage.includes("already registered") || authMessage.includes("user already registered")) {
-              // If profile lookup is unavailable/blocked by RLS and user exists, recover with sign-in.
-              const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-                email: applicantEmail,
-                password: form.password,
-              });
-
-              if (signInError || !signInData.user?.id) {
-                throw new Error("This email is already registered, but the password is incorrect. Use the correct password or reset it, then apply again.");
-              }
-
-              applicantId = signInData.user.id;
-              accountAction = "existing";
+              throw new Error("This email is already registered. Please sign in first, then submit your application.");
             } else {
               throw new Error(authError.message || "Could not register applicant account.");
             }
@@ -311,6 +292,9 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
               throw new Error("Registration succeeded, but no user ID was returned. Please verify your email, sign in, and apply again.");
             }
             accountAction = "created";
+
+            // Defer sign-out until after application insert so RLS-protected insert can complete.
+            shouldSignOutAfterSubmit = Boolean(authData.session);
           }
         }
       }
@@ -421,6 +405,13 @@ export const UnitApplicationForm = ({ onSuccess }: { onSuccess: () => void }) =>
       console.error("Unexpected error:", error);
       toast.error(`An unexpected error occurred: ${error.message}`);
     } finally {
+      if (shouldSignOutAfterSubmit) {
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.warn("Post-submit sign-out failed:", signOutError);
+        }
+      }
       setIsSubmitting(false);
     }
   };

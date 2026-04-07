@@ -63,7 +63,7 @@ const LoginPage: React.FC = () => {
             break;
           case "technician":
             targetPath = "/portal/technician";
-            break;
+                                 break;
           case "proprietor":
             targetPath = "/portal/proprietor";
             break;
@@ -283,7 +283,7 @@ const LoginPage: React.FC = () => {
                     {isSubmitting ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
-                      "Enter Workspace"
+                      "Sign In"
                     )}
                   </button>
                 </div>
@@ -295,7 +295,7 @@ const LoginPage: React.FC = () => {
                       : "border-[#c2c8d0] bg-[#edf1f5]"
                   }`}
                 >
-                  <span>{error || "Sign in to your workspace."}</span>
+                  <span>{error || "Sign in to your account."}</span>
                   {!error && <X className="h-3 w-3 text-[#6f8096]" />}
                 </div>
 

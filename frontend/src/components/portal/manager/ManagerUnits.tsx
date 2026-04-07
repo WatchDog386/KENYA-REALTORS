@@ -77,6 +77,12 @@ interface ApplicantCandidate {
   status: string;
 }
 
+const PANEL_HEADER_CLASS =
+  'bg-[#154279] border-b border-[#123863] text-white uppercase tracking-[0.14em] text-[11px] font-semibold';
+
+const INPUT_CLASS_NAME =
+  'h-9 rounded-none border border-[#b9c3cf] bg-white px-3 text-[12px] text-[#243041] shadow-none focus-visible:ring-0';
+
 const ManagerUnits = () => {
   const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
@@ -119,7 +125,7 @@ const openDetails = (unit: Unit) => {
     setIsEditingDescription(false);
     
     // Initialize edit config in case they switch to Manage tab
-    const effectivePrice = unit.price || unit.property_unit_types?.price_per_unit || 0;
+    const effectivePrice = getEffectiveUnitPrice(unit);
     setUnitToEdit(unit);
     setEditConfig({
         status: unit.status || 'vacant',
@@ -138,7 +144,7 @@ const openDetails = (unit: Unit) => {
 const openEditUnit = (unit: Unit) => {
     setUnitToEdit(unit);
     // Determine effective price
-    const effectivePrice = unit.price || unit.property_unit_types?.price_per_unit || 0;
+    const effectivePrice = getEffectiveUnitPrice(unit);
     
     setEditConfig({
         status: unit.status || 'vacant',
@@ -302,6 +308,28 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     price: '',
     status: 'vacant'
   });
+
+  const getEffectiveUnitPrice = (unit: Unit) => {
+    if (unit.price !== null && unit.price !== undefined) {
+      const directPrice = Number(unit.price);
+      if (!Number.isNaN(directPrice)) {
+        return directPrice;
+      }
+    }
+
+    if (unit.property_unit_types?.price_per_unit !== null && unit.property_unit_types?.price_per_unit !== undefined) {
+      const joinedTypePrice = Number(unit.property_unit_types.price_per_unit);
+      if (!Number.isNaN(joinedTypePrice)) {
+        return joinedTypePrice;
+      }
+    }
+
+    const localTypePrice = Number(
+      unitTypes.find((type) => type.id === unit.unit_type_id)?.price_per_unit ?? 0
+    );
+
+    return Number.isNaN(localTypePrice) ? 0 : localTypePrice;
+  };
 
   useEffect(() => {
     loadUnits();
@@ -708,7 +736,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
             unit_id: selectedUnit.id,
             tenant_id: tenantUserId,
             start_date: now,
-            rent_amount: selectedUnit.property_unit_types?.price_per_unit || 0,
+            rent_amount: getEffectiveUnitPrice(selectedUnit),
             status: 'active'
           })
           .select('id')
@@ -1090,7 +1118,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     
     let matchesPrice = true;
     if (filterPriceRange !== 'all') {
-      const price = unit.price || unitTypes.find(t => t.id === unit.unit_type_id)?.price_per_unit || 0;
+      const price = getEffectiveUnitPrice(unit);
       if (filterPriceRange === '0-10000') matchesPrice = price < 10000;
       else if (filterPriceRange === '10000-20000') matchesPrice = price >= 10000 && price <= 20000;
       else if (filterPriceRange === '20000-50000') matchesPrice = price > 20000 && price <= 50000;
@@ -1128,38 +1156,45 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     return 'bg-slate-100 text-slate-800';
   };
 
+  const occupiedUnitsCount = units.filter((unit) => unit.status === 'occupied' || Boolean(unit.active_lease)).length;
+  const vacantUnitsCount = units.filter((unit) => !unit.active_lease && ['vacant', 'available'].includes(String(unit.status || '').toLowerCase())).length;
+  const maintenanceUnitsCount = units.filter((unit) => String(unit.status || '').toLowerCase() === 'maintenance').length;
+  const activePropertyLabel = propertyName || (properties.length === 1 ? properties[0].name : 'Assigned Properties');
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="w-full h-full p-4 md:p-6 lg:p-8 space-y-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                  <Building className="w-8 h-8 text-blue-600" />
+    <div className="min-h-screen bg-[#d7dce1] pb-10 font-['Poppins','Segoe_UI',sans-serif] text-[#243041]">
+      <div className="w-full h-full p-4 md:p-6 lg:p-8 space-y-3">
+        <section className="relative overflow-hidden border border-[#bcc3cd] bg-[#eef1f4]">
+          <div className="flex w-full flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <div className="h-[2px] w-8 bg-[#154279]" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#154279]">Property Management</span>
               </div>
-              <h1 className="text-4xl font-bold text-slate-800">Units</h1>
+              <h1 className="mb-1 text-3xl font-bold leading-tight tracking-tight text-[#1f2937] md:text-4xl">
+                Unit <span className="text-[#154279]">Directory</span>
+              </h1>
+              <p className="text-[12px] font-medium uppercase tracking-wide text-[#5f6b7c]">{activePropertyLabel}</p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center bg-white border border-slate-200 rounded-lg p-1">
-                <button 
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-slate-100 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="Grid View"
-                >
-                  <LayoutGrid size={18} />
-                </button>
-                <button 
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-slate-100 text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                  title="List View"
-                >
-                  <List size={18} />
-                </button>
-              </div>
+
+            <div className="hidden sm:flex items-center border border-[#b9c3cf] bg-white">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-[#154279] text-white' : 'text-[#5f6b7c] hover:bg-[#f5f7fa]'}`}
+                title="Grid View"
+              >
+                <LayoutGrid size={18} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-[#154279] text-white' : 'text-[#5f6b7c] hover:bg-[#f5f7fa]'}`}
+                title="List View"
+              >
+                <List size={18} />
+              </button>
             </div>
           </div>
-          <p className="text-slate-500 ml-1">Manage all units across your properties</p>
-        </div>
+        </section>
 
         {/* Add Unit Dialog */}
         <Dialog open={isAddUnitOpen} onOpenChange={setIsAddUnitOpen}>
@@ -1958,11 +1993,31 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
         </Dialog>
 
 {/* Search & Filters */}
-        <div className="mb-6 flex flex-col xl:flex-row gap-4">
+        <div className="border border-[#bcc3cd] bg-[#eef1f4] p-4 md:p-5">
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="border border-[#c8d0da] bg-white px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6b7280]">Total Units</p>
+            <p className="text-2xl font-bold text-[#1f2937]">{units.length}</p>
+          </div>
+          <div className="border border-[#b4c5d9] bg-[#f4f8fc] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#154279]">Occupied</p>
+            <p className="text-2xl font-bold text-[#154279]">{occupiedUnitsCount}</p>
+          </div>
+          <div className="border border-[#d5dbe2] bg-white px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6b7c]">Vacant</p>
+            <p className="text-2xl font-bold text-[#334155]">{vacantUnitsCount}</p>
+          </div>
+          <div className="border border-[#e6c7b8] bg-[#fff7f2] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#D85C2C]">Maintenance</p>
+            <p className="text-2xl font-bold text-[#D85C2C]">{maintenanceUnitsCount}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-col xl:flex-row gap-4">
           <div className="relative flex-1 min-w-[200px]">
-            <Search size={16} className="text-slate-400 absolute left-3 top-3" /> 
+            <Search size={16} className="text-[#7b8798] absolute left-3 top-3" /> 
             <Input
-              className="pl-9 w-full bg-white"
+              className={`${INPUT_CLASS_NAME} pl-9`}
               placeholder="Search units by number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -1971,7 +2026,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           
           <div className="flex flex-col sm:flex-row gap-4 overflow-x-auto pb-1">
               <Select value={filterProperty} onValueChange={setFilterProperty}>
-                <SelectTrigger className="w-full sm:w-[180px] bg-white text-slate-700">
+                <SelectTrigger className={`w-full sm:w-[180px] ${INPUT_CLASS_NAME}`}>
                   <SelectValue placeholder="All Properties" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1983,7 +2038,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               </Select>
 
               <Select value={filterUnitType} onValueChange={setFilterUnitType}>
-                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                <SelectTrigger className={`w-full sm:w-[160px] ${INPUT_CLASS_NAME}`}>
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1995,7 +2050,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               </Select>
 
               <Select value={filterPriceRange} onValueChange={setFilterPriceRange}>
-                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                <SelectTrigger className={`w-full sm:w-[160px] ${INPUT_CLASS_NAME}`}>
                   <SelectValue placeholder="Price Range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2008,7 +2063,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               </Select>
 
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full sm:w-[160px] bg-white text-slate-700">
+                <SelectTrigger className={`w-full sm:w-[160px] ${INPUT_CLASS_NAME}`}>
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2021,21 +2076,25 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               </Select>
           </div>
         </div>
+        </div>
 
         {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <div className="border border-[#bcc3cd] bg-white py-16">
+            <div className="flex justify-center items-center gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-[#154279]" />
+              <p className="text-sm font-medium uppercase tracking-wide text-[#5f6b7c]">Loading units</p>
+            </div>
           </div>
         ) : filteredUnits.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <Building className="w-16 h-16 mx-auto mb-4 opacity-30 text-slate-400" />
-            <p className="text-slate-600 text-lg">No units found</p>
+          <div className="border border-[#bcc3cd] bg-white p-12 text-center">
+            <Building className="w-16 h-16 mx-auto mb-4 opacity-30 text-[#8a94a3]" />
+            <p className="text-[#4b5563] text-lg font-semibold">No units found</p>
           </div>
         ) : viewMode === 'list' ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-hidden">
+          <div className="border border-[#bcc3cd] bg-white overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-50/80 border-b border-slate-200/60 text-slate-500 uppercase tracking-widest text-[11px] font-extrabold">
+                <thead className={PANEL_HEADER_CLASS}>
                   <tr>
                     <th className="px-6 py-4">Unit</th>
                     <th className="px-6 py-4">Type & Category</th>
@@ -2056,7 +2115,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                       <tr key={unit.id} className="hover:bg-slate-50/80 hover:shadow-[inset_4px_0_0_0_rgba(59,130,246,0.5)] transition-all duration-200 group cursor-pointer" onClick={() => openDetails(unit)}>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                            <div className="w-10 h-10 bg-[#eef1f4] border border-[#d7dde6] flex items-center justify-center shrink-0 overflow-hidden">
                                 {unit.image_url ? (
                                     <img src={unit.image_url} alt="" className="w-full h-full object-cover" />
                                 ) : (
@@ -2073,12 +2132,12 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <Badge variant="outline" className="bg-slate-50 text-slate-600 font-medium">
+                          <Badge variant="outline" className="border-[#d3dae5] bg-[#f8fafc] text-[#4f5d73] font-semibold">
                             {unit.floor_number ? `Floor ${unit.floor_number}` : 'Ground'}
                           </Badge>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-bold text-blue-600">{(unit.price || unitType?.price_per_unit || 0).toLocaleString()}</span>
+                          <span className="font-bold text-[#154279]">{getEffectiveUnitPrice(unit).toLocaleString()}</span>
                         </td>
                         <td className="px-6 py-4">
                           {isOccupied ? (
@@ -2174,56 +2233,13 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
               const isOccupied = displayStatus === 'occupied';
               const isVacant = displayStatus === 'vacant' || displayStatus === 'available';
 
-              // Theme Selection Based on Category
-              const categoryName = unitType?.unit_category || unitType?.name || 'default';
-              const getTheme = (cat: string) => {
-                  const sum = cat.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-                  const themes = [
-                      { // Emerald
-                        wrapper: "hover:border-emerald-500 hover:shadow-emerald-500/30 via-emerald-500/5",
-                        accent: "from-emerald-900 group-hover:from-emerald-500",
-                        icon: "text-emerald-500"
-                      },
-                      { // Orange
-                        wrapper: "hover:border-orange-500 hover:shadow-orange-500/30 via-orange-500/5",
-                        accent: "from-orange-900 group-hover:from-orange-500",
-                        icon: "text-orange-500"
-                      },
-                      { // Blue
-                        wrapper: "hover:border-blue-500 hover:shadow-blue-500/30 via-blue-500/5",
-                        accent: "from-blue-900 group-hover:from-blue-500",
-                        icon: "text-blue-500"
-                      },
-                      { // Violet
-                        wrapper: "hover:border-violet-500 hover:shadow-violet-500/30 via-violet-500/5",
-                        accent: "from-violet-900 group-hover:from-violet-500",
-                        icon: "text-violet-500"
-                      }, 
-                      { // Rose
-                        wrapper: "hover:border-rose-500 hover:shadow-rose-500/30 via-rose-500/5",
-                        accent: "from-rose-900 group-hover:from-rose-500",
-                        icon: "text-rose-500"
-                      },
-                      { // Amber
-                        wrapper: "hover:border-amber-500 hover:shadow-amber-500/30 via-amber-500/5",
-                        accent: "from-amber-900 group-hover:from-amber-500",
-                        icon: "text-amber-500"
-                      }
-                  ];
-                  return themes[sum % themes.length];
-              };
-              const theme = getTheme(categoryName);
-
               return (
               <div key={unit.id} 
-                  className={`group relative border-2 rounded-2xl transition-all duration-300 flex flex-col overflow-hidden cursor-pointer bg-gradient-to-br from-white to-slate-50 border-slate-300 hover:shadow-2xl hover:scale-[1.02] shadow-lg shadow-slate-300/30 ${theme.wrapper}`}
+                  className="group relative border border-[#bcc3cd] bg-white transition-all duration-200 flex flex-col overflow-hidden cursor-pointer hover:border-[#9fb0c6] hover:shadow-[0_8px_20px_rgba(21,66,121,0.12)]"
                   onClick={() => openDetails(unit)}
               >
-                {/* Decorative Corner Accent */}
-                <div className={`absolute top-0 right-0 w-32 h-32 pointer-events-none opacity-20 bg-gradient-to-br transition-all duration-300 z-20 ${theme.accent}`} style={{ clipPath: "polygon(100% 0, 0 0, 100% 100%)" }} />
-
                 {/* Image / Header Section - Professional Style */}
-                <div className="h-28 bg-slate-100 relative border-b border-slate-50">
+                <div className="h-28 bg-[#eef1f4] relative border-b border-[#d7dde6]">
                      {unit.image_url ? (
                          <>
                            <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-slate-900/0 transition-colors z-10" />
@@ -2234,9 +2250,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                            />
                          </>
                      ) : (
-                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-                             <div className="bg-white p-2 rounded-full shadow-sm mb-1 relative z-10">
-                                <Building2 className={`w-5 h-5 ${theme.icon}`} strokeWidth={2} />
+                       <div className="w-full h-full flex flex-col items-center justify-center bg-[#f8fafc] text-slate-400">
+                         <div className="bg-white p-2 border border-[#d7dde6] mb-1 relative z-10">
+                          <Building2 className="w-5 h-5 text-[#154279]" strokeWidth={2} />
                              </div>
                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest relative z-10">No Image</p>
                          </div>
@@ -2272,20 +2288,20 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                              </p>
                          </div>
                          <div className="text-right">
-                             <span className="block text-base font-bold text-blue-600">
-                               KES {(unit.price || unitType?.price_per_unit || 0).toLocaleString()}
+                             <span className="block text-base font-bold text-[#154279]">
+                               KES {getEffectiveUnitPrice(unit).toLocaleString()}
                              </span>
                              <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wide">/ month</span>
                          </div>
                     </div>
 
                     {/* Divider */}
-                    <div className="h-px bg-slate-100 w-full" />
+                    <div className="h-px bg-[#e2e8f0] w-full" />
 
                     {/* Quick Specs */}
                     <div className="grid grid-cols-2 gap-2 text-xs mt-1">
-                         <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100 group-hover:border-indigo-100 transition-colors" title="Floor Number">
-                             <div className="p-1.5 rounded-md bg-indigo-600 text-white shadow-sm shrink-0">
+                         <div className="flex items-center gap-1.5 bg-[#f8fafc] p-1.5 border border-[#e2e8f0] group-hover:border-[#c8d4e3] transition-colors" title="Floor Number">
+                           <div className="p-1.5 bg-[#154279] text-white shadow-sm shrink-0">
                                 <Layers size={14} strokeWidth={2.5} />
                              </div>
                              <div>
@@ -2293,8 +2309,8 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                                 <span className="font-bold text-slate-700 leading-none">{unit.floor_number ? `${unit.floor_number}` : 'G'}</span>
                              </div>
                          </div>
-                         <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100 group-hover:border-violet-100 transition-colors" title="Unit Category">
-                             <div className="p-1.5 rounded-md bg-violet-600 text-white shadow-sm shrink-0">
+                         <div className="flex items-center gap-1.5 bg-[#f8fafc] p-1.5 border border-[#e2e8f0] group-hover:border-[#c8d4e3] transition-colors" title="Unit Category">
+                           <div className="p-1.5 bg-[#D85C2C] text-white shadow-sm shrink-0">
                                 <Maximize size={14} strokeWidth={2.5} />
                              </div>
                              <div className="overflow-hidden">
@@ -2367,27 +2383,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
           </div>
         )}
 
-        {/* Summary Stats */}
-        {!loading && units.length > 0 && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg shadow-sm border border-slate-100 p-4 text-center">
-              <p className="text-sm text-slate-500 mb-2 font-medium uppercase tracking-wider">Total Units</p>
-              <p className="text-3xl font-bold text-slate-800">{units.length}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-emerald-100 p-4 text-center">
-              <p className="text-sm text-emerald-600 mb-2 font-medium uppercase tracking-wider">Occupied</p>
-              <p className="text-3xl font-bold text-emerald-600">{units.filter(u => u.status === 'occupied').length}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-blue-100 p-4 text-center">
-              <p className="text-sm text-blue-600 mb-2 font-medium uppercase tracking-wider">Vacant</p>
-              <p className="text-3xl font-bold text-blue-600">{units.filter(u => u.status === 'vacant').length}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow-sm border border-orange-100 p-4 text-center">
-              <p className="text-sm text-orange-600 mb-2 font-medium uppercase tracking-wider">Maintenance</p>
-              <p className="text-3xl font-bold text-orange-500">{units.filter(u => u.status === 'maintenance').length}</p>
-            </div>
-          </div>
-        )}
+
       </div>
     </div>
   );

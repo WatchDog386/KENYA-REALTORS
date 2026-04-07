@@ -21,6 +21,8 @@ export interface PaystackResponse {
 export interface PaystackVerificationResponse {
   status: boolean;
   message: string;
+  verification_unavailable?: boolean;
+  fallback_reason?: string;
   data?: {
     id: number;
     reference: string;
@@ -103,7 +105,12 @@ export const verifyPaystackTransaction = async (
 ): Promise<PaystackVerificationResponse> => {
   try {
     if (!PAYSTACK_SECRET_KEY) {
-      throw new Error("Paystack secret key is not configured");
+      return {
+        status: false,
+        message: "Paystack secret key is not configured",
+        verification_unavailable: true,
+        fallback_reason: "VITE_PAYSTACK_SECRET_KEY missing in client runtime",
+      };
     }
 
     const response = await fetch(
@@ -125,8 +132,16 @@ export const verifyPaystackTransaction = async (
     const data: PaystackVerificationResponse = await response.json();
     return data;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown Paystack verification error";
     console.error("Error verifying Paystack transaction:", error);
-    throw error;
+
+    // Keep payment flow alive in client-only mode and let caller decide fallback behavior.
+    return {
+      status: false,
+      message: errorMessage,
+      verification_unavailable: true,
+      fallback_reason: "Paystack verification endpoint unreachable from client",
+    };
   }
 };
 

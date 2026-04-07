@@ -1,11 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { CalendarCheck2, CheckCircle2, CircleX, RefreshCw, Send } from 'lucide-react';
+import { CalendarCheck2, CheckCircle2, CircleX, RefreshCw, Send, UserCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { leaveRequestService, LeavePropertyOption, LeaveRequestRecord, LeaveRequestStatus } from '@/services/leaveRequestService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -74,6 +73,15 @@ const ManagerLeaveRequestsPage = () => {
     return requests.filter((request) => request.status === activeFilter);
   }, [activeFilter, requests]);
 
+  const stats = useMemo(() => {
+    return {
+      total: requests.length,
+      pending: requests.filter((request) => request.status === 'pending').length,
+      approved: requests.filter((request) => request.status === 'approved').length,
+      rejected: requests.filter((request) => request.status === 'rejected').length,
+    };
+  }, [requests]);
+
   const handleReview = async (requestId: string, status: 'approved' | 'rejected') => {
     try {
       setProcessingId(requestId);
@@ -131,19 +139,54 @@ const ManagerLeaveRequestsPage = () => {
   };
 
   return (
-    <div className="bg-slate-50 min-h-screen p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-[#154279]">Submit Leave Request</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmitLeaveRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="manager-leave-property">Property (optional)</Label>
+    <div className="min-h-screen bg-[#d7dce1] p-4 text-[#243041] md:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-4">
+        <section className="border border-[#bcc3cd] bg-[#eef1f4] px-4 py-4 md:px-6">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="h-[2px] w-8 bg-[#154279]" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#154279]">Manager Dashboard</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-[#1f2937] md:text-4xl">
+            Leave <span className="text-[#154279]">Control Center</span>
+          </h1>
+          <p className="mt-1 text-sm font-medium text-[#5f6b7c]">
+            Submit your own leave and review staff leave requests in one workspace.
+          </p>
+        </section>
+
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="border border-[#bcc3cd] bg-white px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6b7280]">Total Requests</p>
+            <p className="text-3xl font-bold text-[#1f2937]">{stats.total}</p>
+          </div>
+          <div className="border border-[#b4c5d9] bg-[#f4f8fc] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#154279]">Pending</p>
+            <p className="text-3xl font-bold text-[#154279]">{stats.pending}</p>
+          </div>
+          <div className="border border-[#d2e3d8] bg-[#f4fbf6] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#157347]">Approved</p>
+            <p className="text-3xl font-bold text-[#157347]">{stats.approved}</p>
+          </div>
+          <div className="border border-[#e7c9c9] bg-[#fff7f7] px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b42318]">Rejected</p>
+            <p className="text-3xl font-bold text-[#b42318]">{stats.rejected}</p>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <section className="border border-[#bcc3cd] bg-white xl:col-span-1">
+            <div className="border-b border-[#bcc3cd] bg-[#e8edf3] px-4 py-3">
+              <h2 className="text-lg font-bold uppercase tracking-wide text-[#154279]">Submit Leave Request</h2>
+            </div>
+
+            <form onSubmit={handleSubmitLeaveRequest} className="space-y-4 p-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="manager-leave-property" className="text-[11px] font-semibold uppercase tracking-wide text-[#5f6b7c]">
+                  Property (Optional)
+                </Label>
                 <select
                   id="manager-leave-property"
-                  className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                  className="h-10 w-full border border-[#b9c3cf] bg-white px-3 text-sm text-[#243041]"
                   value={formData.property_id}
                   onChange={(event) =>
                     setFormData((prev) => ({ ...prev, property_id: event.target.value }))
@@ -158,36 +201,46 @@ const ManagerLeaveRequestsPage = () => {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="manager-leave-start">Start Date</Label>
-                <Input
-                  id="manager-leave-start"
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, start_date: event.target.value }))
-                  }
-                />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="manager-leave-start" className="text-[11px] font-semibold uppercase tracking-wide text-[#5f6b7c]">
+                    Start Date
+                  </Label>
+                  <Input
+                    id="manager-leave-start"
+                    type="date"
+                    className="h-10 rounded-none border-[#b9c3cf]"
+                    value={formData.start_date}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, start_date: event.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="manager-leave-end" className="text-[11px] font-semibold uppercase tracking-wide text-[#5f6b7c]">
+                    End Date
+                  </Label>
+                  <Input
+                    id="manager-leave-end"
+                    type="date"
+                    className="h-10 rounded-none border-[#b9c3cf]"
+                    value={formData.end_date}
+                    onChange={(event) =>
+                      setFormData((prev) => ({ ...prev, end_date: event.target.value }))
+                    }
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="manager-leave-end">End Date</Label>
-                <Input
-                  id="manager-leave-end"
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(event) =>
-                    setFormData((prev) => ({ ...prev, end_date: event.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="manager-leave-reason">Reason</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="manager-leave-reason" className="text-[11px] font-semibold uppercase tracking-wide text-[#5f6b7c]">
+                  Reason
+                </Label>
                 <Textarea
                   id="manager-leave-reason"
-                  rows={3}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500"
+                  rows={4}
+                  className="rounded-none border-[#b9c3cf] px-3 py-2"
                   value={formData.reason}
                   onChange={(event) =>
                     setFormData((prev) => ({ ...prev, reason: event.target.value }))
@@ -196,95 +249,108 @@ const ManagerLeaveRequestsPage = () => {
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <Button type="submit" className="bg-[#154279] hover:bg-[#10355f]" disabled={submitting}>
-                  <Send className="w-4 h-4 mr-2" />
-                  {submitting ? 'Submitting...' : 'Submit Leave Request'}
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                className="h-10 w-full border-b-2 border-[#123863] bg-[#154279] font-semibold uppercase tracking-wide text-white hover:bg-[#10355f]"
+                disabled={submitting}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {submitting ? 'Submitting...' : 'Submit Leave Request'}
+              </Button>
             </form>
-          </CardContent>
-        </Card>
+          </section>
 
-        <Card className="border-none shadow-lg">
-          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <CardTitle className="text-2xl font-bold text-[#154279] flex items-center gap-2">
-                <CalendarCheck2 className="w-6 h-6 text-[#F96302]" />
-                Employee Leave Requests
-              </CardTitle>
-              <p className="text-sm text-slate-600 mt-2">
-                Review employee leave requests and choose when approved requests are visible to proprietors.
-              </p>
-            </div>
-            <Button variant="outline" onClick={loadRequests} className="w-fit">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {(['pending', 'approved', 'rejected', 'cancelled', 'all'] as const).map((status) => (
-                <Button
-                  key={status}
-                  variant={activeFilter === status ? 'default' : 'outline'}
-                  onClick={() => setActiveFilter(status)}
-                  className={activeFilter === status ? 'bg-[#154279] hover:bg-[#10355f]' : ''}
-                >
-                  {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                </Button>
-              ))}
+          <section className="border border-[#bcc3cd] bg-white xl:col-span-2">
+            <div className="flex flex-col gap-3 border-b border-[#bcc3cd] bg-[#e8edf3] px-4 py-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="flex items-center gap-2 text-xl font-bold text-[#154279]">
+                  <CalendarCheck2 className="h-5 w-5 text-[#F96302]" />
+                  Employee Leave Requests
+                </h2>
+                <p className="mt-1 text-sm text-[#5f6b7c]">
+                  Review requests and decide when approved leave is visible to proprietors.
+                </p>
+              </div>
+              <Button variant="outline" onClick={loadRequests} className="h-10 rounded-none border-[#b9c3cf] bg-white">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh
+              </Button>
             </div>
 
-            {loading ? (
-              <p className="text-sm text-slate-500">Loading leave requests...</p>
-            ) : filteredRequests.length === 0 ? (
-              <p className="text-sm text-slate-500">No leave requests found for this filter.</p>
-            ) : (
-              <div className="space-y-4">
-                {filteredRequests.map((request) => {
+            <div className="border-b border-[#d7dde6] bg-[#f7f9fc] p-3">
+              <div className="flex flex-wrap gap-2">
+                {(['pending', 'approved', 'rejected', 'cancelled', 'all'] as const).map((status) => (
+                  <Button
+                    key={status}
+                    variant="outline"
+                    onClick={() => setActiveFilter(status)}
+                    className={`h-9 rounded-none border px-4 font-semibold ${
+                      activeFilter === status
+                        ? 'border-[#154279] bg-[#154279] text-white hover:bg-[#10355f]'
+                        : 'border-[#c8d1dc] bg-white text-[#4b5563] hover:bg-[#eef2f7]'
+                    }`}
+                  >
+                    {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 p-3 md:p-4">
+              {loading ? (
+                <p className="text-sm font-medium text-[#5f6b7c]">Loading leave requests...</p>
+              ) : filteredRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center border border-dashed border-[#c7d0db] bg-[#f9fbfd] px-4 py-10 text-center">
+                  <UserCircle2 className="h-10 w-10 text-[#94a3b8]" />
+                  <p className="mt-2 text-sm font-medium text-[#5f6b7c]">No leave requests found for this filter.</p>
+                </div>
+              ) : (
+                filteredRequests.map((request) => {
                   const requesterName = `${request.requester?.first_name || ''} ${request.requester?.last_name || ''}`.trim() || request.requester?.email || 'Employee';
 
                   return (
-                    <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <article key={request.id} className="border border-[#d7dde6] bg-[#fbfcfe] p-4">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                         <div>
-                          <p className="text-xs text-slate-500">Employee</p>
-                          <p className="font-semibold text-slate-800">{requesterName}</p>
-                          <p className="text-xs text-slate-500">{request.requester?.role || request.role}</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7b8798]">Employee</p>
+                          <p className="font-semibold text-[#1f2937]">{requesterName}</p>
+                          <p className="text-xs text-[#64748b]">{request.requester?.role || request.role}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500">Property</p>
-                          <p className="font-semibold text-slate-800">{request.property?.name || 'General'}</p>
-                          <p className="text-xs text-slate-500">{request.property?.location || '-'}</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7b8798]">Property</p>
+                          <p className="font-semibold text-[#1f2937]">{request.property?.name || 'General'}</p>
+                          <p className="text-xs text-[#64748b]">{request.property?.location || '-'}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500">Dates</p>
-                          <p className="font-semibold text-slate-800">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7b8798]">Date Range</p>
+                          <p className="font-semibold text-[#1f2937]">
                             {formatDate(request.start_date)} - {formatDate(request.end_date)}
                           </p>
-                          <p className="text-xs text-slate-500">{request.days_requested} day(s)</p>
+                          <p className="text-xs text-[#64748b]">{request.days_requested} day(s)</p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500">Status</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7b8798]">Status</p>
                           <Badge className={statusClasses[request.status]}>{request.status}</Badge>
                         </div>
-                        <div className="md:col-span-2">
-                          <p className="text-xs text-slate-500">Reason</p>
-                          <p className="text-sm text-slate-700">{request.reason}</p>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#7b8798]">Reason</p>
+                          <p className="text-sm text-[#334155]">{request.reason}</p>
                           {request.manager_notes && (
-                            <p className="text-xs text-slate-600 mt-1">Note: {request.manager_notes}</p>
+                            <p className="mt-1 text-xs text-[#64748b]">Note: {request.manager_notes}</p>
                           )}
                         </div>
                       </div>
 
                       {request.status === 'pending' && (
-                        <div className="mt-4 border-t border-slate-100 pt-4 space-y-3">
-                          <div>
-                            <Label htmlFor={`notes-${request.id}`}>Manager Notes</Label>
+                        <div className="mt-4 space-y-3 border-t border-[#d7dde6] pt-4">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`notes-${request.id}`} className="text-[11px] font-semibold uppercase tracking-wide text-[#5f6b7c]">
+                              Manager Notes
+                            </Label>
                             <Textarea
                               id={`notes-${request.id}`}
                               rows={2}
+                              className="rounded-none border-[#b9c3cf]"
                               value={notesById[request.id] || ''}
                               onChange={(event) =>
                                 setNotesById((prev) => ({ ...prev, [request.id]: event.target.value }))
@@ -293,7 +359,7 @@ const ManagerLeaveRequestsPage = () => {
                             />
                           </div>
 
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
+                          <label className="flex items-center gap-2 text-sm text-[#334155]">
                             <input
                               type="checkbox"
                               checked={shareById[request.id] || false}
@@ -306,31 +372,32 @@ const ManagerLeaveRequestsPage = () => {
 
                           <div className="flex flex-wrap gap-2">
                             <Button
-                              className="bg-emerald-600 hover:bg-emerald-700"
+                              className="h-9 rounded-none border-b-2 border-emerald-800 bg-emerald-600 font-semibold uppercase tracking-wide text-white hover:bg-emerald-700"
                               disabled={processingId === request.id}
                               onClick={() => handleReview(request.id, 'approved')}
                             >
-                              <CheckCircle2 className="w-4 h-4 mr-2" />
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
                               Approve
                             </Button>
                             <Button
                               variant="destructive"
+                              className="h-9 rounded-none border-b-2 border-red-800 font-semibold uppercase tracking-wide"
                               disabled={processingId === request.id}
                               onClick={() => handleReview(request.id, 'rejected')}
                             >
-                              <CircleX className="w-4 h-4 mr-2" />
+                              <CircleX className="mr-2 h-4 w-4" />
                               Reject
                             </Button>
                           </div>
                         </div>
                       )}
-                    </div>
+                    </article>
                   );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                })
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

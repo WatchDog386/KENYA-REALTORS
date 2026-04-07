@@ -47,6 +47,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import TenantOnboardingHub from "@/components/TenantOnboardingHub";
 
 // Helper function to format currency
 const formatCurrency = (amount: number): string => {
@@ -167,6 +168,11 @@ const TenantDashboard: React.FC = () => {
     transferCharges: 0,
     receiptCount: 0,
   });
+
+  // Onboarding state tracking
+  const [isInOnboarding, setIsInOnboarding] = useState(false);
+  const [pendingApplication, setPendingApplication] = useState<any>(null);
+  const [pendingInvoice, setPendingInvoice] = useState<any>(null);
 
   // Calculate lease months remaining
   const calculateLeaseMonthsLeft = (endDate: string): number => {
@@ -346,6 +352,80 @@ const TenantDashboard: React.FC = () => {
     }
   };
 
+  // Check if tenant is in onboarding state (pending app + unpaid invoice)
+  const checkOnboardingState = async (): Promise<boolean> => {
+    if (!user?.id) return false;
+
+    try {
+      console.log("🔍 Checking onboarding state for user:", user.id);
+
+      // Check for pending application
+      const { data: appData } = await supabase
+        .from("lease_applications")
+        .select("id, property_id, unit_id, applicant_name, status, created_at")
+        .eq("applicant_id", user.id)
+        .in("status", ["pending", "under_review", "approved", "invoice_sent"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!appData) {
+        console.log("✅ No pending application found");
+        setIsInOnboarding(false);
+        return false;
+      }
+
+      setPendingApplication(appData);
+
+      // Check for unpaid invoice related to this application.
+      const buildInvoiceQuery = () =>
+        supabase
+          .from("invoices")
+          .select("id, amount, due_date, status, property_id, unit_id")
+          .eq("property_id", appData.property_id)
+          .in("status", ["unpaid", "overdue", "pending"])
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+      const createdAtIso = appData.created_at ? new Date(appData.created_at).toISOString() : null;
+      const primaryInvoiceResponse = createdAtIso
+        ? await buildInvoiceQuery().gte("created_at", createdAtIso).maybeSingle()
+        : await buildInvoiceQuery().maybeSingle();
+
+      let invData = primaryInvoiceResponse.data;
+      let invoiceError = primaryInvoiceResponse.error;
+
+      if (invoiceError && createdAtIso) {
+        console.warn("⚠️ Invoice lookup with created_at filter failed. Retrying without time filter.", invoiceError);
+        const fallbackInvoiceResponse = await buildInvoiceQuery().maybeSingle();
+        invData = fallbackInvoiceResponse.data;
+        invoiceError = fallbackInvoiceResponse.error;
+      }
+
+      if (invoiceError) {
+        console.error("❌ Failed to fetch pending onboarding invoice:", invoiceError);
+        setIsInOnboarding(false);
+        return false;
+      }
+
+      if (!invData) {
+        console.log("✅ No unpaid invoices found");
+        setIsInOnboarding(false);
+        return false;
+      }
+
+      setPendingInvoice(invData);
+
+      // Both conditions met - tenant is in onboarding
+      console.log("⏳ Tenant is in onboarding state - pending invoice:", invData.id);
+      setIsInOnboarding(true);
+      return true;
+    } catch (error) {
+      console.error("Error checking onboarding state:", error);
+      return false;
+    }
+  };
+
   const fetchDashboardData = async () => {
     if (!user?.id) {
       setLoading(false);
@@ -358,6 +438,16 @@ const TenantDashboard: React.FC = () => {
 
       // Fetch user profile for full name and avatar
       await fetchUserProfile();
+
+      // CHECK ONBOARDING STATE FIRST - this gates the dashboard
+      const inOnboarding = await checkOnboardingState();
+      
+      if (inOnboarding) {
+        // User is pending payment - show onboarding hub instead
+        console.log("🚀 Showing Tenant Onboarding Hub");
+        setLoading(false);
+        return;
+      }
 
       // CRITICAL: Fetch tenant info first - all other queries depend on this
       const hasTenantInfo = await fetchTenantInfo();
@@ -677,10 +767,15 @@ const TenantDashboard: React.FC = () => {
     );
   }
 
+  // Show onboarding hub if tenant is in onboarding state
+  if (isInOnboarding && pendingApplication && pendingInvoice) {
+    return <TenantOnboardingHub />;
+  }
+
   // Show welcome message if no tenant info (user not yet assigned)
   if (!propertyData && !tenantInfo) {
     return (
-      <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+      <div className="antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
          <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
           body { font-family: 'Nunito', sans-serif; }
@@ -747,7 +842,7 @@ const TenantDashboard: React.FC = () => {
   }
 
   return (
-    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+    <div className="antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
         body { font-family: 'Nunito', sans-serif; }

@@ -25,7 +25,7 @@ interface ProprietorProfile {
   user_id: string;
   business_name?: string;
   status: string;
-  properties_count: number;
+  properties_count?: number;
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -76,6 +76,22 @@ export const ProprietorDashboard: React.FC = () => {
     try {
       setLoading(true);
 
+      if (!authUser?.id) {
+        setProprietor(null);
+        setProperties([]);
+        return;
+      }
+
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, email, phone, avatar_url, assigned_property_id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.warn('Unable to load proprietor profile details:', profileError);
+      }
+
       // Get proprietor profile
       const { data: propData, error: propError } = await supabase
         .from('proprietors')
@@ -83,52 +99,193 @@ export const ProprietorDashboard: React.FC = () => {
           id,
           user_id,
           business_name,
-          status,
-          properties_count,
-          profiles:user_id(first_name, last_name, email, phone, avatar_url)
+          status
         `)
         .eq('user_id', authUser?.id)
-        .single();
+        .maybeSingle();
 
-      if (propError) throw propError;
+      if (propError && propError.code !== 'PGRST116') throw propError;
 
-      const mappedProp = {
-        ...propData,
-        profile: propData.profiles
-      };
+      const mappedProp: ProprietorProfile = propData
+        ? {
+            ...(propData as any),
+            profile: (profileData as any) || undefined,
+          }
+        : {
+            id: authUser.id,
+            user_id: authUser.id,
+            business_name: undefined,
+            status: 'active',
+            properties_count: 0,
+            profile: (profileData as any) || undefined,
+          };
 
       setProprietor(mappedProp);
 
-      // Get owned properties
-      const { data: propsData, error: propsError } = await supabase
+      const proprietorIdCandidates = Array.from(
+        new Set([propData?.id, authUser.id].filter(Boolean))
+      ) as string[];
+
+      if (proprietorIdCandidates.length === 0) {
+        setProperties([]);
+        return;
+      }
+
+      // Use EXACT same query as working "My Properties" page
+      let assignmentsQuery = supabase
         .from('proprietor_properties')
         .select(`
           id,
           proprietor_id,
           property_id,
           ownership_percentage,
+          is_active,
           assigned_at,
-          properties(
+          property:properties(
             id,
             name,
             location,
+            type,
             status,
-            total_monthly_rental_expected,
-            image_url,
-            units(id, status)
+            image_url
           )
         `)
-        .eq('proprietor_id', propData.id)
-        .eq('is_active', true);
+        .in('proprietor_id', proprietorIdCandidates)
+        .order('assigned_at', { ascending: false });
 
-      if (propsError) throw propsError;
+      assignmentsQuery = assignmentsQuery.or('is_active.is.null,is_active.eq.true');
+
+      let { data: propsData, error: propsError } = await assignmentsQuery;
+
+      if (propsError) {
+        console.warn('Unable to load proprietor_properties rows for dashboard, using fallbacks:', propsError);
+        propsData = [];
+      }
+
+      // Legacy safety: if records were created with unexpected active flags, retry without active filter.
+      if ((propsData || []).length === 0) {
+        const { data: relaxedData, error: relaxedError } = await supabase
+          .from('proprietor_properties')
+          .select(`
+            id,
+            proprietor_id,
+            property_id,
+            ownership_percentage,
+            is_active,
+            assigned_at,
+            property:properties(
+              id,
+              name,
+              location,
+              type,
+              status,
+              image_url
+            )
+          `)
+          .in('proprietor_id', proprietorIdCandidates)
+          .order('assigned_at', { ascending: false });
+
+        if (relaxedError) {
+          console.warn('Relaxed proprietor_properties query failed, using fallbacks:', relaxedError);
+        }
+
+        if (!relaxedError && (relaxedData || []).length > 0) {
+          propsData = relaxedData;
+        }
+      }
+
+      // Fallback for environments where assignments are stored/visible via profile linkage.
+      const profileAssignedPropertyId = (profileData as any)?.assigned_property_id as string | undefined;
+      if ((propsData || []).length === 0 && profileAssignedPropertyId) {
+        propsData = [
+          {
+            id: `profile-assignment-${profileAssignedPropertyId}`,
+            proprietor_id: propData?.id || authUser.id,
+            property_id: profileAssignedPropertyId,
+            ownership_percentage: 100,
+            assigned_at: new Date().toISOString(),
+            property: null,
+          }
+        ] as any[];
+      }
+
+      // Last-resort fallback: use properties directly visible to the current proprietor via RLS.
+      if ((propsData || []).length === 0) {
+        const { data: visibleProperties, error: visiblePropertiesError } = await supabase
+          .from('properties')
+          .select('id, name, location, type, description, status, total_monthly_rental_expected, image_url, number_of_floors')
+          .order('created_at', { ascending: false });
+
+        if (visiblePropertiesError) {
+          console.warn('Direct properties fallback failed:', visiblePropertiesError);
+        } else if ((visibleProperties || []).length > 0) {
+          propsData = (visibleProperties || []).map((property: any, index: number) => ({
+            id: `visible-property-${property.id}-${index}`,
+            proprietor_id: propData?.id || authUser.id,
+            property_id: property.id,
+            ownership_percentage: 100,
+            assigned_at: new Date().toISOString(),
+            property,
+          }));
+        }
+      }
+
+      const propertyIds = (propsData || [])
+        .map((item: any) => {
+          const property = Array.isArray(item.property) ? item.property[0] : item.property;
+          return item.property_id || property?.id || null;
+        })
+        .filter(Boolean);
+
+      const uniquePropertyIds = Array.from(new Set(propertyIds as string[]));
+
+      // If relation expansion is empty, hydrate property details directly by property_id.
+      let propertyById = new Map<string, any>();
+      if (uniquePropertyIds.length > 0) {
+        const { data: propertyRows, error: propertyRowsError } = await supabase
+          .from('properties')
+          .select('id, name, location, type, description, status, total_monthly_rental_expected, image_url, number_of_floors')
+          .in('id', uniquePropertyIds);
+
+        if (!propertyRowsError) {
+          propertyById = new Map((propertyRows || []).map((row: any) => [row.id, row]));
+        }
+      }
+
+      const unitStatsByProperty = new Map<string, { total: number; occupied: number; estimatedMonthlyRent: number }>();
+      if (uniquePropertyIds.length > 0) {
+        const { data: unitsData, error: unitsError } = await supabase
+          .from('units')
+          .select('property_id, status, price')
+          .in('property_id', uniquePropertyIds);
+
+        if (unitsError) {
+          console.warn('Unable to load unit occupancy stats for proprietor dashboard:', unitsError);
+        } else {
+          (unitsData || []).forEach((unit: any) => {
+            const propertyId = unit.property_id;
+            if (!propertyId) return;
+
+            const current = unitStatsByProperty.get(propertyId) || { total: 0, occupied: 0, estimatedMonthlyRent: 0 };
+            current.total += 1;
+            if (unit.status === 'occupied') {
+              current.occupied += 1;
+            }
+            current.estimatedMonthlyRent += Number(unit.price || 0);
+            unitStatsByProperty.set(propertyId, current);
+          });
+        }
+      }
 
       const mappedProps = (propsData || []).map((p: any) => {
-        const property = p.properties;
-        const allUnits = property?.units || [];
-        const total_units = allUnits.length;
-        const occupied_units = allUnits.filter((u: any) => u.status === 'occupied').length;
-        const monthly_rent = property?.total_monthly_rental_expected || 0;
+        const relationProperty = Array.isArray(p.property) ? p.property[0] : p.property;
+        const property = relationProperty || propertyById.get(p.property_id) || null;
+        const stats = property?.id
+          ? unitStatsByProperty.get(property.id)
+          : undefined;
+        const total_units = stats?.total || 0;
+        const occupied_units = stats?.occupied || 0;
+        const monthly_rent = Number(property?.total_monthly_rental_expected || stats?.estimatedMonthlyRent || 0);
 
         return {
           ...p,

@@ -734,7 +734,7 @@ const MakePaymentPage: React.FC = () => {
   if (!paymentType) {
       // Payment Type Selection Screen
       return (
-      <div className="space-y-6 max-w-4xl mx-auto font-nunito min-h-screen bg-slate-50 py-10 px-6">
+      <div className="space-y-6 max-w-4xl mx-auto font-nunito">
           <div className="flex items-center gap-3 mb-8">
                 <button
                 onClick={() => navigate("/portal/tenant/payments")}
@@ -775,7 +775,7 @@ const MakePaymentPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto font-nunito min-h-screen bg-slate-50 py-10 px-6">
+    <div className="space-y-6 max-w-2xl mx-auto font-nunito">
       <div className="flex items-center gap-3">
         <button
           onClick={() => {
@@ -964,6 +964,7 @@ const MakePaymentPage: React.FC = () => {
         description={`${getTitle()} Payment`}
         paymentType={paymentType as any}
         referenceId={hasValidReferenceId ? referenceId || undefined : undefined}
+        autoGenerateReceipt={false}
         onPaymentSuccess={handlePaystackPaymentSuccess}
         onPaymentError={(error) => {
           toast.error(error);

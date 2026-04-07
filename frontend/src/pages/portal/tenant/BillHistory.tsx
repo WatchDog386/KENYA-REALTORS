@@ -328,7 +328,7 @@ Generated: ${new Date().toLocaleDateString('en-US')}
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen space-y-8"
+      className="space-y-8"
     >
       {/* Header */}
       <div>

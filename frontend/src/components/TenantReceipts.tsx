@@ -190,39 +190,11 @@ const TenantReceipts: React.FC<TenantReceiptsProps> = ({ tenantId }) => {
 
       let billPayments: any[] = [];
       {
-        // Try progressively simpler queries to handle schema variations
-        let { data, error } = await supabase
+        const { data, error } = await supabase
           .from('bills_and_utilities')
-          .select('id, paid_amount, due_date, payment_method, payment_reference, status, property_id, unit_id, bill_type')
+          .select('id, paid_amount, due_date, status, property_id, unit_id, bill_type')
           .eq('unit_id', tenantRow.unit_id)
           .gt('paid_amount', 0);
-
-        // If payment_method fails, try without it
-        if (error && String(error.message || '').toLowerCase().includes('payment_method')) {
-          ({ data, error } = await supabase
-            .from('bills_and_utilities')
-            .select('id, paid_amount, due_date, payment_reference, status, property_id, unit_id, bill_type')
-            .eq('unit_id', tenantRow.unit_id)
-            .gt('paid_amount', 0));
-        }
-
-        // If payment_reference also fails, try without it
-        if (error && String(error.message || '').toLowerCase().includes('payment_reference')) {
-          ({ data, error } = await supabase
-            .from('bills_and_utilities')
-            .select('id, paid_amount, due_date, status, property_id, unit_id, bill_type')
-            .eq('unit_id', tenantRow.unit_id)
-            .gt('paid_amount', 0));
-        }
-
-        // If still failing, get minimal columns only
-        if (error) {
-          ({ data, error } = await supabase
-            .from('bills_and_utilities')
-            .select('id, paid_amount, status, unit_id, property_id')
-            .eq('unit_id', tenantRow.unit_id)
-            .gt('paid_amount', 0));
-        }
 
         if (error) {
           console.warn('Could not fetch bill payments:', error);

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { proprietorService } from '@/services/proprietorService';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from "@/components/ui/badge";
@@ -31,13 +30,26 @@ const ProprietorProperties = () => {
                 return;
             }
 
-            const prop = await proprietorService.getProprietorByUserId(user.id);
-            if (!prop?.id) {
-                setError('No proprietor profile found. Please contact admin.');
+            const { data: proprietorRow, error: proprietorError } = await supabase
+                .from('proprietors')
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (proprietorError && proprietorError.code !== 'PGRST116') {
+                throw proprietorError;
+            }
+
+            const proprietorIdCandidates = Array.from(
+                new Set([proprietorRow?.id, user.id].filter(Boolean))
+            ) as string[];
+
+            if (proprietorIdCandidates.length === 0) {
+                setProperties([]);
                 return;
             }
 
-            const { data: assignments, error: assignError } = await supabase
+            let assignmentsQuery = supabase
                 .from('proprietor_properties')
                 .select(`
                     id,
@@ -55,9 +67,12 @@ const ProprietorProperties = () => {
                         image_url
                     )
                 `)
-                .eq('proprietor_id', prop.id)
-                .eq('is_active', true)
+                .in('proprietor_id', proprietorIdCandidates)
                 .order('assigned_at', { ascending: false });
+
+            assignmentsQuery = assignmentsQuery.or('is_active.is.null,is_active.eq.true');
+
+            const { data: assignments, error: assignError } = await assignmentsQuery;
 
             if (assignError) {
                 setError('Failed to load assigned properties');

@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { getManagerAssignedPropertyIds } from '@/services/managerPropertyAssignmentService';
 import {
   Card,
-  CardContent,
 } from '@/components/ui/card';
 import {
   Dialog,
@@ -144,25 +143,66 @@ const ManagerTenants: React.FC = () => {
         return;
       }
 
-      // Extract User IDs to fetch profiles
-      const userIds = activeLeases.map((l: any) => l.tenant_id).filter(Boolean);
-      
-      // Fetch Profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email, phone, avatar_url')
-        .in('id', userIds);
-        
-      if (profilesError) throw profilesError;
+      // Leases can reference either profiles.id or tenants.id depending on onboarding path.
+      const leaseTenantIds = Array.from(
+        new Set(activeLeases.map((lease: any) => lease.tenant_id).filter(Boolean))
+      );
 
-      const profilesMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+      const tenantIdToProfileId = new Map<string, string>();
+      let profilesMap = new Map<string, any>();
+
+      if (leaseTenantIds.length > 0) {
+        const { data: directProfiles, error: directProfilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, phone, avatar_url')
+          .in('id', leaseTenantIds);
+
+        if (directProfilesError) throw directProfilesError;
+
+        profilesMap = new Map((directProfiles || []).map((profile: any) => [profile.id, profile]));
+
+        const unresolvedLeaseTenantIds = leaseTenantIds.filter((tenantId) => !profilesMap.has(tenantId));
+
+        if (unresolvedLeaseTenantIds.length > 0) {
+          const { data: tenantRows, error: tenantRowsError } = await supabase
+            .from('tenants')
+            .select('id, user_id')
+            .in('id', unresolvedLeaseTenantIds);
+
+          if (tenantRowsError && tenantRowsError.code !== 'PGRST116') throw tenantRowsError;
+
+          (tenantRows || []).forEach((row: any) => {
+            if (row?.id && row?.user_id) {
+              tenantIdToProfileId.set(row.id, row.user_id);
+            }
+          });
+
+          const missingProfileIds = Array.from(
+            new Set((tenantRows || []).map((row: any) => row?.user_id).filter(Boolean))
+          ).filter((profileId) => !profilesMap.has(profileId));
+
+          if (missingProfileIds.length > 0) {
+            const { data: fallbackProfiles, error: fallbackProfilesError } = await supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email, phone, avatar_url')
+              .in('id', missingProfileIds);
+
+            if (fallbackProfilesError) throw fallbackProfilesError;
+
+            (fallbackProfiles || []).forEach((profile: any) => {
+              profilesMap.set(profile.id, profile);
+            });
+          }
+        }
+      }
 
       const formattedTenants: Tenant[] = activeLeases.map((lease: any) => {
-        const profile = profilesMap.get(lease.tenant_id) || {};
+        const resolvedProfileId = tenantIdToProfileId.get(lease.tenant_id) || lease.tenant_id;
+        const profile = profilesMap.get(resolvedProfileId) || {};
         const unit = lease.units || {};
         
         return {
-          id: lease.tenant_id,
+          id: resolvedProfileId,
           first_name: profile.first_name || '',
           last_name: profile.last_name || '',
           email: profile.email || '',
@@ -321,410 +361,434 @@ const ManagerTenants: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50/50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex min-h-[55vh] items-center justify-center bg-[#d7dce1]">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#154279]" />
+          <p className="text-[13px] font-medium text-[#5f6b7c]">Loading tenants...</p>
+        </div>
       </div>
     );
   }
 
+  const activeLeaseCount = tenants.filter((tenant) => tenant.lease_status === 'active').length;
+  const newMoveInsCount = tenants.filter((tenant) => {
+    if (!tenant.move_in_date) return false;
+    const moveInDate = new Date(tenant.move_in_date);
+    const now = new Date();
+    const diffTime = now.getTime() - moveInDate.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 30;
+  }).length;
+
   return (
-    <div className="min-h-screen bg-gray-50/50 p-6 space-y-8">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            Tenants
-             <Badge variant="secondary" className="text-lg px-3 py-1 font-normal text-slate-500 bg-white border shadow-sm">
-                {tenants.length} Active
-             </Badge>
-          </h1>
-          <p className="text-gray-500 mt-1">
-             Manage residents for <span className="font-semibold text-gray-700">{propertyName || 'Your Property'}</span>
-          </p>
-        </div>
-        <div className="flex gap-2">
-            <Button variant="outline" className="bg-white">
-                <Download className="w-4 h-4 mr-2" /> Export List
-            </Button>
-            <Button className="bg-indigo-600 hover:bg-indigo-700">
-                <Mail className="w-4 h-4 mr-2" /> Message All
-            </Button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#d7dce1] p-4 font-['Poppins','Segoe_UI',sans-serif] text-[#243041] md:p-6">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');`}</style>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="shadow-sm border-slate-200">
-              <CardContent className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                      <Users size={24} />
-                  </div>
-                  <div>
-                      <p className="text-sm font-medium text-slate-500">Total Tenants</p>
-                      <h3 className="text-2xl font-bold text-slate-900">{tenants.length}</h3>
-                  </div>
-              </CardContent>
-          </Card>
-          
-          <Card className="shadow-sm border-slate-200">
-              <CardContent className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                      <FileText size={24} />
-                  </div>
-                  <div>
-                      <p className="text-sm font-medium text-slate-500">Active Leases</p>
-                      <h3 className="text-2xl font-bold text-slate-900">{tenants.filter(t => t.lease_status === 'active').length}</h3>
-                  </div>
-              </CardContent>
-          </Card>
-
-           <Card className="shadow-sm border-slate-200">
-              <CardContent className="p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-                      <Calendar size={24} />
-                  </div>
-                  <div>
-                      <p className="text-sm font-medium text-slate-500">New Move-ins (30d)</p>
-                      <h3 className="text-2xl font-bold text-slate-900">
-                        {tenants.filter(t => {
-                            if(!t.move_in_date) return false;
-                            const date = new Date(t.move_in_date);
-                            const now = new Date();
-                            const diffTime = Math.abs(now.getTime() - date.getTime());
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                            return diffDays <= 30;
-                        }).length}
-                      </h3>
-                  </div>
-              </CardContent>
-          </Card>
-      </div>
-
-      {/* Main Content */}
-      <div className="space-y-4">
-        {/* Controls Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-           <div className="relative max-w-md w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input 
-                   placeholder="Search tenants..." 
-                   className="pl-10 bg-slate-50 border-slate-200 focus:bg-white transition-all"
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                />
-           </div>
-           
-           <div className="flex items-center gap-2 w-full sm:w-auto">
-               <div className="bg-slate-100 p-1 rounded-lg flex items-center border border-slate-200">
-                    <button 
-                        onClick={() => setViewMode('grid')}
-                        className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        title="Grid View"
-                    >
-                        <LayoutGrid size={18} />
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('list')}
-                        className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        title="List View"
-                    >
-                        <List size={18} />
-                    </button>
-               </div>
-               <Button variant="outline" size="sm" className="h-10 text-slate-600">
-                   <Filter className="w-4 h-4 mr-2" /> Filter
-               </Button>
-           </div>
-        </div>
-        
-        {filteredTenants.length === 0 ? (
-            <div className="text-center py-16 px-4 bg-white rounded-xl border border-slate-200 border-dashed">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <Users className="w-8 h-8 text-slate-300" />
-              </div>
-              <h3 className="text-lg font-medium text-slate-900">No tenants found</h3>
-              <p className="text-slate-500 mt-1 max-w-sm mx-auto">
-                  {searchTerm ? `No results for "${searchTerm}"` : "You don't have any active tenants yet."}
+      <div className="mx-auto max-w-[1600px] space-y-4">
+        <section className="border border-[#bcc3cd] bg-[#eef1f4] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-widest text-[#6a7788]">Property Management</p>
+              <h1 className="mt-1 text-[42px] font-bold leading-none text-[#1f2937]">Tenant Directory</h1>
+              <p className="mt-2 text-[13px] font-medium text-[#5f6b7c]">
+                Manage residents for <span className="font-semibold text-[#324156]">{propertyName || 'Your Property'}</span>
               </p>
-              {searchTerm && (
-                  <Button variant="link" onClick={() => setSearchTerm('')} className="mt-2 text-indigo-600">
-                      Clear search
-                  </Button>
-              )}
             </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
-            {filteredTenants.map((tenant) => {
-              const isActive = tenant.lease_status === 'active';
-              const gradientClass = isActive
-                ? 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600'
-                : 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500';
-              const badgeClass = isActive
-                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border border-amber-200';
+            <span className="inline-flex items-center bg-[#1f5e8f] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+              {tenants.length} Active Tenants
+            </span>
+          </div>
 
-              return (
-                <div key={tenant.id} className="group bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col h-full overflow-hidden">
-                  <div className={`${gradientClass} p-5 relative`}>
-                    <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-white/10" />
-                    <div className="flex items-start justify-between gap-4 relative z-10">
-                      <Avatar className="h-14 w-14 border-2 border-white/50 shadow-sm">
-                        <AvatarFallback className="bg-white/90 text-slate-900 text-base font-bold">
-                          {getInitials(tenant.first_name, tenant.last_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="text-right">
-                        <p className="text-[11px] uppercase tracking-widest text-white/80 font-semibold">Unit</p>
-                        <p className="text-2xl font-bold text-white leading-tight break-words">{tenant.unit_name || 'Unassigned'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 relative z-10">
-                      <h3 className="text-xl font-bold text-white break-words">{tenant.first_name} {tenant.last_name}</h3>
-                      <p className="text-sm text-white/90 break-all mt-1">{tenant.email || 'No email provided'}</p>
-                    </div>
-                  </div>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#2aa8bf] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/90">Total Tenants</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-white">{tenants.length}</p>
+              </div>
+              <div className="bg-[#1f93a8] px-3 py-1.5 text-[18px] font-medium text-white">All registered tenants</div>
+            </div>
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#2daf4a] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/90">Active Leases</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-white">{activeLeaseCount}</p>
+              </div>
+              <div className="bg-[#24933d] px-3 py-1.5 text-[18px] font-medium text-white">Current occupancy</div>
+            </div>
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#f3bd11] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#1f2937]/80">Move-ins (30d)</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-[#1f2937]">{newMoveInsCount}</p>
+              </div>
+              <div className="bg-[#d6a409] px-3 py-1.5 text-[18px] font-medium text-[#1f2937]">Recent tenants</div>
+            </div>
+          </div>
+        </section>
 
-                  <div className="p-5 space-y-4 flex-1 flex flex-col">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge className={badgeClass}>{formatStatus(tenant.lease_status)}</Badge>
-                      <span className="text-xs text-slate-500">ID: {tenant.id.slice(0, 8)}</span>
-                    </div>
+        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#c4cad3] px-4 py-3">
+            <div>
+              <p className="text-[14px] font-semibold text-[#1f2937]">Tenants and Leases</p>
+              <p className="text-[12px] font-medium text-[#5f6b7c]">{filteredTenants.length} records</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+              >
+                <Download className="mr-2 h-3.5 w-3.5" /> Export List
+              </Button>
+              <Button className="h-10 rounded-none border border-[#d96d26] bg-[#F96302] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]">
+                <Mail className="mr-2 h-3.5 w-3.5" /> Message All
+              </Button>
+            </div>
+          </div>
 
-                    <div className="space-y-3 flex-1">
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                        <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5" /> Phone
-                        </p>
-                        <p className="text-sm font-semibold text-slate-800 break-words">{tenant.phone || 'Not provided'}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-slate-100 p-3">
-                          <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Move In</p>
-                          <p className="text-sm font-semibold text-slate-800">{formatDate(tenant.move_in_date)}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-100 p-3">
-                          <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Lease End</p>
-                          <p className="text-sm font-semibold text-slate-800">{formatDate(tenant.lease_end_date, 'Month-to-Month')}</p>
-                        </div>
-                      </div>
-                    </div>
+          <div className="space-y-3 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative max-w-md w-full">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8595]" />
+                <Input
+                  placeholder="Search tenants by name, email, or unit"
+                  className="h-10 rounded-none border border-[#b6bec8] bg-white px-3 pl-9 text-[13px] text-[#1f2937] shadow-none focus-visible:border-[#F96302] focus-visible:ring-0 focus-visible:ring-offset-0"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
 
-                    <div className="grid grid-cols-2 gap-2 mt-auto">
-                      <Button
-                        onClick={() => handleViewProfile(tenant)}
-                        variant="outline"
-                        className="h-10 border-slate-300 text-slate-700 hover:bg-slate-100"
-                      >
-                        <Eye size={16} className="mr-2" /> View Details
-                      </Button>
-                      <Button
-                        onClick={() => handleMessage(tenant)}
-                        className="h-10 bg-emerald-600 text-white hover:bg-emerald-700"
-                      >
-                        <MessageSquare size={16} className="mr-2" /> Message
-                      </Button>
-                    </div>
-                  </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center border border-[#b6bec8] bg-white">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-[#154279] text-white' : 'text-[#5f6b7c] hover:bg-[#f5f7fa]'}`}
+                    title="Grid View"
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-[#154279] text-white' : 'text-[#5f6b7c] hover:bg-[#f5f7fa]'}`}
+                    title="List View"
+                  >
+                    <List size={18} />
+                  </button>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-             <div className="overflow-x-auto">
-            <Table>
-            <TableHeader className="bg-slate-50/80">
-                <TableRow>
-              <TableHead className="w-[280px]">Tenant</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Lease</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTenants.map((tenant) => (
-              <TableRow key={tenant.id} className="group hover:bg-slate-50/60 transition-colors">
-                    <TableCell>
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
-                                <AvatarFallback className="bg-indigo-100 text-indigo-700 font-bold">
-                                    {getInitials(tenant.first_name, tenant.last_name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <p className="font-semibold text-slate-900">{tenant.first_name} {tenant.last_name}</p>
-                                <p className="text-xs text-slate-500">ID: {tenant.id.slice(0, 8)}</p>
-                            </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+                >
+                  <Filter className="mr-2 h-3.5 w-3.5" /> Filter
+                </Button>
+              </div>
+            </div>
+
+            {filteredTenants.length === 0 ? (
+              <div className="border border-[#c4cad3] bg-white py-16 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center border border-[#d4dae3] bg-[#f6f8fb]">
+                  <Users className="h-7 w-7 text-[#7a8595]" />
+                </div>
+                <h3 className="text-[18px] font-semibold text-[#1f2937]">No tenants found</h3>
+                <p className="mt-1 text-[13px] font-medium text-[#5f6b7c]">
+                  {searchTerm ? `No results for "${searchTerm}"` : "You don't have any active tenants yet."}
+                </p>
+                {searchTerm && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setSearchTerm('')}
+                    className="mt-4 h-9 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+                  >
+                    Clear Search
+                  </Button>
+                )}
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 gap-4 pb-2 md:grid-cols-2 xl:grid-cols-3">
+                {filteredTenants.map((tenant) => {
+                  const isActive = tenant.lease_status === 'active';
+                  const headerClass = isActive ? 'bg-[#2daf4a]' : 'bg-[#f3bd11]';
+                  const headerTitleClass = isActive ? 'text-white' : 'text-[#1f2937]';
+                  const headerSubtitleClass = isActive ? 'text-white/90' : 'text-[#1f2937]/80';
+                  const badgeClass = isActive
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200';
+
+                  return (
+                    <div key={tenant.id} className="border border-[#c4cad3] bg-white">
+                      <div className={`${headerClass} flex items-start justify-between gap-3 px-4 py-3`}>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Avatar className="h-11 w-11 border border-white/60">
+                            <AvatarFallback className="bg-white text-[13px] font-bold text-[#1f2937]">
+                              {getInitials(tenant.first_name, tenant.last_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className={`truncate text-[14px] font-bold ${headerTitleClass}`}>
+                              {tenant.first_name} {tenant.last_name}
+                            </p>
+                            <p className={`truncate text-[11px] font-medium ${headerSubtitleClass}`}>
+                              ID: {tenant.id.slice(0, 8)}
+                            </p>
+                          </div>
                         </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1 max-w-[260px]">
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <Mail size={14} className="text-slate-400" />
-                          <span className="break-all">{tenant.email}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <Phone size={14} className="text-slate-400" />
-                          <span>{tenant.phone || 'Not provided'}</span>
-                            </div>
+                        <span className={`inline-flex border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${badgeClass}`}>
+                          {formatStatus(tenant.lease_status)}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3 p-4">
+                        <div className="border border-[#d4dae3] bg-[#f6f8fb] p-3">
+                          <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">
+                            <Mail className="h-3.5 w-3.5" /> Email
+                          </p>
+                          <p className="break-all text-[13px] font-semibold text-[#324156]">{tenant.email || 'No email provided'}</p>
                         </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                         <div className="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-sm font-semibold text-blue-700">
-                           <Building2 className="h-4 w-4" />
-                           Unit {tenant.unit_name}
-                         </div>
-                         <p className="text-xs text-slate-500">{propertyName || 'Property'}</p>
+                        <div className="border border-[#d4dae3] bg-[#f6f8fb] p-3">
+                          <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">
+                            <Phone className="h-3.5 w-3.5" /> Phone
+                          </p>
+                          <p className="text-[13px] font-semibold text-[#324156]">{tenant.phone || 'Not provided'}</p>
                         </div>
-                    </TableCell>
-                    <TableCell>
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-sm text-slate-700">
-                                <Calendar size={14} className="text-slate-400" />
-                                <span>In: {formatDate(tenant.move_in_date)}</span>
-                            </div>
-                              <div className="text-xs text-slate-500 pl-6">
-                                Ends: {formatDate(tenant.lease_end_date, 'Month-to-Month')}
-                              </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="border border-[#d4dae3] bg-white p-3">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">Unit</p>
+                            <p className="text-[13px] font-semibold text-[#1f2937]">{tenant.unit_name || 'Unassigned'}</p>
+                          </div>
+                          <div className="border border-[#d4dae3] bg-white p-3">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">Move In</p>
+                            <p className="text-[13px] font-semibold text-[#1f2937]">{formatDate(tenant.move_in_date)}</p>
+                          </div>
                         </div>
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant="secondary" className={
-                            tenant.lease_status === 'active' 
-                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100'
-                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-100'
-                        }>
-                            {formatStatus(tenant.lease_status)}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-2">
+                        <div className="grid grid-cols-2 gap-2 pt-1">
                           <Button
-                            variant="outline"
-                            size="sm"
                             onClick={() => handleViewProfile(tenant)}
-                            className="border-slate-300"
+                            variant="outline"
+                            className="h-10 rounded-none border border-[#154279] bg-white text-[11px] font-semibold uppercase tracking-wide text-[#154279] hover:bg-[#f5f7fa]"
                           >
-                            <Eye className="w-4 h-4 mr-1.5" /> View Details
+                            <Eye size={15} className="mr-1.5" /> Details
                           </Button>
                           <Button
-                            size="sm"
                             onClick={() => handleMessage(tenant)}
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="h-10 rounded-none border border-[#d96d26] bg-[#F96302] text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
                           >
-                            <MessageSquare className="w-4 h-4 mr-1.5" /> Message
+                            <MessageSquare size={15} className="mr-1.5" /> Message
                           </Button>
                         </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card className="overflow-hidden rounded-none border border-[#c4cad3] bg-white shadow-none">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b border-[#c4cad3] bg-[#e8ecf1] hover:bg-[#e8ecf1]">
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Tenant</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Contact</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Unit</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Lease</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Status</TableHead>
+                        <TableHead className="h-12 pr-4 text-right text-xs font-bold uppercase tracking-widest text-[#324156]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTenants.map((tenant) => (
+                        <TableRow key={tenant.id} className="border-b border-[#d4dae3] hover:bg-[#f6f8fb]">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10 border border-[#c4cad3]">
+                                <AvatarFallback className="bg-[#eef1f4] font-bold text-[#154279]">
+                                  {getInitials(tenant.first_name, tenant.last_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-[13px] font-semibold text-[#1f2937]">{tenant.first_name} {tenant.last_name}</p>
+                                <p className="text-[11px] font-medium text-[#5f6b7c]">ID: {tenant.id.slice(0, 8)}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-[260px] space-y-1">
+                              <div className="flex items-center gap-2 text-[12px] text-[#5f6b7c]">
+                                <Mail size={14} className="text-[#7a8595]" />
+                                <span className="break-all">{tenant.email}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[12px] text-[#5f6b7c]">
+                                <Phone size={14} className="text-[#7a8595]" />
+                                <span>{tenant.phone || 'Not provided'}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="inline-flex items-center gap-2 border border-[#bfd7ef] bg-[#e9f3ff] px-2.5 py-1.5 text-[12px] font-semibold text-[#1f5e8f]">
+                              <Building2 className="h-4 w-4" />
+                              Unit {tenant.unit_name}
+                            </div>
+                            <p className="mt-1 text-[11px] font-medium text-[#5f6b7c]">{propertyName || 'Property'}</p>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1 text-[12px] text-[#5f6b7c]">
+                              <div className="flex items-center gap-2">
+                                <Calendar size={14} className="text-[#7a8595]" />
+                                <span>In: {formatDate(tenant.move_in_date)}</span>
+                              </div>
+                              <div className="pl-6">Ends: {formatDate(tenant.lease_end_date, 'Month-to-Month')}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={
+                                tenant.lease_status === 'active'
+                                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50'
+                                  : 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50'
+                              }
+                            >
+                              {formatStatus(tenant.lease_status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="inline-flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleViewProfile(tenant)}
+                                className="h-8 rounded-none border border-[#154279] bg-white text-[11px] font-semibold uppercase tracking-wide text-[#154279] hover:bg-[#f5f7fa]"
+                              >
+                                <Eye className="mr-1 h-3.5 w-3.5" /> Details
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleMessage(tenant)}
+                                className="h-8 rounded-none border border-[#d96d26] bg-[#F96302] text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
+                              >
+                                <MessageSquare className="mr-1 h-3.5 w-3.5" /> Message
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            )}
           </div>
-        </Card>
-      )}
+        </section>
       </div>
 
       <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+        <DialogContent
+          overlayClassName="bg-black/45 backdrop-blur-none"
+          className="sm:max-w-3xl rounded-none border border-[#bcc3cd] bg-[#eef1f4] p-0 shadow-xl"
+        >
           <DialogHeader>
-            <div className="bg-gradient-to-r from-[#154279] to-[#0f325e] px-6 py-5 text-white">
-              <DialogTitle className="text-xl">Tenant Details</DialogTitle>
-              <DialogDescription className="text-blue-100 mt-1">
+            <div className="bg-[#154279] px-6 py-5 text-white">
+              <DialogTitle className="text-xl font-bold">Tenant Details</DialogTitle>
+              <DialogDescription className="mt-1 text-blue-100">
                 Full tenant profile aligned with super admin detail view
               </DialogDescription>
             </div>
           </DialogHeader>
           {selectedTenant && (
-            <div className="p-6 space-y-6">
+            <div className="space-y-5 p-5">
               {isDetailsLoading ? (
                 <div className="py-10 text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-[#154279]" />
-                  <p className="text-sm text-slate-500 mt-3">Fetching full tenant details...</p>
+                  <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#154279]" />
+                  <p className="mt-3 text-sm text-[#5f6b7c]">Fetching full tenant details...</p>
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <Avatar className="h-16 w-16 border-2 border-slate-200">
-                      <AvatarFallback className="bg-slate-100 text-slate-700 text-xl font-bold">
+                  <div className="flex flex-col gap-4 border border-[#c4cad3] bg-white p-4 sm:flex-row sm:items-center">
+                    <Avatar className="h-16 w-16 border border-[#c4cad3]">
+                      <AvatarFallback className="bg-[#eef1f4] text-xl font-bold text-[#154279]">
                         {getInitials(tenantDetails?.tenant.first_name || selectedTenant.first_name, tenantDetails?.tenant.last_name || selectedTenant.last_name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <h3 className="text-xl font-bold text-slate-900 break-words">
+                      <h3 className="break-words text-xl font-bold text-[#1f2937]">
                         {tenantDetails?.tenant.first_name || selectedTenant.first_name} {tenantDetails?.tenant.last_name || selectedTenant.last_name}
                       </h3>
-                      <p className="text-sm text-slate-500 break-all">{tenantDetails?.tenant.email || selectedTenant.email || 'No email'}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <p className="break-all text-sm font-medium text-[#5f6b7c]">{tenantDetails?.tenant.email || selectedTenant.email || 'No email'}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge className="border border-emerald-200 bg-emerald-50 text-emerald-700">
                           {formatStatus(tenantDetails?.tenant.lease_status || selectedTenant.lease_status)}
                         </Badge>
-                        <Badge variant="outline">{tenantDetails?.account_status || 'active'}</Badge>
+                        <Badge variant="outline" className="rounded-none border-[#b6bec8] bg-white text-[#465870]">
+                          {tenantDetails?.account_status || 'active'}
+                        </Badge>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Phone</p>
-                      <p className="font-semibold text-slate-800">{tenantDetails?.tenant.phone || selectedTenant.phone || 'Not provided'}</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><Phone className="h-3.5 w-3.5" /> Phone</p>
+                      <p className="text-[13px] font-semibold text-[#324156]">{tenantDetails?.tenant.phone || selectedTenant.phone || 'Not provided'}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Property</p>
-                      <p className="font-semibold text-slate-800 break-words">{tenantDetails?.property_name || propertyName || 'N/A'}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><Building2 className="h-3.5 w-3.5" /> Property</p>
+                      <p className="break-words text-[13px] font-semibold text-[#324156]">{tenantDetails?.property_name || propertyName || 'N/A'}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Unit</p>
-                      <p className="font-semibold text-slate-800">{tenantDetails?.tenant.unit_name || selectedTenant.unit_name || 'N/A'}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><Hash className="h-3.5 w-3.5" /> Unit</p>
+                      <p className="text-[13px] font-semibold text-[#324156]">{tenantDetails?.tenant.unit_name || selectedTenant.unit_name || 'N/A'}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1">Floor</p>
-                      <p className="font-semibold text-slate-800">{tenantDetails?.floor_name || 'N/A'}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">Floor</p>
+                      <p className="text-[13px] font-semibold text-[#324156]">{tenantDetails?.floor_name || 'N/A'}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><Calendar className="h-3.5 w-3.5 inline-block mr-1" /> Move In</p>
-                      <p className="font-semibold text-slate-800">{formatDate(tenantDetails?.tenant.move_in_date || selectedTenant.move_in_date)}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><Calendar className="mr-1 inline-block h-3.5 w-3.5" /> Move In</p>
+                      <p className="text-[13px] font-semibold text-[#324156]">{formatDate(tenantDetails?.tenant.move_in_date || selectedTenant.move_in_date)}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><FileText className="h-3.5 w-3.5 inline-block mr-1" /> Lease End</p>
-                      <p className="font-semibold text-slate-800">{formatDate(tenantDetails?.tenant.lease_end_date || selectedTenant.lease_end_date, 'Month-to-Month')}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><FileText className="mr-1 inline-block h-3.5 w-3.5" /> Lease End</p>
+                      <p className="text-[13px] font-semibold text-[#324156]">{formatDate(tenantDetails?.tenant.lease_end_date || selectedTenant.lease_end_date, 'Month-to-Month')}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><User className="h-3.5 w-3.5 inline-block mr-1" /> Next of Kin</p>
-                      <p className="font-semibold text-slate-800 break-words">{tenantDetails?.next_of_kin || 'Not provided'}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><User className="mr-1 inline-block h-3.5 w-3.5" /> Next of Kin</p>
+                      <p className="break-words text-[13px] font-semibold text-[#324156]">{tenantDetails?.next_of_kin || 'Not provided'}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><Mail className="h-3.5 w-3.5 inline-block mr-1" /> Next of Kin Email</p>
-                      <p className="font-semibold text-slate-800 break-all">{tenantDetails?.next_of_kin_email || 'Not provided'}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><Mail className="mr-1 inline-block h-3.5 w-3.5" /> Next of Kin Email</p>
+                      <p className="break-all text-[13px] font-semibold text-[#324156]">{tenantDetails?.next_of_kin_email || 'Not provided'}</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3 sm:col-span-2">
-                      <p className="text-xs uppercase tracking-wider text-slate-500 mb-1"><User className="h-3.5 w-3.5 inline-block mr-1" /> Nationality</p>
-                      <p className="font-semibold text-slate-800">{tenantDetails?.nationality || 'Not provided'}</p>
+                    <div className="border border-[#c4cad3] bg-white p-3 sm:col-span-2">
+                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]"><User className="mr-1 inline-block h-3.5 w-3.5" /> Nationality</p>
+                      <p className="text-[13px] font-semibold text-[#324156]">{tenantDetails?.nationality || 'Not provided'}</p>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
-                    <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">Audit Information</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <p className="text-slate-600">Tenant ID: <span className="font-medium text-slate-800 break-all">{selectedTenant.id}</span></p>
-                      <p className="text-slate-600">Lease ID: <span className="font-medium text-slate-800 break-all">{tenantDetails?.lease_id || 'N/A'}</span></p>
-                      <p className="text-slate-600">Profile Created: <span className="font-medium text-slate-800">{formatDate(tenantDetails?.profile_created_at)}</span></p>
-                      <p className="text-slate-600">Lease Created: <span className="font-medium text-slate-800">{formatDate(tenantDetails?.lease_created_at)}</span></p>
+                  <div className="border border-[#c4cad3] bg-white p-4">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">Audit Information</p>
+                    <div className="grid grid-cols-1 gap-3 text-[12px] text-[#5f6b7c] sm:grid-cols-2">
+                      <p>Tenant ID: <span className="break-all font-semibold text-[#324156]">{selectedTenant.id}</span></p>
+                      <p>Lease ID: <span className="break-all font-semibold text-[#324156]">{tenantDetails?.lease_id || 'N/A'}</span></p>
+                      <p>Profile Created: <span className="font-semibold text-[#324156]">{formatDate(tenantDetails?.profile_created_at)}</span></p>
+                      <p>Lease Created: <span className="font-semibold text-[#324156]">{formatDate(tenantDetails?.lease_created_at)}</span></p>
                     </div>
                   </div>
                 </>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                <Button variant="outline" onClick={() => setIsProfileOpen(false)}>Close</Button>
-                <Button onClick={() => {
-                  setIsProfileOpen(false);
-                  if (selectedTenant) handleMessage(selectedTenant);
-                }}>
-                  <MessageSquare className="w-4 h-4 mr-2" /> Message Tenant
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    if (selectedTenant) handleMessage(selectedTenant);
+                  }}
+                  className="h-10 rounded-none border border-[#d96d26] bg-[#F96302] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" /> Message Tenant
                 </Button>
               </div>
             </div>

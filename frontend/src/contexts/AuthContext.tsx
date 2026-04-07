@@ -398,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         targetDash = "/portal/tenant";
         break;
       case "owner":
-        targetDash = "/portal/owner";
+        targetDash = "/portal/proprietor";
         break;
       case "accountant":
         targetDash = "/portal/accountant";
@@ -469,6 +469,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("🔄 Auth state changed:", event);
 
       const isInteractiveAuthEvent = event === "SIGNED_IN" || event === "SIGNED_OUT";
+      const shouldHydrateProfile = event === "SIGNED_IN" || event === "USER_UPDATED";
 
       if (isInteractiveAuthEvent) {
         setIsLoading(true);
@@ -482,6 +483,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (event === "SIGNED_OUT") {
           navigate("/login", { replace: true });
         }
+        if (isInteractiveAuthEvent) {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      // INITIAL_SESSION and TOKEN_REFRESHED are non-interactive and already covered
+      // by initializeAuth profile hydration.
+      if (!shouldHydrateProfile) {
         if (isInteractiveAuthEvent) {
           setIsLoading(false);
         }

@@ -8,8 +8,8 @@ import { UnitApplicationForm } from "@/components/UnitApplicationForm";
 
 const GlobalStyles = () => (
   <style dangerouslySetInnerHTML={{ __html: `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    .font-inter { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+    .font-admin { font-family: 'Poppins', 'Segoe UI', sans-serif; }
   ` }} />
 );
 
@@ -23,11 +23,11 @@ const ApplicationForm = () => {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-inter"
+        className="min-h-screen bg-[#d7dce1] flex items-center justify-center p-4 md:p-6 font-admin"
       >
         <GlobalStyles />
-        <Card className="w-full max-w-md border border-gray-100 shadow-2xl bg-white backdrop-blur-sm">
-          <CardHeader className="text-center pb-2">
+        <Card className="w-full max-w-md border border-[#bcc3cd] bg-[#eef1f4] rounded-none shadow-none">
+          <CardHeader className="text-center pb-3 border-b border-[#bcc3cd]">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -36,27 +36,27 @@ const ApplicationForm = () => {
             >
               <CheckCircle className="w-20 h-20 text-[#F96302]" />
             </motion.div>
-            <CardTitle className="text-3xl text-[#154279] font-bold">Success!</CardTitle>
+            <CardTitle className="text-3xl text-[#1f2937] font-bold">Success!</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 p-4">
             <div className="text-center space-y-2">
-              <p className="text-lg font-medium text-gray-800">
+              <p className="text-lg font-semibold text-[#1f2937]">
                 Your rental application has been submitted
               </p>
-              <p className="text-gray-600">
-                Thank you for applying! Our property managers will review your application and get back to you shortly.
+              <p className="text-[#5f6b7c] text-sm">
+                Thank you for applying. Your onboarding was processed automatically.
               </p>
             </div>
 
             <div className="flex gap-3 pt-2">
               <Button
-                className="flex-1 bg-white border border-[#154279] text-[#154279] hover:bg-slate-50 hover:text-[#154279]"
+                className="flex-1 h-10 rounded-none border border-[#b6bec8] bg-white text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
                 onClick={() => navigate("/")}
               >
                 Back to Home
               </Button>
               <Button
-                className="flex-1 bg-[#F96302] hover:bg-[#E85D02] text-white"
+                className="flex-1 h-10 rounded-none border border-[#d96d26] bg-[#F96302] text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
                 onClick={() => setSubmissionSuccess(false)}
               >
                 Submit Another
@@ -69,38 +69,46 @@ const ApplicationForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-inter">
+    <div className="min-h-screen bg-[#d7dce1] p-4 md:p-6 font-admin text-[#243041]">
       <GlobalStyles />
-      <div className="max-w-4xl mx-auto">
+      <div className="mx-auto max-w-[1500px] space-y-3">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="border border-[#bcc3cd] bg-[#eef1f4]"
         >
-          <Button
-            variant="ghost"
-            className="mb-6 text-[#154279] hover:text-[#F96302] hover:bg-transparent pl-0"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
+          <div className="border-b border-[#bcc3cd] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#5d6c7c]">
+            Tenant Application
+          </div>
+          <div className="p-3">
+            <Button
+              variant="outline"
+              className="mb-3 h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
 
-          <div className="flex items-center gap-3 mb-4">
-            <div>
-               <h1 className="text-4xl font-bold text-[#154279]">Unit Rental Application</h1>
-               <p className="text-lg text-gray-600 mt-1">
-                Complete and submit your tenant application form below
-              </p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-[34px] font-bold leading-none text-[#1f2937]">Unit Rental Application</h1>
+                <p className="mt-2 text-[13px] font-medium text-[#5f6b7c]">
+                  Complete and submit your tenant application form below.
+                </p>
+              </div>
             </div>
           </div>
         </motion.div>
 
-        <Card className="shadow-xl border border-gray-200 bg-white overflow-hidden">
-          <CardContent className="p-6 md:p-8">
+        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
+          <div className="border-b border-[#bcc3cd] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#5d6c7c]">
+            Application Details
+          </div>
+          <div className="p-3 md:p-4">
             <UnitApplicationForm onSuccess={() => setSubmissionSuccess(true)} />
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       </div>
     </div>
   );

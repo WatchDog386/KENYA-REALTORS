@@ -510,16 +510,26 @@ const PropertyManager: React.FC = () => {
     units.forEach((unit: any) => {
       floorSet.add(String(unit.floor_number ?? 'G'));
 
-      const unitPrice = Number(unit.price || 0);
+      const unitPrice = unit.price !== null && unit.price !== undefined ? Number(unit.price) : NaN;
       const unitTypeRow = Array.isArray(unit.property_unit_types)
         ? unit.property_unit_types[0]
         : unit.property_unit_types;
       const typeName = normalizeTypeName(unitTypeRow);
       const typeId = String(unit.unit_type_id || unitTypeRow?.id || '').trim();
       const configuredType = typeId ? configuredById.get(typeId) : configuredByName.get(typeName.toLowerCase());
-      const configuredPrice = Number(configuredType?.price_per_unit || 0);
-      const typePrice = Number(unitTypeRow?.price_per_unit || 0);
-      const resolvedPrice = unitPrice > 0 ? unitPrice : configuredPrice || typePrice || 0;
+      const configuredPrice = configuredType?.price_per_unit !== null && configuredType?.price_per_unit !== undefined
+        ? Number(configuredType.price_per_unit)
+        : NaN;
+      const typePrice = unitTypeRow?.price_per_unit !== null && unitTypeRow?.price_per_unit !== undefined
+        ? Number(unitTypeRow.price_per_unit)
+        : NaN;
+      const resolvedPrice = !Number.isNaN(unitPrice)
+        ? unitPrice
+        : !Number.isNaN(configuredPrice)
+          ? configuredPrice
+          : !Number.isNaN(typePrice)
+            ? typePrice
+            : 0;
 
       expectedIncome += resolvedPrice;
 
@@ -568,7 +578,7 @@ const PropertyManager: React.FC = () => {
           : unit.property_unit_types;
         const typeName = normalizeTypeName(unitTypeRow);
         const typeId = String(unit.unit_type_id || unitTypeRow?.id || '').trim();
-        const resolvedPrice = Number(unit.price || unitTypeRow?.price_per_unit || 0);
+        const resolvedPrice = Number(unit.price ?? unitTypeRow?.price_per_unit ?? 0);
 
         const existing = acc.find((item) => item.name.toLowerCase() === typeName.toLowerCase() && item.price_per_unit === resolvedPrice);
         if (existing) {

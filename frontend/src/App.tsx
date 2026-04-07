@@ -4,7 +4,7 @@
 
 import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -496,9 +496,17 @@ const ManagerPortalWrapper = () => {
 const TenantPortalWrapper = () => {
   const { getUserRole, user, supabaseUser, isLoading } = useAuth();
   const location = useLocation();
-  const [leaseGateLoading, setLeaseGateLoading] = useState(true);
-  const [requiresLeaseAgreement, setRequiresLeaseAgreement] = useState(false);
+  const [tenantAccessLoading, setTenantAccessLoading] = useState(true);
+  const [onboardingLocked, setOnboardingLocked] = useState(false);
+  const [requiresLeaseSignature, setRequiresLeaseSignature] = useState(false);
+  const hasResolvedInitialAccessCheck = useRef(false);
   const userRole = getUserRole();
+
+  useEffect(() => {
+    hasResolvedInitialAccessCheck.current = false;
+    setTenantAccessLoading(true);
+    setRequiresLeaseSignature(false);
+  }, [user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -506,35 +514,45 @@ const TenantPortalWrapper = () => {
     const checkLeaseGate = async () => {
       if (!user?.id || userRole !== "tenant") {
         if (!cancelled) {
-          setRequiresLeaseAgreement(false);
-          setLeaseGateLoading(false);
+          setOnboardingLocked(false);
+          setRequiresLeaseSignature(false);
+          setTenantAccessLoading(false);
+          hasResolvedInitialAccessCheck.current = true;
         }
         return;
       }
 
       try {
-        setLeaseGateLoading(true);
+        if (!hasResolvedInitialAccessCheck.current) {
+          setTenantAccessLoading(true);
+        }
 
         const accessState = await getTenantPortalAccessState(user.id);
-        if (accessState.isLocked || !accessState.hasPaidOnboardingInvoice) {
-          if (!cancelled) {
-            setRequiresLeaseAgreement(false);
+
+        let shouldRedirectToLeaseAgreement = false;
+        if (!accessState.isLocked && accessState.hasPaidOnboardingInvoice) {
+          try {
+            const leaseAgreementState = await getTenantLeaseAgreementState(user.id);
+            shouldRedirectToLeaseAgreement = !leaseAgreementState.isSigned;
+          } catch (leaseError) {
+            console.warn("Tenant lease signature check failed, skipping forced lease redirect:", leaseError);
           }
-          return;
         }
 
-        const leaseState = await getTenantLeaseAgreementState(user.id);
         if (!cancelled) {
-          setRequiresLeaseAgreement(!leaseState.isSigned);
+          setOnboardingLocked(accessState.isLocked);
+          setRequiresLeaseSignature(shouldRedirectToLeaseAgreement);
         }
       } catch (error) {
-        console.warn("Tenant lease-gate check failed, allowing normal access:", error);
+        console.warn("Tenant onboarding lock check failed, allowing normal access:", error);
         if (!cancelled) {
-          setRequiresLeaseAgreement(false);
+          setOnboardingLocked(false);
+          setRequiresLeaseSignature(false);
         }
       } finally {
         if (!cancelled) {
-          setLeaseGateLoading(false);
+          hasResolvedInitialAccessCheck.current = true;
+          setTenantAccessLoading(false);
         }
       }
     };
@@ -546,6 +564,12 @@ const TenantPortalWrapper = () => {
     };
   }, [user?.id, userRole, location.pathname]);
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log("TenantPortalWrapper - userRole:", userRole);
+    }
+  }, [userRole]);
+
   if (isLoading) {
     return <GlobalLoader />;
   }
@@ -554,8 +578,6 @@ const TenantPortalWrapper = () => {
   if (!user && supabaseUser) {
     return <GlobalLoader />;
   }
-
-  console.log("TenantPortalWrapper - userRole:", userRole);
 
   if (userRole !== "tenant") {
     // Redirect to appropriate dashboard, NOT back to /portal to avoid loop
@@ -569,7 +591,6 @@ const TenantPortalWrapper = () => {
   }
 
   const leaseAllowedPaths = [
-    "/portal/tenant/lease-agreement",
     "/portal/tenant/payments",
     "/portal/tenant/payments/make",
   ];
@@ -578,11 +599,18 @@ const TenantPortalWrapper = () => {
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
 
-  if (leaseGateLoading) {
+  const isTenantDashboardPath =
+    location.pathname === "/portal/tenant" || location.pathname === "/portal/tenant/";
+
+  if (tenantAccessLoading) {
     return <GlobalLoader />;
   }
 
-  if (requiresLeaseAgreement && !isLeaseExemptPath) {
+  if (onboardingLocked && !isLeaseExemptPath) {
+    return <Navigate to="/portal/tenant/payments?tab=summary" replace />;
+  }
+
+  if (!onboardingLocked && requiresLeaseSignature && isTenantDashboardPath) {
     return <Navigate to="/portal/tenant/lease-agreement" replace />;
   }
 

@@ -5,6 +5,7 @@ import ManagerTenants from './Tenants';
 import ManagerPayments from './Payments';
 import ManagerMaintenance from './Maintenance';
 import ManagerApprovalRequests from './ApprovalRequests';
+import ManagerLeaveRequestsPage from './LeaveRequests';
 import ManagerVacationNotices from './VacationNotices';
 import ManagerReports from './Reports';
 import ManagerUtilityReadings from './UtilityReadings';
@@ -35,6 +36,10 @@ export const managerRoutes: RouteObject[] = [
       {
         path: 'approval-requests',
         element: <ManagerApprovalRequests />,
+      },
+      {
+        path: 'leave-requests',
+        element: <ManagerLeaveRequestsPage />,
       },
       {
         path: 'vacation-notices',

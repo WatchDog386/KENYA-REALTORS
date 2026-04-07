@@ -217,15 +217,19 @@ const TenantPaymentsPage: React.FC = () => {
 
   // Handle successful payment (from webhook)
   const handlePaymentSuccess = async (transactionRef: string, details: any) => {
-    toast.success("Payment submitted! Verifying with Paystack...");
+    console.log("✅ Payment successful:", transactionRef);
+    toast.success("Payment completed! Your dashboard is being updated...");
 
-    // Don't mark as paid immediately - wait for webhook
-    // Refresh data after 3 seconds to check webhook status
+    // Refresh data immediately and then again after 2 seconds to ensure webhook processed
+    if (tenantId) {
+      fetchInvoices(tenantId);
+      fetchReceipts(tenantId);
+    }
+
+    // After another 3 seconds, redirect back to tenant dashboard to show full access
     setTimeout(() => {
-      if (tenantId) {
-        fetchInvoices(tenantId);
-        fetchReceipts(tenantId);
-      }
+      console.log("🚀 Redirecting to tenant dashboard...");
+      navigate("/portal/tenant", { replace: true });
     }, 3000);
 
     setPaymentDialogOpen(false);

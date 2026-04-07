@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "src/server.js",
+  "main": "README.md",
   "scripts": {
-    "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "dev": "echo Backend runtime disabled. Use Supabase direct integration from repository root.",
+    "start": "npm run dev"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

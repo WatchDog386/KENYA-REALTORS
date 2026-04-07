@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Building2, ClipboardCheck, Loader2, Search, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { createOrEnsureMoveInInvoiceForApplication } from '@/services/tenantOnboardingService';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,6 +85,7 @@ const SuperAdminApplications = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [draftStatusById, setDraftStatusById] = useState<Record<string, ApplicationStatus>>({});
+  const autoInvoicedApplicationIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     loadApplications();
@@ -128,12 +130,57 @@ const SuperAdminApplications = () => {
           return acc;
         }, {})
       );
+
+      void autoGenerateFirstInvoices(applicationsWithUnits);
     } catch (err) {
       console.error('Error loading applications:', err);
       setFetchError('Failed to fetch application data from the server.');
       toast.error('Failed to load applications');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const autoGenerateFirstInvoices = async (items: LeaseApplication[]) => {
+    const candidates = items.filter((app) => {
+      const statusKey = getStatusKey(app.status);
+      return (
+        (statusKey === 'pending' || statusKey === 'under_review' || statusKey === 'approved') &&
+        Boolean(app.id && app.applicant_id && app.property_id && app.unit_id) &&
+        !autoInvoicedApplicationIds.current.has(app.id)
+      );
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    let linkedCount = 0;
+
+    for (const app of candidates) {
+      try {
+        const result = await createOrEnsureMoveInInvoiceForApplication({
+          id: app.id,
+          applicant_id: app.applicant_id,
+          property_id: app.property_id,
+          unit_id: app.unit_id,
+          applicant_name: app.applicant_name || undefined,
+          applicant_email: app.applicant_email || undefined,
+          unit_number: app.units?.unit_number || undefined,
+          property_name: app.properties?.name || undefined,
+        });
+
+        if (result?.linkedInvoiceId) {
+          linkedCount += 1;
+          autoInvoicedApplicationIds.current.add(app.id);
+        }
+      } catch (error) {
+        console.warn('Automatic first-invoice generation failed for application', app.id, error);
+      }
+    }
+
+    if (linkedCount > 0) {
+      toast.success(`Auto-generated ${linkedCount} first invoice${linkedCount > 1 ? 's' : ''} for new applications.`);
     }
   };
 
@@ -167,80 +214,40 @@ const SuperAdminApplications = () => {
   const handleStatusChange = async (applicationId: string, newStatus: ApplicationStatus) => {
     setUpdatingId(applicationId);
     try {
-      const { error } = await supabase
-        .from('lease_applications')
-        .update({ status: newStatus })
-        .eq('id', applicationId);
-
-      if (error) throw error;
-
       if (newStatus === 'approved') {
         const app = applications.find((item) => item.id === applicationId);
-        if (app && app.applicant_id && app.unit_id && app.property_id) {
-          const now = new Date().toISOString();
-
-          const { data: existingTenant, error: checkError } = await supabase
-            .from('tenants')
-            .select('id')
-            .eq('user_id', app.applicant_id)
-            .limit(1)
-            .maybeSingle();
-
-          if (checkError && checkError.code !== 'PGRST116') {
-            throw new Error(`Database check failed: ${checkError.message}`);
-          }
-
-          if (existingTenant) {
-            const { error: updateError } = await supabase
-              .from('tenants')
-              .update({
-                property_id: app.property_id,
-                unit_id: app.unit_id,
-                move_in_date: now,
-                status: 'active',
-              })
-              .eq('user_id', app.applicant_id);
-
-            if (updateError) throw updateError;
-          } else {
-            const { error: insertError } = await supabase
-              .from('tenants')
-              .insert({
-                user_id: app.applicant_id,
-                property_id: app.property_id,
-                unit_id: app.unit_id,
-                move_in_date: now,
-                status: 'active',
-              });
-
-            if (insertError) throw insertError;
-          }
-
-          const rentAmount = Number(app.units?.price || 0);
-          const { error: leaseError } = await supabase
-            .from('tenant_leases')
-            .insert({
-              unit_id: app.unit_id,
-              tenant_id: app.applicant_id,
-              start_date: now,
-              rent_amount: rentAmount,
-              status: 'active',
-            });
-
-          if (leaseError) throw leaseError;
-
-          const { error: unitError } = await supabase
-            .from('units')
-            .update({ status: 'occupied' })
-            .eq('id', app.unit_id);
-
-          if (unitError) throw unitError;
-
-          toast.success('Application approved and tenant assigned to the unit');
-        } else {
-          toast.error('Application data missing. Tenant could not be auto-assigned.');
+        if (!app || !app.applicant_id || !app.unit_id || !app.property_id) {
+          throw new Error('Application data missing. Unable to generate onboarding invoice.');
         }
+
+        await createOrEnsureMoveInInvoiceForApplication({
+          id: app.id,
+          applicant_id: app.applicant_id,
+          property_id: app.property_id,
+          unit_id: app.unit_id,
+          applicant_name: app.applicant_name || undefined,
+          applicant_email: app.applicant_email || undefined,
+          unit_number: app.units?.unit_number || undefined,
+        });
+
+        const { error: updateStatusError } = await supabase
+          .from('lease_applications')
+          .update({ status: 'approved' })
+          .eq('id', applicationId);
+
+        if (updateStatusError) {
+          throw updateStatusError;
+        }
+
+        toast.success('Application approved and onboarding invoice is ready for tenant payment.');
       } else {
+        const { error } = await supabase
+          .from('lease_applications')
+          .update({ status: newStatus })
+          .eq('id', applicationId);
+
+        if (error) throw error;
+
         toast.success(`Application marked as ${newStatus}`);
       }
 

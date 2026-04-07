@@ -15,11 +15,10 @@ const getEnv = (key: string): string | undefined => {
   return undefined;
 };
 
-const BACKEND_URL = getEnv("VITE_BACKEND_URL")?.replace(/\/+$/, "");
 const PUBLIC_SUPABASE_URL = getEnv("VITE_SUPABASE_URL") || getEnv("NEXT_PUBLIC_SUPABASE_URL");
-const SUPABASE_URL = BACKEND_URL || PUBLIC_SUPABASE_URL || getEnv("SUPABASE_URL");
+const SUPABASE_URL = PUBLIC_SUPABASE_URL || getEnv("SUPABASE_URL");
 const SUPABASE_ANON_KEY = getEnv("VITE_SUPABASE_ANON_KEY") || getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-const EFFECTIVE_ANON_KEY = SUPABASE_ANON_KEY || (BACKEND_URL ? "backend-proxy-anon" : undefined);
+const EFFECTIVE_ANON_KEY = SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY");
 
 const getProjectRef = (url?: string): string => {
@@ -37,7 +36,7 @@ const AUTH_STORAGE_KEY = `sb-${getProjectRef(SUPABASE_URL)}-auth-token`;
 if (!SUPABASE_URL) throw new Error("❌ Missing SUPABASE_URL.");
 if (isBrowser && !EFFECTIVE_ANON_KEY) throw new Error("❌ Missing SUPABASE_ANON_KEY for browser.");
 
-if (isDev) console.log("✅ Supabase Config Loaded", { url: SUPABASE_URL, hasAnonKey: !!SUPABASE_ANON_KEY, hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY, usingBackendProxy: !!BACKEND_URL, runtime: isBrowser ? "browser" : "server" });
+if (isDev) console.log("✅ Supabase Config Loaded", { url: SUPABASE_URL, hasAnonKey: !!SUPABASE_ANON_KEY, hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY, runtime: isBrowser ? "browser" : "server" });
 
 const getSiteUrl = (): string => {
   if (isBrowser) {

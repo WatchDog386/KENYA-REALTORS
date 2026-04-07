@@ -128,6 +128,8 @@ const prioritizeSuperAdminOnboardingInvoices = <T extends { notes?: string | nul
 const isInvoiceRelevantToCurrentOnboarding = (
   row: { notes?: string | null; property_id?: string | null; tenant_id?: string | null; created_at?: string | null },
   tenantProfileId: string,
+  tenantIdentifiers: string[],
+  tenantEmail: string | null,
   applicationRow: any,
   scopedOnboardingPropertyId?: string | null
 ) => {
@@ -135,9 +137,33 @@ const isInvoiceRelevantToCurrentOnboarding = (
   const appId = String(applicationRow?.id || "");
   const appUnitId = String(applicationRow?.unit_id || "");
   const appPropertyId = String(applicationRow?.property_id || scopedOnboardingPropertyId || "");
+  const rowTenantId = String(row?.tenant_id || "");
+  const scopedTenantIds = Array.from(new Set([tenantProfileId, ...(tenantIdentifiers || [])].filter(Boolean)));
+  const normalizedTenantEmail = String(tenantEmail || "").trim().toLowerCase();
+  const metadataApplicantEmail = String(metadata.APPLICANT_EMAIL || "").trim().toLowerCase();
+
+  const matchesTenantIdentity = (candidateId?: string | null) => {
+    const normalized = String(candidateId || "").trim();
+    if (!normalized) return false;
+    return scopedTenantIds.includes(normalized);
+  };
+
+  const matchesTenantEmail =
+    Boolean(normalizedTenantEmail) &&
+    Boolean(metadataApplicantEmail) &&
+    metadataApplicantEmail === normalizedTenantEmail;
 
   // If metadata explicitly names another applicant, this invoice is not for this tenant.
-  if (metadata.APPLICANT_ID && metadata.APPLICANT_ID !== tenantProfileId) {
+  if (metadata.APPLICANT_ID) {
+    const applicantMatches =
+      matchesTenantIdentity(metadata.APPLICANT_ID) ||
+      matchesTenantIdentity(rowTenantId) ||
+      matchesTenantEmail;
+
+    if (!applicantMatches) {
+      return false;
+    }
+  } else if (rowTenantId && !matchesTenantIdentity(rowTenantId) && !matchesTenantEmail) {
     return false;
   }
 
@@ -165,25 +191,37 @@ const isInvoiceRelevantToCurrentOnboarding = (
 const sortOnboardingInvoicesByRelevance = (
   rows: any[],
   tenantProfileId: string,
+  tenantIdentifiers: string[],
+  tenantEmail: string | null,
   applicationRow: any
 ) => {
   const appId = String(applicationRow?.id || "");
   const appUnitId = String(applicationRow?.unit_id || "");
+  const scopedTenantIds = Array.from(new Set([tenantProfileId, ...(tenantIdentifiers || [])].filter(Boolean)));
+  const normalizedTenantEmail = String(tenantEmail || "").trim().toLowerCase();
 
   return [...(rows || [])].sort((a, b) => {
     const ma = parseInvoiceMetadata(a?.notes);
     const mb = parseInvoiceMetadata(b?.notes);
 
-    const score = (m: InvoiceMetadata) => {
+    const score = (m: InvoiceMetadata, row: any) => {
       let value = 0;
       if (m.APPLICANT_ID === tenantProfileId) value += 8;
+      if (m.APPLICANT_ID && scopedTenantIds.includes(String(m.APPLICANT_ID))) value += 6;
+      if (row?.tenant_id && scopedTenantIds.includes(String(row.tenant_id))) value += 8;
+      if (
+        normalizedTenantEmail &&
+        String(m.APPLICANT_EMAIL || "").trim().toLowerCase() === normalizedTenantEmail
+      ) {
+        value += 6;
+      }
       if (appId && m.LEASE_APPLICATION_ID === appId) value += 10;
       if (appUnitId && m.UNIT_ID === appUnitId) value += 6;
       if (String(m.BILLING_EVENT || "").toLowerCase() === "first_payment") value += 4;
       return value;
     };
 
-    const diff = score(mb) - score(ma);
+    const diff = score(mb, b) - score(ma, a);
     if (diff !== 0) return diff;
 
     const aTime = new Date(a?.updated_at || a?.created_at || 0).getTime();
@@ -560,6 +598,12 @@ const computeTenantPortalAccessState = async (
 
   const tenantRows = await resolveTenantRowsByUser(tenantProfileId);
   const tenantIdentifiers = buildTenantIdentifierSet(tenantProfileId, tenantRows);
+  const { data: tenantProfileRow } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", tenantProfileId)
+    .maybeSingle();
+  const tenantEmail = tenantProfileRow?.email ? String(tenantProfileRow.email).trim().toLowerCase() : null;
 
   const applicationRow = await resolveLatestRelevantApplication(tenantProfileId);
   const hasPendingApplication = Boolean((applicationRow as any)?.id);
@@ -576,7 +620,7 @@ const computeTenantPortalAccessState = async (
 
   let unpaidInvoiceQuery = supabase
     .from("invoices")
-    .select("id, amount, due_date, status, reference_number, property_id, notes, items")
+    .select("id, amount, due_date, status, reference_number, property_id, tenant_id, notes, items, created_at, updated_at")
     .in("status", ["unpaid", "overdue", "pending"]);
 
   unpaidInvoiceQuery = applyOnboardingInvoiceFilter(unpaidInvoiceQuery, tenantIdentifiers);
@@ -587,7 +631,7 @@ const computeTenantPortalAccessState = async (
 
   let paidInvoiceQuery = supabase
     .from("invoices")
-    .select("id, amount, due_date, status, reference_number, property_id, notes, items, tenant_id")
+    .select("id, amount, due_date, status, reference_number, property_id, notes, items, tenant_id, created_at, updated_at")
     .eq("status", "paid");
 
   paidInvoiceQuery = applyOnboardingInvoiceFilter(paidInvoiceQuery, tenantIdentifiers);
@@ -765,11 +809,18 @@ const computeTenantPortalAccessState = async (
   }
 
   const relevantUnpaidRows = (onboardingUnpaidRows || []).filter((row) =>
-    isInvoiceRelevantToCurrentOnboarding(row, tenantProfileId, applicationRow, scopedOnboardingPropertyId)
+    isInvoiceRelevantToCurrentOnboarding(
+      row,
+      tenantProfileId,
+      tenantIdentifiers,
+      tenantEmail,
+      applicationRow,
+      scopedOnboardingPropertyId
+    )
   );
 
   const preferredUnpaidInvoices = prioritizeSuperAdminOnboardingInvoices(
-    sortOnboardingInvoicesByRelevance(relevantUnpaidRows, tenantProfileId, applicationRow)
+    sortOnboardingInvoicesByRelevance(relevantUnpaidRows, tenantProfileId, tenantIdentifiers, tenantEmail, applicationRow)
   );
 
   const pendingInitialInvoices: PendingInitialInvoice[] = preferredUnpaidInvoices.map((row: any) => {
@@ -788,11 +839,18 @@ const computeTenantPortalAccessState = async (
   });
 
   const relevantPaidRows = (onboardingPaidRows || []).filter((row) =>
-    isInvoiceRelevantToCurrentOnboarding(row, tenantProfileId, applicationRow, scopedOnboardingPropertyId)
+    isInvoiceRelevantToCurrentOnboarding(
+      row,
+      tenantProfileId,
+      tenantIdentifiers,
+      tenantEmail,
+      applicationRow,
+      scopedOnboardingPropertyId
+    )
   );
 
   const preferredPaidInvoices = prioritizeSuperAdminOnboardingInvoices(
-    sortOnboardingInvoicesByRelevance(relevantPaidRows, tenantProfileId, applicationRow)
+    sortOnboardingInvoicesByRelevance(relevantPaidRows, tenantProfileId, tenantIdentifiers, tenantEmail, applicationRow)
   );
 
   const paidOnboardingInvoices: InvoiceLike[] = preferredPaidInvoices.map((row: any) => ({
@@ -864,13 +922,32 @@ export const getTenantPortalAccessState = async (
 export const createOrEnsureMoveInInvoiceForApplication = async (
   application: LeaseApplicationOnboardingData
 ): Promise<{ linkedInvoiceId: string | null; source: "billing_invoice" | "awaiting_super_admin" }> => {
-  if (!application.applicant_id) {
+  let applicantId = application.applicant_id || null;
+
+  if (!applicantId && application.applicant_email) {
+    const normalizedEmail = String(application.applicant_email).trim().toLowerCase();
+    const { data: profileByEmail, error: profileLookupError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (!profileLookupError && profileByEmail?.id) {
+      applicantId = profileByEmail.id;
+      await supabase
+        .from("lease_applications")
+        .update({ applicant_id: applicantId })
+        .eq("id", application.id);
+    }
+  }
+
+  if (!applicantId) {
     throw new Error("Application has no registered applicant account.");
   }
 
   const appIdTag = `LEASE_APPLICATION_ID:${application.id}`;
-  const applicantTenantRows = await resolveTenantRowsByUser(application.applicant_id);
-  const applicantIdentifiers = buildTenantIdentifierSet(application.applicant_id, applicantTenantRows);
+  const applicantTenantRows = await resolveTenantRowsByUser(applicantId);
+  const applicantIdentifiers = buildTenantIdentifierSet(applicantId, applicantTenantRows);
   const unitDetails = await readUnitAssignmentDetails(application.unit_id);
 
   const moveInNotesFilter = `${INITIAL_MOVE_IN_INVOICE_NOTES_FILTER},notes.ilike.%${appIdTag}%`;
@@ -880,7 +957,7 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
     .select("id, notes, created_at")
     .in("tenant_id", applicantIdentifiers)
     .eq("property_id", application.property_id)
-    .in("status", ["unpaid", "overdue"])
+    .in("status", ["unpaid", "overdue", "pending", "paid"])
     .or(moveInNotesFilter)
     .order("created_at", { ascending: false })
     .limit(25);
@@ -889,10 +966,29 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
     throw invoiceLookupError;
   }
 
+  let candidateInvoices = (existingInvoices || []) as any[];
+
+  if (candidateInvoices.length === 0) {
+    const { data: applicationTaggedInvoices, error: applicationTaggedLookupError } = await supabase
+      .from("invoices")
+      .select("id, notes, created_at")
+      .eq("property_id", application.property_id)
+      .in("status", ["unpaid", "overdue", "pending", "paid"])
+      .ilike("notes", `%${appIdTag}%`)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (applicationTaggedLookupError && applicationTaggedLookupError.code !== "PGRST116") {
+      throw applicationTaggedLookupError;
+    }
+
+    candidateInvoices = (applicationTaggedInvoices || []) as any[];
+  }
+
   const metadataTags = buildAssignmentMetadataTags({
     unitId: application.unit_id,
     propertyId: application.property_id,
-    applicantId: application.applicant_id,
+    applicantId,
     applicationId: application.id,
     unitNumber: application.unit_number || unitDetails.unitNumber,
     unitTypeId: application.unit_type_id || unitDetails.unitTypeId,
@@ -902,8 +998,8 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
     applicantEmail: application.applicant_email,
   });
 
-  const preferredExistingInvoice = prioritizeSuperAdminOnboardingInvoices((existingInvoices || []) as any[])[0] ||
-    (existingInvoices || [])[0] ||
+  const preferredExistingInvoice = prioritizeSuperAdminOnboardingInvoices(candidateInvoices)[0] ||
+    candidateInvoices[0] ||
     null;
 
   let linkedInvoiceId = preferredExistingInvoice?.id || null;
@@ -957,7 +1053,7 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
         {
           reference_number: referenceNumber,
           property_id: application.property_id,
-          tenant_id: application.applicant_id,
+          tenant_id: applicantId,
           amount: totalAmount,
           due_date: issuedDate,
           issued_date: issuedDate,
@@ -968,7 +1064,7 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
             initial_charges: initialCharges,
             additional_charges: additionalCharges,
           },
-          notes: `${marker}\nAuto-generated after manager approval`,
+          notes: `${marker}\nAuto-generated from super admin onboarding flow`,
         },
       ])
       .select("id")
@@ -983,13 +1079,13 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
 
   await supabase
     .from("units")
-    .update({ status: "booked" })
+    .update({ status: "pending" })
     .eq("id", application.unit_id)
     .in("status", ["vacant", "available", "booked"]);
 
   await supabase
     .from("lease_applications")
-    .update({ status: "under_review" })
+    .update({ status: "pending" })
     .eq("id", application.id);
 
   return {
