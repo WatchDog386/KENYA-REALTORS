@@ -46,7 +46,7 @@ interface UserRoleData {
 }
 
 const PANEL_HEADER_CLASS =
-  "bg-[#154279] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white";
+  "border-b border-[#bcc3cd] px-1 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#5d6c7c]";
 
 const inputClassName =
   "h-10 rounded-none border border-[#b6bec8] bg-white px-3 text-[13px] text-[#1f2937] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#F96302]";
@@ -311,10 +311,10 @@ const SuperAdminProfile: React.FC = () => {
       <div className="mx-auto max-w-[1500px] space-y-3">
         <section className="border border-[#bcc3cd] bg-[#eef1f4]">
           <div className={PANEL_HEADER_CLASS}>Super Admin Profile</div>
-          <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-12">
-            <div className="xl:col-span-8">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="min-w-[240px] flex-1">
+          <div className="grid grid-cols-1 gap-4 p-3 xl:grid-cols-12">
+            <div className="space-y-4 xl:col-span-8">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#c4cad3] pb-3">
+                <div className="min-w-[260px] flex-1">
                   <h1 className="text-[34px] font-bold leading-none text-[#1f2937]">{fullName}</h1>
                   <div className="mt-1 flex items-center gap-2 text-[14px] font-medium text-[#5f6b7c]">
                     <Mail className="h-4 w-4 text-[#154279]" />
@@ -325,7 +325,7 @@ const SuperAdminProfile: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 self-start">
                   <span className="bg-[#154279] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Super Admin</span>
                   <span className="bg-[#F96302] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
                     {(profile?.status || "active").replace("_", " ")}
@@ -333,23 +333,17 @@ const SuperAdminProfile: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Role</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Primary Role</p>
                   <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{roleLabels[0] || "Super Administrator"}</p>
                 </div>
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
+                <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Phone</p>
                   <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{formData.phone || "Not set"}</p>
                 </div>
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Created</p>
-                  <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">
-                    {new Date(profile?.created_at || Date.now()).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Updated</p>
+                <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2 sm:col-span-2 lg:col-span-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Last Updated</p>
                   <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">
                     {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}
                   </p>
@@ -358,16 +352,16 @@ const SuperAdminProfile: React.FC = () => {
             </div>
 
             <div className="xl:col-span-4">
-              <div className="border border-[#c7cdd6] bg-white p-3">
-                <div className="relative h-[290px] overflow-hidden border border-[#c7cdd6] bg-[#eef1f4]">
+              <div className="mx-auto w-full max-w-[360px] p-0">
+                <div className="relative flex h-[220px] items-center justify-center overflow-hidden border border-[#c7cdd6] bg-[#e3e7ec] p-2 md:h-[250px]">
                   <img
                     src={imageSrc}
                     alt="Super admin"
-                    className="h-full w-full object-cover object-center"
+                    className="max-h-full max-w-full object-contain object-center"
                   />
                 </div>
 
-                <label className="mt-3 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 border border-[#d96d26] bg-[#F96302] px-3 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#e15802]">
+                <label className="mt-2 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 border border-[#d96d26] bg-[#F96302] px-3 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#e15802]">
                   {imageUploading ? (
                     <>
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -392,206 +386,232 @@ const SuperAdminProfile: React.FC = () => {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-8">
-            <div className={PANEL_HEADER_CLASS}>Profile Information</div>
-            <div className="space-y-4 p-3">
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">First Name</label>
-                  <Input
-                    name="first_name"
-                    value={formData.first_name}
-                    onChange={handleInputChange}
-                    placeholder="First name"
-                    className={inputClassName}
-                  />
+        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
+          <div className={PANEL_HEADER_CLASS}>Profile Details</div>
+          <div className="space-y-4 p-3">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-4">
+              <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Role</p>
+                <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{roleLabels[0] || "Super Administrator"}</p>
+              </div>
+              <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Phone</p>
+                <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{formData.phone || "Not set"}</p>
+              </div>
+              <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Created</p>
+                <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">
+                  {new Date(profile?.created_at || Date.now()).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Updated</p>
+                <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">
+                  {new Date(profile?.updated_at || Date.now()).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+              <div className="space-y-4 border-t border-[#c4cad3] pt-3 xl:col-span-8">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Profile Information</div>
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">First Name</label>
+                    <Input
+                      name="first_name"
+                      value={formData.first_name}
+                      onChange={handleInputChange}
+                      placeholder="First name"
+                      className={inputClassName}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Last Name</label>
+                    <Input
+                      name="last_name"
+                      value={formData.last_name}
+                      onChange={handleInputChange}
+                      placeholder="Last name"
+                      className={inputClassName}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Email Address</label>
+                    <Input
+                      value={user?.email || ""}
+                      readOnly
+                      className={`${inputClassName} bg-[#e8ecf1] text-[#59687d]`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Phone Number</label>
+                    <Input
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      placeholder="+254..."
+                      className={inputClassName}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Last Name</label>
-                  <Input
-                    name="last_name"
-                    value={formData.last_name}
-                    onChange={handleInputChange}
-                    placeholder="Last name"
-                    className={inputClassName}
-                  />
-                </div>
+                <div className="flex flex-wrap gap-2 border-t border-[#c4cad3] pt-3">
+                  <Button
+                    type="button"
+                    onClick={handleSaveProfile}
+                    disabled={isSaving}
+                    className="h-10 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        Saving
+                      </>
+                    ) : (
+                      <>
+                        <Check className="mr-2 h-3.5 w-3.5" />
+                        Save Profile
+                      </>
+                    )}
+                  </Button>
 
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Email Address</label>
-                  <Input
-                    value={user?.email || ""}
-                    readOnly
-                    className={`${inputClassName} bg-[#e8ecf1] text-[#59687d]`}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Phone Number</label>
-                  <Input
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+254..."
-                    className={inputClassName}
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleResetForm}
+                    disabled={isSaving}
+                    className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+                  >
+                    <X className="mr-2 h-3.5 w-3.5" />
+                    Reset
+                  </Button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 border-t border-[#c4cad3] pt-3">
+              <div className="space-y-4 border-t border-[#c4cad3] pt-3 xl:col-span-4">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Security</div>
+
+                <div className="flex items-start gap-2 border border-[#bfd3ea] bg-[#e9f2fd] px-3 py-2 text-[12px] text-[#154279]">
+                  <Shield className="mt-0.5 h-4 w-4" />
+                  <p className="font-medium">Keep your account secure by updating your password regularly.</p>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">New Password</label>
+                  <Input
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) =>
+                      setPasswordData((prev) => ({
+                        ...prev,
+                        newPassword: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter new password"
+                    className={inputClassName}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Confirm Password</label>
+                  <Input
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordData((prev) => ({
+                        ...prev,
+                        confirmPassword: e.target.value,
+                      }))
+                    }
+                    placeholder="Confirm password"
+                    className={inputClassName}
+                  />
+                </div>
+
                 <Button
                   type="button"
-                  onClick={handleSaveProfile}
-                  disabled={isSaving}
-                  className="h-10 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]"
+                  onClick={handleChangePassword}
+                  disabled={isChangingPassword}
+                  className="h-10 w-full rounded-none border border-[#d96d26] bg-[#F96302] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
                 >
-                  {isSaving ? (
+                  {isChangingPassword ? (
                     <>
                       <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                      Saving
+                      Updating Password
                     </>
                   ) : (
                     <>
-                      <Check className="mr-2 h-3.5 w-3.5" />
-                      Save Profile
+                      <Key className="mr-2 h-3.5 w-3.5" />
+                      Update Password
                     </>
                   )}
                 </Button>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleResetForm}
-                  disabled={isSaving}
-                  className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
-                >
-                  <X className="mr-2 h-3.5 w-3.5" />
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </section>
-
-          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-4">
-            <div className={PANEL_HEADER_CLASS}>Security</div>
-            <div className="space-y-4 p-3">
-              <div className="flex items-start gap-2 border border-[#bfd3ea] bg-[#e9f2fd] px-3 py-2 text-[12px] text-[#154279]">
-                <Shield className="mt-0.5 h-4 w-4" />
-                <p className="font-medium">Keep your account secure by updating your password regularly.</p>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">New Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) =>
-                    setPasswordData((prev) => ({
-                      ...prev,
-                      newPassword: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter new password"
-                  className={inputClassName}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Confirm Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) =>
-                    setPasswordData((prev) => ({
-                      ...prev,
-                      confirmPassword: e.target.value,
-                    }))
-                  }
-                  placeholder="Confirm password"
-                  className={inputClassName}
-                />
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleChangePassword}
-                disabled={isChangingPassword}
-                className="h-10 w-full rounded-none border border-[#d96d26] bg-[#F96302] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
-              >
-                {isChangingPassword ? (
-                  <>
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Updating Password
-                  </>
-                ) : (
-                  <>
-                    <Key className="mr-2 h-3.5 w-3.5" />
-                    Update Password
-                  </>
-                )}
-              </Button>
-
-              <div className="space-y-2 border-t border-[#c4cad3] pt-3">
-                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
-                  <CheckCircle2 className="h-4 w-4 text-[#2dae49]" />
-                  Account status: {(profile?.status || "active").replace("_", " ")}
-                </div>
-                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
-                  <User className="h-4 w-4 text-[#154279]" />
-                  Role: {roleLabels[0] || "Super Administrator"}
-                </div>
-                <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
-                  <Phone className="h-4 w-4 text-[#154279]" />
-                  Contact: {formData.phone || "Not set"}
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
-          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-5">
-            <div className={PANEL_HEADER_CLASS}>Assigned Roles</div>
-            <div className="space-y-2 p-3">
-              {roleLabels.length > 0 ? (
-                roleLabels.map((label) => (
-                  <div key={label} className="flex items-center gap-2 border border-[#c7cdd6] bg-white px-3 py-2 text-[13px] font-semibold text-[#1f2937]">
-                    <Shield className="h-4 w-4 text-[#154279]" />
-                    <span>{label}</span>
+                <div className="space-y-2 border-t border-[#c4cad3] pt-3">
+                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
+                    <CheckCircle2 className="h-4 w-4 text-[#2dae49]" />
+                    Account status: {(profile?.status || "active").replace("_", " ")}
                   </div>
-                ))
-              ) : (
-                <div className="border border-[#c7cdd6] bg-white px-3 py-3 text-[13px] font-medium text-[#5f6b7c]">
-                  No role information available.
+                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
+                    <User className="h-4 w-4 text-[#154279]" />
+                    Role: {roleLabels[0] || "Super Administrator"}
+                  </div>
+                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[#324156]">
+                    <Phone className="h-4 w-4 text-[#154279]" />
+                    Contact: {formData.phone || "Not set"}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
-          </section>
 
-          <section className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-7">
-            <div className={PANEL_HEADER_CLASS}>Permissions</div>
-            <div className="p-3">
-              {allPermissions.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {allPermissions.map((permission) => (
-                    <span
-                      key={permission}
-                      className="border border-[#bed3ea] bg-[#e9f2fd] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#154279]"
-                    >
-                      {permission.replace(/_/g, " ")}
-                    </span>
-                  ))}
+            <div className="grid grid-cols-1 gap-3 border-t border-[#c4cad3] pt-3 xl:grid-cols-12">
+              <div className="xl:col-span-5">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Assigned Roles</div>
+                <div className="space-y-2">
+                  {roleLabels.length > 0 ? (
+                    roleLabels.map((label) => (
+                      <div key={label} className="flex items-center gap-2 border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2 text-[13px] font-semibold text-[#1f2937]">
+                        <Shield className="h-4 w-4 text-[#154279]" />
+                        <span>{label}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-3 text-[13px] font-medium text-[#5f6b7c]">
+                      No role information available.
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="border border-[#c7cdd6] bg-white px-3 py-3 text-[13px] font-medium text-[#5f6b7c]">
-                  No permissions found for this account.
+              </div>
+
+              <div className="xl:col-span-7">
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Permissions</div>
+                <div>
+                  {allPermissions.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {allPermissions.map((permission) => (
+                        <span
+                          key={permission}
+                          className="border border-[#bed3ea] bg-[#e9f2fd] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#154279]"
+                        >
+                          {permission.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-3 text-[13px] font-medium text-[#5f6b7c]">
+                      No permissions found for this account.
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   );

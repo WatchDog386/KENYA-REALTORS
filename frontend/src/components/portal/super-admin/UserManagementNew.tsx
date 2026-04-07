@@ -1,6 +1,5 @@
 // src/components/portal/super-admin/UserManagementNew.tsx
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import {
   User,
   Users,
@@ -36,10 +35,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -59,8 +54,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { supabase } from "@/services/supabase";
 import { userSyncService } from "@/services/userSyncService";
@@ -118,7 +111,6 @@ const UserManagementNew: React.FC = () => {
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
 
@@ -366,21 +358,6 @@ const UserManagementNew: React.FC = () => {
     }
   };
 
-  // Get role-specific stat card color
-  const getStatCardBgColor = (label: string) => {
-    switch (label) {
-      case "Super Admins": return "bg-purple-50 border-purple-200";
-      case "Managers": return "bg-blue-50 border-blue-200";
-      case "Tenants": return "bg-green-50 border-green-200";
-      case "Accountants": return "bg-indigo-50 border-indigo-200";
-      case "Suppliers": return "bg-emerald-50 border-emerald-200";
-      case "Technicians": return "bg-orange-50 border-orange-200";
-      case "Proprietors": return "bg-amber-50 border-amber-200";
-      case "Caretakers": return "bg-cyan-50 border-cyan-200";
-      default: return "bg-slate-50 border-slate-200";
-    }
-  };
-
   const getStatIconColor = (label: string) => {
     switch (label) {
       case "Super Admins": return "text-purple-600";
@@ -406,279 +383,201 @@ const UserManagementNew: React.FC = () => {
     );
   }
 
-  const statCards = [
-    { label: "Total Users", value: stats.totalUsers, icon: Users },
-    { label: "Super Admins", value: stats.superAdmins, icon: Shield },
-    { label: "Managers", value: stats.propertyManagers, icon: Building },
-    { label: "Tenants", value: stats.tenants, icon: Home },
-    { label: "Accountants", value: stats.accountants, icon: DollarSign },
-    { label: "Suppliers", value: stats.suppliers, icon: Handshake },
-    { label: "Technicians", value: stats.technicians, icon: Wrench },
-    { label: "Proprietors", value: stats.proprietors, icon: Briefcase },
-    { label: "Caretakers", value: stats.caretakers, icon: Settings },
-    { label: "Pending", value: stats.unassignedUsers, icon: Clock },
-    { label: "Assigned", value: stats.assignedUsers, icon: CheckCircle },
-  ];
+  const formatFilterLabel = (value: string) =>
+    value
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (match) => match.toUpperCase());
+
+  const filterHeading = roleFilter === "all" ? "Workspace" : formatFilterLabel(roleFilter);
+  const suspendedUsers = users.filter((u) => u.status === "inactive" || u.status === "suspended").length;
 
   return (
     <div className="min-h-screen bg-[#d7dce1] p-4 md:p-6 font-['Poppins','Segoe_UI',sans-serif] text-[#243041]">
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');`}</style>
 
-      <div className="mx-auto max-w-[1500px] space-y-3">
-        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
-          <div className={PANEL_HEADER_CLASS}>User Management</div>
-          <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-12">
-            <div className="xl:col-span-9">
-              <h1 className="text-[34px] font-bold leading-none text-[#1f2937]">User Registry</h1>
-              <p className="mt-2 text-[13px] font-medium text-[#5f6b7c]">
-                Manage platform identities, assign roles, and control account status.
-              </p>
-
-              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Total Users</p>
-                  <p className="mt-1 text-[20px] font-bold text-[#1f2937]">{stats.totalUsers}</p>
-                </div>
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Pending Assignment</p>
-                  <p className="mt-1 text-[20px] font-bold text-[#1f2937]">{stats.unassignedUsers}</p>
-                </div>
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Assigned</p>
-                  <p className="mt-1 text-[20px] font-bold text-[#1f2937]">{stats.assignedUsers}</p>
-                </div>
-                <div className="border border-[#c7cdd6] bg-white px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Managers</p>
-                  <p className="mt-1 text-[20px] font-bold text-[#1f2937]">{stats.propertyManagers}</p>
-                </div>
-              </div>
+      <div className="mx-auto max-w-[1600px] space-y-4">
+        <section className="border border-[#bcc3cd] bg-[#eef1f4] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-widest text-[#6a7788]">Workspace View</p>
+              <h1 className="mt-1 text-[42px] font-bold leading-none text-[#1f2937]">{filterHeading} Users</h1>
+              <p className="mt-2 text-[13px] font-medium text-[#5f6b7c]">See user counts by role and manage access</p>
             </div>
+            <span className="inline-flex items-center bg-[#1f5e8f] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+              {roleFilter === "all" ? "All Users" : formatFilterLabel(roleFilter)}
+            </span>
+          </div>
 
-            <div className="xl:col-span-3">
-              <div className="flex h-full flex-col justify-between gap-3 border border-[#c7cdd6] bg-white p-3">
-                <div className="space-y-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Quick Actions</p>
-                  <div className="space-y-2">
-                    <span className="inline-block bg-[#154279] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Super Admin Panel</span>
-                    <span className="inline-block bg-[#F96302] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">Users Module</span>
-                  </div>
-                </div>
-
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="h-10 w-full rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]">
-                      <Plus className="mr-2 h-3.5 w-3.5" />
-                      Add New User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px] rounded-none border border-[#bcc3cd] bg-[#eef1f4] p-0">
-                    <div className={PANEL_HEADER_CLASS}>Create New User</div>
-                    <div className="p-4">
-                      <CreateUserForm
-                        onSuccess={() => {
-                          setIsDialogOpen(false);
-                          loadUsers();
-                        }}
-                      />
-                    </div>
-                  </DialogContent>
-                </Dialog>
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#2aa8bf] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/90">Total Users</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-white">{stats.totalUsers}</p>
               </div>
+              <div className="bg-[#1f93a8] px-3 py-1.5 text-[18px] font-medium text-white">All roles</div>
+            </div>
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#2daf4a] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/90">Managers</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-white">{stats.propertyManagers}</p>
+              </div>
+              <div className="bg-[#24933d] px-3 py-1.5 text-[18px] font-medium text-white">Manager accounts</div>
+            </div>
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#f3bd11] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#1f2937]/80">Tenants</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-[#1f2937]">{stats.tenants}</p>
+              </div>
+              <div className="bg-[#d6a409] px-3 py-1.5 text-[18px] font-medium text-[#1f2937]">Tenant accounts</div>
+            </div>
+            <div className="overflow-hidden border border-[#adb5bf] rounded-none">
+              <div className="bg-[#dc3545] px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/90">Suspended</p>
+                <p className="mt-1 text-[40px] font-bold leading-none text-white">{suspendedUsers}</p>
+              </div>
+              <div className="bg-[#c12c3a] px-3 py-1.5 text-[18px] font-medium text-white">Access disabled</div>
             </div>
           </div>
         </section>
 
-        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
-          <div className={PANEL_HEADER_CLASS}>Role Metrics</div>
-          <div className="grid grid-cols-2 gap-2 p-3 md:grid-cols-3 xl:grid-cols-6">
-            {statCards.map((stat, idx) => {
-              const IconComponent = stat.icon;
-              const bgColor = getStatCardBgColor(stat.label);
-              const iconColor = getStatIconColor(stat.label);
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-4">
+            <div className="border-b border-[#c4cad3] px-3 py-2 text-[14px] font-semibold text-[#1f2937]">Add User</div>
+            <div className="p-4">
+              <CreateUserForm onSuccess={loadUsers} />
+            </div>
+          </div>
 
-              return (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.04 }}
-                  className={`border ${bgColor} px-3 py-2`}
+          <div className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-8">
+            <div className="flex items-center justify-between border-b border-[#c4cad3] px-3 py-2">
+              <p className="text-[14px] font-semibold text-[#1f2937]">Users and Roles</p>
+              <p className="text-[12px] font-medium text-[#5f6b7c]">{filteredUsers.length} records</p>
+            </div>
+
+            <div className="space-y-3 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8595]" />
+                  <Input
+                    placeholder="Search users by name or email"
+                    className={`${INPUT_CLASS_NAME} pl-9`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="h-10 w-full rounded-none border-2 border-[#7f8fa3] bg-white px-3 text-[13px] font-semibold text-[#111827] outline-none focus:border-[#3c8dbc] sm:w-[240px]"
                 >
-                  <div className="flex items-center justify-between">
-                    <IconComponent className={`h-4 w-4 ${iconColor}`} />
-                    <span className="text-[18px] font-bold leading-none text-[#1f2937]">{stat.value}</span>
-                  </div>
-                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-widest text-[#6a7788]">{stat.label}</p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </section>
+                  <option value="all">ALL ROLES</option>
+                  <option value="super_admin">SUPER ADMIN</option>
+                  <option value="property_manager">PROPERTY MANAGER</option>
+                  <option value="tenant">TENANT</option>
+                  <option value="technician">TECHNICIAN</option>
+                  <option value="proprietor">PROPRIETOR</option>
+                  <option value="caretaker">CARETAKER</option>
+                  <option value="accountant">ACCOUNTANT</option>
+                  <option value="supplier">SUPPLIER</option>
+                  <option value="no-role">UNASSIGNED</option>
+                  <option value="pending-approval">PENDING APPROVAL</option>
+                </select>
 
-        <section className="border border-[#bcc3cd] bg-[#eef1f4]">
-          <div className={PANEL_HEADER_CLASS}>User Registry</div>
-          <div className="space-y-3 p-3">
-            <div className="flex flex-col gap-3 border border-[#c4cad3] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">
-                  Showing {filteredUsers.length} of {stats.totalUsers} records
-                </p>
+                <Button
+                  onClick={loadUsers}
+                  disabled={loading}
+                  className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
+                >
+                  <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
               </div>
-              <Button
-                onClick={loadUsers}
-                disabled={loading}
-                className="h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
-              >
-                <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                Refresh Data
-              </Button>
-            </div>
 
-            <div className="flex flex-col gap-3 border border-[#c4cad3] bg-white p-3 sm:flex-row">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7a8595]" />
-                <Input
-                  placeholder="Search by name or email"
-                  className={`${INPUT_CLASS_NAME} pl-9`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="h-10 w-full rounded-none border border-[#b6bec8] bg-white text-[13px] font-semibold text-[#1f2937] sm:w-[240px]">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent className="rounded-none border border-[#bcc3cd] bg-white">
-                  <SelectItem value="all">ALL ROLES</SelectItem>
-                  <SelectItem value="super_admin">SUPER ADMIN</SelectItem>
-                  <SelectItem value="property_manager">PROPERTY MANAGER</SelectItem>
-                  <SelectItem value="tenant">TENANT</SelectItem>
-                  <SelectItem value="technician">TECHNICIAN</SelectItem>
-                  <SelectItem value="proprietor">PROPRIETOR</SelectItem>
-                  <SelectItem value="caretaker">CARETAKER</SelectItem>
-                  <SelectItem value="accountant">ACCOUNTANT</SelectItem>
-                  <SelectItem value="supplier">SUPPLIER</SelectItem>
-                  <SelectItem value="no-role">UNASSIGNED</SelectItem>
-                  <SelectItem value="pending-approval">PENDING APPROVAL</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {filteredUsers.length === 0 ? (
-              <div className="border border-[#c4cad3] bg-white p-12 text-center">
-                <Search className="mx-auto mb-3 h-8 w-8 text-[#9aa4b1]" />
-                <h3 className="text-sm font-bold uppercase tracking-wider text-[#1f2937]">No records found</h3>
-                <p className="mt-1 text-sm text-[#5f6b7c]">Adjust filters or search terms to locate users.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto border border-[#c4cad3] bg-white">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-[#c4cad3] bg-[#e8ecf1] hover:bg-[#e8ecf1]">
-                      <TableHead className="h-12 w-[300px] text-xs font-bold uppercase tracking-widest text-[#324156]">Profile</TableHead>
-                      <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Contact</TableHead>
-                      <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Role</TableHead>
-                      <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Status</TableHead>
-                      <TableHead className="h-12 pr-6 text-right text-xs font-bold uppercase tracking-widest text-[#324156]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id} className="border-b border-[#d4dae3] hover:bg-[#f6f8fb]">
-                        <TableCell className="py-4">
-                          <div className="flex items-center gap-4">
-                            {user.avatar_url ? (
-                              <img
-                                src={user.avatar_url}
-                                alt={`${user.first_name} ${user.last_name}`}
-                                className="h-10 w-10 rounded-full border border-[#c4cad3] object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#c4cad3] bg-[#eef1f4] text-[#154279]">
-                                {user.first_name?.[0]}
-                                {user.last_name?.[0] || <User className="h-4 w-4" />}
-                              </div>
-                            )}
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold text-[#1f2937]">
-                                {user.first_name} {user.last_name}
-                              </span>
-                              <span className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#7b8895]">
-                                ID #{user.id.substring(0, 8).toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4">
-                          <div className="flex flex-col gap-1.5">
-                            <span className="flex items-center gap-2 text-[13px] font-medium text-[#324156]">
-                              <Mail className="h-3.5 w-3.5 text-[#7b8895]" />
-                              {user.email}
-                            </span>
-                            {user.phone && (
-                              <span className="flex items-center gap-2 text-[13px] font-medium text-[#324156]">
-                                <Phone className="h-3.5 w-3.5 text-[#7b8895]" />
-                                {user.phone}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4">
-                          <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${getRoleBadgeColor(user.role)}`}>
-                            {user.role?.replace("_", " ") || "UNASSIGNED"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4">
-                          <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${getStatusBadgeColor(user.status)}`}>
-                            {user.status || "UNKNOWN"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4 pr-6 text-right">
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            {user.status === "active" ? (
-                              <Button
-                                onClick={() => handleStatusChange(user.id, "inactive")}
-                                className="h-9 rounded-none border border-[#d96d26] bg-[#F96302] px-3 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#e15802]"
-                                title="Suspend Account"
-                              >
-                                <Ban className="mr-1.5 h-3.5 w-3.5" /> Suspend
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={() => handleStatusChange(user.id, "active")}
-                                className="h-9 rounded-none border border-[#2dae49] bg-[#2dae49] px-3 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#24933d]"
-                                title="Activate Account"
-                              >
-                                <Play className="mr-1.5 h-3.5 w-3.5" /> Activate
-                              </Button>
-                            )}
-
-                            <Button
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setIsAssignDialogOpen(true);
-                              }}
-                              className="h-9 rounded-none border border-[#154279] bg-[#154279] px-3 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]"
-                              title="Modify Role"
-                            >
-                              <Edit2 className="mr-1.5 h-3.5 w-3.5" /> Edit Role
-                            </Button>
-
-                            <Button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="h-9 rounded-none border border-[#dc3545] bg-[#dc3545] px-3 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#c12c3a]"
-                              title="Delete User"
-                            >
-                              <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
-                            </Button>
-                          </div>
-                        </TableCell>
+              {filteredUsers.length === 0 ? (
+                <div className="border border-[#c4cad3] bg-white py-16 text-center text-[18px] font-medium text-[#5f6b7c]">
+                  No users found.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-[#c4cad3] bg-white">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b border-[#c4cad3] bg-[#e8ecf1] hover:bg-[#e8ecf1]">
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Name</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Email</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Role</TableHead>
+                        <TableHead className="h-12 text-xs font-bold uppercase tracking-widest text-[#324156]">Status</TableHead>
+                        <TableHead className="h-12 pr-4 text-right text-xs font-bold uppercase tracking-widest text-[#324156]">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id} className="border-b border-[#d4dae3] hover:bg-[#f6f8fb]">
+                          <TableCell className="py-3 text-[13px] font-semibold text-[#1f2937]">
+                            {user.first_name} {user.last_name}
+                          </TableCell>
+                          <TableCell className="py-3 text-[13px] font-medium text-[#324156]">{user.email}</TableCell>
+                          <TableCell className="py-3">
+                            <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${getRoleBadgeColor(user.role)}`}>
+                              {user.role?.replace(/_/g, " ") || "UNASSIGNED"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-3">
+                            <span className={`inline-flex items-center border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${getStatusBadgeColor(user.status)}`}>
+                              {user.status || "UNKNOWN"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-3 pr-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="icon"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setIsAssignDialogOpen(true);
+                                }}
+                                className="h-8 w-8 rounded-none border border-[#154279] bg-[#154279] text-white hover:bg-[#10335f]"
+                                title="Edit role"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+
+                              {user.status === "active" ? (
+                                <Button
+                                  size="icon"
+                                  onClick={() => handleStatusChange(user.id, "inactive")}
+                                  className="h-8 w-8 rounded-none border border-[#d96d26] bg-[#F96302] text-white hover:bg-[#e15802]"
+                                  title="Suspend"
+                                >
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="icon"
+                                  onClick={() => handleStatusChange(user.id, "active")}
+                                  className="h-8 w-8 rounded-none border border-[#2dae49] bg-[#2dae49] text-white hover:bg-[#24933d]"
+                                  title="Activate"
+                                >
+                                  <Play className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+
+                              <Button
+                                size="icon"
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="h-8 w-8 rounded-none border border-[#dc3545] bg-[#dc3545] text-white hover:bg-[#c12c3a]"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
@@ -712,7 +611,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
   const [technicianCategories, setTechnicianCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [formData, setFormData] = useState({
-    email: "", firstName: "", lastName: "", phone: "", password: "", role: "tenant", technicianCategoryId: "",
+    fullName: "", email: "", password: "", role: "tenant", technicianCategoryId: "",
   });
 
   React.useEffect(() => { loadCategories(); }, []);
@@ -728,12 +627,14 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
   };
 
   const handleCreateUser = async () => {
-    // [Logic remains identical]
-    if (!formData.email || !formData.firstName || !formData.lastName) { toast.error("Missing required fields"); return; }
+    if (!formData.email || !formData.fullName.trim()) { toast.error("Missing required fields"); return; }
     if (!formData.password || formData.password.length < 6) { toast.error("Password too short"); return; }
     if (formData.role === 'technician' && !formData.technicianCategoryId) { toast.error("Missing specialty category"); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email.trim())) { toast.error("Invalid email"); return; }
+
+    const [firstName, ...lastNameParts] = formData.fullName.trim().split(/\s+/);
+    const lastName = lastNameParts.join(" ") || "User";
 
     try {
       setLoading(true);
@@ -741,7 +642,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         options: {
-          data: { first_name: formData.firstName.trim(), last_name: formData.lastName.trim(), phone: formData.phone?.trim() || null, role: formData.role, status: "active" },
+          data: { first_name: firstName, last_name: lastName, role: formData.role, status: "active" },
         },
       });
 
@@ -749,6 +650,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
       if (!authData.user) throw new Error("No user data returned");
 
       toast.success("Identity instantiated successfully");
+      setFormData({ fullName: "", email: "", password: "", role: "tenant", technicianCategoryId: "" });
       onSuccess();
     } catch (error) {
       toast.error(`Creation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -758,81 +660,67 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="space-y-4 border border-[#c4cad3] bg-white p-3">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="firstName" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">First Name <span className="text-red-500">*</span></Label>
-          <Input id="firstName" className={INPUT_CLASS_NAME} value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="lastName" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Last Name <span className="text-red-500">*</span></Label>
-          <Input id="lastName" className={INPUT_CLASS_NAME} value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} />
-        </div>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="fullName" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Full Name <span className="text-red-500">*</span></Label>
+        <Input id="fullName" className={INPUT_CLASS_NAME} placeholder="Jane Doe" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="email" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Email Address <span className="text-red-500">*</span></Label>
-        <Input id="email" type="email" className={INPUT_CLASS_NAME} value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+        <Input id="email" type="email" className={INPUT_CLASS_NAME} placeholder="user@company.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="phone" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Phone Directory</Label>
-        <Input id="phone" type="tel" className={INPUT_CLASS_NAME} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+        <Label htmlFor="password" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Password <span className="text-red-500">*</span></Label>
+        <Input id="password" type="password" className={INPUT_CLASS_NAME} placeholder="Minimum 8 characters" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Security Key <span className="text-red-500">*</span></Label>
-        <Input id="password" type="password" className={INPUT_CLASS_NAME} value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="role" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Initial State</Label>
-        <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, technicianCategoryId: "" })}>
-          <SelectTrigger className="h-10 rounded-none border border-[#b6bec8] bg-white text-[13px] font-semibold text-[#1f2937]">
-            <SelectValue placeholder="Select a role" />
-          </SelectTrigger>
-          <SelectContent className="rounded-none border border-[#bcc3cd] bg-white">
-            <SelectItem value="tenant">TENANT</SelectItem>
-            <SelectItem value="property_manager">PROPERTY MANAGER</SelectItem>
-            <SelectItem value="super_admin">SUPER ADMIN</SelectItem>
-            <SelectItem value="proprietor">PROPRIETOR</SelectItem>
-            <SelectItem value="caretaker">CARETAKER</SelectItem>
-            <SelectItem value="technician">TECHNICIAN</SelectItem>
-            <SelectItem value="accountant">ACCOUNTANT</SelectItem>
-            <SelectItem value="supplier">SUPPLIER</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label htmlFor="role" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Role</Label>
+        <select
+          id="role"
+          value={formData.role}
+          onChange={(e) => setFormData({ ...formData, role: e.target.value, technicianCategoryId: "" })}
+          className="h-10 w-full rounded-none border-2 border-[#7f8fa3] bg-white px-3 text-[13px] font-semibold text-[#111827] outline-none focus:border-[#3c8dbc]"
+        >
+          <option value="tenant">TENANT</option>
+          <option value="property_manager">PROPERTY MANAGER</option>
+          <option value="super_admin">SUPER ADMIN</option>
+          <option value="proprietor">PROPRIETOR</option>
+          <option value="caretaker">CARETAKER</option>
+          <option value="technician">TECHNICIAN</option>
+          <option value="accountant">ACCOUNTANT</option>
+          <option value="supplier">SUPPLIER</option>
+        </select>
       </div>
 
       {formData.role === 'technician' && (
-        <div className="space-y-2 border border-slate-300 p-4 bg-slate-50">
+        <div className="space-y-2 border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
           <Label className="text-xs font-bold uppercase tracking-widest text-slate-700">Specialty Designation <span className="text-red-500">*</span></Label>
           {loadingCategories ? (
             <div className="text-xs text-slate-500 font-mono mt-2">Fetching matrix data...</div>
           ) : (
-            <Select value={formData.technicianCategoryId} onValueChange={(value) => setFormData({ ...formData, technicianCategoryId: value })}>
-              <SelectTrigger className="bg-white rounded-none border-slate-300 h-11 focus:border-slate-900 focus:ring-0 mt-2">
-                <SelectValue placeholder="Select designation" />
-              </SelectTrigger>
-              <SelectContent className="rounded-none border-slate-300 shadow-xl">
-                {technicianCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id} className="uppercase text-sm">
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={formData.technicianCategoryId}
+              onChange={(e) => setFormData({ ...formData, technicianCategoryId: e.target.value })}
+              className="mt-2 h-11 w-full rounded-none border-2 border-[#7f8fa3] bg-white px-3 text-[13px] font-semibold text-[#111827] outline-none focus:border-[#3c8dbc]"
+            >
+              <option value="">SELECT DESIGNATION</option>
+              {technicianCategories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {String(cat.name || "").toUpperCase()}
+                </option>
+              ))}
+            </select>
           )}
         </div>
       )}
 
-      <div className="flex gap-4 pt-6">
-        <Button variant="outline" className="flex-1 h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]" onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))}>
-          Abort
-        </Button>
-        <Button onClick={handleCreateUser} disabled={loading} className="flex-1 h-10 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]">
+      <div className="pt-2">
+        <Button onClick={handleCreateUser} disabled={loading} className="h-10 w-full rounded-none border border-[#3c8dbc] bg-[#3c8dbc] px-4 text-[12px] font-semibold uppercase tracking-wide text-white hover:bg-[#337aa8]">
           {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Execute Creation
+          Add User
         </Button>
       </div>
     </div>
@@ -855,8 +743,8 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
   };
 
   return (
-    <div className="space-y-4 border border-[#c4cad3] bg-white p-3">
-      <div className="flex items-center gap-4 border border-[#c4cad3] bg-[#eef1f4] p-3">
+    <div className="space-y-4">
+      <div className="flex items-center gap-4 border-l-2 border-l-[#b7c0cb] bg-transparent px-3 py-2">
         {user.avatar_url ? (
           <img
             src={user.avatar_url}
@@ -877,10 +765,10 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
       <div className="space-y-2">
         <Label htmlFor="newRole" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Target Role</Label>
         <Select value={selectedRole} onValueChange={setSelectedRole}>
-          <SelectTrigger className="h-10 rounded-none border border-[#b6bec8] bg-white text-[13px] font-semibold text-[#1f2937]">
+          <SelectTrigger className="h-10 rounded-none border-2 border-[#9aa7b7] bg-white text-[13px] font-semibold text-[#111827] shadow-none backdrop-blur-none focus:ring-0 focus:ring-offset-0 focus:border-[#6f7e90]">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="rounded-none border border-[#bcc3cd] bg-white">
+          <SelectContent className="rounded-none border-2 border-[#9aa7b7] bg-white text-[#111827] shadow-lg backdrop-blur-none">
             <SelectItem value="tenant">TENANT</SelectItem>
             <SelectItem value="property_manager">PROPERTY MANAGER</SelectItem>
             <SelectItem value="super_admin">SUPER ADMIN</SelectItem>

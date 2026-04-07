@@ -27,12 +27,15 @@ const THEME = {
 };
 
 const DEFAULT_UNIT_IMAGE = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1400&auto=format&fit=crop";
+const FEATURES_BACKGROUND_IMAGE_URL = "/background.png";
 
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     .font-inter { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        .features-flat-dark [class*='shadow'] { box-shadow: none !important; }
+        .features-flat-dark [class*='ring-'] { box-shadow: none !important; }
     
     .custom-scroll::-webkit-scrollbar { width: 4px; }
     .custom-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -494,7 +497,11 @@ const DetailModal = ({ item, onClose }: { item: any, onClose: () => void }) => {
 };
 
 // --- 4. MAIN PAGE COMPONENT ---
-export default function AydenTowersListing() {
+type FeaturesSectionProps = {
+    removeTopSpacing?: boolean;
+};
+
+export default function AydenTowersListing({ removeTopSpacing = false }: FeaturesSectionProps) {
     const navigate = useNavigate();
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [allListings, setAllListings] = useState<any[]>([]);
@@ -783,13 +790,28 @@ export default function AydenTowersListing() {
     return (
         <>
         <GlobalStyles />
-        <div className="min-h-screen bg-[#efeeee] text-slate-800 font-inter" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+        <div
+            className="features-flat-dark min-h-screen text-slate-800 font-inter"
+            style={{
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                backgroundImage: `linear-gradient(rgba(247, 247, 247, 0.82), rgba(247, 247, 247, 0.82)), url(${FEATURES_BACKGROUND_IMAGE_URL})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+            }}
+        >
 
             {/* MAIN CONTENT AREA */}
-            <div className="max-w-[1400px] mx-auto px-4 pb-16 flex flex-col md:flex-row gap-6">
+            <div
+                className={cn(
+                    "w-full pb-16 flex flex-col md:flex-row gap-0",
+                    removeTopSpacing ? "pt-0 md:pt-0" : "pt-4 md:pt-6"
+                )}
+                style={{ paddingLeft: "2cm", paddingRight: "2cm" }}
+            >
                 
                 {/* SIDEBAR FILTER */}
-                <div className="w-full md:w-[280px] flex-shrink-0">
+                <div className="w-full md:w-[320px] flex-shrink-0">
                     <FilterSidebar filters={filters} setFilters={setFilters} allListings={allListings} loading={loading} properties={properties} unitTypes={unitTypes} />
                     
                     {/* Promo Banner */}
@@ -806,7 +828,7 @@ export default function AydenTowersListing() {
                 </div>
 
                 {/* LISTINGS GRID */}
-                <div className="flex-1">
+                <div className="flex-1 px-2 md:px-4 lg:px-5">
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <div className="flex items-center gap-3 mb-2">

@@ -347,6 +347,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Check if we are already on the correct path to avoid loops
     const currentPath = location.pathname;
+    const loginSuccessAnimationEnabled =
+      currentPath === "/login" &&
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem("show-login-success-animation") === "1";
+    const redirectDelay = loginSuccessAnimationEnabled ? 2500 : 100;
+
+    if (loginSuccessAnimationEnabled && typeof window !== "undefined") {
+      window.sessionStorage.removeItem("show-login-success-animation");
+    }
 
     // Keep users on their current work page inside the portal on session refresh/tab return.
     if (currentPath.startsWith("/portal/")) {
@@ -371,7 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         console.log("⚠️ No role assigned yet");
         setTimeout(() => {
           navigate("/auth/role-selection", { replace: true });
-        }, 100);
+        }, redirectDelay);
       }
       return;
     }
@@ -411,7 +420,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (shouldRedirect(targetDash)) {
        setTimeout(() => {
          navigate(targetDash, { replace: true });
-       }, 100);
+       }, redirectDelay);
     }
   };
 
@@ -470,6 +479,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (!session?.user) {
         setUser(null);
+        if (event === "SIGNED_OUT") {
+          navigate("/login", { replace: true });
+        }
         if (isInteractiveAuthEvent) {
           setIsLoading(false);
         }
@@ -707,28 +719,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Sign out function
   const signOut = async () => {
+    const logoutUserId = supabaseUser?.id;
+
     try {
       setIsLoading(true);
       
       // Record logout if user exists
-      if (supabaseUser) {
-        console.log("📝 [AuthContext] About to call recordLogout for user:", supabaseUser.id);
-        const result = await loginActivityService.recordLogout(supabaseUser.id);
+      if (logoutUserId) {
+        console.log("📝 [AuthContext] About to call recordLogout for user:", logoutUserId);
+        const result = await loginActivityService.recordLogout(logoutUserId);
         console.log("📝 [AuthContext] recordLogout returned:", result);
       }
       
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Supabase signOut error:", error);
+      }
 
       setUser(null);
       setSupabaseUser(null);
       setSession(null);
       setError(null);
 
-      navigate("/", { replace: true });
+      navigate("/login", { replace: true });
     } catch (err: any) {
       console.error("❌ Sign out error:", err);
       setError(err.message || "Sign out failed");
+      setUser(null);
+      setSupabaseUser(null);
+      setSession(null);
+      navigate("/login", { replace: true });
     } finally {
       setIsLoading(false);
     }

@@ -54,6 +54,8 @@ const GlobalStyles = () => (
     <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
         .font-nunito { font-family: 'Nunito', sans-serif; }
+    .hero-page-flat [class*='shadow-'] { box-shadow: none !important; }
+    .hero-page-flat [class*='ring-'] { box-shadow: none !important; }
         
         /* Custom scrollbar for consistency */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
@@ -545,7 +547,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
   if (!currentSlide || safeSlides.length === 0) {
     return (
       <div
-        className="relative w-full h-[540px] md:h-[580px] font-nunito overflow-hidden bg-[#0f325e] bg-cover bg-center flex items-center justify-center pt-12 md:pt-16"
+        className="relative w-full h-[540px] md:h-[580px] font-nunito overflow-hidden bg-[#0f325e] bg-cover bg-center flex items-center justify-center pt-4 md:pt-8"
         style={{
           backgroundImage: `linear-gradient(rgba(15, 50, 94, 0.78), rgba(21, 66, 121, 0.78)), url(${HERO_BACKGROUND_IMAGE_URL})`,
         }}
@@ -559,9 +561,16 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
   }
   
   return (
-    <section className="w-full bg-[#efeeee] border-b border-transparent font-nunito pt-12 md:pt-16">
+    <section
+      className="hero-page-flat w-full bg-transparent border-b border-transparent font-nunito pt-4 md:pt-8"
+      style={{
+        backgroundImage: `linear-gradient(rgba(247, 247, 247, 0.78), rgba(247, 247, 247, 0.78)), url(${HERO_BACKGROUND_IMAGE_URL})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div className="w-full max-w-[1660px] mx-auto px-2 md:px-3 lg:px-4 py-4 md:py-6">
-        <div className="relative overflow-hidden border-none bg-[#efeeee] shadow-[10px_10px_20px_#d1d1d1,-10px_-10px_20px_#ffffff]">
+        <div className="relative overflow-hidden border border-white/40 bg-white/80 backdrop-blur-sm">
           <AnimatePresence initial={false} custom={direction} mode="popLayout">
             <motion.div
               key={page}
@@ -573,7 +582,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
               transition={{ x: { type: "spring", stiffness: 280, damping: 28 }, opacity: { duration: 0.2 } }}
               className="grid grid-cols-1 lg:grid-cols-12 min-h-[540px] md:min-h-[580px]"
             >
-              <div className="lg:col-span-5 p-4 md:p-6 lg:p-7 flex flex-col bg-[#efeeee] relative">
+              <div className="lg:col-span-5 p-4 md:p-6 lg:p-7 flex flex-col bg-white/70 relative">
                 <div className="mb-2">
                   <span className="inline-flex items-center gap-2 bg-[#0f335f] text-white text-[10px] md:text-xs font-black uppercase tracking-[0.16em] px-3 py-1">
                     <ShoppingCart size={12} />
@@ -600,7 +609,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                 <div className="mt-3 flex justify-start">
                     <button
                       onClick={() => navigate('/features')}
-                      className="bg-[#F96302] hover:bg-[#e55a00] text-white font-black h-11 px-8 flex items-center justify-center uppercase tracking-[0.12em] text-[10px] md:text-[11px] transition-all shadow-[4px_4px_8px_rgba(0,0,0,0.3)] hover:shadow-[inset_2px_2px_4px_#ab4401,inset_-2px_-2px_4px_#ff8203]"
+                      className="bg-[#F96302] hover:bg-[#e55a00] text-white font-black h-11 px-8 flex items-center justify-center uppercase tracking-[0.12em] text-[10px] md:text-[11px] transition-colors"
                     >
                       Browse Homes
                     </button>
@@ -615,7 +624,7 @@ const VacancyCarousel = ({ onCardClick, onSlideChange, slides = [] }: { onCardCl
                         type="text"
                         readOnly
                         value={currentSlide.location || "Nairobi"}
-                        className="w-full h-11 border-transparent border-transparent  bg-[#efeeee] pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-700 focus:outline-none shadow-[inset_6px_6px_12px_#d1d1d1,inset_-6px_-6px_12px_#ffffff] border-transparent bg-[#efeeee]"
+                        className="w-full h-11 border border-slate-200 bg-white pl-9 pr-3 text-xs md:text-sm font-semibold text-slate-700 focus:outline-none focus:border-[#F96302]"
                       />
                     </div>
                     <button
@@ -982,8 +991,8 @@ const HomePage = () => {
         </div>
 
         {/* Main Content Area - Hidden on mobile to remove gap */}
-        <main className="max-w-[1440px] mx-auto px-4 lg:px-8 py-0 md:py-6 font-nunito hidden md:block">
-          <FeaturesSection />
+        <main className="w-full px-0 py-0 md:py-0 font-nunito hidden md:block">
+          <FeaturesSection removeTopSpacing />
           {(selectedAmenities.length > 0 || selectedBedroom || selectedPrice || selectedLocation) ? (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4 border-b border-transparent  pb-2">

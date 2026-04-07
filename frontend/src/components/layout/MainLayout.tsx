@@ -36,10 +36,10 @@ const MainLayout: React.FC<{ children?: ReactNode }> = ({ children }) => {
 
       {/* 2. Main Content 
           Adjust padding based on whether navbar is shown
-          Mobile: Optimized to PT-16 to reduce gap below rounded navbar
-          Desktop: 10.5rem (pt-[10.5rem]) matches Navbar config
+          Mobile: PT-14 matches reduced navbar height
+          Desktop: PT-24 matches reduced navbar height
       */}
-      <main className={`flex-grow bg-[#f7f7f7] ${!isAuthPage ? 'pt-16 lg:pt-[10.5rem]' : ''}`}>
+      <main className={`flex-grow bg-[#f7f7f7] ${!isAuthPage ? 'pt-16 lg:pt-[8.4rem]' : ''}`}>
         {children || <Outlet />}
       </main>
 

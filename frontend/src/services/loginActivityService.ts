@@ -102,10 +102,15 @@ export const loginActivityService = {
         .is("logout_timestamp", null)
         .order("login_timestamp", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (fetchError || !latestLogin) {
+      if (fetchError) {
         console.error("Could not find active login session:", fetchError);
+        return null;
+      }
+
+      if (!latestLogin) {
+        // No active session row to close; do not treat as an error.
         return null;
       }
 

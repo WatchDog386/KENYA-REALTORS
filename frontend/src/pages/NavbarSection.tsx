@@ -6,10 +6,8 @@ import {
   FaUser,
   FaSearch,
   FaChevronDown,
-  FaShoppingCart,
   FaSignOutAlt,
   FaSignInAlt,
-  FaUserPlus,
   FaCity,
   FaKey,
   FaMapPin,
@@ -21,7 +19,6 @@ import {
   NAVIGATION_SECTIONS,
   COLORS,
   UTILITY_BAR,
-  ACCOUNT_DROPDOWN,
   QUICK_ACTIONS,
   PROMO_BANNER,
   BRAND,
@@ -58,6 +55,8 @@ const PUBLIC_LANGUAGES = [
   { code: "de", label: "German" },
 ];
 
+const NAVBAR_UNIFIED_TEXT_CLASS = "text-lg font-bold";
+
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,7 +66,6 @@ const Navbar = () => {
   const [showResults, setShowResults] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
-  const [showAccountDropdown, setShowAccountDropdown] = useState(false);
   const [filteredResults, setFilteredResults] = useState<typeof SEARCH_DATA>([]);
   const [publicLanguage, setPublicLanguage] = useState(() => localStorage.getItem("public_language") || "en");
 
@@ -80,7 +78,6 @@ const Navbar = () => {
   const goToRoute = (action?: string) => {
     setMenuOpen(false);
     setShowTenantDropdown(false);
-    setShowAccountDropdown(false);
     navigate(resolveRoute(action));
   };
 
@@ -97,12 +94,6 @@ const Navbar = () => {
     window.open(translateUrl, "_blank", "noopener,noreferrer");
   };
 
-  // Cart logic
-  const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem("realtor_cart");
-    return saved ? JSON.parse(saved) : { count: 0, total: 0 };
-  });
-
   // Search Logic
   useEffect(() => {
     const lowerQuery = searchQuery.toLowerCase().trim();
@@ -118,17 +109,6 @@ const Navbar = () => {
     );
     setFilteredResults(results);
   }, [searchQuery]);
-
-  const addToCart = (item: typeof SEARCH_DATA[0]) => {
-    const newCart = {
-      count: cart.count + 1,
-      total: cart.total + (typeof item.price === 'string' ? parseFloat(item.price.replace(/,/g, '')) : item.price)
-    };
-    setCart(newCart);
-    setSearchQuery("");
-    setShowResults(false);
-    // Optional: Flash a toast or something
-  };
 
   // Fonts
   useEffect(() => {
@@ -164,10 +144,6 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("realtor_cart", JSON.stringify(cart));
-  }, [cart]);
-
-  useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
@@ -186,7 +162,7 @@ const Navbar = () => {
 
   return (
     <div 
-      className={`fixed top-0 w-full z-50 transition-all duration-300 bg-[#efeeee] ${isScrolled ? "shadow-sm border-b border-[#d9d9d9]" : ""}`}
+      className={`fixed top-0 w-full z-50 transition-all duration-300 bg-white ${isScrolled ? "shadow-sm" : ""}`}
       style={{
         '--navbar-height-mobile': NAVBAR_HEIGHTS.mobile,
         '--navbar-height-desktop': NAVBAR_HEIGHTS.desktop
@@ -195,18 +171,18 @@ const Navbar = () => {
         
       {/* Top Utility Strip: Deep Blue Background - Brighter */}
       <div
-        className="text-white text-xs hidden lg:block border-b border-slate-200"
+        className="text-white hidden lg:block border-b border-[#e25a00]"
         style={{
-          background: COLORS.primary,
+          background: "#f96302",
         }}
       >
-        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-between h-10">
+        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-between h-14">
           <div className="flex items-center gap-6 text-white font-medium">
             {UTILITY_BAR.location.enabled && (
               <>
                 <button className="flex items-center gap-2 hover:text-[#F96302] transition-colors group">
                   <UTILITY_BAR.location.icon size={12} className={`text-[${COLORS.secondary}]`} />
-                  <span className="font-semibold text-white group-hover:text-[#F96302] transition-colors">{UTILITY_BAR.location.text}</span>
+                  <span className={`${NAVBAR_UNIFIED_TEXT_CLASS} text-white group-hover:text-[#F96302] transition-colors`}>{UTILITY_BAR.location.text}</span>
                 </button>
                 <div className="h-3 w-[1px] bg-white/20"></div>
               </>
@@ -214,17 +190,17 @@ const Navbar = () => {
             {UTILITY_BAR.phone.enabled && (
               <button className="flex items-center gap-2 hover:text-[#F96302] transition-colors group">
                 <UTILITY_BAR.phone.icon size={11} className={`text-[${COLORS.secondary}]`} />
-                <span className="font-semibold text-white group-hover:text-[#F96302] transition-colors">{UTILITY_BAR.phone.text}</span>
+                <span className={`${NAVBAR_UNIFIED_TEXT_CLASS} text-white group-hover:text-[#F96302] transition-colors`}>{UTILITY_BAR.phone.text}</span>
               </button>
             )}
           </div>
-          <div className="flex items-center gap-6 font-bold tracking-wide">
+          <div className="flex items-center gap-6 tracking-wide">
             <div className="flex items-center gap-2">
               <Globe size={11} className="text-[#F96302]" />
               <select
                 value={publicLanguage}
                 onChange={(e) => handleLanguageChange(e.target.value)}
-                className="bg-transparent text-white text-[10px] font-bold uppercase tracking-wider border border-white/30 rounded px-2 py-1 focus:outline-none focus:border-[#F96302]"
+                className={`${NAVBAR_UNIFIED_TEXT_CLASS} bg-transparent text-white uppercase tracking-wider border border-white/30 rounded px-2 py-1 focus:outline-none focus:border-[#F96302]`}
                 aria-label="Select site language"
               >
                 {PUBLIC_LANGUAGES.map((language) => (
@@ -240,7 +216,7 @@ const Navbar = () => {
                 key={idx} 
                 type="button"
                 onClick={() => goToRoute(btn.action)} 
-                className={`text-white hover:text-[#F96302] transition-colors uppercase ${btn.size}`}
+                className={`${NAVBAR_UNIFIED_TEXT_CLASS} text-white hover:text-[#F96302] transition-colors uppercase`}
               >
                 {btn.label}
               </button>
@@ -251,10 +227,9 @@ const Navbar = () => {
 
       {/* Main Nav Bar */}
       <div
-        className={`relative z-20 transition-all duration-300 ${isScrolled ? "border-b border-slate-200" : "lg:border-b-0 border-b-0"} py-2 md:py-4 md:rounded-none rounded-b-[2rem] md:shadow-none`}
+        className={`relative z-20 transition-all duration-300 py-2 md:py-[0.7cm] md:rounded-none rounded-b-[2rem] md:shadow-none`}
         style={{
-          background: "#efeeee",
-          boxShadow: "0 4px 12px rgba(15, 23, 42, 0.06)",
+          background: "#ffffff",
         }}
       >
         <div className="max-w-[1440px] mx-auto px-4 lg:px-6">
@@ -265,7 +240,7 @@ const Navbar = () => {
                {/* 1. Left: Hamburger */}
                <button 
                   onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 rounded-xl text-[#154279] bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors"
+                className="p-2 rounded-xl text-[#154279] bg-white border border-slate-300 hover:bg-slate-50 transition-colors"
                >
                  <FaBars size={24} />
                </button>
@@ -318,7 +293,7 @@ const Navbar = () => {
                   {/* Text Logo */}
                   <div className="flex flex-col justify-center font-brand -mt-1">
                     <div className="flex items-baseline gap-1">
-                      <span className={`text-[${COLORS.primary}] font-bold text-lg tracking-tight leading-none`}>
+                      <span className="text-[#154279] font-bold text-lg tracking-tight leading-none">
                         Kenya
                       </span>
                       <span className="text-slate-900 font-bold text-lg tracking-tight leading-none">
@@ -326,47 +301,19 @@ const Navbar = () => {
                       </span>
                       <div className={`h-1.5 w-1.5 bg-[${COLORS.secondary}] rounded-none mb-1 shadow-sm`}></div>
                     </div>
-                    <span className="text-slate-500 font-bold text-[8px] uppercase tracking-[0.2em]">
+                    <span className="text-slate-500 font-bold text-lg uppercase tracking-[0.2em]">
                       The Property Hub
                     </span>
                   </div>
                </div>
 
-               {/* 3. Right: User Actions (Account Icon with Dropdown) */}
-               <div className="relative">
-                 <button 
-                    onClick={() => setShowTenantDropdown(!showTenantDropdown)}
-                    className="p-2 rounded-xl text-[#154279] relative z-20 bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors"
-                 >
-                   <FaUser size={22} />
-                 </button>
-                 
-                 {/* Mobile Account Dropdown */}
-                 {showTenantDropdown && (
-                   <div className="absolute top-full right-0 mt-2 w-48 border border-[#d9d9d9] overflow-hidden z-30 rounded-2xl bg-[#efeeee] shadow-lg">
-                      {ACCOUNT_DROPDOWN.items.map((item) => (
-                        <button 
-                          key={item.id}
-                          onClick={() => {
-                            navigate(`/${item.action}`);
-                            setShowTenantDropdown(false);
-                          }}
-                          className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 first:rounded-t-2xl last:rounded-b-2xl"
-                        >
-                          <div className={`${item.bgColor} text-[${item.textColor}] p-2 rounded-full`}>
-                            {item.id === 'signin' ? <FaSignInAlt size={12} /> : <FaUserPlus size={12} />}
-                          </div>
-                          <span className="text-sm font-bold text-slate-700">{item.label}</span>
-                        </button>
-                      ))}
-                   </div>
-                 )}
-                 
-                 {/* Overlay to close dropdown when clicking outside */}
-                 {showTenantDropdown && (
-                   <div className="fixed inset-0 z-10" onClick={() => setShowTenantDropdown(false)}></div>
-                 )}
-               </div>
+               {/* 3. Right: Login */}
+               <button
+                  onClick={() => goToRoute("login")}
+                className={`px-3 py-2 text-[#154279] ${NAVBAR_UNIFIED_TEXT_CLASS} uppercase tracking-wider hover:text-[#F96302] transition-colors`}
+               >
+                 Login
+               </button>
             </div>
 
             {/* DESKTOP HEADER (Hidden on mobile) */}
@@ -378,7 +325,7 @@ const Navbar = () => {
                   className="shrink-0 cursor-pointer flex items-center gap-3 group"
                 >
                   {/* SVG: Gold/Metallic Colors */}
-                  <svg viewBox="0 0 200 200" className="h-12 md:h-14 w-auto drop-shadow-sm group-hover:scale-105 transition-transform duration-300 logo-svg" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox="0 0 200 200" className="h-10 md:h-12 w-auto drop-shadow-sm group-hover:scale-105 transition-transform duration-300 logo-svg" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <linearGradient id="grad-front-nav" x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor="#F9F1DC" />
@@ -427,11 +374,11 @@ const Navbar = () => {
 
                   {/* BRAND TEXT: Blue Dominant */}
                   <div className="flex flex-col justify-center select-none ml-1">
-                    <span className={`${BRAND.countryLabelSize} font-bold text-black leading-none ml-0.5 brand-lowercase tracking-[0.2em] uppercase text-xs md:text-sm`}>
+                    <span className={`${NAVBAR_UNIFIED_TEXT_CLASS} text-black leading-none ml-0.5 brand-lowercase tracking-[0.2em] uppercase`}>
                         {BRAND.countryLabel}
                     </span>
                     <div className="flex items-baseline -mt-1 relative">
-                        <span className={`font-semibold text-2xl md:text-4xl font-extrabold tracking-tight text-[${BRAND.primaryColor}] brand-lowercase`}>
+                      <span className="font-semibold text-2xl md:text-4xl font-extrabold tracking-tight text-[#154279] brand-lowercase">
                         {BRAND.brandName}
                         </span>
                         {/* Dot is Bright Orange */}
@@ -515,7 +462,7 @@ const Navbar = () => {
                       <span className={`text-[${COLORS.secondary}]`}>
                         <IconComponent size={item.iconSize} />
                       </span>
-                      <span className={`font-semibold text-[15px] text-[${COLORS.primary}] hover:text-[${COLORS.secondary}] transition-colors`}>
+                      <span className={`${NAVBAR_UNIFIED_TEXT_CLASS} text-[#154279] hover:text-[#F96302] transition-colors`}>
                         {item.name}
                       </span>
                       {isTenantSupport && (
@@ -532,7 +479,7 @@ const Navbar = () => {
                               handleNavClick("faq");
                               setShowTenantDropdown(false);
                             }}
-                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-200"
+                            className={`w-full text-left px-4 py-3 ${NAVBAR_UNIFIED_TEXT_CLASS} text-slate-700 hover:text-[#F96302] hover:bg-slate-50 transition-colors flex items-center gap-3 border-b border-slate-200`}
                           >
                             <span>❓</span>
                             FAQ Section
@@ -542,7 +489,7 @@ const Navbar = () => {
                               navigate("/contact");
                               setShowTenantDropdown(false);
                             }}
-                            className="w-full text-left px-4 py-3 text-sm font-semibold text-slate-700 hover:text-[#F96302] hover:bg-slate-50 transition-colors flex items-center gap-3"
+                            className={`w-full text-left px-4 py-3 ${NAVBAR_UNIFIED_TEXT_CLASS} text-slate-700 hover:text-[#F96302] hover:bg-slate-50 transition-colors flex items-center gap-3`}
                           >
                             <span>📧</span>
                             Contact Us
@@ -555,79 +502,16 @@ const Navbar = () => {
               })}
             </div>
 
-            {/* Desktop Account & Cart Area */}
+            {/* Desktop Account Area */}
             <div className="hidden lg:flex items-center gap-8 shrink-0">
-              
-              {/* Account Dropdown - Blue/Orange */}
-              <div className="relative h-full py-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAccountDropdown((prev) => !prev)}
-                  className="flex flex-col items-start outline-none px-3 py-2 rounded-xl bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-black font-bold uppercase tracking-wider">Account</span>
-                    <FaChevronDown
-                      size={8}
-                      className={`text-[${COLORS.secondary}] transition-transform duration-300 ${showAccountDropdown ? "rotate-180" : ""}`}
-                    />
-                  </div>
-                  <span className={`text-[14px] text-[${COLORS.primary}] font-bold hover:text-[${COLORS.secondary}] transition-colors`}>
-                    Hello, Guest
-                  </span>
-                </button>
-
-                {/* Dropdown Menu - Rounded & Smooth */}
-                <div className={`absolute top-full right-0 pt-3 transition-all duration-300 transform w-64 z-50 ${showAccountDropdown ? "opacity-100 visible translate-y-0" : "opacity-0 invisible translate-y-2"}`}>
-                  <div className="rounded-2xl border border-[#d9d9d9] overflow-hidden p-2 bg-[#efeeee] shadow-lg">
-                    <div className="px-4 py-3 border-b border-slate-100 mb-1">
-                        <p className="text-xs text-slate-600 font-bold uppercase tracking-wide">{ACCOUNT_DROPDOWN.title}</p>
-                    </div>
-                    
-                    {ACCOUNT_DROPDOWN.items.map((item) => (
-                      <button 
-                        key={item.id}
-                        type="button"
-                        onClick={() => goToRoute(item.action)}
-                        className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 rounded-xl transition-all group/item mt-1"
-                      >
-                        <div className={`${item.bgColor} text-[${item.textColor}] p-2.5 rounded-full group-hover/item:bg-[${item.textColor}] group-hover/item:text-white transition-colors shadow-sm`}>
-                          {item.id === 'signin' ? <FaSignInAlt size={14} /> : <FaUserPlus size={14} />}
-                        </div>
-                        <div>
-                            <span className={`block text-sm font-bold text-[${COLORS.primary}] group-hover/item:text-[${COLORS.secondary}] transition-colors`}>{item.label}</span>
-                            <span className="block text-[10px] text-slate-600">{item.description}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {showAccountDropdown && (
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowAccountDropdown(false)}
-                  />
-                )}
-              </div>
-
-              {/* Cart Button */}
-              <button className={`flex items-center gap-3 group relative pl-6 border-l border-slate-300 pr-3 py-2 rounded-xl bg-[#efeeee] border border-slate-300 hover:bg-white transition-colors`}>
-                <div className="relative">
-                  <FaShoppingCart size={24} className={`text-[${COLORS.secondary}] group-hover:text-[${COLORS.primary}] transition-colors duration-300`} />
-                  {cart.count > 0 && (
-                    <span className={`absolute -top-2 -right-2 bg-[${COLORS.secondary}] text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-none border-2 border-white shadow-md scale-100 group-hover:scale-110 transition-transform`}>
-                      {cart.count}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-[10px] text-black font-bold uppercase tracking-wider">My Cart</span>
-                  <span className={`text-[13px] text-[${COLORS.primary}] font-bold leading-tight group-hover:text-[${COLORS.secondary}] transition-colors`}>
-                    {cart.count} Items
-                  </span>
-                </div>
+              <button
+                type="button"
+                onClick={() => goToRoute("login")}
+                className={`px-2 py-2 text-[#154279] ${NAVBAR_UNIFIED_TEXT_CLASS} uppercase tracking-wider hover:text-[#F96302] transition-colors`}
+              >
+                Login
               </button>
+
             </div>
           </div>
         </div>
@@ -645,8 +529,8 @@ const Navbar = () => {
               <div className="flex items-center gap-3">
                 <FaUser className={`text-[${COLORS.secondary}] text-xl`} />
                 <div>
-                  <h2 className="font-bold text-xl">{MOBILE_HEADER.title}</h2>
-                  <p className="text-xs text-white/85 font-medium">{MOBILE_HEADER.subtitle}</p>
+                  <h2 className={`${NAVBAR_UNIFIED_TEXT_CLASS}`}>{MOBILE_HEADER.title}</h2>
+                  <p className={`${NAVBAR_UNIFIED_TEXT_CLASS} text-white/85`}>{MOBILE_HEADER.subtitle}</p>
                 </div>
               </div>
             </div>
@@ -655,7 +539,7 @@ const Navbar = () => {
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {/* Menu Links */}
             <div className="py-4 bg-white">
-              <div className="px-6 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Menu</div>
+              <div className={`px-6 pb-2 ${NAVBAR_UNIFIED_TEXT_CLASS} text-slate-500 uppercase tracking-widest`}>Menu</div>
               {NAVIGATION_SECTIONS.map((item) => {
                 const IconComponent = item.icon;
                 const isTenantSupport = item.id === "faq";
@@ -678,7 +562,7 @@ const Navbar = () => {
                         <span className={`text-slate-600 bg-slate-100 p-2 rounded-xl group-hover:bg-[${COLORS.secondary}] group-hover:text-white transition-colors`}>
                           <IconComponent size={item.iconSize} />
                         </span>
-                        <span className="font-semibold text-sm">{item.name}</span>
+                        <span className={NAVBAR_UNIFIED_TEXT_CLASS}>{item.name}</span>
                       </div>
                       {isTenantSupport && (
                         <FaChevronDown size={12} className={`text-slate-500 transition-transform ${false ? "rotate-180" : ""}`} />
@@ -694,7 +578,7 @@ const Navbar = () => {
                             setMenuOpen(false);
                             
                           }}
-                          className="w-full px-12 py-3 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
+                          className={`w-full px-12 py-3 text-left ${NAVBAR_UNIFIED_TEXT_CLASS} text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3`}
                         >
                           <span>❓</span>
                           FAQ Section
@@ -705,7 +589,7 @@ const Navbar = () => {
                             setMenuOpen(false);
                             
                           }}
-                          className="w-full px-12 py-3 text-left text-sm font-medium text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3"
+                          className={`w-full px-12 py-3 text-left ${NAVBAR_UNIFIED_TEXT_CLASS} text-slate-700 hover:bg-white hover:text-[#F96302] transition-colors flex items-center gap-3`}
                         >
                           <span>📧</span>
                           Contact Us

@@ -11,6 +11,7 @@ import {
   Calendar,
   Search,
   Filter,
+  RefreshCw,
   Download,
   Eye,
   Check,
@@ -365,226 +366,126 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
   };
 
   return (
-    <div className="superadmin-flat-page bg-[#d7dce1] min-h-screen pb-20 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
-      {/* Header */}
-      <section className="superadmin-flat-hero relative overflow-hidden bg-gradient-to-r from-[#154279] to-[#0f325e] text-white py-12 px-6 shadow-xl mb-8 lg:rounded-b-3xl">
-        <HeroBackground />
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 max-w-[1400px] mx-auto">
-          <div className="space-y-1">
-             <div className="flex items-center gap-3 mb-2">
-                 <div className="p-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 shadow-inner">
-                    <CheckCircle className="w-5 h-5 text-white" />
-                 </div>
-                 <span className="text-blue-100 font-bold tracking-wider text-xs uppercase">Requests</span>
-             </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-              Approval <span className="text-[#F96302]">Queue</span>
-            </h1>
-            <p className="text-blue-100 text-sm mt-2 font-medium max-w-xl">
-              Review, approve, or reject pending requests and system actions.
-            </p>
+    <div className="bg-[#d7dce1] min-h-screen pb-14 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
+      <section className="border-b border-[#bcc3cd] bg-[#eef1f4] px-6 py-5 mb-4">
+        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#6a7788]">Approval Workflow</p>
+            <h1 className="mt-1 text-[36px] font-bold leading-none text-[#1f2937]">Approval Queue</h1>
+            <p className="mt-2 text-[13px] font-medium text-[#5f6b7c]">Review and process requests without the clutter.</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handlePrintSummary}
-              className="group flex items-center gap-2 bg-white/10 text-white px-5 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all duration-300 rounded-xl border border-white/20 hover:border-white/40 shadow-sm backdrop-blur-sm"
+              className="inline-flex items-center gap-2 h-10 rounded-none border border-[#b6bec8] bg-white px-4 text-[11px] font-semibold uppercase tracking-wide text-[#465870] hover:bg-[#f5f7fa]"
             >
               <FileText className="h-3.5 w-3.5" />
               Print Summary
             </button>
-            
+
             <button
               onClick={() => {
                 fetchApprovalRequests();
                 fetchApprovalStats();
               }}
-              className="group flex items-center gap-2 bg-white text-[#154279] px-5 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-blue-50 transition-all duration-300 rounded-xl shadow-lg border-2 border-white hover:shadow-xl hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 h-10 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]"
             >
-               <div className="mr-1 group-hover:rotate-180 transition-transform duration-500">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-               </div>
-               Refresh
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refresh
             </button>
           </div>
         </div>
       </section>
 
-      <div className="max-w-[1400px] mx-auto px-6 space-y-8">
+      <div className="max-w-[1400px] mx-auto px-6 space-y-5">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold text-slate-700">
-              Pending Approvals
-            </CardTitle>
-            <div className="h-10 w-10 rounded-lg bg-yellow-100 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-yellow-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-[#154279]">
-              {approvalStats?.pending || 0}
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">Pending requests</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold text-slate-700">
-              Total Requests
-            </CardTitle>
-            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Calendar className="h-5 w-5 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-[#154279]">
-              {approvalStats?.total || 0}
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              {approvalStats?.pending || 0} pending
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold text-slate-700">Approved</CardTitle>
-            <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-[#154279]">
-              {approvalStats?.approved || 0}
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              {(
-                ((approvalStats?.approved || 0) /
-                  Math.max(approvalStats?.total || 1, 1)) *
-                100
-              ).toFixed(0)}
-              % approval rate
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-slate-200 bg-white hover:border-[#154279] transition-all hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-sm font-bold text-slate-700">Rejected</CardTitle>
-            <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-              <XCircle className="h-5 w-5 text-red-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-[#154279]">
-              {approvalStats?.rejected || 0}
-            </div>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              {(
-                ((approvalStats?.rejected || 0) /
-                  Math.max(approvalStats?.total || 1, 1)) *
-                100
-              ).toFixed(0)}
-              % rejection rate
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="border border-[#bcc3cd] bg-[#eef1f4] px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Pending Approvals</p>
+          <p className="mt-1 text-[34px] font-bold leading-none text-[#1f2937]">{approvalStats?.pending || 0}</p>
+          <p className="mt-1 text-[12px] font-medium text-[#5f6b7c]">Needs review</p>
+        </div>
+        <div className="border border-[#bcc3cd] bg-[#eef1f4] px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Total Requests</p>
+          <p className="mt-1 text-[34px] font-bold leading-none text-[#1f2937]">{approvalStats?.total || 0}</p>
+          <p className="mt-1 text-[12px] font-medium text-[#5f6b7c]">All records</p>
+        </div>
+        <div className="border border-[#bcc3cd] bg-[#eef1f4] px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Approved</p>
+          <p className="mt-1 text-[34px] font-bold leading-none text-[#1f2937]">{approvalStats?.approved || 0}</p>
+          <p className="mt-1 text-[12px] font-medium text-[#5f6b7c]">Processed ok</p>
+        </div>
+        <div className="border border-[#bcc3cd] bg-[#eef1f4] px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#7b8895]">Rejected</p>
+          <p className="mt-1 text-[34px] font-bold leading-none text-[#1f2937]">{approvalStats?.rejected || 0}</p>
+          <p className="mt-1 text-[12px] font-medium text-[#5f6b7c]">Needs correction</p>
+        </div>
       </div>
 
       {/* Filters and Search */}
-      <Card className="border-2 border-slate-200 bg-white shadow-lg">
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                <Input
-                  placeholder="Search approvals by ID, user, or property..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                  className="pl-10 bg-white border-2 border-slate-200 rounded-xl focus:border-[#154279] focus:ring-0"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[160px] bg-white border-2 border-slate-200 rounded-xl text-slate-700">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="permission_request">
-                    Permission Request
-                  </SelectItem>
-                  <SelectItem value="manager_assignment">
-                    Manager Assignment
-                  </SelectItem>
-                  <SelectItem value="deposit_refund">
-                    Deposit Refund
-                  </SelectItem>
-                  <SelectItem value="property_addition">
-                    Property Addition
-                  </SelectItem>
-                  <SelectItem value="user_creation">
-                    User Creation
-                  </SelectItem>
-                   <SelectItem value="lease_termination">
-                    Lease Termination
-                  </SelectItem>
-                   <SelectItem value="maintenance_approval">
-                    Maintenance Approval
-                  </SelectItem>
-                   <SelectItem value="role_assignment">
-                    Role Assignment
-                  </SelectItem>
-                  <SelectItem value="tenant_addition">
-                    Tenant Addition
-                  </SelectItem>
-                   <SelectItem value="tenant_removal">
-                    Tenant Removal
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] bg-white border-2 border-slate-200 rounded-xl text-slate-700">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="under_review">Under Review</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <button
-                onClick={handleSearch}
-                className="group flex items-center gap-2 bg-[#154279] text-white px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest hover:bg-[#0f325e] transition-all duration-300 rounded-xl shadow-md hover:shadow-lg border-2 border-[#154279]"
-              >
-                <Filter className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
-                Filter
-              </button>
-            </div>
+      <section className="border border-[#bcc3cd] bg-[#eef1f4] p-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a8595] h-4 w-4" />
+            <Input
+              placeholder="Search approvals by ID, user, or property..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+              className="pl-10 h-10 rounded-none border border-[#b6bec8] bg-white text-[13px]"
+            />
           </div>
-        </CardContent>
-      </Card>
+
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="h-10 rounded-none border border-[#b6bec8] bg-white px-3 text-[13px] font-semibold text-[#1f2937] md:min-w-[180px]"
+          >
+            <option value="all">ALL TYPES</option>
+            <option value="permission_request">PERMISSION REQUEST</option>
+            <option value="manager_assignment">MANAGER ASSIGNMENT</option>
+            <option value="deposit_refund">DEPOSIT REFUND</option>
+            <option value="property_addition">PROPERTY ADDITION</option>
+            <option value="user_creation">USER CREATION</option>
+            <option value="lease_termination">LEASE TERMINATION</option>
+            <option value="maintenance_approval">MAINTENANCE APPROVAL</option>
+            <option value="role_assignment">ROLE ASSIGNMENT</option>
+            <option value="tenant_addition">TENANT ADDITION</option>
+            <option value="tenant_removal">TENANT REMOVAL</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 rounded-none border border-[#b6bec8] bg-white px-3 text-[13px] font-semibold text-[#1f2937] md:min-w-[150px]"
+          >
+            <option value="all">ALL STATUS</option>
+            <option value="pending">PENDING</option>
+            <option value="under_review">UNDER REVIEW</option>
+            <option value="approved">APPROVED</option>
+            <option value="rejected">REJECTED</option>
+          </select>
+
+          <button
+            onClick={handleSearch}
+            className="inline-flex items-center justify-center gap-2 h-10 rounded-none border border-[#154279] bg-[#154279] px-4 text-[11px] font-semibold uppercase tracking-wide text-white hover:bg-[#10335f]"
+          >
+            <Filter className="h-3.5 w-3.5" />
+            Filter
+          </button>
+        </div>
+      </section>
 
       {/* Approvals Table */}
-      <Card className="border-2 border-slate-200 bg-white shadow-lg">
-        <CardHeader className="pb-4 border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-white">
-          <CardTitle className="text-[#154279] font-black text-xl">Approval Requests</CardTitle>
-          <CardDescription className="text-slate-600 font-medium mt-1">
+      <section className="border border-[#bcc3cd] bg-[#eef1f4]">
+        <div className="border-b border-[#c4cad3] px-4 py-3">
+          <h2 className="text-[20px] font-bold text-[#1f2937]">Approval Requests</h2>
+          <p className="text-[12px] font-medium text-[#5f6b7c]">
             {filteredApprovals.length} requests found
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="p-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -596,10 +497,10 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
               <p className="text-gray-500">All requests have been processed</p>
             </div>
           ) : (
-            <div className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="border border-[#c4cad3] bg-white overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="border-b border-[#c4cad3] bg-[#e8ecf1] hover:bg-[#e8ecf1]">
                     <TableHead>Request</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Submitted By</TableHead>
@@ -614,9 +515,7 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
                   {filteredApprovals.map((approval) => (
                     <TableRow
                       key={approval.id}
-                      className={
-                        selectedApproval === approval.id ? "bg-gray-50" : ""
-                      }
+                      className={selectedApproval === approval.id ? "bg-[#f0f4f9]" : "hover:bg-[#f7f9fc]"}
                       onClick={() => {
                         setSelectedApproval(approval.id);
                       }}
@@ -772,8 +671,8 @@ const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ onApprovalUpdate }) => {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* View Approval Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>

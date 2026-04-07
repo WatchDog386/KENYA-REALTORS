@@ -96,18 +96,7 @@ export const UTILITY_BAR = {
     icon: FaPhoneAlt,
     enabled: true,
   },
-  buttons: [
-    {
-      label: "Post a Rental",
-      action: "applications?type=post",
-      size: "text-[10px]",
-    },
-    {
-      label: "Get a Rental",
-      action: "applications?type=looking",
-      size: "text-[10px]",
-    },
-  ],
+  buttons: [],
 };
 
 // Account Dropdown Configuration
@@ -174,8 +163,8 @@ export const SEARCH_BAR = {
 
 // Navbar Height Variables
 export const NAVBAR_HEIGHTS = {
-  mobile: "7rem",      // 112px
-  desktop: "6.5rem",   // 104px (Reduced to pull hero section up)
+  mobile: "6rem",      // 96px
+  desktop: "5.5rem",   // 88px
 };
 
 // Mobile Header Configuration

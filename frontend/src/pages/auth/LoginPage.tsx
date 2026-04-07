@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { CheckCircle, Eye, EyeOff, Loader2, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const GlobalStyles = () => (
   <style>{`
@@ -91,6 +92,10 @@ const LoginPage: React.FC = () => {
         throw new Error("Credentials required.");
       }
 
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem("show-login-success-animation", "1");
+      }
+
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -100,8 +105,12 @@ const LoginPage: React.FC = () => {
         throw signInError;
       }
 
+      toast.success("Login successful! Redirecting...");
       setIsSuccess(true);
     } catch (loginError: any) {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("show-login-success-animation");
+      }
       setIsSubmitting(false);
       setError(loginError.message || "Invalid credentials.");
       toast.error(loginError.message || "Login failed");
@@ -116,32 +125,45 @@ const LoginPage: React.FC = () => {
     <>
       <GlobalStyles />
 
-      <div className="relative min-h-screen overflow-hidden bg-[#d7dce1] font-auth subpixel-antialiased text-[#243041]">
+      <div className="relative min-h-screen overflow-hidden bg-white font-auth subpixel-antialiased text-[#243041]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-12 top-16 h-52 w-52 rotate-45 rounded-[36px] bg-white/25 shadow-[0_12px_24px_rgba(94,105,122,0.15)]" />
-          <div className="absolute left-1/4 top-6 h-36 w-36 rotate-12 rounded-[30px] bg-[#d9eef7]/45" />
-          <div className="absolute right-8 top-20 h-60 w-60 -rotate-12 rounded-[46px] bg-[#d8e7ef]/55" />
-          <div className="absolute bottom-16 left-16 h-44 w-44 rotate-[28deg] rounded-[32px] bg-white/20" />
-          <div className="absolute bottom-20 right-20 h-52 w-52 rotate-[38deg] rounded-[36px] bg-white/25" />
-          <div className="absolute right-1/3 top-1/3 h-6 w-6 rounded-full bg-[#c7d1dc]/70" />
-          <div className="absolute left-1/3 bottom-1/3 h-8 w-8 rounded-full bg-[#c5cfdb]/60" />
+          <div className="absolute -left-12 top-16 h-52 w-52 rotate-45 rounded-[36px] bg-[#f0f4f8] shadow-sm" />
+          <div className="absolute left-1/4 top-6 h-36 w-36 rotate-12 rounded-[30px] bg-[#f8fafc]" />
+          <div className="absolute right-8 top-20 h-60 w-60 -rotate-12 rounded-[46px] bg-[#f1f5f9]" />
+          <div className="absolute bottom-16 left-16 h-44 w-44 rotate-[28deg] rounded-[32px] bg-[#f4f7f9]" />
+          <div className="absolute bottom-20 right-20 h-52 w-52 rotate-[38deg] rounded-[36px] bg-[#fdfdfd]" />
+          <div className="absolute right-1/3 top-1/3 h-6 w-6 rounded-full bg-[#f1f5f9]" />
+          <div className="absolute left-1/3 bottom-1/3 h-8 w-8 rounded-full bg-[#f0f4f8]" />
         </div>
 
-        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6">
-          <div
-            className={`w-full max-w-[860px] overflow-hidden border border-[#b7bcc3] bg-[#c8cbd1] shadow-[0_18px_55px_rgba(71,80,94,0.24)] transition-opacity duration-500 ${
-              isSuccess ? "pointer-events-none opacity-0" : "opacity-100"
-            }`}
+        <div className="relative z-10 flex min-h-screen max-w-[1440px] mx-auto items-center justify-center gap-8 lg:gap-16 px-4 py-8 sm:px-6">
+          
+          {/* Left Side: The Image outside the form, mix-blend-multiply eliminates white borders */}
+          <motion.div 
+            initial={{ opacity: 0, x: -100 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="hidden lg:flex w-[550px] xl:w-[680px] shrink-0 justify-center -mt-20"
           >
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-[#bfc4cb] px-5 py-4 sm:px-7">
+            <img 
+              src="/login.png" 
+              alt="Login" 
+              className="w-full h-auto object-contain mix-blend-multiply scale-110"
+            />
+          </motion.div>
+
+          <AnimatePresence mode="wait">
+            {!isSuccess ? (
+              <motion.div
+                key="login-form"
+                initial={{ opacity: 0, x: 100 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+                className="w-full max-w-[860px] overflow-hidden border border-[#b7bcc3] bg-[#c8cbd1] shadow-[0_18px_55px_rgba(71,80,94,0.24)]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-[#bfc4cb] px-5 py-4 sm:px-7 border-[#a8aeb7]">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded bg-white p-1 shadow-inner">
-                  <img
-                    src="/realtor.jpg"
-                    alt="REALTORS"
-                    className="h-full w-full rounded-sm object-cover"
-                  />
-                </div>
                 <p className="text-[26px] font-bold leading-none text-[#111827] sm:text-[34px]">
                   Login
                   <span className="block text-[15px] font-normal text-[#4b5563] sm:ml-2 sm:inline sm:text-[20px]">
@@ -288,42 +310,65 @@ const LoginPage: React.FC = () => {
                 </div>
               </div>
             </form>
-          </div>
-        </div>
-
-        {isSuccess && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white font-nunito">
-            <div className="flex flex-col items-center">
+          </motion.div>
+          ) : (
+            <motion.div
+              key="login-success"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, ease: "easeOut", type: "spring", bounce: 0.4 }}
+              className="flex w-full max-w-[500px] flex-col items-center justify-center rounded-3xl bg-white p-12 text-center shadow-[0_18px_55px_rgba(71,80,94,0.24)]"
+            >
               <div className="relative mb-6">
-                <div className="absolute inset-0 animate-ping rounded-full bg-green-100 opacity-40" />
-                <div className="relative rounded-full bg-green-50 p-4">
-                  <CheckCircle size={44} className="text-[#22c55e]" strokeWidth={2.4} />
-                </div>
-              </div>
-
-              <h2 className="mb-2 text-2xl font-extrabold text-slate-800">
-                Login Successful
-              </h2>
-              <p className="mb-10 text-sm font-semibold text-slate-500">
-                Preparing your dashboard...
-              </p>
-
-              <div className="h-1 w-32 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full w-1/2 animate-[loading_1.5s_ease-in-out_infinite] bg-[#1a3252]"
-                  style={{ animationName: "loading" }}
+                <motion.div 
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1.2, 1], opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+                  className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full bg-[#22c55e]/10 text-[#22c55e]"
+                >
+                  <CheckCircle size={56} strokeWidth={2.5} />
+                </motion.div>
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.5, opacity: 0 }}
+                  transition={{ delay: 0.5, duration: 1.5, repeat: Infinity }}
+                  className="absolute inset-0 rounded-full bg-[#22c55e]/20"
                 />
               </div>
-
-              <style>{`
-                @keyframes loading {
-                  0% { transform: translateX(-150%); }
-                  100% { transform: translateX(250%); }
-                }
-              `}</style>
-            </div>
-          </div>
-        )}
+              <motion.h3 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mb-2 text-3xl font-extrabold text-[#111827]"
+              >
+                You Have Signed In Successfully
+              </motion.h3>
+              <motion.p 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="mb-8 font-semibold text-[#4b5563]"
+              >
+                Preparing your dashboard...
+              </motion.p>
+              
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+                className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100"
+              >
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "200%" }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                  className="h-full w-1/2 rounded-full bg-[#1a3252]"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+          </AnimatePresence>
+        </div>
       </div>
     </>
   );

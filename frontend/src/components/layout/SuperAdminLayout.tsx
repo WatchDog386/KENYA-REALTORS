@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ChevronRight,
   Bell,
-  Search,
   LogOut,
   LayoutDashboard,
   Building,
@@ -225,7 +224,6 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   const [expandedItems, setExpandedItems] = useState<string[]>(["Dashboard"]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -248,18 +246,18 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
 
   // Inject Fonts and Styles
   React.useEffect(() => {
-    // Add Poppins font
+    // Use an AdminLTE-like font stack
     const link = document.createElement("link");
     link.href =
-      "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap";
+      "https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap";
     link.rel = "stylesheet";
     document.head.appendChild(link);
 
     const style = document.createElement("style");
     style.textContent = `
-      * { font-family: 'Poppins', sans-serif; }
-      body { font-family: 'Poppins', sans-serif; }
-      h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', sans-serif; }
+      * { font-family: 'Source Sans 3', sans-serif; }
+      body { font-family: 'Source Sans 3', sans-serif; }
+      h1, h2, h3, h4, h5, h6 { font-family: 'Source Sans 3', sans-serif; }
       
       .custom-scroll::-webkit-scrollbar { width: 6px; }
       .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -267,9 +265,9 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
       .custom-scroll::-webkit-scrollbar-thumb:hover { background: #154279; }
       
       .sidebar-scroll::-webkit-scrollbar { width: 4px; }
-      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(10, 31, 56, 0.5); }
-      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(67, 153, 220, 0.45); border-radius: 4px; }
-      .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(67, 153, 220, 0.7); }
+      .sidebar-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); }
+      .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(173, 181, 189, 0.38); border-radius: 4px; }
+      .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(173, 181, 189, 0.62); }
     `;
     document.head.appendChild(style);
 
@@ -379,13 +377,6 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
     navigate("/login");
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      console.log("Searching for:", searchQuery);
-    }
-  };
-
   const isActive = (href: string) => {
     return (
       location.pathname === href || location.pathname.startsWith(href + "/")
@@ -475,29 +466,29 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             }
           }}
           className={cn(
-            "group relative mb-1 flex items-center justify-between border-l-4 px-4 py-3 transition-all duration-150",
+            "group relative mb-1 flex items-center justify-between border-l-4 border-l-transparent rounded-none px-4 py-3 transition-all duration-150",
             isItemActive
-              ? "border-l-[#35d0ff] bg-[#1f7fb1] text-white"
-              : "border-l-transparent text-[#d4e4f5] hover:border-l-[#2ea3da] hover:bg-[#123b63] hover:text-white",
-            depth > 0 && "pl-8"
+              ? "border-l-[#17a2b8] bg-[#007bff] text-white"
+              : "text-[#cfd4da] hover:border-l-[#adb5bd] hover:bg-[#343a40] hover:text-[#e9ecef]",
+            depth > 0 && "pl-10"
           )}
         >
           <div className="flex items-center gap-3">
             <div
               className={`${
                 isItemActive
-                  ? "text-[#c6eeff]"
-                  : "text-[#88abcf] group-hover:text-[#d9f0ff]"
+                  ? "text-white"
+                  : "text-[#adb5bd] group-hover:text-[#e9ecef]"
               } relative transition-colors`}
             >
               {item.icon}
               {typeof item.badge === "number" && item.badge > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#0c2c4e] bg-[#f28f1a] text-[9px] font-bold text-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#343a40] bg-[#fd7e14] text-[9px] font-bold text-white shadow-sm">
                   {item.badge}
                 </span>
               )}
               {typeof item.badge === "string" && parseInt(item.badge) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#0c2c4e] bg-[#f28f1a] text-[9px] font-bold text-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#343a40] bg-[#fd7e14] text-[9px] font-bold text-white shadow-sm">
                   {item.badge}
                 </span>
               )}
@@ -505,10 +496,10 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div className="flex-1">
               <span
                 className={cn(
-                  "text-[13px] tracking-wide",
+                  "text-[15px] leading-tight",
                   isItemActive
-                    ? "font-bold"
-                    : "font-medium"
+                    ? "font-semibold"
+                    : "font-normal"
                 )}
               >
                 {item.title}
@@ -521,19 +512,19 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
                 className={cn(
                   "w-4 h-4 transition-transform",
                   isExpanded && "rotate-180",
-                  isItemActive ? "text-white" : "text-[#9ab9d8] group-hover:text-white"
+                  isItemActive ? "text-white" : "text-[#adb5bd] group-hover:text-[#e9ecef]"
                 )}
               />
             ) : (
               isItemActive && (
-                <ChevronRight size={14} className="text-[#d7efff]" />
+                <ChevronRight size={14} className="text-white" />
               )
             )}
           </div>
         </Link> 
 
         {hasChildren && isExpanded && (
-          <div className="mb-2 ml-4 mt-1 space-y-1 border-l border-[#2c5c88] pl-2">
+          <div className="mb-2 ml-4 mt-1 space-y-1 border-l border-[#adb5bd]/40 pl-2">
             {item.children!.map((child) => renderNavItem(child, depth + 1))}
           </div>
         )}
@@ -542,57 +533,56 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#d7dce1] text-[#e8f2ff] selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Poppins', sans-serif" }}>
-      <div className="fixed left-0 top-0 z-50 flex w-full items-center justify-between bg-[#0a1f38] px-4 py-3 shadow-lg lg:hidden">
+    <div className="min-h-screen bg-[#d7dce1] text-[#e8f2ff] selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+      <div className="fixed left-0 top-0 z-50 flex w-full items-center justify-between bg-[#343a40] px-4 py-3 shadow-lg lg:hidden">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-md border border-[#1d3e62] bg-[#0f2b4a] p-2 text-white transition-all hover:bg-[#16436f]"
+            className="rounded-md border border-[#4b545c] bg-[#3f474f] p-2 text-white transition-all hover:bg-[#4b545c]"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <span className="text-sm font-bold tracking-tight text-[#dcecff]">KENYA REALTORS</span>
+          <span className="text-sm font-semibold tracking-tight text-[#f8f9fa]">KENYA REALTORS</span>
         </div>
       </div>
 
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 flex h-full w-80 flex-col border-r border-[#12314f] bg-[#0a1f38] text-[#e8f2ff] shadow-xl transition-all duration-300 ease-in-out",
+          "fixed left-0 top-0 z-40 flex h-full w-80 flex-col border-r border-[#4b545c] bg-[#343a40] text-[#c2c7d0] shadow-xl transition-all duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0"
         )}
       >
-        <div className="flex h-20 items-center border-b border-[#12314f] bg-[#0a1f38] px-6">
-          <div className="flex w-full items-center gap-2">
-            <div className="h-8 w-1.5 bg-[#35d0ff]" />
+        <div className="flex h-20 items-center border-b border-[#4b545c] bg-[#343a40] px-6">
+          <div className="flex w-full items-center">
             <div>
-              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#8fb4d7]">Super Admin</div>
-              <div className="text-[20px] font-bold leading-none text-[#e8f2ff]">Command</div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#9aa4ae]">Super Admin</div>
+              <div className="text-[20px] font-bold leading-none text-[#f8f9fa]">Command</div>
             </div>
           </div>
         </div>
 
         <nav className="sidebar-scroll mt-4 flex-1 overflow-y-auto px-4 pb-4">
           <div className="mb-2">
-            <div className="mb-3 flex items-center gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8fb4d7]">
+            <div className="mb-3 flex items-center gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#adb5bd]">
               <span>Main Menu</span>
-              <div className="h-px flex-1 bg-gradient-to-r from-[#2a5279] to-transparent" />
+              <div className="h-px flex-1 bg-gradient-to-r from-[#6c757d] to-transparent" />
             </div>
             <div className="space-y-0.5">{navItems.map((item) => renderNavItem(item))}</div>
           </div>
         </nav>
 
-        <div className="border-t border-[#12314f] bg-[#0d2744] p-4">
+        <div className="border-t border-[#4b545c] bg-[#30363d] p-4">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-[#9ddab8]">System Online</span>
             </div>
-            <span className="text-[10px] font-semibold text-[#8fb4d7]">v2.4.0</span>
+            <span className="text-[10px] font-semibold text-[#9aa4ae]">v2.4.0</span>
           </div>
           <button
             onClick={handleSignOut}
-            className="flex w-full items-center justify-center gap-2 border border-[#2c5c88] bg-[#16436f] py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white transition-all hover:bg-[#1f7fb1]"
+            className="flex w-full items-center justify-center gap-2 border border-[#dc3545] bg-[#dc3545] py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white transition-all hover:bg-[#c82333]"
           >
             <LogOut size={14} className="stroke-[2.5]" />
             <span>Sign Out</span>
@@ -622,21 +612,10 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
           </div>
 
           <div className="flex items-center gap-6">
-            <form onSubmit={handleSearch} className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#82a8ca] transition-colors group-focus-within:text-[#d6ecff]" size={16} />
-              <input
-                type="text"
-                placeholder="Search workspace..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-72 border border-[#1f466b] bg-[#0f2b4a] py-2.5 pl-11 pr-4 text-sm font-medium text-[#e8f2ff] outline-none transition-all duration-200 placeholder:text-[#7ea5c7] focus:border-[#2ea3da] focus:bg-[#12355a]"
-              />
-            </form>
-
             <div className="relative z-50">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative border border-[#1f466b] bg-[#0f2b4a] p-2.5 text-[#d6e9fb] transition-all hover:border-[#2ea3da] hover:bg-[#123b63]"
+                className="relative p-2 text-[#d6e9fb] transition-colors hover:text-[#35d0ff]"
               >
                 <Bell size={20} />
                 {unreadNotifications > 0 && (
@@ -680,14 +659,14 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 border border-[#1f466b] bg-[#0f2b4a] py-1.5 pl-1 pr-3 transition-all hover:border-[#2ea3da] hover:bg-[#123b63]"
+                className="flex items-center gap-3 py-1.5 pl-1 pr-1 transition-colors hover:text-white"
               >
-                <div className="flex h-9 w-9 items-center justify-center overflow-hidden border border-[#2ea3da] bg-[#1f7fb1] font-bold text-white">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-[#2ea3da] bg-[#1f7fb1] font-bold text-white">
                   {user?.avatar_url ? (
                     <img
                       src={user.avatar_url}
                       alt={fullName}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full rounded-full object-cover"
                     />
                   ) : (
                     user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"

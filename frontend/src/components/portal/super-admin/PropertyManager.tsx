@@ -2240,12 +2240,13 @@ const PropertyManager: React.FC = () => {
           { label: "Monthly Income", value: `KES ${(totalIncome / 1000).toFixed(0)}K`, icon: DollarSign, color: "orange", subtext: "Projected" },
         ].map((stat, idx) => {
           const IconComponent = stat.icon;
-          const colorMap: any = { 
+          const colorMap: Record<string, { body: string; footer: string }> = {
             blue: { body: "bg-[#2aa8bf]", footer: "bg-[#1f93a8]" },
             green: { body: "bg-[#2daf4a]", footer: "bg-[#24933d]" },
             purple: { body: "bg-[#f3bd11]", footer: "bg-[#d6a409]" },
-            orange: { body: "bg-[#dc3545]", footer: "bg-[#c12c3a]" }
+            orange: { body: "bg-[#dc3545]", footer: "bg-[#c12c3a]" },
           };
+          const selectedColor = colorMap[stat.color] || colorMap.blue;
 
           return (
             <motion.div
@@ -2255,14 +2256,14 @@ const PropertyManager: React.FC = () => {
               transition={{ duration: 0.3, delay: idx * 0.05 }}
             >
               <div className="border border-[#adb5bf] shadow-sm rounded-none flex flex-col justify-between">
-                <div className={`${colorMap[stat.color].body} h-[132px] w-full flex flex-col justify-center px-4`}>
+                <div className={`${selectedColor.body} h-[132px] w-full flex flex-col justify-center px-4`}>
                   <div className="flex items-center justify-between">
-                    <div className="text-[36px] font-bold leading-none text-white">{stat.value}</div>
-                    <IconComponent className="h-6 w-6 text-white/90" />
+                    <div className="text-[36px] font-bold leading-none text-[#111827]">{stat.value}</div>
+                    <IconComponent className="h-6 w-6 text-[#111827]" />
                   </div>
-                  <p className="text-[20px] font-semibold leading-none text-white mt-2">{stat.label}</p>
+                  <p className="text-[20px] font-semibold leading-none text-[#111827] mt-2">{stat.label}</p>
                 </div>
-                <div className={`${colorMap[stat.color].footer} h-8 w-full flex items-center justify-center text-[12px] font-semibold text-white`}>
+                <div className={`${selectedColor.footer} h-8 w-full flex items-center justify-center text-[12px] font-semibold text-[#111827]`}>
                   {stat.subtext}
                 </div>
               </div>

@@ -9,7 +9,6 @@ import HowItWorks from "@/pages/HowItWorks";          // Matches id="how-it-work
 // Matches id="features"
 import PricingSection from "@/pages/PricingSection";   // Matches id="pricing"
 import PaymentOptionsSection from "@/pages/PaymentOptionsSection"; // Matches id="payment-options"
-import TestimonialsSection from "@/pages/TestimonialsSection"; // Matches id="testimonials"
 import FaqSection from "@/pages/FaqSection";           // Matches id="faq"
 
 const HomePage = () => {
@@ -27,12 +26,6 @@ const HomePage = () => {
 
       {/* 3. Content Sections - Stacked Vertically */}
       <div className="w-full flex flex-col space-y-0">
-        
-        {/* Testimonials Section - Hidden on Mobile */}
-        <div className="hidden md:block">
-          <TestimonialsSection />
-        </div>
-
         {/* Apartments Features */}
        
         
