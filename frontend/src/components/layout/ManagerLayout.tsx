@@ -593,11 +593,51 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
           "lg:translate-x-0"
         )}
       >
-        <div className="flex h-20 items-center border-b border-[#d65a01] bg-[#F96302] px-6">
-          <div className="flex w-full items-center">
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#fff1e2]">Property Manager</div>
-              <div className="text-[20px] font-bold leading-none text-[#f8f9fa]">Portal</div>
+        <div className="flex h-20 items-center border-b border-[#d65a01] bg-white px-6">
+          <div className="shrink-0 cursor-pointer flex items-center gap-2 md:gap-3 w-full">
+            <svg
+              viewBox="0 0 200 200"
+              className="h-12 w-auto drop-shadow-sm"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id="grad-front-nav-sa" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#F9F1DC" />
+                  <stop offset="100%" stopColor="#D4AF37" />
+                </linearGradient>
+                <linearGradient id="grad-side-nav-sa" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#D4AF37" />
+                  <stop offset="100%" stopColor="#AA8C2C" />
+                </linearGradient>
+                <linearGradient id="grad-dark-nav-sa" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#998A5E" />
+                  <stop offset="100%" stopColor="#5C5035" />
+                </linearGradient>
+              </defs>
+              <path d="M110 90 V170 L160 150 V70 L110 90 Z" fill="url(#grad-front-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M160 70 L180 80 V160 L160 150 Z" fill="url(#grad-dark-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M30 150 V50 L80 20 V120 L30 150 Z" fill="url(#grad-front-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+              <path d="M80 20 L130 40 V140 L80 120 Z" fill="url(#grad-side-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+              <g fill="#154279">
+                <path d="M85 50 L100 56 V86 L85 80 Z" />
+                <path d="M85 90 L100 96 V126 L85 120 Z" />
+                <path d="M45 60 L55 54 V124 L45 130 Z" />
+                <path d="M120 130 L140 122 V152 L120 160 Z" />
+              </g>
+            </svg>
+            <div className="flex flex-col justify-center select-none ml-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.35em] text-[#154279] leading-none ml-0.5">
+                Kenya
+              </span>
+              <div className="flex items-baseline -mt-1 relative">
+                <span className="text-[20px] font-black tracking-tighter text-[#154279]">
+                  REALTOR
+                </span>
+                <span className="text-[20px] font-black tracking-tighter text-[#F96302]">
+                  S
+                </span>
+                <div className="h-1.5 w-1.5 bg-[#F96302] rounded-full ml-1 mb-1.5 shadow-lg shadow-orange-500/50"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -631,16 +671,16 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       </aside>
 
       {/* Main Content */}
-      <main className={cn("min-h-screen flex flex-col bg-white transition-all duration-300", sidebarOpen ? "lg:ml-80" : "lg:ml-0")}>
+      <main className={cn("min-h-screen flex flex-col bg-white transition-all duration-300", sidebarOpen ? "lg:ml-80" : "lg:ml-0")}> 
         {/* Desktop Header */}
-        <header className="sticky top-0 z-30 hidden h-20 items-center justify-between border-b border-[#e5e7eb] bg-white px-8 shadow-sm lg:flex">
+        <header className="sticky top-0 z-30 hidden h-20 items-center justify-between border-b border-[#0f325e] bg-gradient-to-r from-[#154279] via-blue-700 to-[#154279] px-8 shadow-lg lg:flex">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-lg font-semibold tracking-tight uppercase text-[#154279]">
+              <h2 className="text-lg font-semibold tracking-tight uppercase text-white">
                 {currentPage.title}
               </h2>
               {currentPage.description && (
-                <div className="text-[11px] font-medium uppercase tracking-wide text-[#64748b]">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-blue-100">
                   {currentPage.description}
                 </div>
               )}
@@ -652,11 +692,11 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative p-2 text-[#475569] transition-colors hover:text-[#154279]"
+                className="relative rounded-lg p-2 text-white/90 transition-colors hover:bg-white/10 hover:text-white"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
-                  <span className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#f28f1a] text-[10px] font-bold text-white shadow-sm">
+                  <span className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#F96302] text-[10px] font-bold text-white shadow-sm">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -717,9 +757,9 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 py-1.5 pl-1 pr-1 transition-colors hover:text-[#154279]"
+                className="flex items-center gap-3 rounded-lg py-1.5 pl-1 pr-1 transition-colors hover:bg-white/10"
               >
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-[#F96302] bg-[#154279] font-bold text-white">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-[#F96302] bg-[#1b4f8d] font-bold text-white">
                   {userProfile?.avatar_url ? (
                     <img
                       src={userProfile.avatar_url}
@@ -731,10 +771,10 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                   )}
                 </div>
                 <div className="hidden text-left xl:block">
-                  <div className="text-xs font-semibold text-[#154279]">{fullName}</div>
-                  <div className="text-[10px] font-medium text-[#64748b]">Manager</div>
+                  <div className="text-xs font-semibold text-white">{fullName}</div>
+                  <div className="text-[10px] font-medium text-blue-100">Manager</div>
                 </div>
-                <ChevronDown size={14} className="text-[#64748b]" />
+                <ChevronDown size={14} className="text-blue-100" />
               </button>
 
               {userMenuOpen && (
@@ -744,10 +784,10 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                     <div className="border-b border-[#d8e3ef] bg-[#f3f7fb] px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#154279]">Account</p>
                     </div>
-                    <Link to="/portal/manager/profile" className="block border-b border-[#e1e9f2] px-4 py-3 text-sm font-medium text-[#1f2937] transition-all hover:bg-[#f3f7fb] hover:text-[#154279]">
+                    <Link to="/portal/manager/profile" className="block border-b border-[#e1e9f2] px-4 py-3 text-sm font-medium text-[#1f2937] transition-colors hover:bg-[#f3f7fb] hover:text-[#154279]">
                       View Profile
                     </Link>
-                    <Link to="/portal/settings" className="block border-b border-[#e1e9f2] px-4 py-3 text-sm font-medium text-[#1f2937] transition-all hover:bg-[#f3f7fb] hover:text-[#154279]">
+                    <Link to="/portal/settings" className="block border-b border-[#e1e9f2] px-4 py-3 text-sm font-medium text-[#1f2937] transition-colors hover:bg-[#f3f7fb] hover:text-[#154279]">
                       Settings
                     </Link>
                     <button
