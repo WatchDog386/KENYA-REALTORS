@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Wrench, AlertCircle, Clock, CheckCircle, MessageCircle, Send, User, Home, Calendar, Filter } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { getManagerAssignedPropertyIds } from "@/services/managerPropertyAssignmentService";
 
 const ManagerMaintenance: React.FC = () => {
   const { user } = useAuth();
@@ -84,11 +85,18 @@ const ManagerMaintenance: React.FC = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
+
+            const managerPropertyIds = await getManagerAssignedPropertyIds(user.id);
+            if (managerPropertyIds.length === 0) {
+                setRequests([]);
+                return;
+            }
       
-      // Get all requests for properties managed by this user
+            // Only load maintenance requests for properties assigned to this manager.
       const { data, error } = await supabase
         .from('maintenance_requests')
         .select('*')
+                .in('property_id', managerPropertyIds)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -101,17 +109,28 @@ const ManagerMaintenance: React.FC = () => {
           // Manually enrich data to avoid 400 errors from missing relationships
           const propertyIds = [...new Set(data.map(r => r.property_id).filter(Boolean))];
           const unitIds = [...new Set(data.map(r => r.unit_id).filter(Boolean))];
-          const userIds = [...new Set(data.map(r => r.user_id).filter(Boolean))];
+                    const tenantProfileIds = [
+                        ...new Set(data.map(r => r.tenant_id || r.user_id || r.reported_by).filter(Boolean))
+                    ];
 
-          const { data: properties } = await supabase.from('properties').select('id, name').in('id', propertyIds);
-          const { data: units } = await supabase.from('units').select('id, unit_number').in('id', unitIds);
-          const { data: profiles } = await supabase.from('profiles').select('id, first_name, last_name, email').in('id', userIds);
+                    const [{ data: properties }, { data: units }, { data: profiles }] = await Promise.all([
+                        propertyIds.length > 0
+                            ? supabase.from('properties').select('id, name').in('id', propertyIds)
+                            : Promise.resolve({ data: [] as any[] }),
+                        unitIds.length > 0
+                            ? supabase.from('units').select('id, unit_number').in('id', unitIds)
+                            : Promise.resolve({ data: [] as any[] }),
+                        tenantProfileIds.length > 0
+                            ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', tenantProfileIds)
+                            : Promise.resolve({ data: [] as any[] })
+                    ]);
 
           const enrichedData = data.map(r => ({
+                            requesterId: r.tenant_id || r.user_id || r.reported_by,
               ...r,
               properties: properties?.find(p => p.id === r.property_id) || { name: 'Unknown' },
               units: units?.find(u => u.id === r.unit_id) || { unit_number: 'N/A' },
-              profiles: profiles?.find(p => p.id === r.user_id) || { first_name: 'Unknown', last_name: '', email: '' }
+                            profiles: profiles?.find(p => p.id === (r.tenant_id || r.user_id || r.reported_by)) || { first_name: 'Unknown', last_name: '', email: '' }
           }));
           
           setRequests(enrichedData);
@@ -259,11 +278,39 @@ const ManagerMaintenance: React.FC = () => {
       const colors = {
           completed: 'bg-green-100 text-green-800',
           in_progress: 'bg-blue-100 text-blue-800',
+                    assigned: 'bg-indigo-100 text-indigo-800',
           pending: 'bg-yellow-100 text-yellow-800',
           cancelled: 'bg-gray-100 text-gray-800'
       };
       return <Badge variant="outline" className={colors[status as keyof typeof colors]}>{status.replace('_', ' ')}</Badge>;
   };
+
+    const resolveImageUrl = (value?: string | null): string | null => {
+        if (!value) return null;
+        if (value.startsWith('http://') || value.startsWith('https://')) return value;
+        const { data } = supabase.storage.from('maintenance-images').getPublicUrl(value);
+        return data?.publicUrl || value;
+    };
+
+    const getRequestEvidenceImages = (request: any): string[] => {
+        const imageCandidates: Array<string | null | undefined> = [];
+
+        if (Array.isArray(request?.images)) {
+            imageCandidates.push(...request.images);
+        }
+
+        imageCandidates.push(request?.image_url, request?.work_start_photo, request?.work_completion_photo);
+
+        if (Array.isArray(request?.work_progress_photos)) {
+            imageCandidates.push(...request.work_progress_photos);
+        }
+
+        const normalized = imageCandidates
+            .map((path) => resolveImageUrl(path || undefined))
+            .filter((url): url is string => Boolean(url));
+
+        return Array.from(new Set(normalized));
+    };
 
   return (
     <div className="p-8 space-y-8">
@@ -374,11 +421,11 @@ const ManagerMaintenance: React.FC = () => {
                                        </p>
                                   </div>
 
-                                  {selectedRequest.images && selectedRequest.images.length > 0 && (
+                                  {getRequestEvidenceImages(selectedRequest).length > 0 && (
                                      <div>
                                         <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Attachments</label>
                                         <div className="flex gap-2 overflow-x-auto pb-2">
-                                            {selectedRequest.images.map((img: string, i: number) => (
+                                            {getRequestEvidenceImages(selectedRequest).map((img: string, i: number) => (
                                                 <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="block w-16 h-16 rounded-lg bg-gray-100 border overflow-hidden flex-shrink-0">
                                                     <img src={img} alt="Evidence" className="w-full h-full object-cover" />
                                                 </a>

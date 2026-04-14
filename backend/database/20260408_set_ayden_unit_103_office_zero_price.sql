@@ -1,7 +1,7 @@
 -- ============================================================================
--- SCRIPT: Set Ayden Home(s) Towers Unit 103 as Office with Zero Price
+-- SCRIPT: Set Ayden Home(s) Towers Unit 103 as Occupied Office with Zero Price
 -- Date: April 8, 2026
--- Purpose: Ensure unit 103 is classified as Office and priced at KES 0
+-- Purpose: Ensure unit 103 is classified as an occupied Office and priced at KES 0
 -- ============================================================================
 
 BEGIN;
@@ -56,6 +56,7 @@ BEGIN
 
     UPDATE public.units
     SET unit_type_id = v_office_type_id,
+        status = 'occupied',
         price = 0,
         updated_at = NOW()
     WHERE property_id = v_property_id
@@ -70,6 +71,7 @@ END $$;
 SELECT
     p.name AS property_name,
     u.unit_number,
+    u.status AS unit_status,
     put.unit_type_name,
     put.unit_category,
     u.price AS unit_price,

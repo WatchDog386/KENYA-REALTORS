@@ -1,23 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../integrations/supabase/client';
-import { 
-  Building, 
-  Briefcase, 
-  Loader2, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  TrendingUp, 
+import { useAuth } from "../../../contexts/AuthContext";
+import { supabase } from "../../../integrations/supabase/client";
+import {
+  Briefcase,
+  Loader2,
+  MapPin,
+  Phone,
+  Mail,
   RefreshCw,
   Home,
   Users,
   DollarSign,
-  Building2
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Badge } from '../../../components/ui/badge';
+  Building2,
+} from "lucide-react";
+import { Badge } from "../../../components/ui/badge";
 import { cn } from "../../../lib/utils";
 
 interface ProprietorProfile {
@@ -51,6 +48,7 @@ interface OwnedProperty {
     monthly_rent: number;
     occupied_units: number;
     total_units: number;
+    type?: string;
   };
 }
 
@@ -59,16 +57,16 @@ export const ProprietorDashboard: React.FC = () => {
   const [proprietor, setProprietor] = useState<ProprietorProfile | null>(null);
   const [properties, setProperties] = useState<OwnedProperty[]>([]);
   const [loading, setLoading] = useState(true);
-  const [greeting, setGreeting] = useState('');
+  const [greeting, setGreeting] = useState("");
 
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Good Morning');
-    else if (hour < 18) setGreeting('Good Afternoon');
-    else setGreeting('Good Evening');
+    if (hour < 12) setGreeting("Good Morning");
+    else if (hour < 18) setGreeting("Good Afternoon");
+    else setGreeting("Good Evening");
 
     if (authUser?.id) {
-      loadProprietorData();
+      void loadProprietorData();
     }
   }, [authUser?.id]);
 
@@ -83,28 +81,27 @@ export const ProprietorDashboard: React.FC = () => {
       }
 
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email, phone, avatar_url, assigned_property_id')
-        .eq('id', authUser.id)
+        .from("profiles")
+        .select("first_name, last_name, email, phone, avatar_url, assigned_property_id")
+        .eq("id", authUser.id)
         .maybeSingle();
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.warn('Unable to load proprietor profile details:', profileError);
+      if (profileError && profileError.code !== "PGRST116") {
+        console.warn("Unable to load proprietor profile details:", profileError);
       }
 
-      // Get proprietor profile
       const { data: propData, error: propError } = await supabase
-        .from('proprietors')
+        .from("proprietors")
         .select(`
           id,
           user_id,
           business_name,
           status
         `)
-        .eq('user_id', authUser?.id)
+        .eq("user_id", authUser.id)
         .maybeSingle();
 
-      if (propError && propError.code !== 'PGRST116') throw propError;
+      if (propError && propError.code !== "PGRST116") throw propError;
 
       const mappedProp: ProprietorProfile = propData
         ? {
@@ -115,7 +112,7 @@ export const ProprietorDashboard: React.FC = () => {
             id: authUser.id,
             user_id: authUser.id,
             business_name: undefined,
-            status: 'active',
+            status: "active",
             properties_count: 0,
             profile: (profileData as any) || undefined,
           };
@@ -123,7 +120,7 @@ export const ProprietorDashboard: React.FC = () => {
       setProprietor(mappedProp);
 
       const proprietorIdCandidates = Array.from(
-        new Set([propData?.id, authUser.id].filter(Boolean))
+        new Set([propData?.id, authUser.id].filter(Boolean)),
       ) as string[];
 
       if (proprietorIdCandidates.length === 0) {
@@ -131,9 +128,8 @@ export const ProprietorDashboard: React.FC = () => {
         return;
       }
 
-      // Use EXACT same query as working "My Properties" page
       let assignmentsQuery = supabase
-        .from('proprietor_properties')
+        .from("proprietor_properties")
         .select(`
           id,
           proprietor_id,
@@ -150,22 +146,21 @@ export const ProprietorDashboard: React.FC = () => {
             image_url
           )
         `)
-        .in('proprietor_id', proprietorIdCandidates)
-        .order('assigned_at', { ascending: false });
+        .in("proprietor_id", proprietorIdCandidates)
+        .order("assigned_at", { ascending: false });
 
-      assignmentsQuery = assignmentsQuery.or('is_active.is.null,is_active.eq.true');
+      assignmentsQuery = assignmentsQuery.or("is_active.is.null,is_active.eq.true");
 
       let { data: propsData, error: propsError } = await assignmentsQuery;
 
       if (propsError) {
-        console.warn('Unable to load proprietor_properties rows for dashboard, using fallbacks:', propsError);
+        console.warn("Unable to load proprietor_properties rows for dashboard, using fallbacks:", propsError);
         propsData = [];
       }
 
-      // Legacy safety: if records were created with unexpected active flags, retry without active filter.
       if ((propsData || []).length === 0) {
         const { data: relaxedData, error: relaxedError } = await supabase
-          .from('proprietor_properties')
+          .from("proprietor_properties")
           .select(`
             id,
             proprietor_id,
@@ -182,11 +177,11 @@ export const ProprietorDashboard: React.FC = () => {
               image_url
             )
           `)
-          .in('proprietor_id', proprietorIdCandidates)
-          .order('assigned_at', { ascending: false });
+          .in("proprietor_id", proprietorIdCandidates)
+          .order("assigned_at", { ascending: false });
 
         if (relaxedError) {
-          console.warn('Relaxed proprietor_properties query failed, using fallbacks:', relaxedError);
+          console.warn("Relaxed proprietor_properties query failed, using fallbacks:", relaxedError);
         }
 
         if (!relaxedError && (relaxedData || []).length > 0) {
@@ -194,7 +189,6 @@ export const ProprietorDashboard: React.FC = () => {
         }
       }
 
-      // Fallback for environments where assignments are stored/visible via profile linkage.
       const profileAssignedPropertyId = (profileData as any)?.assigned_property_id as string | undefined;
       if ((propsData || []).length === 0 && profileAssignedPropertyId) {
         propsData = [
@@ -205,19 +199,18 @@ export const ProprietorDashboard: React.FC = () => {
             ownership_percentage: 100,
             assigned_at: new Date().toISOString(),
             property: null,
-          }
+          },
         ] as any[];
       }
 
-      // Last-resort fallback: use properties directly visible to the current proprietor via RLS.
       if ((propsData || []).length === 0) {
         const { data: visibleProperties, error: visiblePropertiesError } = await supabase
-          .from('properties')
-          .select('id, name, location, type, description, status, total_monthly_rental_expected, image_url, number_of_floors')
-          .order('created_at', { ascending: false });
+          .from("properties")
+          .select("id, name, location, type, description, status, total_monthly_rental_expected, image_url, number_of_floors")
+          .order("created_at", { ascending: false });
 
         if (visiblePropertiesError) {
-          console.warn('Direct properties fallback failed:', visiblePropertiesError);
+          console.warn("Direct properties fallback failed:", visiblePropertiesError);
         } else if ((visibleProperties || []).length > 0) {
           propsData = (visibleProperties || []).map((property: any, index: number) => ({
             id: `visible-property-${property.id}-${index}`,
@@ -239,13 +232,12 @@ export const ProprietorDashboard: React.FC = () => {
 
       const uniquePropertyIds = Array.from(new Set(propertyIds as string[]));
 
-      // If relation expansion is empty, hydrate property details directly by property_id.
       let propertyById = new Map<string, any>();
       if (uniquePropertyIds.length > 0) {
         const { data: propertyRows, error: propertyRowsError } = await supabase
-          .from('properties')
-          .select('id, name, location, type, description, status, total_monthly_rental_expected, image_url, number_of_floors')
-          .in('id', uniquePropertyIds);
+          .from("properties")
+          .select("id, name, location, type, description, status, total_monthly_rental_expected, image_url, number_of_floors")
+          .in("id", uniquePropertyIds);
 
         if (!propertyRowsError) {
           propertyById = new Map((propertyRows || []).map((row: any) => [row.id, row]));
@@ -255,12 +247,12 @@ export const ProprietorDashboard: React.FC = () => {
       const unitStatsByProperty = new Map<string, { total: number; occupied: number; estimatedMonthlyRent: number }>();
       if (uniquePropertyIds.length > 0) {
         const { data: unitsData, error: unitsError } = await supabase
-          .from('units')
-          .select('property_id, status, price')
-          .in('property_id', uniquePropertyIds);
+          .from("units")
+          .select("property_id, status, price")
+          .in("property_id", uniquePropertyIds);
 
         if (unitsError) {
-          console.warn('Unable to load unit occupancy stats for proprietor dashboard:', unitsError);
+          console.warn("Unable to load unit occupancy stats for proprietor dashboard:", unitsError);
         } else {
           (unitsData || []).forEach((unit: any) => {
             const propertyId = unit.property_id;
@@ -268,7 +260,7 @@ export const ProprietorDashboard: React.FC = () => {
 
             const current = unitStatsByProperty.get(propertyId) || { total: 0, occupied: 0, estimatedMonthlyRent: 0 };
             current.total += 1;
-            if (unit.status === 'occupied') {
+            if (unit.status === "occupied") {
               current.occupied += 1;
             }
             current.estimatedMonthlyRent += Number(unit.price || 0);
@@ -280,9 +272,7 @@ export const ProprietorDashboard: React.FC = () => {
       const mappedProps = (propsData || []).map((p: any) => {
         const relationProperty = Array.isArray(p.property) ? p.property[0] : p.property;
         const property = relationProperty || propertyById.get(p.property_id) || null;
-        const stats = property?.id
-          ? unitStatsByProperty.get(property.id)
-          : undefined;
+        const stats = property?.id ? unitStatsByProperty.get(property.id) : undefined;
         const total_units = stats?.total || 0;
         const occupied_units = stats?.occupied || 0;
         const monthly_rent = Number(property?.total_monthly_rental_expected || stats?.estimatedMonthlyRent || 0);
@@ -293,14 +283,14 @@ export const ProprietorDashboard: React.FC = () => {
             ...property,
             total_units,
             occupied_units,
-            monthly_rent
-          }
+            monthly_rent,
+          },
         };
       });
 
       setProperties(mappedProps);
     } catch (error: any) {
-      console.error('Error loading proprietor data:', error);
+      console.error("Error loading proprietor data:", error);
     } finally {
       setLoading(false);
     }
@@ -316,333 +306,289 @@ export const ProprietorDashboard: React.FC = () => {
     if (first_name && last_name) {
       return `${first_name} ${last_name}`;
     }
-    return proprietor.business_name || 'Proprietor';
+    return proprietor.business_name || "Proprietor";
   };
 
   const totalMonthlyRent = properties.reduce(
     (sum, p) => sum + ((p.property?.monthly_rent || 0) * (p.ownership_percentage / 100)),
-    0
+    0,
   );
 
-  const totalUnits = properties.reduce(
-    (sum, p) => sum + (p.property?.total_units || 0),
-    0
-  );
+  const totalUnits = properties.reduce((sum, p) => sum + (p.property?.total_units || 0), 0);
 
-  const occupiedUnits = properties.reduce(
-    (sum, p) => sum + (p.property?.occupied_units || 0),
-    0
-  );
+  const occupiedUnits = properties.reduce((sum, p) => sum + (p.property?.occupied_units || 0), 0);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-spin text-4xl text-[#154279]">⌛</div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-[#2f3d51]" />
+          <p className="text-[13px] font-medium text-[#5f6b7c]">Loading dashboard data...</p>
+        </div>
       </div>
     );
   }
 
+  const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
+  const averageOwnership =
+    properties.length > 0
+      ? Math.round(
+          properties.reduce((sum, property) => sum + Number(property.ownership_percentage || 0), 0) /
+            properties.length,
+        )
+      : 0;
+
+  const topMetrics = [
+    {
+      title: "Properties",
+      value: properties.length.toLocaleString(),
+      subTitle: "Assigned portfolio",
+      bg: "bg-[#2aa8bf]",
+      footer: "bg-[#1f93a8]",
+    },
+    {
+      title: "Total Units",
+      value: totalUnits.toLocaleString(),
+      subTitle: "All mapped units",
+      bg: "bg-[#2daf4a]",
+      footer: "bg-[#24933d]",
+    },
+    {
+      title: "Occupancy",
+      value: `${occupancyRate}%`,
+      subTitle: `${occupiedUnits}/${totalUnits} occupied`,
+      bg: "bg-[#f3bd11]",
+      footer: "bg-[#d6a409]",
+    },
+    {
+      title: "Monthly Income",
+      value: `KES ${totalMonthlyRent.toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
+      subTitle: "Estimated revenue share",
+      bg: "bg-[#dc3545]",
+      footer: "bg-[#c12c3a]",
+    },
+  ];
+
+  const latestAssignments = properties.slice(0, 8);
+
   return (
-    <div className="bg-slate-50 min-h-screen antialiased text-slate-900 font-nunito" style={{ fontFamily: "'Nunito', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap');
-        body { font-family: 'Nunito', sans-serif; }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Nunito', sans-serif; }
-      `}</style>
-      
-      {/* HERO SECTION */}
-      <section className="bg-gradient-to-r from-[#154279] to-[#0f325e] overflow-hidden py-10 shadow-lg relative">
-        <div className="w-full px-4 md:px-8">
-             <div className="flex flex-col md:flex-row items-center justify-between gap-10">
-                <div className="w-full md:w-2/3 relative z-10">
-                    <div className="flex items-center gap-3 mb-4">
-                        <span className="bg-white/20 text-white text-[10px] font-bold px-3 py-1 tracking-wide uppercase rounded-full border border-white/30">
-                          Proprietor Portal
-                        </span>
-                        <span className="text-blue-100 text-[10px] font-semibold uppercase tracking-widest">
-                          {greeting}
-                        </span>
-                    </div>
-                    
-                    <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-3 leading-[1.2] tracking-tight">
-                        Welcome back, <span className="text-[#F96302]">{getProprietorName()}</span>
-                    </h1>
-                    
-                    <p className="text-sm text-blue-100 leading-relaxed mb-8 max-w-lg font-medium">
-                        You have <span className="text-white font-bold">{properties.length} properties</span> in your portfolio.
+    <div className="min-h-screen bg-[#d7dce1] p-4 md:p-6 font-['Poppins','Segoe_UI',sans-serif] text-[#243041]">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');`}</style>
+
+      <div className="mx-auto max-w-[1600px] space-y-4">
+        <section className="border border-[#bcc3cd] bg-[#eef1f4] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-widest text-[#6a7788]">Proprietor Workspace</p>
+              <h1 className="mt-1 text-[42px] font-bold leading-none text-[#1f2937]">
+                {greeting}, {getProprietorName()}
+              </h1>
+              <p className="mt-2 text-[13px] font-medium text-[#5f6b7c]">
+                Portfolio summary with occupancy, revenue and property allocations.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex h-10 items-center gap-2 border border-[#2f3d51] bg-[#2f3d51] px-4 text-[11px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[#243041]"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refresh
+            </button>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {topMetrics.map((metric, index) => (
+            <motion.div
+              key={metric.title}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * index }}
+              className="border border-[#adb5bf] shadow-sm"
+            >
+              <div className={`${metric.bg} h-[132px] w-full px-4 py-3`}>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#111827]/80">{metric.title}</p>
+                <p className="mt-4 text-[34px] font-bold leading-none text-[#111827]">{metric.value}</p>
+              </div>
+              <div className={`${metric.footer} px-4 py-2 text-[12px] font-semibold text-[#111827]`}>
+                {metric.subTitle}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="space-y-4 xl:col-span-4">
+            <div className="border border-[#bcc3cd] bg-[#eef1f4] p-4">
+              <div className="mb-3 border-b border-[#c8cfd8] pb-2">
+                <h2 className="text-[28px] font-bold leading-none text-[#263143]">Profile</h2>
+              </div>
+
+              {proprietor ? (
+                <div className="space-y-4">
+                  <div className="border border-[#c7ced7] bg-white px-3 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6a7788]">Business Name</p>
+                    <p className="mt-1 text-[15px] font-semibold text-[#1f2937]">
+                      {proprietor.business_name || getProprietorName()}
                     </p>
+                  </div>
 
-                    <button
-                      onClick={handleRefresh}
-                      className="group flex items-center gap-2 bg-white text-[#154279] px-6 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all duration-300 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                  <div className="space-y-2">
+                    {proprietor.profile?.email && (
+                      <div className="flex items-center gap-2 border border-[#c7ced7] bg-white px-3 py-2 text-[13px] font-medium text-[#334155]">
+                        <Mail className="h-4 w-4 text-[#154279]" />
+                        {proprietor.profile.email}
+                      </div>
+                    )}
+                    {proprietor.profile?.phone && (
+                      <div className="flex items-center gap-2 border border-[#c7ced7] bg-white px-3 py-2 text-[13px] font-medium text-[#334155]">
+                        <Phone className="h-4 w-4 text-[#154279]" />
+                        {proprietor.profile.phone}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Badge
+                      className={cn(
+                        "rounded-none border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                        proprietor.status === "active"
+                          ? "border-[#2daf4a] bg-[#2daf4a] text-white"
+                          : "border-[#9aa4b1] bg-[#9aa4b1] text-white",
+                      )}
                     >
-                      <RefreshCw className={cn("w-3.5 h-3.5", loading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500")} />
-                      <span>Refresh Data</span>
-                    </button>
+                      {proprietor.status}
+                    </Badge>
+                    <Badge className="rounded-none border border-[#2f3d51] bg-[#2f3d51] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      Avg Ownership {averageOwnership}%
+                    </Badge>
+                  </div>
                 </div>
-             </div>
-        </div>
-      </section>
-
-      {/* DASHBOARD CONTENT */}
-      <div className="w-full px-4 md:px-8 -mt-8 pb-20 relative z-20">
-      
-        {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* Total Properties */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white rounded-2xl overflow-hidden h-full group">
-                    <CardContent className="p-6 relative">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Building2 className="w-16 h-16 text-emerald-600" />
-                        </div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-emerald-50 rounded-xl">
-                                <Building2 className="w-6 h-6 text-emerald-600" />
-                            </div>
-                            <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 uppercase text-[10px] tracking-wider">Portfolio</Badge>
-                        </div>
-                        <div className="text-2xl font-black text-slate-800 mb-1">
-                            {properties.length}
-                        </div>
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Properties</div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-
-            {/* Total Units */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white rounded-2xl overflow-hidden h-full group">
-                    <CardContent className="p-6 relative">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Home className="w-16 h-16 text-blue-600" />
-                        </div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-blue-50 rounded-xl">
-                                <Home className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <Badge className="bg-blue-50 text-blue-600 border-blue-100 uppercase text-[10px] tracking-wider">Units</Badge>
-                        </div>
-                        <div className="text-2xl font-black text-slate-800 mb-1">
-                            {totalUnits}
-                        </div>
-                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Units</div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-
-            {/* Occupied Units */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-                <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white rounded-2xl overflow-hidden h-full group">
-                    <CardContent className="p-6 relative">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Users className="w-16 h-16 text-[#F96302]" />
-                        </div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-orange-50 rounded-xl">
-                                <Users className="w-6 h-6 text-[#F96302]" />
-                            </div>
-                            <Badge className="bg-orange-50 text-[#F96302] border-orange-100 uppercase text-[10px] tracking-wider">Occupancy</Badge>
-                        </div>
-                        <div className="text-2xl font-black text-slate-800 mb-1">
-                            {occupiedUnits} <span className="text-sm text-slate-400 font-semibold">/ {totalUnits}</span>
-                        </div>
-                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Occupied Units</div>
-                        <div className="text-sm font-semibold text-[#F96302] bg-orange-50 px-2 py-1 rounded inline-block">
-                             {totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0}% Occupancy
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-
-            {/* Monthly Income */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-                <Card className="border-none shadow-lg hover:shadow-xl transition-shadow duration-300 bg-white rounded-2xl overflow-hidden h-full group">
-                    <CardContent className="p-6 relative">
-                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <DollarSign className="w-16 h-16 text-purple-600" />
-                        </div>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-3 bg-purple-50 rounded-xl">
-                                <DollarSign className="w-6 h-6 text-purple-600" />
-                            </div>
-                            <Badge className="bg-purple-50 text-purple-600 border-purple-100 uppercase text-[10px] tracking-wider">Income</Badge>
-                        </div>
-                        <div className="text-2xl font-black text-slate-800 mb-1">
-                            {properties.length > 0 ? 'KES ' + totalMonthlyRent.toLocaleString('en-US', { maximumFractionDigits: 0 }) : 'KES 0'}
-                        </div>
-                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Est. Monthly Income</div>
-                    </CardContent>
-                </Card>
-            </motion.div>
-        </div>
-
-        {/* Business Profile + Properties Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column: Business Profile */}
-            <div className="lg:col-span-1 space-y-6">
-                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
-                    <Card className="border-none shadow-lg bg-white rounded-2xl overflow-hidden">
-                        <CardHeader className="bg-slate-50 border-b border-slate-100">
-                             <CardTitle className="text-lg font-bold text-[#154279]">Business Profile</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-6 space-y-6">
-                            {proprietor ? (
-                                <>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Business Name</p>
-                                        <p className="text-base font-bold text-slate-800">
-                                        {proprietor.business_name || getProprietorName()}
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact</p>
-                                        <div className="space-y-2 mt-2">
-                                        {proprietor.profile?.email && (
-                                            <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                                            <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
-                                                 <Mail className="w-4 h-4" />
-                                            </div>
-                                            {proprietor.profile.email}
-                                            </div>
-                                        )}
-                                        {proprietor.profile?.phone && (
-                                            <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
-                                            <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
-                                                 <Phone className="w-4 h-4" />
-                                            </div>
-                                            {proprietor.profile.phone}
-                                            </div>
-                                        )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Account Status</p>
-                                        <div className="mt-2">
-                                            <Badge
-                                                className={cn(
-                                                    "px-3 py-1 text-[10px] uppercase tracking-wider",
-                                                    proprietor.status === 'active'
-                                                    ? 'bg-green-100 text-green-700 border-green-200'
-                                                    : 'bg-gray-100 text-gray-700 border-gray-200'
-                                                )}
-                                            >
-                                                {proprietor.status}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="text-slate-500 text-sm">No profile data available.</p>
-                            )}
-                        </CardContent>
-                    </Card>
-                 </motion.div>
+              ) : (
+                <p className="text-[13px] font-medium text-[#5f6b7c]">No profile data available.</p>
+              )}
             </div>
 
-            {/* Right Column: Properties List */}
-            <div className="lg:col-span-2 space-y-6">
-                 <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 mb-2">
-                    <div>
-                        <h2 className="text-xl font-black text-[#154279] tracking-tight">My Properties</h2>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
-                            Use custom view to manage specific properties
-                        </p>
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {properties.map((ownership, index) => (
-                        <motion.div 
-                            key={ownership.id}
-                            initial={{ opacity: 0, y: 20 }} 
-                            animate={{ opacity: 1, y: 0 }} 
-                            transition={{ delay: 0.2 + (index * 0.1) }}
-                        >
-                            <Card className="border-none shadow-md hover:shadow-xl transition-all duration-300 bg-white rounded-2xl overflow-hidden group h-full">
-                                <CardHeader className="pb-3 border-b border-slate-50">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <CardTitle className="text-base font-bold text-[#154279] line-clamp-1">
-                                                {ownership.property?.name || 'Unknown Property'}
-                                            </CardTitle>
-                                            <div className="text-xs text-slate-500 mt-1 flex items-start gap-1 font-medium">
-                                                <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0 text-[#F96302]" />
-                                                <span className="line-clamp-1">
-                                                    {ownership.property?.location || "No location set"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-[#154279] group-hover:text-white transition-colors">
-                                             <Building2 className="w-4 h-4" />
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="pt-4 space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                         <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ownership</p>
-                                            <p className="text-sm font-bold text-slate-700 mt-0.5">{ownership.ownership_percentage}%</p>
-                                         </div>
-                                         <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</p>
-                                            <Badge
-                                                className={cn(
-                                                    "mt-0.5 text-[10px] uppercase font-bold tracking-wide",
-                                                    ownership.property?.status === 'available'
-                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                                )}
-                                            >
-                                                {ownership.property?.status || 'Unknown'}
-                                            </Badge>
-                                         </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Units</p>
-                                            <p className="text-sm font-bold text-slate-700">
-                                                {ownership.property?.occupied_units}/{ownership.property?.total_units}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Est. Income</p>
-                                            <p className="text-sm font-black text-[#154279]">
-                                                KES {(
-                                                ((ownership.property?.monthly_rent || 0) *
-                                                    ownership.ownership_percentage) /
-                                                100
-                                                ).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    ))}
-                 </div>
-                 
-                 {properties.length === 0 && (
-                     <Card className="border-dashed border-2 bg-slate-50/50 shadow-none">
-                        <CardContent className="py-12 text-center">
-                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Briefcase className="w-8 h-8 text-slate-300" />
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-700 mb-1">
-                            No Properties Assigned
-                            </h3>
-                            <p className="text-sm text-slate-500 max-w-xs mx-auto">
-                            You haven't been assigned any properties yet. Contact the administrator to get started.
-                            </p>
-                        </CardContent>
-                    </Card>
-                 )}
+            <div className="border border-[#bcc3cd] bg-[#eef1f4] p-4">
+              <div className="mb-3 border-b border-[#c8cfd8] pb-2">
+                <h3 className="text-[24px] font-bold leading-none text-[#263143]">Quick Snapshot</h3>
+              </div>
+              <div className="space-y-2 text-[13px]">
+                <div className="flex items-center justify-between border border-[#c7ced7] bg-white px-3 py-2">
+                  <div className="flex items-center gap-2 text-[#334155]">
+                    <Building2 className="h-4 w-4 text-[#154279]" />
+                    Assigned Properties
+                  </div>
+                  <span className="font-semibold text-[#1f2937]">{properties.length}</span>
+                </div>
+                <div className="flex items-center justify-between border border-[#c7ced7] bg-white px-3 py-2">
+                  <div className="flex items-center gap-2 text-[#334155]">
+                    <Home className="h-4 w-4 text-[#154279]" />
+                    Occupied Units
+                  </div>
+                  <span className="font-semibold text-[#1f2937]">{occupiedUnits}</span>
+                </div>
+                <div className="flex items-center justify-between border border-[#c7ced7] bg-white px-3 py-2">
+                  <div className="flex items-center gap-2 text-[#334155]">
+                    <Users className="h-4 w-4 text-[#154279]" />
+                    Total Units
+                  </div>
+                  <span className="font-semibold text-[#1f2937]">{totalUnits}</span>
+                </div>
+                <div className="flex items-center justify-between border border-[#c7ced7] bg-white px-3 py-2">
+                  <div className="flex items-center gap-2 text-[#334155]">
+                    <DollarSign className="h-4 w-4 text-[#154279]" />
+                    Monthly Estimate
+                  </div>
+                  <span className="font-semibold text-[#1f2937]">
+                    KES {totalMonthlyRent.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+              </div>
             </div>
-        </div>
+          </div>
 
+          <div className="xl:col-span-8">
+            <div className="border border-[#bcc3cd] bg-[#eef1f4] p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-[#c8cfd8] pb-2">
+                <h2 className="text-[32px] font-bold leading-none text-[#263143]">Property Assignments</h2>
+                <Badge className="rounded-none border border-[#2f3d51] bg-[#2f3d51] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  {latestAssignments.length} Showing
+                </Badge>
+              </div>
+
+              {latestAssignments.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[780px] border-collapse text-left">
+                    <thead>
+                      <tr className="bg-[#d7dee6] text-[11px] uppercase tracking-wide text-[#5f6b7c]">
+                        <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Property</th>
+                        <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Location</th>
+                        <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Ownership</th>
+                        <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Status</th>
+                        <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Units</th>
+                        <th className="border-b border-[#c2c9d2] px-4 py-2.5 font-semibold">Income</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {latestAssignments.map((ownership) => {
+                        const property = ownership.property;
+                        const propertyStatus = String(property?.status || "active").toLowerCase();
+                        const isActive = propertyStatus === "active" || propertyStatus === "occupied";
+
+                        return (
+                          <tr key={ownership.id} className="hover:bg-[#e8edf3]">
+                            <td className="border-b border-[#cfd6df] px-4 py-3 text-[12px] font-semibold text-[#2d3748]">
+                              {property?.name || "Unnamed Property"}
+                            </td>
+                            <td className="border-b border-[#cfd6df] px-4 py-3 text-[12px] text-[#334155]">
+                              <div className="flex items-start gap-1.5">
+                                <MapPin className="mt-0.5 h-3.5 w-3.5 text-[#f05f01]" />
+                                <span>{property?.location || "No location set"}</span>
+                              </div>
+                            </td>
+                            <td className="border-b border-[#cfd6df] px-4 py-3 text-[11px] font-bold text-[#1f2937]">
+                              {Number(ownership.ownership_percentage || 0)}%
+                            </td>
+                            <td className="border-b border-[#cfd6df] px-4 py-3 text-[11px] font-bold">
+                              <span
+                                className={cn(
+                                  "inline-flex px-2 py-1",
+                                  isActive ? "bg-[#2daf4a] text-white" : "bg-[#9aa4b1] text-white",
+                                )}
+                              >
+                                {property?.status || "Unknown"}
+                              </span>
+                            </td>
+                            <td className="border-b border-[#cfd6df] px-4 py-3 text-[11px] font-semibold text-[#334155]">
+                              {property?.occupied_units || 0}/{property?.total_units || 0}
+                            </td>
+                            <td className="border-b border-[#cfd6df] px-4 py-3 text-[11px] font-semibold text-[#1f2937]">
+                              KES{" "}
+                              {(
+                                ((property?.monthly_rent || 0) * Number(ownership.ownership_percentage || 0)) /
+                                100
+                              ).toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="border border-dashed border-[#b8c0cb] bg-white px-4 py-12 text-center">
+                  <Briefcase className="mx-auto mb-3 h-7 w-7 text-[#9aa4b1]" />
+                  <p className="text-[14px] font-semibold text-[#334155]">No Properties Assigned</p>
+                  <p className="mt-1 text-[12px] text-[#5f6b7c]">
+                    Ask your administrator to assign properties to your proprietor profile.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

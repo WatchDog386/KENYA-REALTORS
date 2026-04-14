@@ -171,12 +171,12 @@ const Navbar = () => {
         
       {/* Top Utility Strip: Deep Blue Background - Brighter */}
       <div
-        className="text-white hidden lg:block border-b border-[#e25a00]"
+        className="text-white hidden lg:block border-b border-primary"
         style={{
-          background: "#f96302",
+          background: COLORS.primary,
         }}
       >
-        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-between h-14">
+        <div className="max-w-[1440px] mx-auto px-6 flex items-center justify-between h-9">
           <div className="flex items-center gap-6 text-white font-medium">
             {UTILITY_BAR.location.enabled && (
               <>
@@ -227,7 +227,7 @@ const Navbar = () => {
 
       {/* Main Nav Bar */}
       <div
-        className={`relative z-20 transition-all duration-300 py-2 md:py-[0.7cm] md:rounded-none rounded-b-[2rem] md:shadow-none`}
+        className={`relative z-20 transition-all duration-300 py-2 md:py-3 md:rounded-none rounded-b-[2rem] md:shadow-none`}
         style={{
           background: "#ffffff",
         }}

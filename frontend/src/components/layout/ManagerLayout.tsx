@@ -459,8 +459,8 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
           className={cn(
             "group relative mb-1 flex items-center justify-between border-l-4 border-l-transparent rounded-none px-4 py-3 transition-all duration-150",
             isItemActive
-              ? "border-l-[#17a2b8] bg-[#007bff] text-white"
-              : "text-[#cfd4da] hover:border-l-[#adb5bd] hover:bg-[#343a40] hover:text-[#e9ecef]",
+              ? "border-l-white bg-[#154279] text-white"
+              : "text-[#fff3e5] hover:border-l-[#154279] hover:bg-[#154279] hover:text-white",
             depth > 0 && "pl-10"
           )}
         >
@@ -469,17 +469,17 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
               className={`${
                 isItemActive
                   ? "text-white"
-                  : "text-[#adb5bd] group-hover:text-[#e9ecef]"
+                  : "text-[#ffe0bf] group-hover:text-white"
               } relative transition-colors`}
             >
               {item.icon}
               {typeof item.badge === "number" && item.badge > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#343a40] bg-[#fd7e14] text-[9px] font-bold text-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-white bg-[#154279] text-[9px] font-bold text-white shadow-sm">
                   {item.badge}
                 </span>
               )}
               {typeof item.badge === "string" && parseInt(item.badge) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-[#343a40] bg-[#fd7e14] text-[9px] font-bold text-white shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-white bg-[#154279] text-[9px] font-bold text-white shadow-sm">
                   {item.badge}
                 </span>
               )}
@@ -506,7 +506,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                 className={cn(
                   "w-4 h-4 transition-transform",
                   isExpanded && "rotate-180",
-                  isItemActive ? "text-white" : "text-[#adb5bd] group-hover:text-[#e9ecef]"
+                  isItemActive ? "text-white" : "text-[#ffe0bf] group-hover:text-white"
                 )}
               />
             ) : (
@@ -518,7 +518,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         </Link>
 
         {hasChildren && isExpanded && (
-          <div className="mb-2 ml-4 mt-1 space-y-1 border-l border-[#adb5bd]/40 pl-2">
+          <div className="mb-2 ml-4 mt-1 space-y-1 border-l border-white/30 pl-2">
             {item.children!.map((child) => renderNavItem(child, depth + 1))}
           </div>
         )}
@@ -571,32 +571,32 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#d7dce1] text-[#e8f2ff] selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
+    <div className="min-h-screen bg-white text-[#1f2937] selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 w-full bg-[#343a40] z-50 px-4 py-3 flex items-center justify-between shadow-lg border-b border-[#4b545c]">
+      <div className="lg:hidden fixed top-0 left-0 w-full bg-white z-50 px-4 py-3 flex items-center justify-between shadow-sm border-b border-[#e5e7eb]">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-md border border-[#4b545c] bg-[#3f474f] p-2 text-white transition-all hover:bg-[#4b545c]"
+            className="rounded-md border border-[#154279] bg-[#154279] p-2 text-white transition-all hover:bg-[#10335f]"
           >
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <span className="text-sm font-semibold tracking-tight text-[#f8f9fa]">KENYA REALTORS</span>
+          <span className="text-sm font-semibold tracking-tight text-[#154279]">KENYA REALTORS</span>
         </div>
       </div>
 
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 flex h-full w-80 flex-col border-r border-[#4b545c] bg-[#343a40] text-[#c2c7d0] shadow-xl transition-all duration-300 ease-in-out",
+          "fixed left-0 top-0 z-40 flex h-full w-80 flex-col border-r border-[#d65a01] bg-[#F96302] text-white shadow-xl transition-all duration-300 ease-in-out",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0"
         )}
       >
-        <div className="flex h-20 items-center border-b border-[#4b545c] bg-[#343a40] px-6">
+        <div className="flex h-20 items-center border-b border-[#d65a01] bg-[#F96302] px-6">
           <div className="flex w-full items-center">
             <div>
-              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#9aa4ae]">Property Manager</div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#fff1e2]">Property Manager</div>
               <div className="text-[20px] font-bold leading-none text-[#f8f9fa]">Portal</div>
             </div>
           </div>
@@ -604,25 +604,25 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
 
         <nav className="sidebar-scroll mt-4 flex-1 overflow-y-auto px-4 pb-4">
           <div className="mb-2">
-            <div className="mb-3 flex items-center gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#adb5bd]">
+            <div className="mb-3 flex items-center gap-2 px-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#fff1e2]">
               <span>Management</span>
-              <div className="h-px flex-1 bg-gradient-to-r from-[#6c757d] to-transparent" />
+              <div className="h-px flex-1 bg-gradient-to-r from-[#ffd2ad] to-transparent" />
             </div>
             <div className="space-y-0.5">{navItems.map((item) => renderNavItem(item))}</div>
           </div>
         </nav>
 
-        <div className="border-t border-[#4b545c] bg-[#30363d] p-4">
+        <div className="border-t border-[#d65a01] bg-[#F05F01] p-4">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#9ddab8]">System Online</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#e8ffe8]">System Online</span>
             </div>
-            <span className="text-[10px] font-semibold text-[#9aa4ae]">v2.4.0</span>
+            <span className="text-[10px] font-semibold text-[#fff1e2]">v2.4.0</span>
           </div>
           <button
             onClick={handleSignOut}
-            className="flex w-full items-center justify-center gap-2 border border-[#dc3545] bg-[#dc3545] py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white transition-all hover:bg-[#c82333]"
+            className="flex w-full items-center justify-center gap-2 border border-white bg-white py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#154279] transition-all hover:bg-[#154279] hover:text-white"
           >
             <LogOut size={14} className="stroke-[2.5]" />
             <span>Sign Out</span>
@@ -631,16 +631,16 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
       </aside>
 
       {/* Main Content */}
-      <main className={cn("min-h-screen flex flex-col bg-[#d7dce1] transition-all duration-300", sidebarOpen ? "lg:ml-80" : "lg:ml-0")}>
+      <main className={cn("min-h-screen flex flex-col bg-white transition-all duration-300", sidebarOpen ? "lg:ml-80" : "lg:ml-0")}>
         {/* Desktop Header */}
-        <header className="sticky top-0 z-30 hidden h-20 items-center justify-between border-b border-[#12314f] bg-[#0a1f38] px-8 shadow-sm lg:flex">
+        <header className="sticky top-0 z-30 hidden h-20 items-center justify-between border-b border-[#e5e7eb] bg-white px-8 shadow-sm lg:flex">
           <div className="flex items-center gap-4">
             <div className="flex flex-col gap-0.5">
-              <h2 className="text-lg font-semibold tracking-tight uppercase text-[#e8f2ff]">
+              <h2 className="text-lg font-semibold tracking-tight uppercase text-[#154279]">
                 {currentPage.title}
               </h2>
               {currentPage.description && (
-                <div className="text-[11px] font-medium uppercase tracking-wide text-[#8fb4d7]">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[#64748b]">
                   {currentPage.description}
                 </div>
               )}
@@ -652,7 +652,7 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative p-2 text-[#d6e9fb] transition-colors hover:text-[#35d0ff]"
+                className="relative p-2 text-[#475569] transition-colors hover:text-[#154279]"
               >
                 <Bell size={20} />
                 {unreadCount > 0 && (
@@ -665,13 +665,13 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
               {notificationsOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-4 w-96 overflow-hidden border border-[#1f466b] bg-[#0f2b4a] shadow-[0_15px_50px_-10px_rgba(0,0,0,0.35)]">
-                    <div className="bg-[#194b79] px-4 py-3 text-sm font-semibold text-[#e8f2ff] flex justify-between items-center">
+                  <div className="absolute right-0 top-full z-50 mt-4 w-96 overflow-hidden border border-[#b7cce3] bg-white shadow-[0_15px_50px_-10px_rgba(0,0,0,0.25)]">
+                    <div className="bg-[#154279] px-4 py-3 text-sm font-semibold text-white flex justify-between items-center">
                       <span>Notifications ({unreadCount})</span>
                       {unreadCount > 0 && (
                         <button
                           onClick={markAllAsRead}
-                          className="text-[10px] text-[#35d0ff] hover:text-white font-bold"
+                          className="text-[10px] text-[#dbe8f7] hover:text-white font-bold"
                         >
                           Mark all as read
                         </button>
@@ -692,20 +692,20 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                               setNotificationsOpen(false);
                             }}
                           >
-                            <div className={`cursor-pointer border-b border-[#1e476e] px-4 py-3 last:border-0 transition-all hover:bg-opacity-80 ${!n.read ? 'bg-blue-50/10' : 'bg-transparent'}`}>
+                            <div className={`cursor-pointer border-b border-[#e1e9f2] px-4 py-3 last:border-0 transition-all hover:bg-opacity-80 ${!n.read ? 'bg-blue-50' : 'bg-transparent'}`}>
                               <div className="flex items-start gap-3">
-                                <div className="mt-1 text-[#8fb4d7]">{getNotificationIcon(n.type)}</div>
+                                <div className="mt-1 text-[#64748b]">{getNotificationIcon(n.type)}</div>
                                 <div className="flex-1">
-                                  <h3 className="text-sm font-semibold text-[#e8f2ff]">{n.title}</h3>
-                                  <p className="mt-1 text-xs text-[#a8c5dd]">{n.message}</p>
-                                  <span className="mt-1 block text-[10px] font-medium text-[#8fb4d7]">{n.time}</span>
+                                  <h3 className="text-sm font-semibold text-[#0d243f]">{n.title}</h3>
+                                  <p className="mt-1 text-xs text-[#334155]">{n.message}</p>
+                                  <span className="mt-1 block text-[10px] font-medium text-[#64748b]">{n.time}</span>
                                 </div>
                               </div>
                             </div>
                           </Link>
                         ))
                       ) : (
-                        <div className="px-4 py-8 text-center text-sm text-[#9dbedf]">No notifications</div>
+                        <div className="px-4 py-8 text-center text-sm text-[#6a7d92]">No notifications</div>
                       )}
                     </div>
                   </div>
@@ -717,9 +717,9 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
             <div className="relative z-50">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 py-1.5 pl-1 pr-1 transition-colors hover:text-white"
+                className="flex items-center gap-3 py-1.5 pl-1 pr-1 transition-colors hover:text-[#154279]"
               >
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-[#2ea3da] bg-[#1f7fb1] font-bold text-white">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-[#F96302] bg-[#154279] font-bold text-white">
                   {userProfile?.avatar_url ? (
                     <img
                       src={userProfile.avatar_url}
@@ -731,28 +731,28 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
                   )}
                 </div>
                 <div className="hidden text-left xl:block">
-                  <div className="text-xs font-semibold text-[#e8f2ff]">{fullName}</div>
-                  <div className="text-[10px] font-medium text-[#9dc0df]">Manager</div>
+                  <div className="text-xs font-semibold text-[#154279]">{fullName}</div>
+                  <div className="text-[10px] font-medium text-[#64748b]">Manager</div>
                 </div>
-                <ChevronDown size={14} className="text-[#8fb4d7]" />
+                <ChevronDown size={14} className="text-[#64748b]" />
               </button>
 
               {userMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden border border-[#1f466b] bg-[#0f2b4a] shadow-[0_15px_50px_-10px_rgba(0,0,0,0.35)]">
-                    <div className="border-b border-[#1e476e] bg-[#123b63] px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b9d7f2]">Account</p>
+                  <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden border border-[#b7cce3] bg-white shadow-[0_15px_50px_-10px_rgba(0,0,0,0.25)]">
+                    <div className="border-b border-[#d8e3ef] bg-[#f3f7fb] px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#154279]">Account</p>
                     </div>
-                    <Link to="/portal/manager/profile" className="block border-b border-[#1e476e] px-4 py-3 text-sm font-medium text-[#d4e4f5] transition-all hover:bg-[#194b79] hover:text-white">
+                    <Link to="/portal/manager/profile" className="block border-b border-[#e1e9f2] px-4 py-3 text-sm font-medium text-[#1f2937] transition-all hover:bg-[#f3f7fb] hover:text-[#154279]">
                       View Profile
                     </Link>
-                    <Link to="/portal/settings" className="block border-b border-[#1e476e] px-4 py-3 text-sm font-medium text-[#d4e4f5] transition-all hover:bg-[#194b79] hover:text-white">
+                    <Link to="/portal/settings" className="block border-b border-[#e1e9f2] px-4 py-3 text-sm font-medium text-[#1f2937] transition-all hover:bg-[#f3f7fb] hover:text-[#154279]">
                       Settings
                     </Link>
                     <button
                       onClick={handleSignOut}
-                      className="w-full border-t border-[#1e476e] bg-[#f28f1a] px-4 py-3 text-left text-sm font-semibold text-white transition-all hover:bg-[#d6780c]"
+                      className="w-full border-t border-[#e1e9f2] bg-[#F96302] px-4 py-3 text-left text-sm font-semibold text-white transition-all hover:bg-[#e05800]"
                     >
                       Sign Out
                     </button>
@@ -764,26 +764,26 @@ const ManagerLayout = ({ children }: { children?: ReactNode }) => {
         </header>
 
         {/* Content Area */}
-        <div className="relative z-10 flex-1 overflow-hidden bg-[#d7dce1]">
+        <div className="relative z-10 flex-1 overflow-hidden bg-white">
           <div className="h-full w-full overflow-y-auto custom-scroll p-4 md:p-6 lg:p-8">
             {children}
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="hidden border-t border-[#12314f] bg-[#0a1f38] px-8 py-5 shadow-sm lg:block">
+        <footer className="hidden border-t border-[#e5e7eb] bg-white px-8 py-5 shadow-sm lg:block">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-medium text-[#9dc0df]">
-              <span className="font-semibold tracking-tight text-[#e8f2ff]">KENYA REALTORS</span> © {new Date().getFullYear()}. All rights reserved.
+            <div className="text-xs font-medium text-[#64748b]">
+              <span className="font-semibold tracking-tight text-[#154279]">KENYA REALTORS</span> © {new Date().getFullYear()}. All rights reserved.
             </div>
-            <div className="flex gap-6 text-xs font-semibold text-[#9dc0df]">
-              <Link to="/portal/manager/profile" className="transition-colors duration-200 hover:text-[#35d0ff]">
+            <div className="flex gap-6 text-xs font-semibold text-[#64748b]">
+              <Link to="/portal/manager/profile" className="transition-colors duration-200 hover:text-[#154279]">
                 Profile
               </Link>
-              <Link to="/portal/settings" className="transition-colors duration-200 hover:text-[#35d0ff]">
+              <Link to="/portal/settings" className="transition-colors duration-200 hover:text-[#154279]">
                 Settings
               </Link>
-              <Link to="/portal/help" className="transition-colors duration-200 hover:text-[#35d0ff]">
+              <Link to="/portal/help" className="transition-colors duration-200 hover:text-[#154279]">
                 Help Center
               </Link>
             </div>

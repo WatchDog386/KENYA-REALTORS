@@ -394,22 +394,18 @@ export const technicianService = {
             .in('property_id', assignedPropertyIds);
     }
 
-    // Query C: Category Pool in assigned properties only.
-    // This prevents technicians from seeing jobs for unrelated properties.
-    let queryCategoryPool = null;
-    if (assignedPropertyIds.length > 0) {
-      queryCategoryPool = supabase
-        .from('maintenance_requests')
-        .select(`
-          *,
-          property:properties(id, name, location),
-          tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
-          category:technician_categories:category_id(name)
-        `)
-        .is('assigned_to_technician_id', null)
-        .eq('category_id', tech.category_id)
-        .in('property_id', assignedPropertyIds);
-    }
+    // Query C: Category Pool across properties.
+    // This allows technicians to pick category-matching work from different properties.
+    let queryCategoryPool = supabase
+      .from('maintenance_requests')
+      .select(`
+        *,
+        property:properties(id, name, location),
+        tenant:profiles!fk_maintenance_tenant_profile(id, first_name, last_name, email, phone, avatar_url),
+        category:technician_categories:category_id(name)
+      `)
+      .is('assigned_to_technician_id', null)
+      .eq('category_id', tech.category_id);
 
     // Query D: Fallback legacy un-categorized requests in assigned properties only.
     let queryFallback = null;

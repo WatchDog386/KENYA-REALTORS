@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { maintenanceService } from "@/services/maintenanceService";
 import { toast } from "sonner";
 
 const NewMaintenanceRequestPage: React.FC = () => {
@@ -12,11 +13,38 @@ const NewMaintenanceRequestPage: React.FC = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
+  const [categoryId, setCategoryId] = useState("");
+  const [damageImage, setDamageImage] = useState<File | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
   const [loading, setLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const { data, error } = await supabase
+          .from("technician_categories")
+          .select("id, name, description")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        if (error) throw error;
+        setCategories((data || []) as Array<{ id: string; name: string; description?: string | null }>);
+      } catch (error) {
+        console.error("Failed to load maintenance categories", error);
+        toast.error("Could not load maintenance categories");
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id || !title || !description) {
+    if (!user?.id || !title.trim() || !description.trim() || !categoryId || !damageImage) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -29,26 +57,68 @@ const NewMaintenanceRequestPage: React.FC = () => {
         .eq("user_id", user.id)
         .single();
 
-      if (!tenant) {
+      if (!tenant?.property_id) {
         toast.error("Tenant profile not found");
         return;
       }
 
-      const { error } = await supabase.from("maintenance_requests").insert([
-        {
-          title,
-          description,
-          priority,
-          status: "pending",
-          property_id: tenant.property_id,
-          unit_id: tenant.unit_id,
-          tenant_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]);
+      const normalizedPriority = priority === "urgent" ? "emergency" : priority;
 
-      if (error) throw error;
+      const createdRequest = await maintenanceService.createMaintenanceRequest(
+        user.id,
+        tenant.property_id,
+        tenant.unit_id || null,
+        title.trim(),
+        description.trim(),
+        normalizedPriority as "low" | "medium" | "high" | "emergency",
+        categoryId,
+        damageImage
+      );
+
+      // Best-effort routing and alerts for manager + matching technician category.
+      try {
+        await maintenanceService.autoAssignToTechnician(createdRequest.id, categoryId, tenant.property_id);
+
+        const [managerAssignments, categoryTechnicians] = await Promise.all([
+          supabase
+            .from("property_manager_assignments")
+            .select("property_manager_id")
+            .eq("property_id", tenant.property_id)
+            .eq("status", "active"),
+          maintenanceService.getAvailableTechnicians(categoryId, tenant.property_id),
+        ]);
+
+        const recipientIds = new Set<string>();
+
+        (managerAssignments.data || []).forEach((row: any) => {
+          const managerId = row?.property_manager_id;
+          if (managerId) recipientIds.add(managerId);
+        });
+
+        (categoryTechnicians || []).forEach((technician: any) => {
+          if (technician?.user_id) recipientIds.add(technician.user_id);
+        });
+
+        recipientIds.delete(user.id);
+
+        if (recipientIds.size > 0) {
+          const categoryName = categories.find((category) => category.id === categoryId)?.name || "General Maintenance";
+          const notificationRows = Array.from(recipientIds).map((recipientId) => ({
+            recipient_id: recipientId,
+            sender_id: user.id,
+            type: "maintenance",
+            title: "New maintenance request submitted",
+            message: `A new ${categoryName} issue was reported: ${title.trim()}`,
+            related_entity_type: "maintenance_request",
+            related_entity_id: createdRequest.id,
+            read: false,
+          }));
+
+          await supabase.from("notifications").insert(notificationRows);
+        }
+      } catch (routingError) {
+        console.warn("Maintenance routing notifications failed", routingError);
+      }
 
       toast.success("Maintenance request submitted successfully!");
       navigate("/portal/tenant/maintenance");
@@ -111,6 +181,28 @@ const NewMaintenanceRequestPage: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Damage Category *
+              </label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00356B] focus:border-transparent"
+                disabled={categoriesLoading}
+              >
+                <option value="">Select issue category</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select the closest category so the request goes to the right technician type.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Priority
               </label>
               <select
@@ -121,8 +213,23 @@ const NewMaintenanceRequestPage: React.FC = () => {
                 <option value="low">Low - Non-urgent repairs</option>
                 <option value="medium">Medium - Standard repairs</option>
                 <option value="high">High - Urgent issues</option>
-                <option value="urgent">Urgent - Safety concerns</option>
+                <option value="emergency">Emergency - Safety concerns</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Damage Photo *
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setDamageImage(e.target.files?.[0] || null)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00356B] focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                A clear photo is required to speed up technician assignment and repair planning.
+              </p>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

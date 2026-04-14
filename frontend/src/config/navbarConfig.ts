@@ -163,8 +163,8 @@ export const SEARCH_BAR = {
 
 // Navbar Height Variables
 export const NAVBAR_HEIGHTS = {
-  mobile: "6rem",      // 96px
-  desktop: "5.5rem",   // 88px
+  mobile: "4.5rem",    // 72px
+  desktop: "4rem",     // 64px
 };
 
 // Mobile Header Configuration

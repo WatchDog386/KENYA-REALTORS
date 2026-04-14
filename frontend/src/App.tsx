@@ -13,6 +13,7 @@ import { ApprovalProvider } from "@/contexts/ApprovalContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { testSupabaseConnection } from "@/integrations/supabase/client";
 
 /* ======================
    PUBLIC PAGES
@@ -198,7 +199,6 @@ import TechnicianSchedule from "@/components/portal/technician/TechnicianSchedul
 import TechnicianEarnings from "@/components/portal/technician/TechnicianEarnings";
 import TechnicianProfile from "@/components/portal/technician/TechnicianProfile";
 
-import ProprietorDashboard from "@/components/portal/proprietor/ProprietorDashboard";
 import CaretakerDashboard from "@/components/portal/caretaker/CaretakerDashboard";
 import CaretakerMaintenance from "@/components/portal/caretaker/CaretakerMaintenance";
 import CaretakerProperty from "@/components/portal/caretaker/CaretakerProperty";
@@ -207,6 +207,7 @@ import CaretakerMessages from "@/components/portal/caretaker/CaretakerMessages";
 import CaretakerDuties from "@/components/portal/caretaker/CaretakerDuties";
 import SupplierDashboard from "@/pages/portal/supplier/SupplierDashboard";
 
+import ProprietorDashboard from "@/components/portal/proprietor/ProprietorDashboard";
 import ProprietorProperties from "@/pages/portal/proprietor/ProprietorProperties";
 import ProprietorReports from "@/pages/portal/proprietor/ProprietorReports";
 import ProprietorMessages from "@/pages/portal/proprietor/ProprietorMessages";
@@ -713,34 +714,23 @@ const ComponentsDemoPage = () => (
 
 const App = () => {
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
     const checkDatabaseHealth = async () => {
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const result = await testSupabaseConnection();
 
-        if (!supabaseUrl || !supabaseKey) {
-          console.warn("Missing Supabase environment variables");
-          return;
-        }
-
-        const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-          headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-        });
-
-        if (response.ok) {
+        if (result.success) {
           console.log("✅ Supabase connection OK");
         } else {
-          console.warn("❌ Supabase connection check failed:", response.status);
+          console.warn("❌ Supabase connection check failed:", result.error);
         }
       } catch (err) {
         console.warn("🌐 Network or Supabase connectivity issue:", err);
       }
     };
 
-    checkDatabaseHealth();
+    void checkDatabaseHealth();
   }, []);
 
   return (

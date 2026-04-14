@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Filter, Wrench, Calendar, MapPin, Eye, CheckCircle, ClipboardList, FileText } from 'lucide-react';
+import { Search, Filter, Wrench, Calendar, MapPin, ClipboardList, FileText, CheckCircle2, XCircle, PlayCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TechnicianJobs = () => {
@@ -38,6 +38,7 @@ const TechnicianJobs = () => {
     const [loading, setLoading] = useState(true);
     const [jobs, setJobs] = useState<any[]>([]);
     const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
+    const [technicianId, setTechnicianId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [vacancyInspections, setVacancyInspections] = useState<any[]>([]);
@@ -56,6 +57,88 @@ const TechnicianJobs = () => {
     const [estimatedCost, setEstimatedCost] = useState('');
     const [proprietorReport, setProprietorReport] = useState('');
     const [procurementSubmitting, setProcurementSubmitting] = useState(false);
+    const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+    const [selectedJobForCompletion, setSelectedJobForCompletion] = useState<any>(null);
+    const [completionNotes, setCompletionNotes] = useState('');
+    const [hoursSpent, setHoursSpent] = useState('');
+    const [completionCost, setCompletionCost] = useState('');
+    const [beforePhoto, setBeforePhoto] = useState<File | null>(null);
+    const [progressPhoto, setProgressPhoto] = useState<File | null>(null);
+    const [afterPhoto, setAfterPhoto] = useState<File | null>(null);
+    const [completionSubmitting, setCompletionSubmitting] = useState(false);
+
+    const uploadMaintenancePhoto = async (
+        propertyId: string,
+        requestId: string,
+        phase: 'before' | 'progress' | 'after',
+        file: File
+    ): Promise<string> => {
+        const extension = file.name.split('.').pop() || 'jpg';
+        const filePath = `${propertyId}/${requestId}-${phase}-${Date.now()}.${extension}`;
+        const { data, error } = await supabase.storage
+            .from('maintenance-images')
+            .upload(filePath, file, { upsert: false });
+
+        if (error) throw error;
+
+        const { data: publicData } = supabase.storage
+            .from('maintenance-images')
+            .getPublicUrl(data.path);
+
+        return publicData?.publicUrl || data.path;
+    };
+
+    const notifyMaintenanceStakeholders = async (
+        job: any,
+        title: string,
+        message: string,
+        includeTenant: boolean = true
+    ) => {
+        if (!user?.id || !job?.property_id) return;
+
+        const recipientIds = new Set<string>();
+
+        if (includeTenant && job.tenant_id) {
+            recipientIds.add(job.tenant_id);
+        }
+
+        const [{ data: managers }, { data: accountants }, { data: superAdmins }] = await Promise.all([
+            supabase
+                .from('property_manager_assignments')
+                .select('property_manager_id')
+                .eq('property_id', job.property_id)
+                .eq('status', 'active'),
+            supabase
+                .from('profiles')
+                .select('id')
+                .eq('role', 'accountant'),
+            supabase
+                .from('profiles')
+                .select('id')
+                .eq('role', 'super_admin')
+        ]);
+
+        (managers || []).forEach((row: any) => row.property_manager_id && recipientIds.add(row.property_manager_id));
+        (accountants || []).forEach((row: any) => row.id && recipientIds.add(row.id));
+        (superAdmins || []).forEach((row: any) => row.id && recipientIds.add(row.id));
+
+        recipientIds.delete(user.id);
+
+        if (recipientIds.size === 0) return;
+
+        const notifications = Array.from(recipientIds).map((recipientId) => ({
+            recipient_id: recipientId,
+            sender_id: user.id,
+            type: 'maintenance',
+            title,
+            message,
+            related_entity_type: 'maintenance_request',
+            related_entity_id: job.id,
+            read: false,
+        }));
+
+        await supabase.from('notifications').insert(notifications);
+    };
 
     useEffect(() => {
         fetchJobs();
@@ -87,10 +170,13 @@ const TechnicianJobs = () => {
             
             const tech = await technicianService.getTechnicianByUserId(user.id);
             if (tech?.id) {
+                setTechnicianId(tech.id);
                 const data = await technicianService.getTechnicianJobs(tech.id);
                 setJobs(data);
                 setFilteredJobs(data);
                 await fetchVacancyInspections(tech.id);
+            } else {
+                setTechnicianId(null);
             }
         } catch (error) {
             console.error('Error fetching jobs:', error);
@@ -381,11 +467,227 @@ const TechnicianJobs = () => {
         }
     };
 
+    const handleAcceptJob = async (job: any) => {
+        if (!technicianId || !user?.id) {
+            toast.error('Technician profile not found');
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('maintenance_requests')
+                .update({
+                    assigned_to_technician_id: technicianId,
+                    technician_id: technicianId,
+                    status: 'assigned',
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', job.id);
+
+            if (error) throw error;
+
+            await supabase.from('technician_job_updates').insert({
+                maintenance_request_id: job.id,
+                technician_id: technicianId,
+                status: 'assigned',
+                notes: 'Technician accepted this maintenance request',
+                update_type: 'status_change',
+            });
+
+            await notifyMaintenanceStakeholders(
+                job,
+                'Maintenance request accepted',
+                `Technician accepted request "${job.title}" and will proceed with scheduling and repairs.`,
+                true
+            );
+
+            toast.success('Job accepted. Tenant and manager have been notified.');
+            await fetchJobs();
+        } catch (error: any) {
+            console.error('Error accepting job:', error);
+            toast.error(error?.message || 'Failed to accept job');
+        }
+    };
+
+    const handleRejectJob = async (job: any) => {
+        if (!technicianId || !user?.id) {
+            toast.error('Technician profile not found');
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('maintenance_requests')
+                .update({
+                    assigned_to_technician_id: null,
+                    technician_id: null,
+                    status: 'pending',
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', job.id)
+                .eq('assigned_to_technician_id', technicianId);
+
+            if (error) throw error;
+
+            await supabase.from('technician_job_updates').insert({
+                maintenance_request_id: job.id,
+                technician_id: technicianId,
+                status: 'pending',
+                notes: 'Technician rejected this assignment; request returned to queue',
+                update_type: 'status_change',
+            });
+
+            await notifyMaintenanceStakeholders(
+                job,
+                'Maintenance request rejected',
+                `Technician rejected request "${job.title}". It has been returned to the maintenance queue.`,
+                true
+            );
+
+            toast.success('Job rejected and returned to queue.');
+            await fetchJobs();
+        } catch (error: any) {
+            console.error('Error rejecting job:', error);
+            toast.error(error?.message || 'Failed to reject job');
+        }
+    };
+
+    const handleStartJob = async (job: any) => {
+        if (!technicianId) {
+            toast.error('Technician profile not found');
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('maintenance_requests')
+                .update({
+                    assigned_to_technician_id: technicianId,
+                    technician_id: technicianId,
+                    status: 'in_progress',
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', job.id);
+
+            if (error) throw error;
+
+            await supabase.from('technician_job_updates').insert({
+                maintenance_request_id: job.id,
+                technician_id: technicianId,
+                status: 'in_progress',
+                notes: 'Technician started repair work',
+                update_type: 'status_change',
+            });
+
+            await notifyMaintenanceStakeholders(
+                job,
+                'Maintenance work started',
+                `Repair work for "${job.title}" is now in progress.`,
+                true
+            );
+
+            toast.success('Job moved to in progress.');
+            await fetchJobs();
+        } catch (error: any) {
+            console.error('Error starting job:', error);
+            toast.error(error?.message || 'Failed to start job');
+        }
+    };
+
+    const submitCompletionEvidence = async () => {
+        if (!user?.id || !technicianId || !selectedJobForCompletion) return;
+        if (!beforePhoto || !progressPhoto || !afterPhoto) {
+            toast.error('Before, in-progress, and after photos are required.');
+            return;
+        }
+
+        try {
+            setCompletionSubmitting(true);
+
+            const [beforeUrl, progressUrl, afterUrl] = await Promise.all([
+                uploadMaintenancePhoto(selectedJobForCompletion.property_id, selectedJobForCompletion.id, 'before', beforePhoto),
+                uploadMaintenancePhoto(selectedJobForCompletion.property_id, selectedJobForCompletion.id, 'progress', progressPhoto),
+                uploadMaintenancePhoto(selectedJobForCompletion.property_id, selectedJobForCompletion.id, 'after', afterPhoto),
+            ]);
+
+            const { data: report, error: reportError } = await supabase
+                .from('maintenance_completion_reports')
+                .insert({
+                    maintenance_request_id: selectedJobForCompletion.id,
+                    technician_id: technicianId,
+                    property_id: selectedJobForCompletion.property_id,
+                    notes: completionNotes.trim() || null,
+                    hours_spent: hoursSpent ? Number(hoursSpent) : null,
+                    cost_estimate: completionCost ? Number(completionCost) : null,
+                    actual_cost: completionCost ? Number(completionCost) : null,
+                    before_work_image_url: beforeUrl,
+                    in_progress_image_url: progressUrl,
+                    after_repair_image_url: afterUrl,
+                    status: 'submitted',
+                    submitted_at: new Date().toISOString(),
+                })
+                .select('id')
+                .single();
+
+            if (reportError) throw reportError;
+
+            const { error: updateError } = await supabase
+                .from('maintenance_requests')
+                .update({
+                    assigned_to_technician_id: technicianId,
+                    technician_id: technicianId,
+                    status: 'completed',
+                    completion_status: 'submitted',
+                    completion_report_id: report.id,
+                    work_start_photo: beforeUrl,
+                    work_progress_photos: [progressUrl],
+                    work_completion_photo: afterUrl,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', selectedJobForCompletion.id);
+
+            if (updateError) throw updateError;
+
+            await supabase.from('technician_job_updates').insert({
+                maintenance_request_id: selectedJobForCompletion.id,
+                technician_id: technicianId,
+                status: 'completed',
+                notes: 'Repair completed with before, progress, and after evidence uploaded',
+                update_type: 'status_change',
+            });
+
+            await notifyMaintenanceStakeholders(
+                selectedJobForCompletion,
+                'Maintenance completed with evidence',
+                `Request "${selectedJobForCompletion.title}" has been completed. Photos and cost report are now available.`,
+                true
+            );
+
+            toast.success('Completion evidence submitted and shared with tenant, manager, accountant, and super admin.');
+            setCompletionDialogOpen(false);
+            setSelectedJobForCompletion(null);
+            setCompletionNotes('');
+            setHoursSpent('');
+            setCompletionCost('');
+            setBeforePhoto(null);
+            setProgressPhoto(null);
+            setAfterPhoto(null);
+            await fetchJobs();
+        } catch (error: any) {
+            console.error('Error submitting completion evidence:', error);
+            toast.error(error?.message || 'Failed to submit completion evidence');
+        } finally {
+            setCompletionSubmitting(false);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'completed': return <Badge className="bg-emerald-500 hover:bg-emerald-600">Completed</Badge>;
             case 'in_progress': return <Badge className="bg-blue-500 hover:bg-blue-600">In Progress</Badge>;
+            case 'assigned': return <Badge className="bg-indigo-500 hover:bg-indigo-600">Assigned</Badge>;
             case 'pending': return <Badge className="bg-amber-500 hover:bg-amber-600">Pending</Badge>;
+            case 'cancelled': return <Badge className="bg-slate-500 hover:bg-slate-600">Cancelled</Badge>;
             default: return <Badge variant="outline">{status}</Badge>;
         }
     };
@@ -419,6 +721,7 @@ const TechnicianJobs = () => {
                             <SelectContent>
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="assigned">Assigned</SelectItem>
                                 <SelectItem value="in_progress">In Progress</SelectItem>
                                 <SelectItem value="completed">Completed</SelectItem>
                             </SelectContent>
@@ -481,25 +784,78 @@ const TechnicianJobs = () => {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 text-xs"
-                                                onClick={() => {
-                                                    setSelectedJobForProcurement(job);
-                                                    setDamageReport(job.description || '');
-                                                    setRequiredTools('');
-                                                    setRequiredMaterials('');
-                                                    setSupplierName('');
-                                                    setSupplierEmail('');
-                                                    setSupplierPhone('');
-                                                    setEstimatedCost('');
-                                                    setProprietorReport('');
-                                                    setProcurementDialogOpen(true);
-                                                }}
-                                            >
-                                                <ClipboardList className="w-4 h-4 mr-1" /> LPO / Invoice
-                                            </Button>
+                                            <div className="flex flex-wrap justify-end gap-2">
+                                                {job.status === 'pending' && (!job.assigned_to_technician_id || job.assigned_to_technician_id === technicianId) && (
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-8 text-xs bg-[#154279] hover:bg-[#10335f]"
+                                                        onClick={() => handleAcceptJob(job)}
+                                                    >
+                                                        <CheckCircle2 className="w-4 h-4 mr-1" /> Accept
+                                                    </Button>
+                                                )}
+
+                                                {job.status === 'pending' && job.assigned_to_technician_id === technicianId && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 text-xs border-red-300 text-red-700 hover:bg-red-50"
+                                                        onClick={() => handleRejectJob(job)}
+                                                    >
+                                                        <XCircle className="w-4 h-4 mr-1" /> Reject
+                                                    </Button>
+                                                )}
+
+                                                {(job.status === 'assigned' || (job.status === 'pending' && job.assigned_to_technician_id === technicianId)) && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 text-xs"
+                                                        onClick={() => handleStartJob(job)}
+                                                    >
+                                                        <PlayCircle className="w-4 h-4 mr-1" /> Start
+                                                    </Button>
+                                                )}
+
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-8 text-xs"
+                                                    disabled={!['assigned', 'in_progress'].includes(job.status)}
+                                                    onClick={() => {
+                                                        setSelectedJobForProcurement(job);
+                                                        setDamageReport(job.description || '');
+                                                        setRequiredTools('');
+                                                        setRequiredMaterials('');
+                                                        setSupplierName('');
+                                                        setSupplierEmail('');
+                                                        setSupplierPhone('');
+                                                        setEstimatedCost('');
+                                                        setProprietorReport('');
+                                                        setProcurementDialogOpen(true);
+                                                    }}
+                                                >
+                                                    <ClipboardList className="w-4 h-4 mr-1" /> LPO / Invoice
+                                                </Button>
+
+                                                <Button
+                                                    size="sm"
+                                                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+                                                    disabled={!['assigned', 'in_progress'].includes(job.status)}
+                                                    onClick={() => {
+                                                        setSelectedJobForCompletion(job);
+                                                        setCompletionNotes('');
+                                                        setHoursSpent('');
+                                                        setCompletionCost('');
+                                                        setBeforePhoto(null);
+                                                        setProgressPhoto(null);
+                                                        setAfterPhoto(null);
+                                                        setCompletionDialogOpen(true);
+                                                    }}
+                                                >
+                                                    <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -619,6 +975,61 @@ const TechnicianJobs = () => {
                         <Button variant="outline" onClick={() => setProcurementDialogOpen(false)} disabled={procurementSubmitting}>Cancel</Button>
                         <Button onClick={submitProcurementOrder} disabled={procurementSubmitting}>
                             <FileText className="w-4 h-4 mr-1" /> {procurementSubmitting ? 'Submitting...' : 'Submit LPO/Invoice'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={completionDialogOpen} onOpenChange={setCompletionDialogOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Submit Completion Evidence</DialogTitle>
+                        <DialogDescription>
+                            Upload before, in-progress, and after repair photos. This is shared with tenant, manager, accountant, and super admin.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <Textarea
+                            rows={4}
+                            value={completionNotes}
+                            onChange={(e) => setCompletionNotes(e.target.value)}
+                            placeholder="Completion notes and work summary"
+                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <Input
+                                type="number"
+                                min="0"
+                                value={hoursSpent}
+                                onChange={(e) => setHoursSpent(e.target.value)}
+                                placeholder="Hours spent"
+                            />
+                            <Input
+                                type="number"
+                                min="0"
+                                value={completionCost}
+                                onChange={(e) => setCompletionCost(e.target.value)}
+                                placeholder="Final cost"
+                            />
+                        </div>
+                        <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                            <label className="text-sm font-medium text-slate-700">Before repair photo *</label>
+                            <Input type="file" accept="image/*" onChange={(e) => setBeforePhoto(e.target.files?.[0] || null)} />
+                        </div>
+                        <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                            <label className="text-sm font-medium text-slate-700">In-progress repair photo *</label>
+                            <Input type="file" accept="image/*" onChange={(e) => setProgressPhoto(e.target.files?.[0] || null)} />
+                        </div>
+                        <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                            <label className="text-sm font-medium text-slate-700">After repair photo *</label>
+                            <Input type="file" accept="image/*" onChange={(e) => setAfterPhoto(e.target.files?.[0] || null)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCompletionDialogOpen(false)} disabled={completionSubmitting}>
+                            Cancel
+                        </Button>
+                        <Button onClick={submitCompletionEvidence} disabled={completionSubmitting}>
+                            {completionSubmitting ? 'Submitting...' : 'Submit Completion'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

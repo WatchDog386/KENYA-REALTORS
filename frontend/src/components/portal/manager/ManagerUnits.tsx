@@ -1146,14 +1146,28 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     }));
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     const s = status?.toLowerCase();
-    if (s === 'occupied') return 'bg-green-100 text-green-800';
-    if (s === 'booked') return 'bg-purple-100 text-purple-800';
-    if (s === 'vacant') return 'bg-yellow-100 text-yellow-800';
-    if (s === 'maintenance') return 'bg-red-100 text-red-800';
-    if (s === 'available') return 'bg-yellow-100 text-yellow-800';
-    return 'bg-slate-100 text-slate-800';
+    if (s === 'occupied') return 'bg-[#1e40af] text-white border-[#1e3a8a]';
+    if (s === 'booked') return 'bg-[#7c3aed] text-white border-[#6d28d9]';
+    if (s === 'maintenance') return 'bg-[#b91c1c] text-white border-[#991b1b]';
+    if (s === 'vacant' || s === 'available') return 'bg-[#047857] text-white border-[#065f46]';
+    return 'bg-[#334155] text-white border-[#1f2937]';
+  };
+
+  const getStatusLabel = (status: string) => {
+    const s = status?.toLowerCase();
+    if (s === 'available') return 'Vacant';
+    return (s || 'unknown').charAt(0).toUpperCase() + (s || 'unknown').slice(1);
+  };
+
+  const getUnitCategoryBadgeClass = (category?: string) => {
+    const c = (category || '').toLowerCase();
+    if (c === 'residential') return 'bg-[#1d4ed8] text-white border-[#1e3a8a]';
+    if (c === 'commercial') return 'bg-[#0f766e] text-white border-[#115e59]';
+    if (c === 'office') return 'bg-[#15803d] text-white border-[#166534]';
+    if (c === 'retail' || c === 'shop') return 'bg-[#c2410c] text-white border-[#9a3412]';
+    return 'bg-[#475569] text-white border-[#334155]';
   };
 
   const occupiedUnitsCount = units.filter((unit) => unit.status === 'occupied' || Boolean(unit.active_lease)).length;
@@ -2126,9 +2140,11 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1.5">
                             <span className="font-semibold text-slate-700">{unitType?.name || 'Unknown Type'}</span>
-                            <span className="text-xs text-slate-500">{unitType?.unit_category || 'Std'}</span>
+                            <span className={`inline-flex w-fit items-center rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${getUnitCategoryBadgeClass(unitType?.unit_category)}`}>
+                              {unitType?.unit_category || 'Standard'}
+                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -2140,19 +2156,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                           <span className="font-bold text-[#154279]">{getEffectiveUnitPrice(unit).toLocaleString()}</span>
                         </td>
                         <td className="px-6 py-4">
-                          {isOccupied ? (
-                              <Badge className="bg-blue-100 text-blue-700 border-none font-semibold px-2.5 py-0.5">
-                                  Occupied
-                              </Badge>
-                          ) : isVacant ? (
-                              <Badge className="bg-emerald-100 text-emerald-700 border-none font-semibold px-2.5 py-0.5">
-                                  Vacant
-                              </Badge>
-                          ) : (
-                              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-none font-semibold px-2.5 py-0.5">
-                                  {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                              </Badge>
-                          )}
+                          <Badge className={`border font-semibold px-2.5 py-0.5 uppercase tracking-[0.08em] ${getStatusBadgeClass(displayStatus)}`}>
+                            {isVacant ? 'Vacant' : getStatusLabel(displayStatus)}
+                          </Badge>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -2260,19 +2266,9 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                      
                      {/* Status Badge - Floating Top Right */}
                      <div className="absolute top-3 right-3 z-20">
-                        {isOccupied ? (
-                            <Badge className="bg-blue-600 text-white border-none shadow-md hover:bg-blue-700 font-semibold px-2.5 py-0.5">
-                                Occupied
-                            </Badge>
-                        ) : isVacant ? (
-                            <Badge className="bg-emerald-600 text-white border-none shadow-md hover:bg-emerald-700 font-semibold px-2.5 py-0.5">
-                                Vacant
-                            </Badge>
-                        ) : (
-                            <Badge variant="secondary" className="bg-orange-500 text-white border-none shadow-md font-semibold px-2.5 py-0.5">
-                                {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                            </Badge>
-                        )}
+                      <Badge className={`border shadow-md font-semibold px-2.5 py-0.5 uppercase tracking-[0.08em] ${getStatusBadgeClass(displayStatus)}`}>
+                        {isVacant ? 'Vacant' : getStatusLabel(displayStatus)}
+                      </Badge>
                      </div>
                 </div>
                 
@@ -2283,7 +2279,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                     <div className="flex justify-between items-start">
                          <div>
                              <h3 className="text-base font-extrabold text-blue-900 group-hover:text-blue-700 transition-colors">Unit {unit.unit_number}</h3>
-                             <p className="text-xs text-blue-500 font-semibold truncate max-w-[120px]" title={unitType?.name}>
+                              <p className="text-xs text-[#475569] font-semibold truncate max-w-[120px]" title={unitType?.name}>
                                 {unitType?.name || 'Unknown Type'}
                              </p>
                          </div>
@@ -2310,12 +2306,14 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
                              </div>
                          </div>
                          <div className="flex items-center gap-1.5 bg-[#f8fafc] p-1.5 border border-[#e2e8f0] group-hover:border-[#c8d4e3] transition-colors" title="Unit Category">
-                           <div className="p-1.5 bg-[#D85C2C] text-white shadow-sm shrink-0">
+                           <div className="p-1.5 bg-[#334155] text-white shadow-sm shrink-0">
                                 <Maximize size={14} strokeWidth={2.5} />
                              </div>
                              <div className="overflow-hidden">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mb-0.5">Type</p>
-                                <span className="font-bold text-slate-700 truncate block leading-none">{unitType?.unit_category || 'Std'}</span>
+                                <span className={`inline-flex max-w-full items-center truncate rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${getUnitCategoryBadgeClass(unitType?.unit_category)}`}>
+                                  {unitType?.unit_category || 'Standard'}
+                                </span>
                              </div>
                          </div>
                     </div>

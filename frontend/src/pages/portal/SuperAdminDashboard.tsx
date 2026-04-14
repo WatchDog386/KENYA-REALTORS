@@ -61,6 +61,7 @@ interface SystemAlert {
   type: "warning" | "error" | "success" | "info" | "critical";
   priority: "low" | "medium" | "high" | "critical";
   action?: string;
+  createdAt?: string;
 }
 
 interface SystemStatus {
@@ -290,38 +291,106 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const mapEntityTypeToRecentType = (entityType?: string): RecentItem["type"] => {
+    const normalized = String(entityType || "").toLowerCase();
+    if (["property", "properties", "unit", "units"].includes(normalized)) return "property";
+    if (["profile", "profiles", "user", "users", "tenant", "tenants"].includes(normalized)) return "user";
+    if (["payment", "payments", "rent_payments", "invoice", "invoices"].includes(normalized)) return "payment";
+    if (["maintenance", "maintenance_request", "maintenance_requests"].includes(normalized)) return "maintenance";
+    return "approval";
+  };
+
+  const mapEntityTypeToRoute = (entityType?: string): string => {
+    const normalized = String(entityType || "").toLowerCase();
+    if (["property", "properties", "unit", "units"].includes(normalized)) return "/portal/super-admin/properties";
+    if (["profile", "profiles", "user", "users", "tenant", "tenants"].includes(normalized)) return "/portal/super-admin/users";
+    if (["payment", "payments", "rent_payments", "invoice", "invoices"].includes(normalized)) return "/portal/super-admin/payments";
+    if (["maintenance", "maintenance_request", "maintenance_requests"].includes(normalized)) return "/portal/super-admin/dashboard";
+    if (["application", "applications", "lease_application", "lease_applications"].includes(normalized)) return "/portal/super-admin/applications";
+    return "/portal/super-admin/approvals";
+  };
+
+  const formatAuditActionLabel = (action?: string): string => {
+    const safeAction = String(action || "ACTIVITY");
+    return safeAction
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
   const loadRecentItems = async (): Promise<RecentItem[]> => {
     try {
+      const { data: auditLogs, error: auditError } = await supabase
+        .from("audit_logs")
+        .select("id, action, entity_type, entity_id, details, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (!auditError && (auditLogs || []).length > 0) {
+        const auditItems: RecentItem[] = (auditLogs || []).map((log: any) => {
+          const details = typeof log?.details === "object" && log.details !== null ? log.details : {};
+          const entityLabel = String(log?.entity_type || "system").replace(/_/g, " ");
+          const summaryBits = [
+            details?.reason ? `Reason: ${details.reason}` : null,
+            log?.entity_id ? `ID: ${String(log.entity_id).slice(0, 8)}` : null,
+          ].filter(Boolean);
+
+          return {
+            id: `audit-${log.id}`,
+            title: formatAuditActionLabel(log.action),
+            subtitle: `${entityLabel}${summaryBits.length ? ` • ${summaryBits.join(" • ")}` : ""}`,
+            type: mapEntityTypeToRecentType(log.entity_type),
+            createdAt: log.created_at,
+            time: formatTimeAgo(log.created_at),
+            action: mapEntityTypeToRoute(log.entity_type),
+          };
+        });
+
+        return auditItems.slice(0, 12);
+      }
+
       const items: RecentItem[] = [];
 
-      const [propertiesRes, usersRes, approvalsRes, paymentsRes] = await Promise.all([
+      const [propertiesRes, usersRes, approvalsRes, paymentsRes, maintenanceRes, applicationsRes] = await Promise.all([
         supabase
           .from("properties")
           .select("id, name, status, created_at")
           .order("created_at", { ascending: false })
-          .limit(5),
+          .limit(8),
         supabase
           .from("profiles")
           .select("id, email, first_name, last_name, role, status, created_at")
           .neq("role", "super_admin")
           .order("created_at", { ascending: false })
-          .limit(5),
+          .limit(8),
         supabase
           .from("approvals")
           .select("id, approval_type, status, created_at")
           .order("created_at", { ascending: false })
-          .limit(5),
+          .limit(8),
         supabase
           .from("rent_payments")
           .select("id, amount, amount_paid, status, created_at")
           .order("created_at", { ascending: false })
-          .limit(5),
+          .limit(8),
+        supabase
+          .from("maintenance_requests")
+          .select("id, title, status, priority, created_at")
+          .order("created_at", { ascending: false })
+          .limit(8),
+        supabase
+          .from("lease_applications")
+          .select("id, applicant_name, status, created_at")
+          .order("created_at", { ascending: false })
+          .limit(8),
       ]);
 
       const recentProperties = propertiesRes.data || [];
       const recentUsers = usersRes.data || [];
       const recentApprovals = approvalsRes.data || [];
       const recentPayments = paymentsRes.data || [];
+      const recentMaintenance = maintenanceRes.data || [];
+      const recentApplications = applicationsRes.data || [];
 
       recentProperties.forEach((prop: any) => {
         items.push({
@@ -373,6 +442,30 @@ const SuperAdminDashboard = () => {
         });
       });
 
+      recentMaintenance.forEach((request: any) => {
+        items.push({
+          id: `maintenance-${request.id}`,
+          title: request.title || "Maintenance request",
+          subtitle: `Maintenance • ${request.status || "pending"}${request.priority ? ` • ${request.priority}` : ""}`,
+          type: "maintenance",
+          createdAt: request.created_at,
+          time: formatTimeAgo(request.created_at),
+          action: "/portal/super-admin/dashboard",
+        });
+      });
+
+      recentApplications.forEach((application: any) => {
+        items.push({
+          id: `application-${application.id}`,
+          title: application.applicant_name || "Lease application",
+          subtitle: `Application • ${application.status || "pending"}`,
+          type: "approval",
+          createdAt: application.created_at,
+          time: formatTimeAgo(application.created_at),
+          action: "/portal/super-admin/applications",
+        });
+      });
+
       return items
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 12);
@@ -385,10 +478,11 @@ const SuperAdminDashboard = () => {
   const loadSystemAlerts = async (nextStats: DashboardStats): Promise<SystemAlert[]> => {
     try {
       const alerts: SystemAlert[] = [];
+      const nowIso = new Date().toISOString();
 
       const { data: emergencyMaintenance } = await supabase
         .from("maintenance_requests")
-        .select("id, title, description")
+        .select("id, title, description, created_at")
         .eq("priority", "emergency")
         .eq("status", "pending")
         .limit(3);
@@ -401,6 +495,7 @@ const SuperAdminDashboard = () => {
           type: "critical",
           priority: "critical",
           action: "/portal/super-admin/maintenance",
+          createdAt: req.created_at || nowIso,
         });
       });
 
@@ -412,6 +507,7 @@ const SuperAdminDashboard = () => {
           type: "error",
           priority: "high",
           action: "/portal/super-admin/payments",
+          createdAt: nowIso,
         });
       }
 
@@ -423,6 +519,7 @@ const SuperAdminDashboard = () => {
           type: "warning",
           priority: "high",
           action: "/portal/super-admin/approvals",
+          createdAt: nowIso,
         });
       }
 
@@ -434,6 +531,7 @@ const SuperAdminDashboard = () => {
           type: "info",
           priority: "medium",
           action: "/portal/super-admin/properties",
+          createdAt: nowIso,
         });
       }
 
@@ -445,6 +543,7 @@ const SuperAdminDashboard = () => {
           type: "success",
           priority: "low",
           action: "/portal/super-admin/dashboard",
+          createdAt: nowIso,
         });
       }
 
@@ -459,6 +558,7 @@ const SuperAdminDashboard = () => {
           type: "warning",
           priority: "medium",
           action: "/portal/super-admin/settings",
+          createdAt: new Date().toISOString(),
         },
       ];
     }
@@ -579,6 +679,34 @@ const SuperAdminDashboard = () => {
         item.title.toLowerCase().includes(term) || item.subtitle.toLowerCase().includes(term),
     );
   }, [recentItems, searchQuery]);
+
+  const staffActivityNotes = useMemo(() => {
+    const alertNotes = systemAlerts.map((alert) => ({
+      id: `alert-${alert.id}`,
+      source: "alert" as const,
+      label: alert.id.split("-")[0] || "System",
+      createdAt: alert.createdAt || new Date().toISOString(),
+      title: alert.title,
+      detail: alert.description,
+      alertType: alert.type,
+      activityType: undefined as RecentItem["type"] | undefined,
+    }));
+
+    const recentNotes = recentItems.map((item) => ({
+      id: `recent-${item.id}`,
+      source: "recent" as const,
+      label: item.type,
+      createdAt: item.createdAt,
+      title: item.title,
+      detail: item.subtitle,
+      alertType: undefined as SystemAlert["type"] | undefined,
+      activityType: item.type,
+    }));
+
+    return [...alertNotes, ...recentNotes]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+  }, [systemAlerts, recentItems]);
 
   const highPriorityCount = useMemo(
     () => systemAlerts.filter((alert) => alert.priority === "high" || alert.priority === "critical").length,
@@ -752,37 +880,28 @@ const SuperAdminDashboard = () => {
             </div>
 
             <div className="max-h-[260px] space-y-3 overflow-y-auto pt-2 pb-4">
-              {systemAlerts.slice(0, 3).map((alert, idx) => (
+              {staffActivityNotes.map((note, idx) => (
                 <div
-                  key={alert.id}
-                  style={{ paddingLeft: idx > 0 ? idx * 24 : 0 }}
+                  key={note.id}
+                  style={{ paddingLeft: idx > 0 ? idx * 12 : 0 }}
                 >
                   <div className="flex items-center justify-between text-[11px] text-[#5f6b7c] mb-1">
-                    <span>{alert.id.split('-')[0] || "System"}</span>
-                    <span>{idx === 0 ? "Now" : `${idx * 2}m ago`}</span>
+                    <span>{note.label}</span>
+                    <span>{formatTimeAgo(note.createdAt)}</span>
                   </div>
-                  <div className={`px-3 py-2 text-[13px] border ${getStaffAlertTone(alert.type)}`}>
-                    {alert.title}: {alert.description}
+                  <div
+                    className={`px-3 py-2 text-[13px] border ${
+                      note.source === "alert"
+                        ? getStaffAlertTone(note.alertType || "info")
+                        : getRecentItemTone(note.activityType || "property")
+                    }`}
+                  >
+                    {note.title}: {note.detail}
                   </div>
                 </div>
               ))}
 
-              {filteredRecentItems.slice(0, 2).map((item) => (
-                <div
-                  key={item.id}
-                  className="pl-4"
-                >
-                  <div className="flex items-center justify-between text-[11px] text-[#5f6b7c] mb-1">
-                    <span>{item.type}</span>
-                    <span>{item.time}</span>
-                  </div>
-                  <div className={`px-3 py-2 text-[13px] border ${getRecentItemTone(item.type)}`}>
-                    {item.title}: {item.subtitle}
-                  </div>
-                </div>
-              ))}
-
-              {systemAlerts.length === 0 && filteredRecentItems.length === 0 && (
+              {staffActivityNotes.length === 0 && (
                 <div className="bg-[#eef1f4] border border-[#d2d8e0] px-3 py-8 text-center text-[13px] font-medium text-[#5f6b7c]">
                   No notes available right now.
                 </div>

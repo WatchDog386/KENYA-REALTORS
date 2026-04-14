@@ -223,11 +223,36 @@ const MaintenanceDetailPage: React.FC = () => {
     switch(status) {
         case 'completed': return <Badge className="bg-green-600">Completed</Badge>;
         case 'in_progress': return <Badge className="bg-blue-600">In Progress</Badge>;
+        case 'assigned': return <Badge className="bg-indigo-600">Assigned</Badge>;
         case 'pending': return <Badge className="bg-yellow-500">Pending</Badge>;
         case 'cancelled': return <Badge variant="destructive">Cancelled</Badge>;
         default: return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const resolveImageUrl = (value?: string | null): string | null => {
+    if (!value) return null;
+    if (value.startsWith("http://") || value.startsWith("https://")) return value;
+    const { data } = supabase.storage.from("maintenance-images").getPublicUrl(value);
+    return data?.publicUrl || value;
+  };
+
+  const reportedImages = [request?.image_url]
+    .concat(Array.isArray(request?.images) ? request.images : [])
+    .map((imagePath: string) => resolveImageUrl(imagePath))
+    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+
+  const workProgressImages = Array.isArray(request?.work_progress_photos)
+    ? request.work_progress_photos
+        .map((imagePath: string) => resolveImageUrl(imagePath))
+        .filter((imageUrl): imageUrl is string => Boolean(imageUrl))
+    : [];
+
+  const workEvidenceImages = [
+    resolveImageUrl(request?.work_start_photo),
+    ...workProgressImages,
+    resolveImageUrl(request?.work_completion_photo),
+  ].filter((imageUrl): imageUrl is string => Boolean(imageUrl));
 
   if (loading) return <div className="p-8"><div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div></div>;
   if (!request) return <div className="p-8">Request not found</div>;
@@ -296,14 +321,26 @@ const MaintenanceDetailPage: React.FC = () => {
                      </div>
                  )}
                  
-                 {/* Images (Placeholder if array exists) */}
-                 {request.images && request.images.length > 0 && (
+                 {reportedImages.length > 0 && (
+                   <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Reported Damage Photos</label>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {reportedImages.map((img: string, i: number) => (
+                        <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="block w-16 h-16 rounded-lg bg-gray-100 border overflow-hidden flex-shrink-0">
+                          <img src={img} alt="Reported damage" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                   </div>
+                 )}
+
+                 {workEvidenceImages.length > 0 && (
                      <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Attachments</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Technician Work Photos</label>
                         <div className="flex gap-2 overflow-x-auto pb-2">
-                            {request.images.map((img: string, i: number) => (
+                      {workEvidenceImages.map((img: string, i: number) => (
                                 <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="block w-16 h-16 rounded-lg bg-gray-100 border overflow-hidden flex-shrink-0">
-                                    <img src={img} alt="Evidence" className="w-full h-full object-cover" />
+                          <img src={img} alt="Repair evidence" className="w-full h-full object-cover" />
                                 </a>
                             ))}
                         </div>
