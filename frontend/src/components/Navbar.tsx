@@ -29,8 +29,37 @@ const Navbar: React.FC = () => {
 
           {/* Logo - Center on Mobile, Left on Desktop */}
           <Link to="/" className="flex items-center gap-2 group order-2 lg:order-1 mx-auto lg:mx-0">
-            <div className="p-1.5 md:p-2 skeuo-logo-chip">
-              <Home className="text-white w-5 h-5 md:w-5 md:h-5" />
+            <div className="p-1.5 md:p-2 skeuo-logo-chip bg-white rounded-md">
+              <svg
+                viewBox="0 0 200 200"
+                className="h-7 w-auto drop-shadow-sm"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <defs>
+                  <linearGradient id="grad-front-nav-sa" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#F9F1DC" />
+                    <stop offset="100%" stopColor="#D4AF37" />
+                  </linearGradient>
+                  <linearGradient id="grad-side-nav-sa" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#D4AF37" />
+                    <stop offset="100%" stopColor="#AA8C2C" />
+                  </linearGradient>
+                  <linearGradient id="grad-dark-nav-sa" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#998A5E" />
+                    <stop offset="100%" stopColor="#5C5035" />
+                  </linearGradient>
+                </defs>
+                <path d="M110 90 V170 L160 150 V70 L110 90 Z" fill="url(#grad-front-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M160 70 L180 80 V160 L160 150 Z" fill="url(#grad-dark-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M30 150 V50 L80 20 V120 L30 150 Z" fill="url(#grad-front-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M80 20 L130 40 V140 L80 120 Z" fill="url(#grad-side-nav-sa)" stroke="#8A7D55" strokeWidth="2" strokeLinejoin="round" />
+                <g fill="#154279">
+                  <path d="M85 50 L100 56 V86 L85 80 Z" />
+                  <path d="M85 90 L100 96 V126 L85 120 Z" />
+                  <path d="M45 60 L55 54 V124 L45 130 Z" />
+                  <path d="M120 130 L140 122 V152 L120 160 Z" />
+                </g>
+              </svg>
             </div>
             <span className="text-lg md:text-xl font-black text-[#154279] uppercase tracking-tighter">REALTORS<span className="text-[#F96302]">.</span></span>
           </Link>
