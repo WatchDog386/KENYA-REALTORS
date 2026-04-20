@@ -562,7 +562,7 @@ export default function AydenTowersListing({ removeTopSpacing = false }: Feature
                                 ${unitTypeColumns}
                             )
                         `)
-                        .in('status', ['available', 'vacant'])
+                        .in('status', ['vacant'])
                         .order('created_at', { ascending: false });
                 };
 

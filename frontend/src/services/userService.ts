@@ -18,6 +18,8 @@ export const userService = {
           data: {
             full_name: input.full_name,
             role: input.role,
+            user_type: input.role,
+            account_type: input.role,
           },
         },
       });

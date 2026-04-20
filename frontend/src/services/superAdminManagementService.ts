@@ -10,7 +10,7 @@ export interface UserManagementData {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'supplier' | 'property_manager' | 'tenant';
+  role: 'super_admin' | 'technician' | 'proprietor' | 'caretaker' | 'accountant' | 'supplier' | 'property_manager' | 'tenant';
   roleSpecificData?: any; // Additional data based on role
 }
 
@@ -31,6 +31,17 @@ export const createUserWithRole = async (
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: userData.email,
       password: Math.random().toString(36).slice(-12), // Temporary password
+      options: {
+        data: {
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          phone: userData.phone || null,
+          role: userData.role,
+          user_type: userData.role,
+          account_type: userData.role,
+          status: 'active',
+        },
+      },
     });
 
     if (authError) throw authError;
@@ -47,6 +58,7 @@ export const createUserWithRole = async (
         last_name: userData.last_name,
         phone: userData.phone,
         role: userData.role,
+        user_type: userData.role,
       },
     ]);
 
@@ -419,7 +431,7 @@ export const getUserWithRoleDetails = async (userId: string) => {
  */
 export const getRoleStatistics = async () => {
   try {
-    const roles = ['technician', 'proprietor', 'caretaker', 'accountant', 'property_manager', 'tenant'];
+    const roles = ['technician', 'proprietor', 'caretaker', 'accountant', 'supplier', 'property_manager', 'tenant'];
     const stats = {};
 
     for (const role of roles) {

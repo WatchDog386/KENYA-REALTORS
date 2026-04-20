@@ -1113,8 +1113,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
     const matchesProperty = filterProperty === 'all' || unit.property_id === filterProperty;
     const matchesUnitType = filterUnitType === 'all' || unit.unit_type_id === filterUnitType;
     const displayStatus = (unit.active_lease ? 'occupied' : unit.status)?.toLowerCase() || 'vacant';
-    const normalizedStatus = displayStatus === 'available' ? 'vacant' : displayStatus;
-    const matchesStatus = filterStatus === 'all' || normalizedStatus === filterStatus;
+    const matchesStatus = filterStatus === 'all' || displayStatus === filterStatus;
     
     let matchesPrice = true;
     if (filterPriceRange !== 'all') {
@@ -1171,7 +1170,7 @@ const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   };
 
   const occupiedUnitsCount = units.filter((unit) => unit.status === 'occupied' || Boolean(unit.active_lease)).length;
-  const vacantUnitsCount = units.filter((unit) => !unit.active_lease && ['vacant', 'available'].includes(String(unit.status || '').toLowerCase())).length;
+  const vacantUnitsCount = units.filter((unit) => !unit.active_lease && String(unit.status || '').toLowerCase() === 'vacant').length;
   const maintenanceUnitsCount = units.filter((unit) => String(unit.status || '').toLowerCase() === 'maintenance').length;
   const activePropertyLabel = propertyName || (properties.length === 1 ? properties[0].name : 'Assigned Properties');
 

@@ -38,6 +38,7 @@ interface UserProfile {
   first_name?: string;
   last_name?: string;
   role: "super_admin" | "property_manager" | "tenant" | "owner" | "technician" | "proprietor" | "caretaker" | "accountant" | "supplier" | null;
+  user_type?: string | null;
   phone?: string;
   avatar_url?: string;
   is_active: boolean;
@@ -131,10 +132,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (data) {
         console.log("✅ Profile found:", data.email, "Role:", data.role);
-        // Ensure role defaults to tenant if not set
+        // Preserve role accurately; fall back to legacy user_type when role is null.
         const profile = {
           ...data,
-          role: data.role || "tenant",
+          role: (data.role || data.user_type || null) as UserProfile["role"],
+          user_type: data.user_type || null,
           is_active: data.is_active !== false,
         } as UserProfile;
         return profile;
@@ -266,16 +268,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Get user role
   const getUserRole = (): string | null => {
-    return user?.role || null;
+    return user?.role || user?.user_type || null;
   };
 
   // Permission checking helper
   const hasPermission = (permission: string): boolean => {
-    if (!user?.role) return false;
+    const effectiveRole = user?.role || user?.user_type || null;
+    if (!effectiveRole) return false;
 
-    if (user.role === "super_admin") return true;
+    if (effectiveRole === "super_admin") return true;
 
-    const permissions = ROLE_PERMISSIONS[user.role] || [];
+    const permissions = ROLE_PERMISSIONS[effectiveRole] || [];
 
     if (permissions.includes("*")) return true;
 
@@ -769,12 +772,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!user) throw new Error("No user logged in");
     try {
       setError(null);
+      // Only send allowed, defined fields
+      const allowedFields = [
+        "first_name",
+        "last_name",
+        "phone",
+        "avatar_url",
+        "status",
+        "approved",
+        "property_id",
+        "role",
+        "user_type",
+        "is_active"
+      ];
+      const cleanData: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (key in data && data[key] !== undefined) {
+          cleanData[key] = data[key];
+        }
+      }
+      cleanData.updated_at = new Date().toISOString();
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          ...data,
-          updated_at: new Date().toISOString(),
-        })
+        .update(cleanData)
         .eq("id", user.id);
 
       if (error) throw error;
@@ -783,8 +804,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!prev) return null;
         return {
           ...prev,
-          ...data,
-          updated_at: new Date().toISOString(),
+          ...cleanData,
         };
       });
     } catch (err: any) {

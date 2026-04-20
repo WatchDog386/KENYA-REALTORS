@@ -852,9 +852,7 @@ export const useUserManagement = () => {
       const { data: currentUser } = await supabase.auth.getUser();
       
       // Calculate user_type based on role
-      const user_type = role === 'super_admin' ? 'super_admin' :
-                       role === 'property_manager' ? 'property_manager' :
-                       role === 'unassigned' ? 'tenant' : 'tenant';
+      const user_type = role === 'unassigned' ? 'tenant' : role;
       
       // Step 1: Update user role in profiles table
       const { data: profileData, error: profileError } = await supabase

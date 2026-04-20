@@ -30,8 +30,14 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Filter, Wrench, Calendar, MapPin, ClipboardList, FileText, CheckCircle2, XCircle, PlayCircle } from 'lucide-react';
+import { Search, Filter, Wrench, Calendar, MapPin, ClipboardList, FileText, CheckCircle2, XCircle, PlayCircle, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+type CompletionMaterialLine = {
+    item: string;
+    quantity: string;
+    unitPrice: string;
+};
 
 const TechnicianJobs = () => {
     const { user } = useAuth();
@@ -65,7 +71,33 @@ const TechnicianJobs = () => {
     const [beforePhoto, setBeforePhoto] = useState<File | null>(null);
     const [progressPhoto, setProgressPhoto] = useState<File | null>(null);
     const [afterPhoto, setAfterPhoto] = useState<File | null>(null);
+    const [completionMaterials, setCompletionMaterials] = useState<CompletionMaterialLine[]>([
+        { item: '', quantity: '', unitPrice: '' }
+    ]);
     const [completionSubmitting, setCompletionSubmitting] = useState(false);
+
+    const addCompletionMaterialRow = () => {
+        setCompletionMaterials((prev) => [...prev, { item: '', quantity: '', unitPrice: '' }]);
+    };
+
+    const removeCompletionMaterialRow = (index: number) => {
+        setCompletionMaterials((prev) => {
+            if (prev.length === 1) {
+                return [{ item: '', quantity: '', unitPrice: '' }];
+            }
+            return prev.filter((_, rowIndex) => rowIndex !== index);
+        });
+    };
+
+    const updateCompletionMaterialRow = (
+        index: number,
+        field: keyof CompletionMaterialLine,
+        value: string
+    ) => {
+        setCompletionMaterials((prev) => prev.map((row, rowIndex) => (
+            rowIndex === index ? { ...row, [field]: value } : row
+        )));
+    };
 
     const uploadMaintenancePhoto = async (
         propertyId: string,
@@ -479,7 +511,7 @@ const TechnicianJobs = () => {
                 .update({
                     assigned_to_technician_id: technicianId,
                     technician_id: technicianId,
-                    status: 'assigned',
+                    status: 'in_progress',
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', job.id);
@@ -489,19 +521,20 @@ const TechnicianJobs = () => {
             await supabase.from('technician_job_updates').insert({
                 maintenance_request_id: job.id,
                 technician_id: technicianId,
-                status: 'assigned',
-                notes: 'Technician accepted this maintenance request',
+                status: 'accepted',
+                notes: 'Technician accepted this maintenance request and started work',
                 update_type: 'status_change',
+                created_by: user.id,
             });
 
             await notifyMaintenanceStakeholders(
                 job,
                 'Maintenance request accepted',
-                `Technician accepted request "${job.title}" and will proceed with scheduling and repairs.`,
+                `Technician accepted request "${job.title}" and work is now in progress.`,
                 true
             );
 
-            toast.success('Job accepted. Tenant and manager have been notified.');
+            toast.success('Job accepted and moved to in progress. Tenant and manager have been notified.');
             await fetchJobs();
         } catch (error: any) {
             console.error('Error accepting job:', error);
@@ -532,9 +565,10 @@ const TechnicianJobs = () => {
             await supabase.from('technician_job_updates').insert({
                 maintenance_request_id: job.id,
                 technician_id: technicianId,
-                status: 'pending',
+                status: 'rejected',
                 notes: 'Technician rejected this assignment; request returned to queue',
                 update_type: 'status_change',
+                created_by: user.id,
             });
 
             await notifyMaintenanceStakeholders(
@@ -553,7 +587,7 @@ const TechnicianJobs = () => {
     };
 
     const handleStartJob = async (job: any) => {
-        if (!technicianId) {
+        if (!technicianId || !user?.id) {
             toast.error('Technician profile not found');
             return;
         }
@@ -577,6 +611,7 @@ const TechnicianJobs = () => {
                 status: 'in_progress',
                 notes: 'Technician started repair work',
                 update_type: 'status_change',
+                created_by: user.id,
             });
 
             await notifyMaintenanceStakeholders(
@@ -601,6 +636,19 @@ const TechnicianJobs = () => {
             return;
         }
 
+        const normalizedMaterials = completionMaterials
+            .map((line) => ({
+                item: line.item.trim(),
+                quantity: Number(line.quantity),
+                unitPrice: Number(line.unitPrice),
+            }))
+            .filter((line) => line.item && line.quantity > 0 && line.unitPrice > 0);
+
+        if (normalizedMaterials.length === 0) {
+            toast.error('Please add at least one material with quantity and unit price.');
+            return;
+        }
+
         try {
             setCompletionSubmitting(true);
 
@@ -610,6 +658,18 @@ const TechnicianJobs = () => {
                 uploadMaintenancePhoto(selectedJobForCompletion.property_id, selectedJobForCompletion.id, 'after', afterPhoto),
             ]);
 
+            const materialsTotal = normalizedMaterials.reduce(
+                (sum, line) => sum + (line.quantity * line.unitPrice),
+                0
+            );
+            const resolvedCost = completionCost ? Number(completionCost) : materialsTotal;
+            const materialsSummary = normalizedMaterials
+                .map((line, index) => {
+                    const lineTotal = line.quantity * line.unitPrice;
+                    return `${index + 1}. ${line.item} | Qty: ${line.quantity} | Unit: KES ${line.unitPrice.toFixed(2)} | Total: KES ${lineTotal.toFixed(2)}`;
+                })
+                .join('\n');
+
             const { data: report, error: reportError } = await supabase
                 .from('maintenance_completion_reports')
                 .insert({
@@ -618,8 +678,9 @@ const TechnicianJobs = () => {
                     property_id: selectedJobForCompletion.property_id,
                     notes: completionNotes.trim() || null,
                     hours_spent: hoursSpent ? Number(hoursSpent) : null,
-                    cost_estimate: completionCost ? Number(completionCost) : null,
-                    actual_cost: completionCost ? Number(completionCost) : null,
+                    materials_used: materialsSummary,
+                    cost_estimate: resolvedCost,
+                    actual_cost: resolvedCost,
                     before_work_image_url: beforeUrl,
                     in_progress_image_url: progressUrl,
                     after_repair_image_url: afterUrl,
@@ -642,6 +703,7 @@ const TechnicianJobs = () => {
                     work_start_photo: beforeUrl,
                     work_progress_photos: [progressUrl],
                     work_completion_photo: afterUrl,
+                    actual_cost: resolvedCost,
                     updated_at: new Date().toISOString(),
                 })
                 .eq('id', selectedJobForCompletion.id);
@@ -652,14 +714,15 @@ const TechnicianJobs = () => {
                 maintenance_request_id: selectedJobForCompletion.id,
                 technician_id: technicianId,
                 status: 'completed',
-                notes: 'Repair completed with before, progress, and after evidence uploaded',
+                notes: `Repair completed with before, progress, and after evidence plus ${normalizedMaterials.length} material line item(s)`,
                 update_type: 'status_change',
+                created_by: user.id,
             });
 
             await notifyMaintenanceStakeholders(
                 selectedJobForCompletion,
                 'Maintenance completed with evidence',
-                `Request "${selectedJobForCompletion.title}" has been completed. Photos and cost report are now available.`,
+                `Request "${selectedJobForCompletion.title}" has been completed. Photos, materials, and cost report are now available.`,
                 true
             );
 
@@ -672,6 +735,7 @@ const TechnicianJobs = () => {
             setBeforePhoto(null);
             setProgressPhoto(null);
             setAfterPhoto(null);
+            setCompletionMaterials([{ item: '', quantity: '', unitPrice: '' }]);
             await fetchJobs();
         } catch (error: any) {
             console.error('Error submitting completion evidence:', error);
@@ -850,6 +914,7 @@ const TechnicianJobs = () => {
                                                         setBeforePhoto(null);
                                                         setProgressPhoto(null);
                                                         setAfterPhoto(null);
+                                                        setCompletionMaterials([{ item: '', quantity: '', unitPrice: '' }]);
                                                         setCompletionDialogOpen(true);
                                                     }}
                                                 >
@@ -1010,6 +1075,50 @@ const TechnicianJobs = () => {
                                 onChange={(e) => setCompletionCost(e.target.value)}
                                 placeholder="Final cost"
                             />
+                        </div>
+                        <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-slate-700">Materials used (item, quantity, unit price) *</label>
+                                <Button type="button" size="sm" variant="outline" onClick={addCompletionMaterialRow}>
+                                    <Plus className="w-4 h-4 mr-1" /> Add
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                {completionMaterials.map((line, index) => (
+                                    <div key={index} className="grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr_auto] gap-2 items-center">
+                                        <Input
+                                            value={line.item}
+                                            onChange={(e) => updateCompletionMaterialRow(index, 'item', e.target.value)}
+                                            placeholder="Material name"
+                                        />
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={line.quantity}
+                                            onChange={(e) => updateCompletionMaterialRow(index, 'quantity', e.target.value)}
+                                            placeholder="Qty"
+                                        />
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={line.unitPrice}
+                                            onChange={(e) => updateCompletionMaterialRow(index, 'unitPrice', e.target.value)}
+                                            placeholder="Unit price"
+                                        />
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => removeCompletionMaterialRow(index)}
+                                            className="text-red-600 hover:text-red-700"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                         <div className="space-y-2 rounded-md border border-slate-200 p-3">
                             <label className="text-sm font-medium text-slate-700">Before repair photo *</label>

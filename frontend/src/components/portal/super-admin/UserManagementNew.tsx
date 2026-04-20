@@ -37,13 +37,6 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -85,6 +78,34 @@ interface UserStats {
   proprietors: number;
   caretakers: number;
 }
+
+interface RoleAssignmentPayload {
+  userId: string;
+  role: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  technicianCategoryId?: string | null;
+}
+
+const SUPPORTED_USER_ROLES = new Set([
+  "super_admin",
+  "property_manager",
+  "tenant",
+  "caretaker",
+  "technician",
+  "accountant",
+  "supplier",
+  "proprietor",
+]);
+
+const normalizeRole = (role: string): string => {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "manager") return "property_manager";
+  if (normalized === "admin") return "super_admin";
+  return normalized;
+};
 
 const PANEL_HEADER_CLASS =
   "bg-[#154279] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-white";
@@ -163,7 +184,7 @@ const UserManagementNew: React.FC = () => {
         first_name: u.first_name || "",
         last_name: u.last_name || "",
         phone: u.phone || null,
-        role: u.role,
+        role: u.role || u.user_type || null,
         status: u.status,
         created_at: u.created_at,
         last_login_at: u.last_login_at || null,
@@ -194,6 +215,122 @@ const UserManagementNew: React.FC = () => {
     }
   };
 
+  const ensureUserRoleAssignment = async ({
+    userId,
+    role,
+    email,
+    firstName,
+    lastName,
+    phone,
+    technicianCategoryId,
+  }: RoleAssignmentPayload): Promise<void> => {
+    const targetRole = normalizeRole(role);
+    if (!SUPPORTED_USER_ROLES.has(targetRole)) {
+      throw new Error(`Unsupported role: ${role}`);
+    }
+
+    const { data: authData } = await supabase.auth.getUser();
+    const currentUserId = authData.user?.id || null;
+    const now = new Date().toISOString();
+
+    const { data: upsertedProfile, error: upsertError } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: userId,
+          email,
+          first_name: firstName || "",
+          last_name: lastName || "",
+          phone: phone || null,
+          role: targetRole,
+          user_type: targetRole,
+          status: "active",
+          is_active: true,
+          approved: true,
+          approved_at: now,
+          approved_by: currentUserId,
+          created_at: now,
+          updated_at: now,
+        },
+        { onConflict: "id" }
+      )
+      .select("id, role, user_type")
+      .single();
+
+    if (upsertError) throw upsertError;
+
+    const persistedRole = normalizeRole(upsertedProfile?.role || "");
+    const persistedUserType = normalizeRole(upsertedProfile?.user_type || "");
+
+    if (persistedRole !== targetRole || persistedUserType !== targetRole) {
+      const { data: correctedProfile, error: correctionError } = await supabase
+        .from("profiles")
+        .update({
+          role: targetRole,
+          user_type: targetRole,
+          status: "active",
+          is_active: true,
+          approved: true,
+          approved_at: now,
+          approved_by: currentUserId,
+          updated_at: now,
+        })
+        .eq("id", userId)
+        .select("id, role, user_type")
+        .single();
+
+      if (correctionError) throw correctionError;
+
+      const correctedRole = normalizeRole(correctedProfile?.role || "");
+      const correctedUserType = normalizeRole(correctedProfile?.user_type || "");
+
+      if (correctedRole !== targetRole || correctedUserType !== targetRole) {
+        throw new Error(
+          `Role mismatch persisted for this account. Expected ${targetRole}, got ${correctedProfile?.role || correctedProfile?.user_type || "unknown"}.`
+        );
+      }
+    }
+
+    if (!currentUserId) return;
+
+    try {
+      if (targetRole === "accountant") {
+        await supabase
+          .from("accountants")
+          .insert({ user_id: userId, assigned_by: currentUserId, status: "active", transactions_processed: 0 });
+      }
+
+      if (targetRole === "technician") {
+        await supabase
+          .from("technicians")
+          .insert({
+            user_id: userId,
+            category_id: technicianCategoryId || null,
+            status: "active",
+            is_available: true,
+            total_jobs_completed: 0,
+          });
+      }
+
+      if (targetRole === "proprietor") {
+        await supabase
+          .from("proprietors")
+          .insert({ user_id: userId, status: "active" });
+      }
+
+      if (targetRole === "caretaker") {
+        await supabase
+          .from("caretakers")
+          .insert({ user_id: userId, assigned_by: currentUserId, status: "active", is_available: true });
+      }
+    } catch (error: any) {
+      const message = String(error?.message || "").toLowerCase();
+      if (!message.includes("duplicate")) {
+        console.warn("Role-specific profile provisioning warning:", error);
+      }
+    }
+  };
+
   const handleAssignRole = async (
     userId: string,
     newRole: string,
@@ -212,55 +349,18 @@ const UserManagementNew: React.FC = () => {
 
       if (checkError) throw checkError;
 
-      if (!existingProfile) {
-        if (!userData) throw new Error(`Cannot create profile: user data not available`);
-        const { error: createError } = await supabase
-          .from("profiles")
-          .insert({
-            id: userId,
-            email: userData.email,
-            first_name: userData.first_name || '',
-            last_name: userData.last_name || '',
-            phone: userData.phone || null,
-            role: newRole,
-            status: 'active',
-            is_active: true,
-            user_type: newRole,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        if (createError && !createError.message.includes("duplicate")) throw createError;
-      }
+      const roleEmail = existingProfile?.email || userData?.email;
+      if (!roleEmail) throw new Error("Cannot assign role: missing user email");
 
-      const currentUser = await supabase.auth.getUser();
-      const { data: updateData, error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          role: newRole,
-          user_type: newRole,
-          status: 'active',
-          is_active: true,
-          approved_at: new Date().toISOString(),
-          approved_by: currentUser.data.user?.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId)
-        .select();
-
-      if (profileError) throw profileError;
-      if (!updateData || updateData.length === 0) throw new Error("User not found or update failed");
-
-      const currentUserId = currentUser.data.user?.id;
-      if (currentUserId) {
-        try {
-          if (newRole === "accountant") await supabase.from("accountants").insert({ user_id: userId, assigned_by: currentUserId, status: 'active', transactions_processed: 0 });
-          if (newRole === "technician") await supabase.from("technicians").insert({ user_id: userId, status: 'active', is_available: true, total_jobs_completed: 0 });
-          if (newRole === "proprietor") await supabase.from("proprietors").insert({ user_id: userId, status: 'active' });
-          if (newRole === "caretaker") await supabase.from("caretakers").insert({ user_id: userId, assigned_by: currentUserId, status: 'active', is_available: true });
-        } catch (e) {
-          /* ignore duplicate role assignments */
-        }
-      }
+      await ensureUserRoleAssignment({
+        userId,
+        role: newRole,
+        email: roleEmail,
+        firstName: userData?.first_name || "",
+        lastName: userData?.last_name || "",
+        phone: userData?.phone || null,
+        technicianCategoryId: null,
+      });
 
       const user = users.find(u => u.id === userId);
       if (user) await sendApprovalEmail(user, newRole, undefined, undefined);
@@ -444,7 +544,7 @@ const UserManagementNew: React.FC = () => {
           <div className="border border-[#bcc3cd] bg-[#eef1f4] xl:col-span-4">
             <div className="border-b border-[#c4cad3] px-3 py-2 text-[14px] font-semibold text-[#1f2937]">Add User</div>
             <div className="p-4">
-              <CreateUserForm onSuccess={loadUsers} />
+              <CreateUserForm onSuccess={loadUsers} onCreateUserRole={ensureUserRoleAssignment} />
             </div>
           </div>
 
@@ -582,7 +682,10 @@ const UserManagementNew: React.FC = () => {
         </section>
 
         <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
-          <DialogContent className="sm:max-w-[450px] rounded-none border border-[#bcc3cd] bg-[#eef1f4] p-0">
+          <DialogContent
+            overlayClassName="fixed inset-0 z-50 bg-black/50 backdrop-blur-none"
+            className="sm:max-w-[450px] rounded-none border border-[#bcc3cd] bg-[#eef1f4] p-0"
+          >
             <div className={PANEL_HEADER_CLASS}>Modify Access Role</div>
             <div className="p-4">
               {selectedUser && (
@@ -604,9 +707,12 @@ const UserManagementNew: React.FC = () => {
 // --------------------------------------------------------------------------------
 // CREATE USER FORM (Sharp Design)
 // --------------------------------------------------------------------------------
-interface CreateUserFormProps { onSuccess: () => void; }
+interface CreateUserFormProps {
+  onSuccess: () => void;
+  onCreateUserRole: (payload: RoleAssignmentPayload) => Promise<void>;
+}
 
-const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
+const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess, onCreateUserRole }) => {
   const [loading, setLoading] = useState(false);
   const [technicianCategories, setTechnicianCategories] = useState<any[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -642,14 +748,31 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onSuccess }) => {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         options: {
-          data: { first_name: firstName, last_name: lastName, role: formData.role, status: "active" },
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            role: formData.role,
+            user_type: formData.role,
+            account_type: formData.role,
+            status: "active",
+          },
         },
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("No user data returned");
 
-      toast.success("Identity instantiated successfully");
+      await onCreateUserRole({
+        userId: authData.user.id,
+        role: formData.role,
+        email: formData.email.trim().toLowerCase(),
+        firstName,
+        lastName,
+        phone: null,
+        technicianCategoryId: formData.technicianCategoryId || null,
+      });
+
+      toast.success(`${formData.role.replace(/_/g, " ")} user created successfully`);
       setFormData({ fullName: "", email: "", password: "", role: "tenant", technicianCategoryId: "" });
       onSuccess();
     } catch (error) {
@@ -764,21 +887,21 @@ const AssignRoleForm: React.FC<AssignRoleFormProps> = ({ user, onAssignRole }) =
 
       <div className="space-y-2">
         <Label htmlFor="newRole" className="text-[11px] font-semibold uppercase tracking-wide text-[#6a7788]">Target Role</Label>
-        <Select value={selectedRole} onValueChange={setSelectedRole}>
-          <SelectTrigger className="h-10 rounded-none border-2 border-[#9aa7b7] bg-white text-[13px] font-semibold text-[#111827] shadow-none backdrop-blur-none focus:ring-0 focus:ring-offset-0 focus:border-[#6f7e90]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="rounded-none border-2 border-[#9aa7b7] bg-white text-[#111827] shadow-lg backdrop-blur-none">
-            <SelectItem value="tenant">TENANT</SelectItem>
-            <SelectItem value="property_manager">PROPERTY MANAGER</SelectItem>
-            <SelectItem value="super_admin">SUPER ADMIN</SelectItem>
-            <SelectItem value="proprietor">PROPRIETOR</SelectItem>
-            <SelectItem value="caretaker">CARETAKER</SelectItem>
-            <SelectItem value="technician">TECHNICIAN</SelectItem>
-            <SelectItem value="accountant">ACCOUNTANT</SelectItem>
-            <SelectItem value="supplier">SUPPLIER</SelectItem>
-          </SelectContent>
-        </Select>
+        <select
+          id="newRole"
+          value={selectedRole}
+          onChange={(e) => setSelectedRole(e.target.value)}
+          className="h-10 w-full rounded-none border-2 border-[#9aa7b7] bg-white px-3 text-[13px] font-semibold text-[#111827] outline-none focus:border-[#6f7e90]"
+        >
+          <option value="tenant">TENANT</option>
+          <option value="property_manager">PROPERTY MANAGER</option>
+          <option value="super_admin">SUPER ADMIN</option>
+          <option value="proprietor">PROPRIETOR</option>
+          <option value="caretaker">CARETAKER</option>
+          <option value="technician">TECHNICIAN</option>
+          <option value="accountant">ACCOUNTANT</option>
+          <option value="supplier">SUPPLIER</option>
+        </select>
       </div>
 
       <div className="pt-2">

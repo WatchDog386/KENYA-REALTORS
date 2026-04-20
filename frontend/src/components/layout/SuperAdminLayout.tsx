@@ -288,6 +288,14 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
 
     invoiceSweepRunningRef.current = true;
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user?.id) {
+        return;
+      }
+
       const { data: applications, error } = await supabase
         .from("lease_applications")
         .select(
@@ -337,6 +345,20 @@ const SuperAdminLayout = ({ children }: { children?: ReactNode }) => {
             autoInvoicedApplicationIdsRef.current.add(appId);
           }
         } catch (invoiceError) {
+          const errorCode = String((invoiceError as any)?.code || "");
+          const errorMessage = String((invoiceError as any)?.message || "").toLowerCase();
+          const isAuthError =
+            errorCode === "401" ||
+            errorCode === "PGRST301" ||
+            errorMessage.includes("jwt") ||
+            errorMessage.includes("not authenticated") ||
+            errorMessage.includes("invalid token") ||
+            errorMessage.includes("permission denied");
+
+          if (isAuthError) {
+            return;
+          }
+
           console.warn("Super admin invoice sweep failed for application:", appId, invoiceError);
         }
       }

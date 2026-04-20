@@ -17,7 +17,6 @@ export interface SupplierProcurementRow {
   cost_estimate?: number | null;
   actual_cost?: number | null;
   paid_amount?: number | null;
-  paid_at?: string | null;
   status: string;
   submitted_at?: string | null;
   maintenance_request?: {
@@ -59,10 +58,9 @@ const PROCUREMENT_SELECT = `
   cost_estimate,
   actual_cost,
   paid_amount,
-  paid_at,
   status,
   submitted_at,
-  maintenance_request:maintenance_requests(title),
+  maintenance_request:maintenance_requests!maintenance_completion_reports_maintenance_request_id_fkey(title),
   property:properties(name, location)
 `;
 

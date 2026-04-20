@@ -1079,9 +1079,9 @@ export const createOrEnsureMoveInInvoiceForApplication = async (
 
   await supabase
     .from("units")
-    .update({ status: "pending" })
+    .update({ status: "booked" })
     .eq("id", application.unit_id)
-    .in("status", ["vacant", "available", "booked"]);
+    .in("status", ["vacant", "booked"]);
 
   await supabase
     .from("lease_applications")

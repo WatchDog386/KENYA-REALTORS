@@ -140,6 +140,7 @@ export const SuperAdminUserManagement = () => {
       proprietor: 'bg-green-100 text-green-800',
       caretaker: 'bg-yellow-100 text-yellow-800',
       accountant: 'bg-emerald-100 text-emerald-800',
+      supplier: 'bg-cyan-100 text-cyan-800',
       tenant: 'bg-gray-100 text-gray-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
@@ -240,6 +241,7 @@ export const SuperAdminUserManagement = () => {
                   <option value="super_admin">Super Admin</option>
                   <option value="property_manager">Property Manager</option>
                   <option value="accountant">Accountant</option>
+                  <option value="supplier">Supplier</option>
                   <option value="technician">Technician</option>
                   <option value="proprietor">Proprietor</option>
                   <option value="caretaker">Caretaker</option>
@@ -298,6 +300,7 @@ export const SuperAdminUserManagement = () => {
               <option value="super_admin">Super Admin</option>
               <option value="property_manager">Property Manager</option>
               <option value="accountant">Accountant</option>
+              <option value="supplier">Supplier</option>
               <option value="technician">Technician</option>
               <option value="proprietor">Proprietor</option>
               <option value="caretaker">Caretaker</option>

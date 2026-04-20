@@ -58,95 +58,53 @@ const TenantDetails: React.FC = () => {
   const fetchTenantDetails = async (tenantId: string) => {
     try {
       setLoading(true);
-      
-      // Fetch tenant with joins for properties and units
-      const { data, error } = await supabase
+
+      const { data: rawTenant, error: tenantError } = await supabase
         .from('tenants')
-        .select(`
-          id,
-          status,
-          user_id,
-          property_id,
-          unit_id,
-          move_in_date,
-          move_out_date,
-          properties!tenants_property_id_fkey(name, location),
-          units!tenants_unit_id_fkey(unit_number, price)
-        `)
+        .select('id, status, user_id, property_id, unit_id, move_in_date, move_out_date')
         .eq('id', tenantId)
         .single();
 
-      if (error) {
-        console.warn('Supabase join query failed. Falling back to manual fetch.', error);
-        
-        // Fallback manual fetch
-        const { data: rawTenant, error: fetchError } = await supabase
-            .from('tenants')
-            .select('*')
-            .eq('id', tenantId)
-            .single();
-            
-        if (fetchError) throw fetchError;
-        
-        if (rawTenant) {
-            const [profilesRes, propsRes, unitsRes] = await Promise.all([
-                rawTenant.user_id ? supabase.from('profiles').select('first_name, last_name, email, avatar_url, phone').eq('id', rawTenant.user_id).single() : { data: null },
-                rawTenant.property_id ? supabase.from('properties').select('name, location').eq('id', rawTenant.property_id).single() : { data: null },
-                rawTenant.unit_id ? supabase.from('units').select('unit_number, price').eq('id', rawTenant.unit_id).single() : { data: null }
-            ]);
+      if (tenantError) throw tenantError;
 
-            const tenantData = {
-                ...rawTenant,
-                profiles: profilesRes.data,
-                properties: propsRes.data,
-                units: unitsRes.data,
-            };
-            
-            // Fetch active lease
-            if (rawTenant.user_id) {
-                const { data: leaseData } = await supabase
-                    .from('leases')
-                    .select('start_date, end_date, status')
-                    .eq('tenant_id', rawTenant.user_id)
-                    .eq('status', 'active')
-                    .maybeSingle();
-                    
-                tenantData.active_lease = leaseData;
-            }
-            
-            setTenant(tenantData as TenantData);
-        }
-      } else {
-        let tenantData = { ...data } as any;
-        
-        // Handle array returns from joins
-        if (Array.isArray(tenantData.properties)) tenantData.properties = tenantData.properties[0];
-        if (Array.isArray(tenantData.units)) tenantData.units = tenantData.units[0];
-        
-        // Fetch profile separately since there's no direct FK from tenants to profiles
-        if (data.user_id) {
-            const { data: profileData } = await supabase
-                .from('profiles')
-                .select('first_name, last_name, email, avatar_url, phone')
-                .eq('id', data.user_id)
-                .single();
-            tenantData.profiles = profileData;
-        }
-        
-        // Fetch active lease
-        if (data.user_id) {
-            const { data: leaseData } = await supabase
-                .from('leases')
-                .select('start_date, end_date, status')
-                .eq('tenant_id', data.user_id)
-                .eq('status', 'active')
-                .maybeSingle();
-                
-            tenantData.active_lease = leaseData;
-        }
-        
-        setTenant(tenantData as TenantData);
+      if (!rawTenant) {
+        setTenant(null);
+        return;
       }
+
+      const [profileRes, propertyRes, unitRes, leaseRes] = await Promise.all([
+        rawTenant.user_id
+          ? supabase
+              .from('profiles')
+              .select('first_name, last_name, email, avatar_url, phone')
+              .eq('id', rawTenant.user_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        rawTenant.property_id
+          ? supabase.from('properties').select('name, location').eq('id', rawTenant.property_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        rawTenant.unit_id
+          ? supabase.from('units').select('unit_number, price').eq('id', rawTenant.unit_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        rawTenant.user_id
+          ? supabase
+              .from('leases')
+              .select('start_date, end_date, status')
+              .eq('tenant_id', rawTenant.user_id)
+              .eq('status', 'active')
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+      const tenantData = {
+        ...rawTenant,
+        profiles: profileRes.data,
+        properties: propertyRes.data,
+        units: unitRes.data,
+        active_lease: leaseRes.data,
+      };
+
+      setTenant(tenantData as TenantData);
     } catch (error) {
       console.error('Error fetching tenant details:', error);
       toast.error('Failed to load tenant details');

@@ -331,12 +331,9 @@ export const PropertyUnitManager: React.FC<PropertyUnitManagerProps> = ({ proper
         const rent = normalizedRow['rent'] || normalizedRow['rent (kes)'] || normalizedRow['price'] || normalizedRow['price (kes)'] || normalizedRow['amount'] || null;
         
         // Handle "status" or "availability"
-        // Also map 'vacant' -> 'available'
-        let status = (normalizedRow['status'] || normalizedRow['availability'] || 'available').toString().toLowerCase().trim();
-        if (status === 'vacant') status = 'available';
-
-        const validStatuses = ['available', 'occupied', 'booked', 'maintenance'];
-        if (!validStatuses.includes(status)) status = 'available'; // Default fallback
+        let status = (normalizedRow['status'] || normalizedRow['availability'] || 'vacant').toString().toLowerCase().trim();
+        const validStatuses = ['vacant', 'occupied', 'booked', 'maintenance'];
+        if (!validStatuses.includes(status)) status = 'vacant'; // Default fallback
         
         const description = normalizedRow['description'] || normalizedRow['details'] || null;
         const featuresRaw = normalizedRow['features'] || normalizedRow['amenities'];

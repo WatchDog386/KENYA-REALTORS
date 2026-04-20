@@ -39,30 +39,52 @@ const ManagerMessages = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      
-      // Fetch messages where user is sender
+
+      // Use schema-safe message fetch, then hydrate profile details in a second query.
       const { data: sentMessages, error: sentError } = await supabase
         .from('messages')
-        .select('*, sender:profiles!sender_id(first_name, last_name, email), recipient:profiles!recipient_id(first_name, last_name, email)')
+        .select('*')
         .eq('sender_id', user.id)
         .order('created_at', { ascending: false });
 
       if (sentError) throw sentError;
 
-      // Fetch messages where user is recipient
       const { data: receivedMessages, error: receivedError } = await supabase
         .from('messages')
-        .select('*, sender:profiles!sender_id(first_name, last_name, email), recipient:profiles!recipient_id(first_name, last_name, email)')
+        .select('*')
         .eq('recipient_id', user.id)
         .order('created_at', { ascending: false });
 
       if (receivedError) throw receivedError;
 
-      // Merge and sort by created_at
       const allMessages = [...(sentMessages || []), ...(receivedMessages || [])]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) as Message[];
 
-      setMessages(allMessages);
+      const uniqueUserIds = Array.from(
+        new Set(
+          allMessages
+            .flatMap((msg) => [msg.sender_id, msg.recipient_id])
+            .filter(Boolean)
+        )
+      );
+
+      let profileMap = new Map<string, any>();
+      if (uniqueUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', uniqueUserIds);
+
+        profileMap = new Map((profiles || []).map((profile: any) => [profile.id, profile]));
+      }
+
+      const hydratedMessages = allMessages.map((msg) => ({
+        ...msg,
+        sender: profileMap.get(msg.sender_id) || null,
+        recipient: profileMap.get(msg.recipient_id) || null,
+      }));
+
+      setMessages(hydratedMessages);
     } catch (err) {
       console.error('Error loading messages:', err);
       toast.error('Failed to load messages');

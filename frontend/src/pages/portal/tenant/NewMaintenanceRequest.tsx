@@ -240,8 +240,8 @@ const NewMaintenanceRequestPage: React.FC = () => {
                     Request Submission
                   </p>
                   <p className="text-sm text-blue-700 mt-1">
-                    Your request will be reviewed and assigned to the appropriate
-                    team. You'll receive updates as work progresses.
+                    Your request goes directly to your property manager and the matching technician category.
+                    You'll see live updates as the technician accepts, works, and completes the repair.
                   </p>
                 </div>
               </div>

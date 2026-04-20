@@ -6,11 +6,9 @@ import {
   CheckCircle,
   Clock,
   CreditCard,
-  DollarSign,
   Loader2,
   RefreshCw,
   Search,
-  Send,
   UserCheck,
   Users,
   Wrench,
@@ -84,7 +82,6 @@ const ManagerDashboard: React.FC = () => {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [userName, setUserName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [noteDraft, setNoteDraft] = useState("");
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     database: true,
     api: true,
@@ -230,14 +227,30 @@ const ManagerDashboard: React.FC = () => {
 
       const units = unitsRes.data || [];
       const totalUnits = units.length;
-      const occupiedUnits = units.filter((unit: any) => String(unit.status || "").toLowerCase() === "occupied").length;
-      const vacantUnits = units.filter((unit: any) => String(unit.status || "").toLowerCase() === "vacant").length;
+      const occupiedUnits = units.filter((unit: any) => {
+        const status = String(unit.status || "").toLowerCase();
+        return status === "occupied" || status === "booked";
+      }).length;
+      const vacantUnits = units.filter((unit: any) => {
+        const status = String(unit.status || "").toLowerCase();
+        return status === "vacant" || status === "available";
+      }).length;
 
       const monthlyPayments = monthlyPaymentsRes.data || [];
       const totalRevenueMonth = monthlyPayments.reduce((sum: number, payment: any) => {
+        const status = String(payment.status || "").toLowerCase();
         const paidAmount = Number(payment.amount_paid || 0);
-        const fallbackAmount = Number(payment.amount || 0);
-        return sum + (paidAmount || fallbackAmount);
+        const grossAmount = Number(payment.amount || 0);
+
+        if (status === "paid" || status === "completed" || status === "success") {
+          return sum + (paidAmount || grossAmount);
+        }
+
+        if (status === "partial") {
+          return sum + paidAmount;
+        }
+
+        return sum;
       }, 0);
 
       setStats({
@@ -311,16 +324,6 @@ const ManagerDashboard: React.FC = () => {
     await loadManagerData();
   };
 
-  const handleSendNote = () => {
-    if (!noteDraft.trim()) {
-      toast.info("Type a note first");
-      return;
-    }
-
-    toast.success("Note queued for manager activity log");
-    setNoteDraft("");
-  };
-
   const formatTimeAgo = (dateString: string): string => {
     try {
       const date = new Date(dateString);
@@ -358,6 +361,78 @@ const ManagerDashboard: React.FC = () => {
         String(item.status || "").toLowerCase().includes(term),
     );
   }, [recentActivities, searchQuery]);
+
+    const priorityActions = useMemo(() => {
+      const actions: Array<{
+        id: string;
+        label: string;
+        value: string;
+        helper: string;
+        tone: "danger" | "warning" | "info" | "success";
+        href: string;
+      }> = [];
+
+      if (stats.overduePayments > 0) {
+        actions.push({
+          id: "overdue-payments",
+          label: "Overdue Rent Follow-up",
+          value: `${stats.overduePayments} account(s) overdue`,
+          helper: "Prioritize reminders and payment plans",
+          tone: "danger",
+          href: "/portal/manager/payments",
+        });
+      }
+
+      if (stats.maintenancePending > 0) {
+        actions.push({
+          id: "pending-maintenance",
+          label: "Pending Maintenance Tickets",
+          value: `${stats.maintenancePending} ticket(s) waiting`,
+          helper: "Assign technicians and track SLA",
+          tone: "warning",
+          href: "/portal/manager/maintenance",
+        });
+      }
+
+      if (stats.vacantUnits > 0) {
+        actions.push({
+          id: "vacant-units",
+          label: "Vacant Units to Fill",
+          value: `${stats.vacantUnits} unit(s) vacant`,
+          helper: "Review listings and tenant applications",
+          tone: "info",
+          href: "/portal/manager/properties/units",
+        });
+      }
+
+      if (stats.occupancyRate >= 85) {
+        actions.push({
+          id: "occupancy-health",
+          label: "Occupancy Performance",
+          value: `${stats.occupancyRate}% occupancy`,
+          helper: "Occupancy is healthy this period",
+          tone: "success",
+          href: "/portal/manager/properties/units",
+        });
+      }
+
+      if (actions.length === 0) {
+        actions.push({
+          id: "all-clear",
+          label: "Operations Overview",
+          value: "No urgent actions detected",
+          helper: "Keep monitoring payments and maintenance",
+          tone: "success",
+          href: "/portal/manager",
+        });
+      }
+
+      return actions.slice(0, 4);
+    }, [stats]);
+
+    const feedItems = useMemo(() => {
+      return recentActivities.slice(0, 6);
+    }, [recentActivities]);
 
   const pipelineLegend = useMemo(() => {
     const data = [
@@ -535,61 +610,63 @@ const ManagerDashboard: React.FC = () => {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-8">
           <div className="mb-3 border-b border-[#bcc3cd] pb-3">
-            <h2 className="text-[34px] font-bold leading-none text-[#263143]">Staff Activity Notes</h2>
+            <h2 className="text-[34px] font-bold leading-none text-[#263143]">Priority Action Queue</h2>
+            <p className="mt-1 text-[12px] font-medium text-[#5f6b7c]">
+              Live operations view based on maintenance, payments, vacancies, and occupancy.
+            </p>
           </div>
 
-          <div className="max-h-[260px] space-y-3 overflow-y-auto pb-4 pt-2">
-            <div>
-              <div className="mb-1 flex items-center justify-between text-[11px] text-[#5f6b7c]">
-                <span>vacancies</span>
-                <span>Now</span>
-              </div>
-              <div className="border border-[#78a7ce] bg-[#eaf4ff] px-3 py-2 text-[13px] text-[#21486f]">
-                Vacant units: {stats.vacantUnits} unit(s) are currently vacant.
-              </div>
-            </div>
-
-            {recentActivities.slice(0, 3).map((item, idx) => (
-              <div key={item.id} style={{ paddingLeft: idx > 0 ? idx * 24 : 0 }}>
-                <div className="mb-1 flex items-center justify-between text-[11px] text-[#5f6b7c]">
-                  <span>{item.type}</span>
-                  <span>{formatTimeAgo(item.date)}</span>
-                </div>
-                <div
-                  className={`border px-3 py-2 text-[13px] ${
-                    item.type === "maintenance"
-                      ? "border-[#e0a838] bg-[#fff4d8] text-[#6b4c05]"
-                      : "border-[#9d88e0] bg-[#efeaff] text-[#3f2a80]"
+          <div className="grid grid-cols-1 gap-4 pt-2 lg:grid-cols-12">
+            <div className="space-y-3 lg:col-span-6">
+              {priorityActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => navigate(action.href)}
+                  className={`w-full border px-3 py-3 text-left transition-colors ${
+                    action.tone === "danger"
+                      ? "border-[#dc3545] bg-[#ffe9eb] hover:bg-[#ffdadd]"
+                      : action.tone === "warning"
+                        ? "border-[#d9a62a] bg-[#fff3d6] hover:bg-[#ffebc2]"
+                        : action.tone === "info"
+                          ? "border-[#2fa7bf] bg-[#e5f6fa] hover:bg-[#d7f0f6]"
+                          : "border-[#2dae49] bg-[#e7f7eb] hover:bg-[#daf2e1]"
                   }`}
                 >
-                  {item.title}: {item.description}
-                </div>
-              </div>
-            ))}
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[13px] font-bold text-[#1f2937]">{action.label}</p>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-[#334155]">Action</span>
+                  </div>
+                  <p className="mt-1 text-[13px] font-semibold text-[#223247]">{action.value}</p>
+                  <p className="mt-1 text-[11px] text-[#516174]">{action.helper}</p>
+                </button>
+              ))}
+            </div>
 
-            {recentActivities.length === 0 && (
-              <div className="border border-[#d2d8e0] bg-[#eef1f4] px-3 py-8 text-center text-[13px] font-medium text-[#5f6b7c]">
-                No notes available right now.
+            <div className="lg:col-span-6">
+              <div className="mb-2 flex items-center justify-between border-b border-[#c8ced8] pb-2">
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-[#5f6b7c]">Live Activity Feed</p>
+                <p className="text-[11px] font-medium text-[#5f6b7c]">Updated now</p>
               </div>
-            )}
-          </div>
 
-          <div className="mt-3 border-t border-[#bcc3cd] pt-4">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-                placeholder="Type Message ..."
-                className="h-10 flex-1 border border-[#b6bec8] bg-[#eef1f4] px-3 text-[13px] text-[#1f2937] outline-none transition-colors placeholder:text-[#778396] focus:border-[#8e98a5]"
-              />
-              <button
-                type="button"
-                onClick={handleSendNote}
-                className="inline-flex h-10 items-center justify-center gap-2 bg-[#f0a500] px-5 text-[12px] font-semibold text-[#1f2937] transition-colors hover:bg-[#da9600]"
-              >
-                <Send className="h-3.5 w-3.5" />
-                Send
-              </button>
+              <div className="max-h-[310px] space-y-2 overflow-y-auto pr-1">
+                {feedItems.map((item) => (
+                  <div key={item.id} className="border border-[#cfd6df] bg-[#eef1f4] px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[12px] font-semibold uppercase tracking-wide text-[#334155]">{item.type}</p>
+                      <p className="text-[11px] text-[#5f6b7c]">{formatTimeAgo(item.date)}</p>
+                    </div>
+                    <p className="mt-1 text-[13px] font-semibold text-[#1f2937]">{item.title}</p>
+                    <p className="mt-1 text-[12px] text-[#475569]">{item.description}</p>
+                  </div>
+                ))}
+
+                {feedItems.length === 0 && (
+                  <div className="border border-[#d2d8e0] bg-[#eef1f4] px-3 py-8 text-center text-[13px] font-medium text-[#5f6b7c]">
+                    No recent payment or maintenance events found.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

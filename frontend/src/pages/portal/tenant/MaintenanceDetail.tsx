@@ -13,13 +13,14 @@ import {
   CheckCircle, 
   AlertCircle,
   Calendar,
-  Image as ImageIcon
+  Star
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { getTenantPortalAccessState } from "@/services/tenantOnboardingService";
 
 const MaintenanceDetailPage: React.FC = () => {
@@ -34,6 +35,9 @@ const MaintenanceDetailPage: React.FC = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   useEffect(() => {
     if (user?.id && id) {
@@ -219,6 +223,79 @@ const MaintenanceDetailPage: React.FC = () => {
       } catch(e) { console.error(e); }
   };
 
+  const submitCompletionFeedback = async () => {
+    if (!id || !user?.id || !request) return;
+    if (request.status !== 'completed') {
+      toast.error('Feedback can only be submitted after completion.');
+      return;
+    }
+    if (!request.assigned_to_technician_id) {
+      toast.error('No technician is assigned to this request yet.');
+      return;
+    }
+
+    try {
+      setSubmittingFeedback(true);
+
+      const { error: ratingError } = await supabase
+        .from('maintenance_requests')
+        .update({
+          rating_by_tenant: feedbackRating,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .or(`tenant_id.eq.${user.id},reported_by.eq.${user.id}`);
+
+      if (ratingError) throw ratingError;
+
+      const feedbackText = feedbackMessage.trim();
+      const feedbackLine = feedbackText
+        ? `TENANT FEEDBACK (${feedbackRating}/5): ${feedbackText}`
+        : `TENANT FEEDBACK (${feedbackRating}/5): Tenant submitted rating after completion.`;
+
+      const { error: messageError } = await supabase
+        .from('maintenance_request_messages')
+        .insert({
+          maintenance_request_id: id,
+          sender_id: user.id,
+          message: feedbackLine,
+        });
+
+      if (messageError) throw messageError;
+
+      const { data: technicianRow } = await supabase
+        .from('technicians')
+        .select('user_id')
+        .eq('id', request.assigned_to_technician_id)
+        .maybeSingle();
+
+      if (technicianRow?.user_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            recipient_id: technicianRow.user_id,
+            sender_id: user.id,
+            type: 'maintenance',
+            title: 'New tenant maintenance feedback',
+            message: `Feedback received for request #${id.slice(0, 8)} (${feedbackRating}/5).`,
+            related_entity_type: 'maintenance_request',
+            related_entity_id: id,
+            read: false,
+          });
+      }
+
+      setRequest((prev: any) => ({ ...prev, rating_by_tenant: feedbackRating }));
+      setFeedbackMessage('');
+      await fetchMessages();
+      toast.success('Feedback shared with the technician.');
+    } catch (error: any) {
+      console.error('Error submitting tenant feedback:', error);
+      toast.error(error?.message || 'Failed to submit feedback');
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch(status) {
         case 'completed': return <Badge className="bg-green-600">Completed</Badge>;
@@ -345,6 +422,52 @@ const MaintenanceDetailPage: React.FC = () => {
                             ))}
                         </div>
                      </div>
+                 )}
+
+                 {request.status === 'completed' && (
+                   <div className="space-y-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                    <label className="text-xs font-bold text-blue-700 uppercase block">Completion Feedback</label>
+
+                    {request.rating_by_tenant ? (
+                      <div>
+                        <p className="text-sm font-semibold text-blue-900">You rated this job {Number(request.rating_by_tenant).toFixed(1)} / 5</p>
+                        <p className="text-xs text-blue-700 mt-1">Your feedback is already visible to the technician.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              className="p-1"
+                              onClick={() => setFeedbackRating(star)}
+                              aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                            >
+                              <Star
+                                size={18}
+                                className={star <= feedbackRating ? 'text-amber-500 fill-amber-500' : 'text-slate-300'}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                        <Textarea
+                          rows={3}
+                          value={feedbackMessage}
+                          onChange={(e) => setFeedbackMessage(e.target.value)}
+                          placeholder="Share your feedback with the technician..."
+                          className="bg-white"
+                        />
+                        <Button
+                          onClick={submitCompletionFeedback}
+                          disabled={submittingFeedback}
+                          className="w-full bg-[#00356B] hover:bg-[#002a54]"
+                        >
+                          {submittingFeedback ? 'Submitting Feedback...' : 'Submit Feedback'}
+                        </Button>
+                      </div>
+                    )}
+                   </div>
                  )}
              </CardContent>
            </Card>

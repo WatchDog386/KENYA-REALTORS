@@ -43,18 +43,18 @@ export const TenantBillingHistory: React.FC<TenantBillingHistoryProps> = ({ tena
         .from('utility_readings')
         .select('*')
         .eq('tenant_id', userId)
-        .order('reading_date', { ascending: false });
+        .order('reading_month', { ascending: false });
 
       if (billsError) throw billsError;
       setBills(billsData || []);
 
       // Calculate arrears (simplified logic: sum of pending payments + unpaid bills)
       const pendingPayments = (paymentsData || []).filter(p => p.status === 'pending' || p.status === 'overdue');
-      const unpaidBills = (billsData || []).filter(b => b.status === 'pending' || b.status === 'overdue');
+      const unpaidBills = (billsData || []).filter(b => b.status !== 'paid' && b.status !== 'completed');
       
       const totalArrears = 
         pendingPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) +
-        unpaidBills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+        unpaidBills.reduce((sum, b) => sum + (Number(b.total_bill ?? b.total_amount) || 0), 0);
         
       setArrears(totalArrears);
 
@@ -66,8 +66,8 @@ export const TenantBillingHistory: React.FC<TenantBillingHistoryProps> = ({ tena
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(amount);
+  const formatCurrency = (amount: number | null | undefined) => {
+    return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(amount) || 0);
   };
 
   const handleDownloadStatement = () => {
@@ -126,7 +126,7 @@ export const TenantBillingHistory: React.FC<TenantBillingHistoryProps> = ({ tena
               <div>
                 <p className="text-sm font-medium text-green-600 uppercase">Total Paid</p>
                 <h3 className="text-2xl font-bold text-green-700">
-                  {formatCurrency(payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0))}
+                  {formatCurrency(payments.filter(p => p.status === 'completed' || p.status === 'paid').reduce((sum, p) => sum + (Number(p.amount) || 0), 0))}
                 </h3>
               </div>
             </div>
@@ -142,7 +142,7 @@ export const TenantBillingHistory: React.FC<TenantBillingHistoryProps> = ({ tena
               <div>
                 <p className="text-sm font-medium text-blue-600 uppercase">Total Bills</p>
                 <h3 className="text-2xl font-bold text-blue-700">
-                  {formatCurrency(bills.reduce((sum, b) => sum + Number(b.total_amount), 0))}
+                  {formatCurrency(bills.reduce((sum, b) => sum + (Number(b.total_bill ?? b.total_amount) || 0), 0))}
                 </h3>
               </div>
             </div>
@@ -199,15 +199,15 @@ export const TenantBillingHistory: React.FC<TenantBillingHistoryProps> = ({ tena
                 {bills.slice(0, 5).map((bill) => (
                   <div key={bill.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
                     <div>
-                      <p className="font-medium text-slate-800 capitalize">{bill.utility_type} Bill</p>
+                      <p className="font-medium text-slate-800 capitalize">{bill.utility_type || 'Utility'} Bill</p>
                       <p className="text-xs text-slate-500">
-                        {format(new Date(bill.reading_date), 'MMM yyyy')} • {bill.current_reading - bill.previous_reading} units
+                        {format(new Date(bill.reading_month || bill.reading_date || bill.created_at), 'MMM yyyy')} • {(Number(bill.current_reading) || 0) - (Number(bill.previous_reading) || 0)} units
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-slate-800">{formatCurrency(bill.total_amount)}</p>
+                      <p className="font-bold text-slate-800">{formatCurrency(bill.total_bill ?? bill.total_amount)}</p>
                       <Badge className={
-                        bill.status === 'paid' ? 'bg-green-100 text-green-800' :
+                        bill.status === 'paid' || bill.status === 'completed' ? 'bg-green-100 text-green-800' :
                         bill.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-red-100 text-red-800'
                       }>

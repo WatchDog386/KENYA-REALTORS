@@ -209,7 +209,7 @@ const MaintenancePage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
-                {requests.filter((r) => r.status === "in_progress").length}
+                {requests.filter((r) => ["in_progress", "assigned"].includes(r.status)).length}
               </div>
                <p className="text-xs text-blue-500 mt-1 flex items-center">
                 <Wrench size={12} className="mr-1" /> Currently working
